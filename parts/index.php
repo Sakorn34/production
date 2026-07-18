@@ -44,6 +44,7 @@ $recent = $stock->getRecentMovements(8);
 <div class="grid-2">
     <div class="card">
         <h2>📋 อะไหล่คงเหลือ</h2>
+        <div class="table-wrap">
         <table>
             <thead>
                 <tr>
@@ -74,12 +75,14 @@ $recent = $stock->getRecentMovements(8);
                 <?php endforeach; ?>
             </tbody>
         </table>
+        </div>
     </div>
 
     <div>
         <?php if (!empty($lowStock)): ?>
         <div class="card">
             <h2>⚠️ แจ้งเตือนอะไหล่ใกล้หมด</h2>
+            <div class="table-wrap">
             <table>
                 <thead>
                     <tr>
@@ -98,7 +101,8 @@ $recent = $stock->getRecentMovements(8);
                     <?php endforeach; ?>
                 </tbody>
             </table>
-        </div>  
+            </div>
+        </div>
         <?php endif; ?>
 
         <div class="card">
@@ -106,6 +110,7 @@ $recent = $stock->getRecentMovements(8);
             <?php if (empty($recent)): ?>
                 <p class="empty-state">ยังไม่มีข้อมูล</p>
             <?php else: ?>
+            <div class="table-wrap">
             <table>
                 <thead>
                     <tr>
@@ -132,6 +137,7 @@ $recent = $stock->getRecentMovements(8);
                     <?php endforeach; ?>
                 </tbody>
             </table>
+            </div>
             <?php endif; ?>
         </div>
     </div>

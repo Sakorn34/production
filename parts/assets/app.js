@@ -1,0 +1,103 @@
+/**
+ * app.js — sidebar overlay (hover ขอบซ้าย) + modal S/N basket
+ */
+(function () {
+    'use strict';
+
+    var body = document.body;
+    var sidebar = document.getElementById('app-sidebar');
+    var edge = document.querySelector('.sidebar-edge');
+    var backdrop = document.getElementById('sidebar-backdrop');
+    var hoverTimer = null;
+
+    function showSidebar() {
+        body.classList.add('sidebar-hover');
+    }
+
+    function hideSidebar() {
+        body.classList.remove('sidebar-hover');
+    }
+
+    function scheduleHide() {
+        hoverTimer = setTimeout(hideSidebar, 280);
+    }
+
+    if (edge) {
+        edge.addEventListener('mouseenter', function () {
+            clearTimeout(hoverTimer);
+            showSidebar();
+        });
+        edge.addEventListener('click', function () {
+            clearTimeout(hoverTimer);
+            showSidebar();
+        });
+    }
+
+    if (sidebar) {
+        sidebar.addEventListener('mouseenter', function () {
+            clearTimeout(hoverTimer);
+            showSidebar();
+        });
+        sidebar.addEventListener('mouseleave', function () {
+            scheduleHide();
+        });
+    }
+
+    if (backdrop) {
+        backdrop.addEventListener('click', hideSidebar);
+    }
+
+    document.querySelectorAll('.sidebar .nav-links a').forEach(function (a) {
+        a.addEventListener('click', hideSidebar);
+    });
+
+    /* ─ Modal S/N basket ─ */
+    var modal = document.getElementById('sn-basket-modal');
+    var modalBody = document.getElementById('sn-basket-body');
+    var basePath = document.querySelector('link[href*="style.css"]');
+    var partsBase = basePath ? basePath.getAttribute('href').replace(/\/assets\/style\.css.*$/, '') : '';
+
+    function openBasket(sn) {
+        if (!modal || !modalBody || !sn) return;
+        modalBody.innerHTML = '<p class="text-muted text-center" style="padding:2rem">กำลังโหลด…</p>';
+        modal.hidden = false;
+        document.body.classList.add('modal-open');
+
+        fetch(partsBase + '/pages/history.php?ajax=sn_basket&sn=' + encodeURIComponent(sn))
+            .then(function (r) { return r.text(); })
+            .then(function (html) {
+                modalBody.innerHTML = html;
+            })
+            .catch(function () {
+                modalBody.innerHTML = '<p class="text-danger">โหลดข้อมูลไม่สำเร็จ</p>';
+            });
+    }
+
+    function closeBasket() {
+        if (!modal) return;
+        modal.hidden = true;
+        document.body.classList.remove('modal-open');
+    }
+
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-sn-basket]');
+        if (btn) {
+            e.preventDefault();
+            openBasket(btn.getAttribute('data-sn-basket'));
+            return;
+        }
+        if (e.target.closest('.modal-close') || e.target === modal) {
+            closeBasket();
+        }
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            if (body.classList.contains('sidebar-hover')) {
+                hideSidebar();
+            } else {
+                closeBasket();
+            }
+        }
+    });
+})();

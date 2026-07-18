@@ -52,18 +52,33 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'parts_list') {
     $rows = qr("SELECT p.*, COALESCE((SELECT SUM(pm.qty) FROM part_movements pm WHERE pm.part_id=p.id AND pm.direction='out'),0) used_qty
                 FROM parts p $w ORDER BY p.name LIMIT 300", $types, $params);
 
+    $partList = [];
+    while ($r = $rows->fetch_assoc()) {
+        $partList[] = $r;
+    }
+    $qtyMap = tech_parts_qty_map_for_parts($partList);
+
     $baseUrl = BASE_URL;
     ?>
     <form onsubmit="event.preventDefault();var qv=encodeURIComponent(this.q.value);showListModal('รายการอะไหล่','<?= h($baseUrl) ?>/parts.php?ajax=parts_list&q='+qv,'');" style="display:flex;gap:8px;margin-bottom:10px">
       <input name="q" type="text" value="<?= h($q) ?>" placeholder="ค้นหาชื่อ / รหัส / หมวด" style="flex:1;min-width:0">
       <button type="submit">ค้นหา</button>
     </form>
+    <p class="muted" style="font-size:12px;margin:0 0 8px">จำนวนคงเหลืออ่านจากระบบสต็อกกลาง (biton_tech_parts)</p>
     <table class="list">
-      <tr><th></th><th>อะไหล่</th><th>หมวด</th><th style="text-align:right">เบิกแล้ว</th><th>ร้านค้า</th><?= can('parts') ? '<th style="white-space:nowrap">การดำเนินการ</th>' : '' ?></tr>
+      <tr><th></th><th>อะไหล่</th><th>หมวด</th><th style="text-align:right">คงเหลือ</th><th style="text-align:right">เบิกแล้ว</th><th>ร้านค้า</th><?= can('parts') ? '<th style="white-space:nowrap">การดำเนินการ</th>' : '' ?></tr>
       <?php
       $hasRows = false;
-      while ($r = $rows->fetch_assoc()) {
+      foreach ($partList as $r) {
           $hasRows = true;
+          $codeKey = part_row_stock_code($r);
+          if ($codeKey === '') {
+              $codeKey = trim((string)($r['part_code'] ?? ''));
+          }
+          if ($codeKey === '') {
+              $codeKey = trim((string)($r['name'] ?? ''));
+          }
+          $stockQty = ($codeKey !== '' && isset($qtyMap[$codeKey])) ? (int)$qtyMap[$codeKey] : null;
           $qty = rtrim(rtrim(number_format((float)$r['used_qty'], 2), '0'), '.');
           $usedLink = (float)$r['used_qty'] > 0
               ? '<a href="javascript:void(0)" onclick="showListModal(' . h(json_encode('เครื่องที่เบิก: ' . $r['name'], JSON_UNESCAPED_UNICODE)) . ',' . h(json_encode($baseUrl . '/parts.php?part_used=' . $r['id'])) . ",'')\">"
@@ -74,9 +89,11 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'parts_list') {
         <td style="width:48px"><?= img_tag($r['icon_path'], $r['name']) ?></td>
         <td>
           <b><?= h($r['name']) ?></b>
-          <?= $r['part_code'] ? '<br><span class="muted">' . h($r['part_code']) . '</span>' : '' ?>
+          <?= $r['part_code'] ? '<br><span class="muted">Code Part : ' . h($r['part_code']) . '</span>' : '' ?>
+          <?= $r['stock_code'] ? '<br><span class="muted">ID Part : ' . h($r['stock_code']) . '</span>' : '' ?>
         </td>
         <td><?= h($r['category'] ?: '-') ?></td>
+        <td style="text-align:right"><?= $stockQty === null ? '<span class="muted" title="ไม่พบรหัสในระบบสต็อก">—</span>' : '<b>' . $stockQty . '</b>' . ($r['unit'] ? ' <span class="muted">' . h($r['unit']) . '</span>' : '') ?></td>
         <td style="text-align:right"><?= $usedLink ?></td>
         <td><?= h($r['dealer'] ?: '-') ?><?= $r['link'] ? ' · <a href="' . h($r['link']) . '" target="_blank">ลิงก์</a>' : '' ?></td>
         <?php if (can('parts')) { ?>
@@ -88,7 +105,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'parts_list') {
         </td>
         <?php } ?>
       </tr>
-      <?php } if (!$hasRows) echo '<tr><td colspan="6" class="muted" style="text-align:center;padding:16px">ไม่พบอะไหล่</td></tr>'; ?>
+      <?php } if (!$hasRows) echo '<tr><td colspan="' . (can('parts') ? 7 : 6) . '" class="muted" style="text-align:center;padding:16px">ไม่พบอะไหล่</td></tr>'; ?>
     </table>
     <?php
     exit;
@@ -175,7 +192,8 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'edit_part_form') {
       <input type="hidden" name="part_id"   value="<?= (int)$r['id'] ?>">
       <div class="formgrid form-narrow">
         <label>ชื่ออะไหล่</label><input type="text" name="name"      value="<?= h($r['name']) ?>" required>
-        <label>รหัส</label>      <input type="text" name="part_code" value="<?= h($r['part_code'] ?? '') ?>">
+        <label>รหัสชิ้นส่วน</label><input type="text" name="part_code" value="<?= h($r['part_code'] ?? '') ?>">
+        <label>รหัสสต็อก (P00001)</label><input type="text" name="stock_code" value="<?= h($r['stock_code'] ?? '') ?>" placeholder="ตรงกับ code ใน biton_tech_parts">
         <label>หมวด</label>      <input type="text" name="category"  value="<?= h($r['category'] ?? '') ?>">
         <label>หน่วย</label>     <input type="text" name="unit"      value="<?= h($r['unit'] ?? '') ?>" placeholder="ชิ้น, เมตร, ม้วน">
         <label>ร้านค้า</label>   <input type="text" name="dealer"    value="<?= h($r['dealer'] ?? '') ?>">
@@ -207,10 +225,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['move_part'])) {
         if ($a) $refId = (int)$a['id'];
     }
     $remark = trim(isset($_POST['remark']) ? $_POST['remark'] : '') ?: null;
-    q("INSERT INTO part_movements (part_id,moved_at,direction,qty,mode,ref_asset_id,made_by,remark)
-       VALUES (?,NOW(),'out',?,'เบิกใช้',?,?,?)", 'idiss',
-      [$pid, $qty, $refId, actor_name(), $remark]);
-    q("UPDATE parts SET stock_qty = stock_qty - ? WHERE id=?", 'di', [$qty, $pid]);
+    $out = tech_parts_stock_out_by_part_id($pid, $qty, 'เบิกใช้', actor_name(), $code !== '' ? $code : null);
+    if (!$out['ok']) {
+        flash_set($out['error'], 'err');
+        header('Location: ' . BASE_URL . '/parts.php');
+        exit;
+    }
+    q("INSERT INTO part_movements (part_id,moved_at,direction,qty,mode,ref_asset_id,made_by,remark,tech_stock_out_id)
+       VALUES (?,NOW(),'out',?,'เบิกใช้',?,?,?,?,?)", 'idissi',
+      [$pid, $qty, $refId, actor_name(), $remark, (int)($out['stock_out_id'] ?? 0)]);
+    $mid = (int)db()->insert_id;
+    if (!empty($out['stock_out_id']) && function_exists('production_link_stock_out')) {
+        production_link_stock_out(dbParts(), (int)$out['stock_out_id'], $mid, $code !== '' ? $code : null);
+    }
 
     flash_set('บันทึกการเบิกอะไหล่แล้ว');
     header('Location: ' . BASE_URL . '/parts.php'); exit;
@@ -220,7 +247,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['move_part'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_movement'])) {
     csrf_check(); require_can('parts');
     $mid = (int)$_POST['movement_id'];
-    $old = qr("SELECT part_id, qty, ref_asset_id FROM part_movements WHERE id=? AND direction='out'", 'i', [$mid])->fetch_assoc();
+    $old = qr("SELECT part_id, qty, ref_asset_id, tech_stock_out_id FROM part_movements WHERE id=? AND direction='out'", 'i', [$mid])->fetch_assoc();
     if (!$old) { flash_set('ไม่พบรายการที่จะแก้ไข', 'err'); header('Location: ' . BASE_URL . '/parts.php'); exit; }
     $qty = max(0.01, (float)$_POST['qty']);
     $refId = null;
@@ -231,10 +258,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_movement'])) {
     }
     $remark = trim(isset($_POST['remark']) ? $_POST['remark'] : '') ?: null;
     $diff = $qty - (float)$old['qty'];
-    if ($diff != 0) {
-        q("UPDATE parts SET stock_qty = stock_qty - ? WHERE id=?", 'di', [$diff, (int)$old['part_id']]);
+    if ($diff != 0 && empty($old['tech_stock_out_id'])) {
+        $adj = tech_parts_adjust_by_part_id((int)$old['part_id'], $diff, actor_name(), 'ปรับรายการเบิก');
+        if (!$adj['ok']) {
+            flash_set($adj['error'], 'err');
+            header('Location: ' . BASE_URL . '/parts.php');
+            exit;
+        }
     }
     q("UPDATE part_movements SET qty=?, ref_asset_id=?, remark=? WHERE id=?", 'dissi', [$qty, $refId, $remark, $mid]);
+    if (!empty($old['tech_stock_out_id']) && function_exists('production_sync_stock_out_from_movement')) {
+        production_sync_stock_out_from_movement($mid, $qty, $code !== '' ? $code : null, $remark);
+    }
     flash_set('แก้ไขรายการเบิกอะไหล่แล้ว');
     header('Location: ' . BASE_URL . '/parts.php'); exit;
 }
@@ -243,10 +278,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_movement'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_movement'])) {
     csrf_check(); require_can('parts');
     $mid = (int)$_POST['movement_id'];
-    $old = qr("SELECT part_id, qty FROM part_movements WHERE id=? AND direction='out'", 'i', [$mid])->fetch_assoc();
+    $old = qr("SELECT part_id, qty, tech_stock_out_id FROM part_movements WHERE id=? AND direction='out'", 'i', [$mid])->fetch_assoc();
     if ($old) {
-        q("UPDATE parts SET stock_qty = stock_qty + ? WHERE id=?", 'di', [(float)$old['qty'], (int)$old['part_id']]);
-        q("DELETE FROM part_movements WHERE id=?", 'i', [$mid]);
+        $synced = false;
+        if (!empty($old['tech_stock_out_id']) && function_exists('production_sync_delete_stock_out_from_movement')) {
+            $synced = production_sync_delete_stock_out_from_movement($mid);
+        }
+        if (!$synced) {
+            if (empty($old['tech_stock_out_id'])) {
+                $ret = tech_parts_stock_in_by_part_id((int)$old['part_id'], (float)$old['qty'], 'ลบรายการเบิก', actor_name());
+                if (!$ret['ok']) {
+                    flash_set($ret['error'], 'err');
+                    header('Location: ' . BASE_URL . '/parts.php');
+                    exit;
+                }
+            }
+            q("DELETE FROM part_movements WHERE id=?", 'i', [$mid]);
+        }
         flash_set('ลบรายการเบิกอะไหล่แล้ว');
     }
     header('Location: ' . BASE_URL . '/parts.php'); exit;
@@ -256,13 +304,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_movement'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_part'])) {
     csrf_check(); require_can('parts');
     $icon     = save_upload('icon', 'parts');
-    $stockQty = (isset($_POST['stock_qty']) && $_POST['stock_qty'] !== '') ? (float)$_POST['stock_qty'] : 0;
-    $stockMin = (isset($_POST['stock_min']) && $_POST['stock_min'] !== '') ? (float)$_POST['stock_min'] : null;
-    q("INSERT INTO parts (part_code,name,category,unit,stock_qty,stock_min,dealer,link,icon_path)
-       VALUES (?,?,?,?,?,?,?,?,?)", 'ssssddsss',
-      [trim($_POST['part_code']) ?: null, trim($_POST['name']),
+    q("INSERT INTO parts (part_code,stock_code,name,category,unit,stock_qty,stock_min,dealer,link,icon_path)
+       VALUES (?,?,?,?,?,0,?,?,?,?)", 'sssssdsss',
+      [trim($_POST['part_code']) ?: null, trim($_POST['stock_code'] ?? '') ?: null, trim($_POST['name']),
        trim($_POST['category']) ?: null, trim($_POST['unit']) ?: null,
-       $stockQty, $stockMin,
+       (isset($_POST['stock_min']) && $_POST['stock_min'] !== '') ? (float)$_POST['stock_min'] : null,
        trim($_POST['dealer']) ?: null, trim(isset($_POST['link']) ? $_POST['link'] : '') ?: null, $icon]);
     flash_set('เพิ่มอะไหล่ใหม่แล้ว');
     header('Location: ' . BASE_URL . '/parts.php'); exit;
@@ -276,16 +322,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_part'])) {
     $params = [
         trim($_POST['name']),
         trim($_POST['part_code']) ?: null,
+        trim($_POST['stock_code'] ?? '') ?: null,
         trim($_POST['category']) ?: null,
         trim($_POST['unit']) ?: null,
         trim($_POST['dealer']) ?: null,
         trim(isset($_POST['link']) ? $_POST['link'] : '') ?: null,
     ];
-    $types = 'ssssss';
+    $types = 'sssssss';
     if ($icon !== null) { $params[] = $icon; $types .= 's'; $iconSql = ', icon_path=?'; }
     else { $iconSql = ''; }
     $params[] = $id; $types .= 'i';
-    q("UPDATE parts SET name=?,part_code=?,category=?,unit=?,dealer=?,link=?$iconSql WHERE id=?", $types, $params);
+    q("UPDATE parts SET name=?,part_code=?,stock_code=?,category=?,unit=?,dealer=?,link=?$iconSql WHERE id=?", $types, $params);
     flash_set('แก้ไขข้อมูลอะไหล่แล้ว');
     header('Location: ' . BASE_URL . '/parts.php'); exit;
 }
@@ -325,12 +372,38 @@ $recent = qr("SELECT pm.id, pm.moved_at, pm.qty, pm.made_by, pm.remark,
 $groups = [];
 $groupOrder = [];
 while ($m = $recent->fetch_assoc()) {
-    $key = ($m['asset_id'] !== null) ? 'a' . $m['asset_id'] : 'x' . $m['id'];
+    // จัดกลุ่มเฉพาะรายการที่เบิกพร้อมกัน (timestamp เดียวกัน) — ไม่รวมประวัติเก่าของเครื่องเดียวกัน
+    $key = ($m['asset_id'] !== null)
+        ? 'a' . $m['asset_id'] . '@' . $m['moved_at']
+        : 'x' . $m['id'];
     if (!isset($groups[$key])) {
         $groups[$key] = [];
         $groupOrder[] = $key;
     }
     $groups[$key][] = $m;
+}
+
+/**
+ * สรุปชื่ออะไหล่สำหรับแถวที่มีหลายรายการในกลุ่มเดียวกัน
+ *
+ * @param array<int,array<string,mixed>> $items
+ * @return string HTML ที่ escape แล้ว
+ */
+function parts_group_part_label(array $items): string
+{
+    if (count($items) === 1) {
+        return h($items[0]['pname']);
+    }
+    $names = [];
+    foreach ($items as $item) {
+        $names[$item['pname']] = true;
+    }
+    $unique = array_keys($names);
+    if (count($unique) <= 3) {
+        return h(implode(', ', $unique));
+    }
+    return '<b>' . count($items) . ' รายการ</b><br><span class="muted" style="font-size:11px">'
+        . h(implode(', ', array_slice($unique, 0, 2))) . ' …</span>';
 }
 
 page_header('อะไหล่');
@@ -359,9 +432,11 @@ require __DIR__ . '/includes/list_search.php';
   <form method="post" class="formgrid form-narrow" enctype="multipart/form-data">
     <?= csrf_field() ?><input type="hidden" name="new_part" value="1">
     <label>ชื่ออะไหล่</label><input type="text" name="name" required>
-    <label>รหัส</label>      <input type="text" name="part_code">
+    <label>รหัสชิ้นส่วน</label><input type="text" name="part_code">
+    <label>รหัสสต็อก</label>  <input type="text" name="stock_code" placeholder="P00001 — ตรงกับ biton_tech_parts">
     <label>หมวด</label>      <input type="text" name="category">
     <label>หน่วย</label>     <input type="text" name="unit" placeholder="ชิ้น, เมตร, ม้วน">
+    <p class="muted full" style="margin:0;font-size:12px">จำนวนคงเหลือจัดการที่ระบบสต็อกอะไหล่ (biton_tech_parts) — รับเข้าที่แอป parts/</p>
     <label>ร้านค้า</label>   <input type="text" name="dealer">
     <label>ลิงก์</label>    <input type="url"  name="link" placeholder="https://...">
     <label>รูปอะไหล่</label><input type="file" name="icon" accept="image/*">
@@ -410,7 +485,11 @@ list_search_form([
       $items = $groups[$key];
       $first = $items[0];
       $extra = count($items) - 1;
-      $qty = rtrim(rtrim(number_format((float)$first['qty'], 2), '0'), '.');
+      $totalQty = 0.0;
+      foreach ($items as $gi) {
+          $totalQty += (float)$gi['qty'];
+      }
+      $qty = rtrim(rtrim(number_format($extra > 0 ? $totalQty : (float)$first['qty'], 2), '0'), '.');
       $assetCell = $first['asset_code']
           ? '<a href="' . BASE_URL . '/asset.php?id=' . $first['asset_id'] . '"><b>' . h($first['asset_code']) . '</b></a>'
           : '<span class="muted">ไม่ระบุ</span>';
@@ -418,19 +497,19 @@ list_search_form([
   <tr>
     <td style="white-space:nowrap"><?= dthai_full($first['moved_at']) ?></td>
     <td>
-      <?= h($first['pname']) ?>
+      <?= parts_group_part_label($items) ?>
       <?php if ($extra > 0) { ?>
-        <br><span class="muted" style="font-size:11px">และอีก <?= $extra ?> รายการ</span>
+        <br><span class="muted" style="font-size:11px">รวม <?= count($items) ?> ชิ้นในรอบนี้</span>
       <?php } ?>
       <?php if ($first['remark']) { ?><br><span class="muted"><?= h($first['remark']) ?></span><?php } ?>
     </td>
-    <td style="text-align:right"><?= $qty ?><?= $first['unit'] ? ' <span class="muted">' . h($first['unit']) . '</span>' : '' ?></td>
+    <td style="text-align:right"><?= $qty ?><?= $extra > 0 ? ' <span class="muted">รวม</span>' : ($first['unit'] ? ' <span class="muted">' . h($first['unit']) . '</span>' : '') ?></td>
     <td><?= h($first['product_name'] ?: '-') ?></td>
     <td>
       <?= $assetCell ?>
       <?php if ($extra > 0) { ?>
         <br><button type="button" class="btn btn-sm btn-line" style="margin-top:3px;font-size:11px"
-                    onclick="var r=document.getElementById('exp-<?= h($key) ?>');var b=this;if(r.style.display==='none'){r.style.display='';b.textContent='▲ ซ่อน'}else{r.style.display='none';b.textContent='▼ ดูเพิ่ม <?= $extra ?> รายการ'}">▼ ดูเพิ่ม <?= $extra ?> รายการ</button>
+                    onclick="var r=document.getElementById('exp-<?= h($key) ?>');var b=this;if(r.style.display==='none'){r.style.display='';b.textContent='▲ ซ่อน'}else{r.style.display='none';b.textContent='▼ ดูรายละเอียด <?= count($items) ?> รายการ'}">▼ ดูรายละเอียด <?= count($items) ?> รายการ</button>
       <?php } ?>
     </td>
     <td><?= h($first['made_by'] ?: '-') ?></td>
@@ -449,7 +528,7 @@ list_search_form([
     <td colspan="<?= can('parts') ? 7 : 6 ?>" style="padding:0 0 6px 24px;background:var(--hover,#f7f9fc)">
       <table class="list" style="margin:0">
         <tr><th>วันที่</th><th>อะไหล่</th><th style="text-align:right">จำนวน</th><th>โดย</th><th>หมายเหตุ</th><?= can('parts') ? '<th></th>' : '' ?></tr>
-        <?php foreach (array_slice($items, 1) as $sub) {
+        <?php foreach ($items as $sub) {
             $sq = rtrim(rtrim(number_format((float)$sub['qty'], 2), '0'), '.'); ?>
         <tr>
           <td style="white-space:nowrap"><?= dthai_full($sub['moved_at']) ?></td>

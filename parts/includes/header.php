@@ -2,20 +2,29 @@
 ob_start();
 session_start();
 
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/helpers.php';
+
+parts_localhost_bootstrap_session();
+
 if (!isset($_SESSION['profile'])) {
     session_unset();
     session_destroy();
-    header("Location: https://bit-online.net/bitlogin/index.php");
+    $loginUrl = parts_is_localhost_request()
+        ? 'http://localhost/production/finishgoogs_ma_update/login.php'
+        : 'https://bit-online.net/bitlogin/index.php';
+    header('Location: ' . $loginUrl);
     exit();
 }
 $profile = $_SESSION['profile'];
-$line_name = $profile->login_name;
+$line_name = $profile->login_name ?? 'User';
 
-require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/../includes/helpers.php';
 require_once __DIR__ . '/../includes/StockService.php';
 
 $db = getDB();
+require_once __DIR__ . '/../includes/production_sync.php';
+ensure_stock_production_sync_schema($db);
+
 $stock = new StockService($db);
 
 $currentPage = basename($_SERVER['PHP_SELF'], '.php');
@@ -31,7 +40,9 @@ $flash = getFlash();
     <link rel="stylesheet" href="<?= url('/assets/style.css') ?>">
 </head>
 <body>
-    <nav class="sidebar">
+    <div class="sidebar-edge" aria-hidden="true"></div>
+    <div class="sidebar-backdrop" id="sidebar-backdrop" aria-hidden="true"></div>
+    <nav class="sidebar" id="app-sidebar">
         <div class="sidebar-brand">
             <span class="brand-icon">📦</span>
             <span>Stock ช่าง</span>

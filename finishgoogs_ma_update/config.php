@@ -9,8 +9,55 @@ error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
 // ชี้ error_log ออกนอก web root แทนตำแหน่งเดิม (default ของ php.ini) กันไฟล์ log หลุดออกเว็บได้
 ini_set('error_log', 'D:/Ops/logs/php-error.log');
 
-define('BASE_URL', '/production');
+/**
+ * คืน BASE_URL ตาม environment — localhost ใช้ path จริงของ finishgoogs_ma_update
+ *
+ * @return string
+ */
+function app_base_url() {
+    $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+    $localIp = in_array($ip, ['127.0.0.1', '::1'], true);
+    $host = (string)($_SERVER['HTTP_HOST'] ?? '');
+    $localHost = (bool)preg_match('/^(localhost|127\.0\.0\.1)(:\d+)?$/', $host);
+    if ($localIp && $localHost) {
+        return '/production/finishgoogs_ma_update';
+    }
+    return '/production';
+}
+
+define('BASE_URL', app_base_url());
 define('APP_NAME', 'ระบบทะเบียนเครื่องและซ่อมบำรุง');
+
+/**
+ * โหลด secrets แบบ cache ต่อ request
+ *
+ * @return array<string,mixed>
+ */
+function db_secrets() {
+    static $c = null;
+    if ($c === null) {
+        $c = require 'D:/AppServ/secrets/production/finishgoogs.secrets.php';
+    }
+    return $c;
+}
+
+/**
+ * ตรวจว่า request มาจาก localhost dev หรือไม่
+ *
+ * @return bool
+ */
+function is_localhost_request() {
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
+    $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+    $localIp = in_array($ip, ['127.0.0.1', '::1'], true);
+    $host = (string)($_SERVER['HTTP_HOST'] ?? '');
+    $localHost = (bool)preg_match('/^(localhost|127\.0\.0\.1)(:\d+)?$/', $host);
+    $cached = $localIp && $localHost;
+    return $cached;
+}
 
 function dbStock()
 {
@@ -18,7 +65,7 @@ function dbStock()
 
     if (!$db) {
 
-        $c = require 'D:/AppServ/secrets/production/finishgoogs.secrets.php';
+        $c = db_secrets();
 
         $db = new mysqli(
             $c['stockparts']['host'],
@@ -36,10 +83,36 @@ function dbStock()
     return $db;
 }
 
+/**
+ * PDO ไปยัง biton_tech_parts — สต็อกอะไหล่จริง (single source of truth)
+ *
+ * @return PDO
+ */
+function dbParts() {
+    static $pdo = null;
+    if ($pdo === null) {
+        $c = db_secrets();
+        if (empty($c['techparts'])) {
+            die('ไม่พบการตั้งค่า techparts ใน finishgoogs.secrets.php');
+        }
+        $tp = $c['techparts'];
+        $host = (string)$tp['host'];
+        $dbName = (string)$tp['db'];
+        $dsn = 'mysql:host=' . $host . ';dbname=' . $dbName . ';charset=utf8mb4';
+        $pdo = new PDO($dsn, (string)$tp['user'], (string)$tp['pass'], [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES   => false,
+        ]);
+        $pdo->exec('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci');
+    }
+    return $pdo;
+}
+
 function db() {
     static $db = null;
     if ($db === null) {
-        $c = require 'D:/AppServ/secrets/production/finishgoogs.secrets.php';
+        $c = db_secrets();
 
         $db = new mysqli(
             $c['production']['host'],
@@ -200,6 +273,22 @@ define('SSO_LOGIN_URL', 'https://bit-online.net/bitlogin/bitlink.php');
 require_once __DIR__ . '/includes/session_profile.php';
 
 /**
+ * Dev localhost — auto-login เป็น Tom แทน SSO (ห้ามใช้บน production)
+ *
+ * @return void
+ */
+function ss_dev_localhost_bootstrap() {
+    if (!is_localhost_request() || ss_session_has_profile()) {
+        return;
+    }
+    $_SESSION['profile'] = (object)[
+        'login_name'   => 'Tom',
+        'display_name' => 'Tom',
+    ];
+}
+ss_dev_localhost_bootstrap();
+
+/**
  * คืนข้อมูลผู้ใช้จาก `$_SESSION['profile']` (ไม่พึ่งตาราง users)
  *
  * @return array{id:null,username:string,display_name:string,role:string}|null
@@ -249,6 +338,9 @@ function settings_admin_unlocked() {
     if (!user()) {
         return false;
     }
+    if (is_localhost_request() && strcasecmp(maintenance_new_profile_login_name() ?: '', 'Tom') === 0) {
+        return true;
+    }
     return !empty($_SESSION['settings_unlocked']);
 }
 
@@ -259,8 +351,13 @@ function settings_admin_unlocked() {
  */
 function require_login() {
     if (!ss_session_has_profile()) {
-        header('Location: ' . SSO_LOGIN_URL);
-        exit;
+        if (is_localhost_request()) {
+            ss_dev_localhost_bootstrap();
+        }
+        if (!ss_session_has_profile()) {
+            header('Location: ' . (is_localhost_request() ? BASE_URL . '/login.php' : SSO_LOGIN_URL));
+            exit;
+        }
     }
     ss_sync_session_employee_from_profile();
     ensure_field_input_mode_schema();
@@ -988,7 +1085,11 @@ function asset_delete_full($assetId) {
     if (!$a) {
         return false;
     }
-    q("UPDATE part_movements SET ref_asset_id=NULL WHERE ref_asset_id=?", 'i', [$assetId]);
+    if (function_exists('production_sync_delete_all_withdrawals_for_asset')) {
+        production_sync_delete_all_withdrawals_for_asset($assetId, $a['asset_code']);
+    } else {
+        q("UPDATE part_movements SET ref_asset_id=NULL WHERE ref_asset_id=?", 'i', [$assetId]);
+    }
     q("DELETE FROM spare_loans WHERE spare_asset_id=? OR replaces_asset_id=?", 'ii', [$assetId, $assetId]);
     q("DELETE FROM assets WHERE id=?", 'i', [$assetId]);
     share_delete_asset($a['asset_code']);
@@ -1947,3 +2048,5 @@ function effective_ma_form_fields($productId) {
     $cfg = product_config_fields($productId, 'ma');
     return $cfg ?: derive_ma_form_fields($productId);
 }
+
+require_once __DIR__ . '/includes/part_stock_bridge.php';

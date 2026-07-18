@@ -62,7 +62,9 @@ $products = $stock->getAllProducts();
                     <label>รายละเอียด</label>
                     <textarea name="description" rows="2"></textarea>
                 </div>
-                <button type="submit" class="btn btn-primary">สร้าง Set</button>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">สร้าง Set</button>
+                </div>
             </form>
         </div>
 
@@ -79,20 +81,24 @@ $products = $stock->getAllProducts();
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label>เลือกอะไหล่</label>
-                    <select name="product_id" required>
-                        <option value="">-- เลือกอะไหล่ --</option>
-                        <?php foreach ($products as $p): ?>
-                        <option value="<?= $p['id'] ?>"> <?= e($p['name']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>เลือกอะไหล่</label>
+                        <select name="product_id" required>
+                            <option value="">-- เลือกอะไหล่ --</option>
+                            <?php foreach ($products as $p): ?>
+                            <option value="<?= $p['id'] ?>"> <?= e($p['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>จำนวนต่อ 1 Set</label>
+                        <input type="number" name="quantity" min="1" value="1" required>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>จำนวนต่อ 1 Set</label>
-                    <input type="number" name="quantity" min="1" value="1" required>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">เพิ่มใน Set</button>
                 </div>
-                <button type="submit" class="btn btn-primary">เพิ่มใน Set</button>
             </form>
         </div>
     </div>
@@ -124,11 +130,11 @@ $products = $stock->getAllProducts();
                     <tr>
                         <td><?= e($item['name']) ?></td>
                         <td class="text-right"><?= formatNumber($item['quantity']) ?> <?= e($item['unit']) ?></td>
-                        <td class="text-right">
-                            <form method="POST" style="display:inline;">
+                        <td class="col-actions">
+                            <form method="POST" onsubmit="return confirm('ลบรายการนี้ออกจาก Set?')">
                                 <input type="hidden" name="action" value="remove_item">
                                 <input type="hidden" name="item_id" value="<?= $item['id'] ?>">
-                                <button type="submit" class="btn btn-outline" style="padding:0.2rem 0.5rem;font-size:0.8rem;">ลบ</button>
+                                <?= actionIcon('delete', '', 'ลบ') ?>
                             </form>
                         </td>
                     </tr>

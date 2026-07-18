@@ -71,10 +71,16 @@ $pages = max(1, (int)ceil($totalRows / $per));
 $off = ($page - 1) * $per;
 
 $rows = qr("SELECT a.id, a.asset_code, a.factory_serial, a.status, a.produced_at, a.current_fw_version,
-                   p.name pname, p.icon_path,
+                   p.name pname, p.icon_path, p.id product_id,
                    (SELECT pr.made_by FROM production_records pr
                     WHERE pr.asset_id=a.id AND pr.made_by IS NOT NULL AND pr.made_by<>''
-                    ORDER BY pr.recorded_at ASC, pr.id ASC LIMIT 1) recorder
+                    ORDER BY pr.recorded_at ASC, pr.id ASC LIMIT 1) recorder,
+                   (SELECT COUNT(*) FROM part_movements pm
+                    WHERE pm.ref_asset_id=a.id AND pm.direction='out') parts_out_cnt,
+                   (SELECT COUNT(*) FROM bom_items b WHERE b.product_id=a.product_id) bom_cnt,
+                   (SELECT COUNT(DISTINCT pm.part_id) FROM part_movements pm
+                    INNER JOIN bom_items b ON b.part_id=pm.part_id
+                    WHERE pm.ref_asset_id=a.id AND pm.direction='out' AND b.product_id=a.product_id) bom_out_cnt
             FROM assets a JOIN products p ON p.id=a.product_id
             $w ORDER BY {$sortSql[$sort]} LIMIT $per OFFSET $off", $types, $params);
 
@@ -137,13 +143,38 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
 </script>
 
 <table class="list">
-  <tr><th></th><th>หมายเลขสินค้า</th><th>รุ่น</th><th>สถานะ</th><th>ผู้บันทึกรายการ</th><th>ผลิตเมื่อ</th><th>FW</th></tr>
-  <?php while ($r = $rows->fetch_assoc()) { ?>
+  <tr><th></th><th>หมายเลขสินค้า</th><th>รุ่น</th><th>สถานะ</th><th>เบิกอะไหล่</th><th>ผู้บันทึกรายการ</th><th>ผลิตเมื่อ</th><th>FW</th></tr>
+  <?php while ($r = $rows->fetch_assoc()) {
+      $outCnt = (int)$r['parts_out_cnt'];
+      $bomCnt = (int)$r['bom_cnt'];
+      $bomOut = (int)$r['bom_out_cnt'];
+      if ($outCnt === 0) {
+          $pStatus = $bomCnt > 0 ? 'pending' : 'none';
+          $pLabel = $bomCnt > 0 ? 'ยังไม่เบิก' : '—';
+      } elseif ($bomCnt > 0 && $bomOut < $bomCnt) {
+          $pStatus = 'partial';
+          $pLabel = "เบิกแล้ว {$bomOut}/{$bomCnt}";
+      } else {
+          $pStatus = 'done';
+          $pLabel = "เบิกแล้ว {$outCnt} รายการ";
+      }
+      $partsAppUrl = parts_app_base_url() . '/pages/history.php';
+  ?>
   <tr>
     <td style="width:56px"><?= img_tag($r['icon_path'], $r['pname']) ?></td>
     <td><a href="<?= BASE_URL ?>/asset.php?id=<?= $r['id'] ?>"><b><?= h($r['asset_code']) ?></b></a></td>
     <td><?= h($r['pname']) ?></td>
     <td><?= status_badge($r['status']) ?></td>
+    <td>
+      <?php if ($pStatus === 'none') { ?>
+        <span class="muted">—</span>
+      <?php } else { ?>
+        <a href="<?= BASE_URL ?>/asset.php?id=<?= (int)$r['id'] ?>#parts-withdraw" class="parts-status parts-status-<?= h($pStatus) ?>" title="ดูรายละเอียดการเบิก"><?= h($pLabel) ?></a>
+        <?php if ($outCnt > 0) { ?>
+        <br><a href="<?= h($partsAppUrl) ?>" target="_blank" class="muted" style="font-size:11px" title="ดูใน Stock ช่าง">📦 Stock</a>
+        <?php } ?>
+      <?php } ?>
+    </td>
     <td><?= h($r['recorder'] ?: '-') ?></td>
     <td><?= dthai($r['produced_at']) ?></td>
     <td><?= h($r['current_fw_version'] ?: '-') ?></td>

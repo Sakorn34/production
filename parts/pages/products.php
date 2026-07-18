@@ -124,28 +124,35 @@ $products = $stock->getAllProducts();
                 <label>หน่วย</label>
                 <input type="text" name="unit" value="ชิ้น" required>
             </div>
-            <div class="form-group">
-                <label>จำนวนเริ่มต้น</label>
-                <input type="number" name="quantity" value="0" min="0" required>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>จำนวนเริ่มต้น</label>
+                    <input type="number" name="quantity" value="0" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label>สต็อกขั้นต่ำ (แจ้งเตือน)</label>
+                    <input type="number" name="min_stock" value="0" min="0" required>
+                </div>
             </div>
-            <div class="form-group">
-                <label>สต็อกขั้นต่ำ (แจ้งเตือน)</label>
-                <input type="number" name="min_stock" value="0" min="0" required>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>ราคา</label>
+                    <input type="number" name="price" value="0.00" min="0" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>ลิงก์สั่งซื้อ (URL)</label>
+                    <input type="url" name="purchase_link" placeholder="https://...">
+                </div>
             </div>
-            <div class="form-group">
-                <label>ราคา</label>
-                <input type="number" name="price" value="0.00" min="0" step="0.01">
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">เพิ่มอะไหล่</button>
             </div>
-            <div class="form-group">
-                <label>ลิงก์สั่งซื้อ (URL)</label>
-                <input type="url" name="purchase_link" placeholder="https://...">
-            </div>
-            <button type="submit" class="btn btn-primary">เพิ่มอะไหล่</button>
         </form>
     </div>
 
     <div class="card">
         <h2>รายการอะไหล่ทั้งหมด</h2>
+        <div class="table-wrap">
         <table>
             <thead>
                 <tr>
@@ -156,18 +163,18 @@ $products = $stock->getAllProducts();
                     <th class="text-right">คงเหลือ</th>
                     <th>หน่วย</th>
                     <th class="text-right">ขั้นต่ำ</th>
-                    <th>จัดการ</th>
+                    <th class="col-actions">จัดการ</th>
                 </tr>
             </thead>
             <tbody>
                 <?php foreach ($products as $p): ?>
                 <tr>
                     <td><?= e($p['code']) ?></td>
-                    <td><a href="<?= url('/pages/product-detail.php?id=' . (int) $p['id']) ?>"><?= e($p['name']) ?></a></td>
+                    <td><a href="<?= url('/pages/product-detail.php?id=' . (int) $p['id']) ?>" class="detail-link"><?= e($p['name']) ?></a></td>
                     <td><?= formatCurrency($p['price'] ?? null) ?></td>
                     <td>
                         <?php if (!empty($p['purchase_link'])): ?>
-                            <a href="<?= e($p['purchase_link']) ?>" target="_blank">สั่งซื้อ</a>
+                            <a href="<?= e($p['purchase_link']) ?>" target="_blank" class="detail-link">สั่งซื้อ</a>
                         <?php else: ?>
                             -
                         <?php endif; ?>
@@ -179,21 +186,21 @@ $products = $stock->getAllProducts();
                     </td>
                     <td><?= e($p['unit']) ?></td>
                     <td class="text-right"><?= formatNumber($p['min_stock']) ?></td>
-                    <td>
-                        <form method="POST" onsubmit="return confirm('ยืนยันการลบอะไหล่?');">
-                            <input type="hidden" name="action" value="delete">
-                            <input type="hidden" name="product_id" value="<?= (int) $p['id'] ?>">
-                            <!-- ผู้ลบ ถูกกำหนดอัตโนมัติตามผู้ใช้งาน (session) -->
-                             
-                            <div style="margin:0.25rem 0; font-size:0.9em;">ผู้ลบ: <b><?= e($line_name ?: '-') ?></b></div>
-                            <br>
-                            <button type="submit" class="btn btn-danger">🗑️</button>
-                        </form>
+                    <td class="col-actions">
+                        <div class="table-actions">
+                            <?= actionIcon('view', url('/pages/product-detail.php?id=' . (int) $p['id']), 'ดูรายละเอียด') ?>
+                            <form method="POST" onsubmit="return confirm('ยืนยันการลบอะไหล่ <?= e($p['name']) ?>?');">
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="product_id" value="<?= (int) $p['id'] ?>">
+                                <?= actionIcon('delete', '', 'ลบ') ?>
+                            </form>
+                        </div>
                     </td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
         </table>
+        </div>
     </div>
 </div>
 

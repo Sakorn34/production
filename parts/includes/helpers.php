@@ -35,9 +35,16 @@ function getFlash(): ?array
 function generateDocNo(PDO $db): string
 {
     $prefix = 'OUT-' . date('Ymd') . '-';
-    $stmt = $db->prepare("SELECT COUNT(*) FROM stock_out WHERE doc_no LIKE ?");
+    $inTx = $db->inTransaction();
+    $sql = 'SELECT doc_no FROM stock_out WHERE doc_no LIKE ? ORDER BY doc_no DESC LIMIT 1'
+        . ($inTx ? ' FOR UPDATE' : '');
+    $stmt = $db->prepare($sql);
     $stmt->execute([$prefix . '%']);
-    $seq = (int) $stmt->fetchColumn() + 1;
+    $last = $stmt->fetchColumn();
+    $seq = 1;
+    if ($last && preg_match('/-(\d{4})$/', (string) $last, $m)) {
+        $seq = (int) $m[1] + 1;
+    }
     return $prefix . str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
 }
 
@@ -111,4 +118,35 @@ function validateStockOutNote(?string $note): string
         throw new InvalidArgumentException('กรุณาเลือกหมายเหตุ');
     }
     return $note;
+}
+
+/**
+ * สร้างปุ่ม action แบบ icon (ดู / แก้ไข / ลบ)
+ *
+ * @param string $type view|edit|delete
+ * @param string $href URL สำหรับ view/edit
+ * @param string $title tooltip
+ * @param bool   $small ใช้ขนาดเล็กในตาราง
+ * @return string HTML
+ */
+function actionIcon(string $type, string $href = '', string $title = '', bool $small = true): string
+{
+    $icons = ['view' => '🔍', 'edit' => '✏️', 'delete' => '🗑️', 'basket' => '🧺'];
+    $classes = [
+        'view'   => 'btn-icon btn-icon-view',
+        'edit'   => 'btn-icon btn-icon-edit',
+        'delete' => 'btn-icon btn-icon-delete',
+        'basket' => 'btn-icon btn-icon-basket',
+    ];
+    $icon = $icons[$type] ?? '•';
+    $cls = ($small ? 'btn btn-sm ' : 'btn ') . ($classes[$type] ?? 'btn-icon');
+    $titleAttr = $title !== '' ? ' title="' . e($title) . '"' : '';
+
+    if ($type === 'delete') {
+        return '<button type="submit" class="' . $cls . '"' . $titleAttr . '>' . $icon . '</button>';
+    }
+    if ($type === 'basket') {
+        return '<button type="button" class="' . $cls . '"' . $titleAttr . ' data-sn-basket="' . e($href) . '">' . $icon . '</button>';
+    }
+    return '<a href="' . e($href) . '" class="' . $cls . '"' . $titleAttr . '>' . $icon . '</a>';
 }

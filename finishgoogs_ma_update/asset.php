@@ -103,11 +103,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_update'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_part_move'])) {
     csrf_check();
     $mid = (int)$_POST['record_id'];
-    $old = qr("SELECT part_id, qty, direction FROM part_movements WHERE id=? AND ref_asset_id=?", 'ii', [$mid, $id])->fetch_assoc();
+    $old = qr("SELECT part_id, qty, direction, tech_stock_out_id FROM part_movements WHERE id=? AND ref_asset_id=?", 'ii', [$mid, $id])->fetch_assoc();
     if ($old && $old['direction'] === 'out') {
-        q("UPDATE parts SET stock_qty = stock_qty + ? WHERE id=?", 'di', [(float)$old['qty'], (int)$old['part_id']]);
+        $synced = false;
+        if (!empty($old['tech_stock_out_id']) && function_exists('production_sync_delete_stock_out_from_movement')) {
+            $synced = production_sync_delete_stock_out_from_movement($mid);
+        }
+        if (!$synced) {
+            $ret = tech_parts_stock_in_by_part_id((int)$old['part_id'], (float)$old['qty'], 'ลบรายการเบิก (เครื่อง)', actor_name());
+            if (!$ret['ok']) {
+                flash_set($ret['error'], 'err');
+                header('Location: ' . BASE_URL . '/asset.php?id=' . $id);
+                exit;
+            }
+            q("DELETE FROM part_movements WHERE id=? AND ref_asset_id=?", 'ii', [$mid, $id]);
+        }
+    } elseif ($old) {
+        q("DELETE FROM part_movements WHERE id=? AND ref_asset_id=?", 'ii', [$mid, $id]);
     }
-    q("DELETE FROM part_movements WHERE id=? AND ref_asset_id=?", 'ii', [$mid, $id]);
     flash_set('ลบรายการเบิกอะไหล่แล้ว');
     header('Location: ' . BASE_URL . '/asset.php?id=' . $id); exit;
 }
@@ -125,10 +138,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_ma_asset'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_asset'])) {
     csrf_check();
     $delCode = $a['asset_code'];
-    q("UPDATE part_movements SET ref_asset_id=NULL WHERE ref_asset_id=?", 'i', [$id]);
-    q("DELETE FROM spare_loans WHERE spare_asset_id=? OR replaces_asset_id=?", 'ii', [$id, $id]);
-    q("DELETE FROM assets WHERE id=?", 'i', [$id]); // ประวัติที่เหลือลบตาม (ON DELETE CASCADE)
-    share_delete_asset($delCode); // sync ลบออกจากตารางแชร์ด้วย
+    if (!asset_delete_full($id)) {
+        flash_set('ลบเครื่องไม่สำเร็จ', 'err');
+        header('Location: ' . BASE_URL . '/asset.php?id=' . $id);
+        exit;
+    }
     flash_set("ลบเครื่อง $delCode และประวัติทั้งหมดเรียบร้อยแล้ว");
     header('Location: ' . BASE_URL . '/assets.php'); exit;
 }
@@ -172,6 +186,7 @@ require __DIR__ . "/includes/list_search.php";
 $tlData = asset_timeline_items($id);
 $tl = $tlData["tl"];
 $partsUsed = $tlData["partsUsed"];
+$partsSummary = asset_parts_withdraw_summary($id);
 
 /** ปุ่มแก้ไข/ลบรายการในประวัติ */
 function asset_tl_actions($e, $assetId) {
@@ -301,14 +316,65 @@ page_header('เครื่อง ' . $a['asset_code']);
   <form method="post" id="del-asset-form"><?= csrf_field() ?><input type="hidden" name="delete_asset" value="1"></form>
 </details>
 
-<?php if ($partsUsed) { ?>
+<?php if ($partAlertsHtml) { ?>
+<div style="margin-bottom:16px"><?= $partAlertsHtml ?></div>
+<?php } ?>
+
+<div id="parts-withdraw" style="margin-bottom:20px;padding:14px 16px;background:#fff;border:1px solid #dfe4ec;border-radius:8px">
+  <b style="font-size:14px">🔩 สถานะการเบิกอะไหล่</b>
+  <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-start">
+    <div>
+      <span class="muted" style="font-size:12px">สถานะ</span><br>
+      <?= asset_parts_status_badge($partsSummary) ?>
+      <?php if ($partsSummary['bom_count'] > 0) { ?>
+      <span class="muted" style="font-size:11px;margin-left:6px">BOM <?= (int)$partsSummary['bom_withdrawn'] ?>/<?= (int)$partsSummary['bom_count'] ?> ชนิด</span>
+      <?php } ?>
+    </div>
+    <?php if ($partsSummary['out_count'] > 0) { ?>
+    <div>
+      <span class="muted" style="font-size:12px">อ้างอิง Stock ช่าง</span><br>
+      <?php
+      $docShown = [];
+      foreach ($partsSummary['movements'] as $mv) {
+          $sid = (int)($mv['tech_stock_out_id'] ?? 0);
+          if ($sid <= 0 || isset($docShown[$sid])) continue;
+          $docShown[$sid] = true;
+          $doc = $partsSummary['stock_docs'][$sid] ?? null;
+          $docNo = $doc ? $doc['doc_no'] : ('#' . $sid);
+          echo '<span style="display:inline-block;margin:2px 6px 2px 0;font-size:12px"><code>' . h($docNo) . '</code></span>';
+      }
+      if (!$docShown) {
+          echo '<span class="muted" style="font-size:12px">movement ในระบบ (ยังไม่ link doc)</span>';
+      }
+      ?>
+    </div>
+    <div>
+      <a class="btn btn-sm btn-line" href="<?= h(parts_app_base_url() . '/pages/history.php') ?>" target="_blank">📦 ดูใน Stock ช่าง</a>
+      <a class="btn btn-sm btn-line" href="<?= h(BASE_URL . '/parts.php?rs=' . urlencode($a['asset_code'])) ?>">📋 ประวัติเบิก (production)</a>
+    </div>
+    <?php } elseif ($partsSummary['bom_count'] > 0) { ?>
+    <div><span class="muted" style="font-size:12px">รุ่นนี้มี BOM <?= (int)$partsSummary['bom_count'] ?> ชนิด — ยังไม่มีการเบิกอะไหล่สำหรับเครื่องนี้</span></div>
+    <?php } else { ?>
+    <div><span class="muted" style="font-size:12px">ไม่มี BOM กำหนดไว้สำหรับรุ่นนี้</span></div>
+    <?php } ?>
+  </div>
+</div>
+
+<?php if ($partsUsed) {
+    $stockCodeMap = [];
+    $scRes = qr('SELECT name, stock_code FROM parts WHERE stock_code IS NOT NULL AND TRIM(stock_code)<>""');
+    while ($scRow = $scRes->fetch_assoc()) {
+        $stockCodeMap[$scRow['name']] = $scRow['stock_code'];
+    }
+?>
 <h2>🔩 อะไหล่ที่เบิกใช้กับเครื่องนี้</h2>
-<table class="list" style="max-width:520px; margin-bottom:20px">
-  <tr><th>อะไหล่</th><th style="text-align:right">จำนวนที่เบิกใช้</th></tr>
+<table class="list" style="max-width:640px; margin-bottom:20px">
+  <tr><th>อะไหล่</th><th style="text-align:right">จำนวนที่เบิกใช้</th><th>รหัส Stock</th></tr>
   <?php foreach ($partsUsed as $pu) { ?>
   <tr>
     <td><?= h($pu['name']) ?></td>
-    <td style="text-align:right"><b><?= qty_fmt($pu["qty"]) ?></b><?= $pu['unit'] ? ' <span class="muted">' . h($pu['unit']) . '</span>' : '' ?></td>
+    <td style="text-align:right"><b><?= qty_fmt($pu["qty"]) ?></b><?= $pu['unit'] ? ' ' . h($pu['unit']) : '' ?></td>
+    <td class="muted"><?= h($stockCodeMap[$pu['name']] ?? '—') ?></td>
   </tr>
   <?php } ?>
 </table>

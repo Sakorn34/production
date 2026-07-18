@@ -286,13 +286,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         q("INSERT INTO stock_movements (asset_id,moved_at,direction,reason,made_by) VALUES (?,NOW(),'in','ผลิตเสร็จเข้าคลัง',?)",
           'is', [$r['asset_id'], $bomBy]);
-        // เบิกชุดอะไหล่ประจำรุ่นอัตโนมัติ (ผูกกับเครื่องนี้)
+        // เบิกชุดอะไหล่ประจำรุ่นอัตโนมัติ (ผูกกับเครื่องนี้) — ตัดสต็อกจริงที่ biton_tech_parts
+        $deductedThisUnit = [];
         foreach ($bomList as $bi) {
             $bq = (float)$bi['qty_per_unit'];
-            q("INSERT INTO part_movements (part_id,moved_at,direction,qty,mode,ref_asset_id,made_by,remark)
-               VALUES (?,NOW(),'out',?,?,?,?,NULL)", 'idsis',
-              [(int)$bi['part_id'], $bq, 'เบิกอัตโนมัติ (ชุดอะไหล่รุ่น)', $r['asset_id'], $bomBy]);
-            q("UPDATE parts SET stock_qty = stock_qty - ? WHERE id=?", 'di', [$bq, (int)$bi['part_id']]);
+            $partId = (int)$bi['part_id'];
+            $bomAssetCode = null;
+            if (!empty($r['asset_id'])) {
+                $acRow = qr('SELECT asset_code FROM assets WHERE id=?', 'i', [(int)$r['asset_id']])->fetch_assoc();
+                $bomAssetCode = $acRow['asset_code'] ?? null;
+            }
+            $out = tech_parts_stock_out_by_part_id($partId, $bq, 'เบิกผลิต', $bomBy, $bomAssetCode);
+            if (!$out['ok']) {
+                foreach (array_reverse($deductedThisUnit) as $rev) {
+                    tech_parts_stock_in_by_part_id($rev['part_id'], $rev['qty'], 'ยกเลิกเบิกอัตโนมัติ', $bomBy);
+                }
+                $err = $out['error'];
+                break 2;
+            }
+            $deductedThisUnit[] = ['part_id' => $partId, 'qty' => (int)($out['qty'] ?? tech_parts_qty_to_int($bq))];
+            q("INSERT INTO part_movements (part_id,moved_at,direction,qty,mode,ref_asset_id,made_by,remark,tech_stock_out_id)
+               VALUES (?,NOW(),'out',?,?,?,?,NULL,?)", 'idsisi',
+              [$partId, $bq, 'เบิกอัตโนมัติ (ชุดอะไหล่รุ่น)', $r['asset_id'], $bomBy, (int)($out['stock_out_id'] ?? 0)]);
+            $bomMid = (int)db()->insert_id;
+            if (!empty($out['stock_out_id']) && function_exists('production_link_stock_out')) {
+                $ac = qr('SELECT asset_code FROM assets WHERE id=?', 'i', [$r['asset_id']])->fetch_assoc();
+                production_link_stock_out(dbParts(), (int)$out['stock_out_id'], $bomMid, $ac['asset_code'] ?? null);
+            }
         }
         if ($fw !== '') q("UPDATE assets SET current_fw_version=? WHERE id=?", 'si', [$fw, $r['asset_id']]);
         if ($lot !== '') q("UPDATE assets SET lot_label=? WHERE id=?", 'si', [$lot, $r['asset_id']]);

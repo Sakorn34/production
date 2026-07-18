@@ -1,23 +1,33 @@
 <?php
- 
+
 $pageTitle = 'รับเข้า';
 require_once __DIR__ . '/../includes/header.php';
 
+$editIn = isset($_GET['edit_in']) ? (int) $_GET['edit_in'] : 0;
+$editRow = $editIn ? $stock->getStockInRow($editIn) : null;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        // ensure stock_in.received_by column exists
-        try {
+        if (isset($_POST['delete_stock_in'])) {
+            $stock->deleteStockIn((int) $_POST['id']);
+            flash('success', 'ลบรายการรับเข้าแล้ว');
+        } elseif (isset($_POST['update_stock_in'])) {
+            $stock->updateStockIn(
+                (int) $_POST['id'],
+                (int) $_POST['quantity'],
+                trim($_POST['note'] ?? '') ?: null
+            );
+            flash('success', 'แก้ไขรายการรับเข้าแล้ว');
+        } else {
             ensureStockInColumns($db);
-        } catch (Exception $ex) {
-            // ignore migration error
+            $stock->stockIn(
+                (int) $_POST['product_id'],
+                (int) $_POST['quantity'],
+                trim($_POST['note'] ?? '') ?: null,
+                $line_name
+            );
+            flash('success', 'บันทึกรับเข้าเรียบร้อย');
         }
-        $stock->stockIn(
-            (int) $_POST['product_id'],
-            (int) $_POST['quantity'],
-            trim($_POST['note'] ?? '') ?: null,
-            $line_name
-        );
-        flash('success', 'บันทึกรับเข้าเรียบร้อย');
     } catch (Exception $e) {
         flash('error', $e->getMessage());
     }
@@ -25,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $products = $stock->getAllProducts();
-$history = $stock->getStockInHistory(20);
+$history = $stock->getStockInHistory(30);
 ?>
 
 <div class="page-header">
@@ -35,7 +45,31 @@ $history = $stock->getStockInHistory(20);
 
 <div class="grid-2">
     <div class="card">
-        <h2>บันทึกรับเข้า</h2>
+        <h2><?= $editRow ? 'แก้ไขรายการรับเข้า' : 'บันทึกรับเข้า' ?></h2>
+        <?php if ($editRow): ?>
+        <form method="POST">
+            <input type="hidden" name="update_stock_in" value="1">
+            <input type="hidden" name="id" value="<?= (int) $editRow['id'] ?>">
+            <div class="form-group">
+                <label>อะไหล่</label>
+                <input type="text" value="<?= e($editRow['name']) ?>" readonly>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>จำนวนรับเข้า</label>
+                    <input type="number" name="quantity" min="1" value="<?= (int) $editRow['quantity'] ?>" required>
+                </div>
+                <div class="form-group">
+                    <label>หมายเหตุ</label>
+                    <textarea name="note" rows="2"><?= e($editRow['note'] ?? '') ?></textarea>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-success">บันทึกการแก้ไข</button>
+                <a href="<?= url('/pages/stock-in.php') ?>" class="btn btn-outline">ยกเลิก</a>
+            </div>
+        </form>
+        <?php else: ?>
         <form method="POST">
             <div class="form-group">
                 <label>เลือกอะไหล่</label>
@@ -48,16 +82,21 @@ $history = $stock->getStockInHistory(20);
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="form-group">
-                <label>จำนวนรับเข้า</label>
-                <input type="number" name="quantity" min="1" required>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>จำนวนรับเข้า</label>
+                    <input type="number" name="quantity" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label>หมายเหตุ</label>
+                    <textarea name="note" rows="2" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea>
+                </div>
             </div>
-            <div class="form-group">
-                <label>หมายเหตุ</label>
-                <textarea name="note" rows="2" placeholder="รายล่ะเอียด.."></textarea>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-success">บันทึกรับเข้า</button>
             </div>
-            <button type="submit" class="btn btn-success">บันทึกรับเข้า</button>
         </form>
+        <?php endif; ?>
     </div>
 
     <div class="card">
@@ -65,6 +104,7 @@ $history = $stock->getStockInHistory(20);
         <?php if (empty($history)): ?>
             <p class="empty-state">ยังไม่มีประวัติ</p>
         <?php else: ?>
+        <div class="table-wrap">
         <table>
             <thead>
                 <tr>
@@ -73,6 +113,7 @@ $history = $stock->getStockInHistory(20);
                     <th class="text-right">จำนวน</th>
                     <th>หมายเหตุ</th>
                     <th>วันที่</th>
+                    <th class="col-actions">จัดการ</th>
                 </tr>
             </thead>
             <tbody>
@@ -83,10 +124,21 @@ $history = $stock->getStockInHistory(20);
                     <td class="text-right text-success">+<?= formatNumber($h['quantity']) ?> <?= e($h['unit']) ?></td>
                     <td class="text-muted"><?= e($h['note'] ?: '-') ?></td>
                     <td class="text-muted"><?= formatDate($h['created_at']) ?></td>
+                    <td class="col-actions">
+                        <div class="table-actions">
+                            <?= actionIcon('edit', url('/pages/stock-in.php?edit_in=' . (int) $h['id']), 'แก้ไข') ?>
+                            <form method="POST" onsubmit="return confirm('ลบรายการรับเข้านี้?')">
+                                <input type="hidden" name="delete_stock_in" value="1">
+                                <input type="hidden" name="id" value="<?= (int) $h['id'] ?>">
+                                <?= actionIcon('delete', '', 'ลบ') ?>
+                            </form>
+                        </div>
+                    </td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
         </table>
+        </div>
         <?php endif; ?>
     </div>
 </div>

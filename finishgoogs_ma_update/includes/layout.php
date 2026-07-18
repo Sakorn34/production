@@ -34,13 +34,13 @@ function page_header($title, $showBack = true) {
 }</style>
 </head>
 <body>
+<div class="sidebar-edge" id="fg-sidebar-edge" aria-hidden="true"></div>
 <?php
 $brandLogo = setting('brand_logo');
 $side = setting('sidebar_side', 'left');
 $sideClass = $side === 'right' ? ' sidebar-right' : ($side === 'top' ? ' sidebar-top' : '');
 ?>
-<div class="app<?= $sideClass ?>">
-  <script>try{ if(localStorage.getItem('navHidden')==='1') document.currentScript.parentNode.classList.add('nav-hidden'); }catch(e){}</script>
+<div class="app nav-hidden<?= $sideClass ?>">
   <aside class="sidebar">
     <div class="brand">
       <?php if ($brandLogo) { ?><img src="<?= h(img_url($brandLogo)) ?>" alt="โลโก้" class="brand-logo"><?php } else { ?><?= h(setting('app_name', APP_NAME)) ?><?php } ?>
@@ -68,10 +68,9 @@ $sideClass = $side === 'right' ? ' sidebar-right' : ($side === 'top' ? ' sidebar
       </div>
     </div>
   </aside>
-  <div class="nav-backdrop" onclick="document.querySelector('.app').classList.remove('nav-open')"></div>
+  <div class="nav-backdrop" id="fg-nav-backdrop" aria-hidden="true"></div>
   <main class="content">
     <div class="pagehead">
-      <button type="button" class="nav-toggle" onclick="toggleNav()" title="ซ่อน/แสดงเมนู">☰</button>
       <?php if ($showBack && $cur !== 'index.php') { ?>
         <a href="javascript:history.back()" class="btn btn-line btn-sm backbtn">← ย้อนกลับ</a>
       <?php } ?>
@@ -121,19 +120,46 @@ function page_footer() {
 
 <script>
 function closeOverlay(id){ document.getElementById(id).hidden = true; }
-function toggleNav(){
+(function(){
   var app = document.querySelector('.app');
-  if (window.matchMedia('(max-width: 800px)').matches) { app.classList.toggle('nav-open'); return; } // จอแคบ: เปิด/ปิดลิ้นชักเมนู
-  app.classList.toggle('nav-hidden');
-  try { localStorage.setItem('navHidden', app.classList.contains('nav-hidden') ? '1' : '0'); } catch(e){}
-}
-// ปิดแถบเมนูเมื่อกดเลือกเมนู (เปิดใหม่ด้วยปุ่ม ☰)
-document.querySelectorAll('.sidebar nav a').forEach(function(a){
-  a.addEventListener('click', function(){
-    document.querySelector('.app').classList.remove('nav-open');
-    if (!window.matchMedia('(max-width: 800px)').matches) { try { localStorage.setItem('navHidden', '1'); } catch(e){} }
+  var edge = document.getElementById('fg-sidebar-edge');
+  var sidebar = app && app.querySelector('.sidebar');
+  var backdrop = document.getElementById('fg-nav-backdrop');
+  var timer = null;
+  if (!app || !edge || !sidebar) return;
+  if (app.classList.contains('sidebar-top')) return;
+
+  function showNav(){
+    clearTimeout(timer);
+    app.classList.add('nav-hover');
+    app.classList.remove('nav-hidden');
+  }
+  function hideNav(){
+    app.classList.remove('nav-hover', 'nav-open');
+    app.classList.add('nav-hidden');
+  }
+  function scheduleHide(){
+    timer = setTimeout(hideNav, 280);
+  }
+
+  edge.addEventListener('mouseenter', showNav);
+  edge.addEventListener('click', showNav);
+  sidebar.addEventListener('mouseenter', function(){ clearTimeout(timer); showNav(); });
+  sidebar.addEventListener('mouseleave', scheduleHide);
+  edge.addEventListener('mouseleave', function(e){
+    if (sidebar.contains(e.relatedTarget)) return;
+    scheduleHide();
   });
-});
+  if (backdrop) backdrop.addEventListener('click', hideNav);
+
+  document.querySelectorAll('.sidebar nav a').forEach(function(a){
+    a.addEventListener('click', hideNav);
+  });
+
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && app.classList.contains('nav-hover')) hideNav();
+  });
+})();
 
 // ฟิลเตอร์ค้นหา: เลือก dropdown แล้วค้นหาทันที ไม่ต้องกดปุ่ม
 document.querySelectorAll('form.filter select').forEach(function(s){
