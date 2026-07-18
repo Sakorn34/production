@@ -89,6 +89,32 @@
   .toc li{margin:4px 0 4px 18px}
 
   footer{margin-top:56px;text-align:center;color:var(--muted);font-size:12.5px}
+
+  /* ---- feedback widget ---- */
+  .fb{background:#fff;border:1px dashed #b6c2d6;border-radius:var(--radius);padding:14px 18px;margin:10px 0 26px}
+  .fb .fb-title{font-size:13px;font-weight:700;color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .fb .fb-title::before{content:'🗳️'}
+  .fb .fb-choices{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .fb .fb-choices label{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--line);border-radius:999px;padding:6px 14px;font-size:13.5px;cursor:pointer;user-select:none;background:#fafbfd;transition:.15s}
+  .fb .fb-choices label:hover{border-color:#94a3b8}
+  .fb .fb-choices input{accent-color:var(--accent)}
+  .fb .fb-choices label.sel-new{border-color:var(--ok);background:#f0fdf4;color:#15803d;font-weight:600}
+  .fb .fb-choices label.sel-adjust{border-color:var(--warn);background:#fffbeb;color:#a16207;font-weight:600}
+  .fb .fb-choices label.sel-keep{border-color:var(--bad);background:#fef2f2;color:#b91c1c;font-weight:600}
+  .fb textarea{width:100%;min-height:64px;border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-family:inherit;font-size:13.5px;resize:vertical;background:#fafbfd}
+  .fb textarea:focus{outline:none;border-color:var(--accent);background:#fff}
+  .fb .fb-saved{font-size:11.5px;color:var(--ok);margin-top:5px;min-height:16px;transition:opacity .4s}
+
+  /* ---- summary panel ---- */
+  .sumpanel{background:#0f172a;color:#e2e8f0;border-radius:var(--radius);padding:22px 24px;margin:20px 0}
+  .sumpanel h3{color:#fff;margin-top:0}
+  .sumpanel .sumbtns{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+  .sumpanel button{font-family:inherit;font-size:13.5px;font-weight:600;border:none;border-radius:8px;padding:9px 18px;cursor:pointer}
+  .sumpanel button.primary{background:#38bdf8;color:#0f172a}
+  .sumpanel button.ghost{background:rgba(255,255,255,.12);color:#e2e8f0}
+  .sumpanel button:hover{filter:brightness(1.1)}
+  .sumpanel pre{background:rgba(255,255,255,.07);border-radius:8px;padding:12px 14px;font-size:12.5px;white-space:pre-wrap;max-height:320px;overflow:auto;margin-top:8px;font-family:Consolas,monospace;display:none}
+  .sumpanel .cnt{font-size:13px;color:#94a3b8}
 </style>
 </head>
 <body>
@@ -227,6 +253,8 @@
   </div>
 </div>
 
+<div class="fb" data-topic="1.1 Sidebar สีเดียวกัน + ไอคอน SVG ชุดเดียว"></div>
+
 <h3>1.2 ฟอนต์ไทย: parts ยังใช้ Segoe UI ทำให้น้ำหนัก/ความสูงบรรทัดไม่เท่ากัน</h3>
 <div class="ba">
   <div class="pane before">
@@ -246,6 +274,8 @@
     </div>
   </div>
 </div>
+
+<div class="fb" data-topic="1.2 ฟอนต์ไทย Noto Sans Thai เดียวกันทั้ง 2 ระบบ"></div>
 
 <h3>1.3 Badge สถานะ: คนละทรง คนละภาษาสี</h3>
 <div class="ba">
@@ -274,6 +304,8 @@
     </div>
   </div>
 </div>
+
+<div class="fb" data-topic="1.3 Badge สถานะทรง pill + ชุดสีเดียวกัน"></div>
 
 <!-- ================================================================ -->
 <h2 id="p2"><span class="part">Part 2</span>finishgoogs_ma_update — จุดที่ไม่บาลานซ์ภายในตัวเอง</h2>
@@ -320,6 +352,8 @@
   </div>
 </div>
 
+<div class="fb" data-topic="F1+F2 Dashboard tiles การ์ดขาว + แถบสีความหมาย"></div>
+
 <h3>F5 · ข้อเสนอเสริมใน appearance.php</h3>
 <div class="card">
   <ul class="tick">
@@ -327,6 +361,8 @@
     <li>ให้ preset "vibrant" ปรับ PALETTE ของกราฟให้เข้มขึ้นเล็กน้อยเมื่อพื้นหลังเป็นสีอ่อน</li>
   </ul>
 </div>
+
+<div class="fb" data-topic="F5 ตัวเช็ค contrast AA ใน appearance.php"></div>
 
 <!-- ================================================================ -->
 <h2 id="p3"><span class="part">Part 3</span>parts — จุดที่ไม่บาลานซ์ภายในตัวเอง</h2>
@@ -359,6 +395,8 @@
   <p class="note">token ที่เหลือของ parts (shadow, radius, success/warning/danger) คงไว้ตามเดิม — เป็นชุดที่ดีอยู่แล้ว และจะถูกยกไปให้ระบบหลักใช้ด้วยใน Part 4</p>
 </div>
 
+<div class="fb" data-topic="P1 parts รับธีมสี/ฟอนต์จาก site_settings ของระบบหลัก"></div>
+
 <h3>P3 · เมนูเบิกออก — ก่อน / หลัง</h3>
 <div class="ba">
   <div class="pane before">
@@ -382,6 +420,8 @@
     </div>
   </div>
 </div>
+
+<div class="fb" data-topic="P3 แยกไอคอนเมนูเบิก Set / เบิกรายชิ้น"></div>
 
 <!-- ================================================================ -->
 <h2 id="p4"><span class="part">Part 4</span>Design Token กลาง + ลำดับการลงมือ</h2>
@@ -413,6 +453,8 @@
 }</div>
 </div>
 
+<div class="fb" data-topic="4.1 ชุด Design Token กลางที่เสนอ"></div>
+
 <h3>4.2 ลำดับการลงมือ (เรียงตามผลลัพธ์ต่อแรงที่ลง)</h3>
 <div class="card">
   <table class="cmp">
@@ -428,11 +470,129 @@
   <p class="note">ข้อ 1–4 รวมกันคือ "ทำให้ 2 ระบบเป็นครอบครัวเดียวกัน" — แนะนำทำเป็นชุดแรกชุดเดียว ข้อ 5–7 เป็นรอบเก็บรายละเอียด</p>
 </div>
 
+<div class="fb" data-topic="4.2 ลำดับการลงมือ 7 ข้อ"></div>
+
+<!-- ================================================================ -->
+<h2 id="p5"><span class="part">สรุปผล</span>ความเห็นของคุณทั้งหมด</h2>
+<p class="lede">คำตอบทุกข้อบันทึกอัตโนมัติในเบราว์เซอร์เครื่องนี้ (localStorage) — ปิดแล้วเปิดใหม่คำตอบยังอยู่ กดปุ่มด้านล่างเพื่อคัดลอกสรุปไปส่งต่อได้เลย</p>
+<div class="sumpanel">
+  <h3 style="font-size:16px">📋 สรุปความเห็น</h3>
+  <p class="cnt" id="sum-count">ยังไม่ได้เลือก</p>
+  <div class="sumbtns">
+    <button class="primary" id="btn-copy">คัดลอกสรุปทั้งหมด</button>
+    <button class="ghost" id="btn-show">แสดง/ซ่อนสรุป</button>
+    <button class="ghost" id="btn-dl">ดาวน์โหลด .txt</button>
+    <button class="ghost" id="btn-clear" style="color:#fca5a5">ล้างคำตอบทั้งหมด</button>
+  </div>
+  <pre id="sum-pre"></pre>
+</div>
+
 </div>
 
 <footer>
   UX/UI Review · 19 กรกฎาคม 2026 · ไฟล์นี้อยู่ที่ <b>production/ux-review/</b> (โฟลเดอร์เอกสารภายใน — ไม่ต้อง deploy ขึ้น server)
 </footer>
+
+<script>
+(function(){
+  var KEY='uxreview-2026-07-19';
+  var CHOICES=[
+    {val:'new',    label:'👍 ใช้แบบใหม่เลย',      cls:'sel-new'},
+    {val:'adjust', label:'✏️ ใช้ แต่ขอปรับเพิ่ม',  cls:'sel-adjust'},
+    {val:'keep',   label:'❌ คงแบบเดิมไว้ก่อน',   cls:'sel-keep'}
+  ];
+  var LABELS={new:'ใช้แบบใหม่เลย',adjust:'ใช้ แต่ขอปรับเพิ่ม',keep:'คงแบบเดิมไว้ก่อน'};
+
+  function load(){try{return JSON.parse(localStorage.getItem(KEY))||{}}catch(e){return{}}}
+  function save(d){localStorage.setItem(KEY,JSON.stringify(d))}
+  var data=load();
+
+  var blocks=document.querySelectorAll('.fb');
+  blocks.forEach(function(fb,i){
+    var topic=fb.getAttribute('data-topic');
+    var saved=data[topic]||{};
+    var html='<div class="fb-title">ความเห็นของคุณ — '+topic+'</div><div class="fb-choices">';
+    CHOICES.forEach(function(c){
+      var checked=saved.choice===c.val?' checked':'';
+      html+='<label class="'+(saved.choice===c.val?c.cls:'')+'"><input type="radio" name="fb'+i+'" value="'+c.val+'"'+checked+'>'+c.label+'</label>';
+    });
+    html+='</div><textarea placeholder="ความคิดเห็นเพิ่มเติม / สิ่งที่อยากให้ปรับในหัวข้อนี้...">'+(saved.comment||'')+'</textarea><div class="fb-saved"></div>';
+    fb.innerHTML=html;
+
+    var savedMsg=fb.querySelector('.fb-saved');
+    function persist(){
+      var choice=(fb.querySelector('input:checked')||{}).value||null;
+      var comment=fb.querySelector('textarea').value.trim();
+      if(choice||comment){data[topic]={choice:choice,comment:comment}}else{delete data[topic]}
+      save(data);updateCount();
+      savedMsg.textContent='✓ บันทึกแล้ว';savedMsg.style.opacity=1;
+      clearTimeout(savedMsg._t);savedMsg._t=setTimeout(function(){savedMsg.style.opacity=0},1500);
+      fb.querySelectorAll('.fb-choices label').forEach(function(l){
+        var input=l.querySelector('input');
+        l.className=input.checked?CHOICES.find(function(c){return c.val===input.value}).cls:'';
+      });
+    }
+    fb.querySelectorAll('input').forEach(function(r){r.addEventListener('change',persist)});
+    var ta=fb.querySelector('textarea');var t;
+    ta.addEventListener('input',function(){clearTimeout(t);t=setTimeout(persist,600)});
+    ta.addEventListener('blur',persist);
+  });
+
+  function buildSummary(){
+    var lines=['สรุปความเห็น UX/UI Review — '+new Date().toLocaleString('th-TH'),''];
+    var n=0;
+    blocks.forEach(function(fb){
+      var topic=fb.getAttribute('data-topic');
+      var d=data[topic];
+      if(!d)return;n++;
+      lines.push('■ '+topic);
+      if(d.choice)lines.push('   ตัดสินใจ: '+LABELS[d.choice]);
+      if(d.comment)lines.push('   ความเห็น: '+d.comment);
+      lines.push('');
+    });
+    if(!n)lines.push('(ยังไม่ได้เลือกหัวข้อใด)');
+    return lines.join('\n');
+  }
+  function updateCount(){
+    var n=Object.keys(data).length;
+    document.getElementById('sum-count').textContent=n?('ตอบแล้ว '+n+' จาก '+blocks.length+' หัวข้อ'):'ยังไม่ได้เลือก';
+    var pre=document.getElementById('sum-pre');
+    if(pre.style.display==='block')pre.textContent=buildSummary();
+  }
+  updateCount();
+
+  document.getElementById('btn-copy').addEventListener('click',function(){
+    var txt=buildSummary();
+    (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(function(){
+      var b=document.getElementById('btn-copy');b.textContent='✓ คัดลอกแล้ว';
+      setTimeout(function(){b.textContent='คัดลอกสรุปทั้งหมด'},1500);
+    }).catch(function(){
+      var pre=document.getElementById('sum-pre');pre.style.display='block';pre.textContent=txt;
+      alert('คัดลอกอัตโนมัติไม่ได้ — เลือกข้อความในกล่องด้านล่างแล้วคัดลอกเองได้เลย');
+    });
+  });
+  document.getElementById('btn-show').addEventListener('click',function(){
+    var pre=document.getElementById('sum-pre');
+    pre.style.display=pre.style.display==='block'?'none':'block';
+    pre.textContent=buildSummary();
+  });
+  document.getElementById('btn-dl').addEventListener('click',function(){
+    var blob=new Blob(['﻿'+buildSummary()],{type:'text/plain;charset=utf-8'});
+    var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download='ux-review-feedback-'+new Date().toISOString().slice(0,10)+'.txt';a.click();
+  });
+  document.getElementById('btn-clear').addEventListener('click',function(){
+    if(!confirm('ล้างคำตอบทั้งหมด?'))return;
+    data={};save(data);
+    blocks.forEach(function(fb){
+      fb.querySelectorAll('input').forEach(function(r){r.checked=false});
+      fb.querySelectorAll('.fb-choices label').forEach(function(l){l.className=''});
+      fb.querySelector('textarea').value='';
+    });
+    updateCount();
+  });
+})();
+</script>
 
 </body>
 </html>
