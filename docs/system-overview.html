@@ -1,0 +1,454 @@
+<title>สองระบบ Production — ภาพรวมการทำงาน</title>
+<style>
+  :root {
+    --bg: #f2f4f8;
+    --surface: #ffffff;
+    --surface-2: #eef1f6;
+    --border: #dbe1ea;
+    --ink: #172033;
+    --ink-soft: #5b6478;
+    --ink-faint: #8b93a5;
+    --accent-a: #2c4a7c;
+    --accent-a-dark: #1d3a68;
+    --accent-a-soft: #e7edf7;
+    --accent-b: #1f7a5c;
+    --accent-b-dark: #17604a;
+    --accent-b-soft: #e4f3ec;
+    --good: #15803d;
+    --warn: #b45309;
+    --critical: #b91c1c;
+    --shadow: 0 1px 2px rgba(23,32,51,.06), 0 8px 24px -12px rgba(23,32,51,.18);
+  }
+  :root[data-theme="dark"] {
+    --bg: #10141c;
+    --surface: #161c27;
+    --surface-2: #1b222f;
+    --border: #2a3444;
+    --ink: #e7ebf2;
+    --ink-soft: #9aa5b8;
+    --ink-faint: #6b7588;
+    --accent-a: #7ea1e0;
+    --accent-a-dark: #a9c2ec;
+    --accent-a-soft: #1c2942;
+    --accent-b: #57c79e;
+    --accent-b-dark: #7fdcb6;
+    --accent-b-soft: #163529;
+    --good: #4ade80;
+    --warn: #fbbf24;
+    --critical: #f87171;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10141c;
+      --surface: #161c27;
+      --surface-2: #1b222f;
+      --border: #2a3444;
+      --ink: #e7ebf2;
+      --ink-soft: #9aa5b8;
+      --ink-faint: #6b7588;
+      --accent-a: #7ea1e0;
+      --accent-a-dark: #a9c2ec;
+      --accent-a-soft: #1c2942;
+      --accent-b: #57c79e;
+      --accent-b-dark: #7fdcb6;
+      --accent-b-soft: #163529;
+      --good: #4ade80;
+      --warn: #fbbf24;
+      --critical: #f87171;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { color-scheme: light dark; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Leelawadee UI", "Thonburi", "Noto Sans Thai", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: ui-monospace, "Cascadia Mono", "Consolas", "SFMono-Regular", Menlo, monospace; }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  a { color: var(--accent-a); }
+  :root[data-theme="dark"] a, @media (prefers-color-scheme: dark) { a { color: var(--accent-a); } }
+
+  code {
+    font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: .1em .4em;
+    font-size: .88em;
+  }
+
+  /* ── Top bar ───────────────────────────────────────── */
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar-inner {
+    max-width: 980px; margin: 0 auto;
+    padding: 12px 24px;
+    display: flex; align-items: center; gap: 20px;
+    overflow-x: auto;
+  }
+  .topbar-brand {
+    font-weight: 700; font-size: 14px; white-space: nowrap;
+    color: var(--ink-soft);
+  }
+  .topbar-nav { display: flex; gap: 4px; flex-wrap: nowrap; }
+  .topbar-nav a {
+    color: var(--ink-soft); text-decoration: none;
+    font-size: 13.5px; font-weight: 600;
+    padding: 7px 12px; border-radius: 999px;
+    white-space: nowrap;
+    transition: background .15s, color .15s;
+  }
+  .topbar-nav a:hover { background: var(--surface-2); color: var(--ink); }
+
+  /* ── Shell ─────────────────────────────────────────── */
+  .shell { max-width: 980px; margin: 0 auto; padding: 0 24px 96px; }
+
+  /* ── Masthead ──────────────────────────────────────── */
+  .masthead { padding: 56px 0 40px; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--ink-faint); margin-bottom: 18px;
+  }
+  .eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 20%, transparent); }
+  h1 {
+    font-size: clamp(2rem, 4.4vw, 2.65rem);
+    line-height: 1.15; letter-spacing: -.01em;
+    margin: 0 0 16px; text-wrap: balance;
+    font-weight: 800;
+  }
+  .lede {
+    font-size: 17px; color: var(--ink-soft); max-width: 62ch;
+    margin: 0 0 32px;
+  }
+  .lede code { font-size: .82em; }
+
+  .snapshot {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1px; background: var(--border);
+    border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .snapshot .cell { background: var(--surface); padding: 16px 18px; }
+  .snapshot .cell .num { font-size: 1.7rem; font-weight: 800; letter-spacing: -.01em; }
+  .snapshot .cell .num.a { color: var(--accent-a); }
+  .snapshot .cell .num.b { color: var(--accent-b); }
+  .snapshot .cell .lbl { font-size: 12px; color: var(--ink-faint); margin-top: 2px; }
+
+  /* ── Section chrome ────────────────────────────────── */
+  section { padding: 56px 0; border-top: 1px solid var(--border); }
+  section:first-of-type { border-top: none; }
+  .section-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+  .section-head h2 { margin: 0; font-size: 1.55rem; letter-spacing: -.01em; text-wrap: balance; }
+  .section-sub { color: var(--ink-soft); max-width: 68ch; margin: 10px 0 28px; }
+  .kicker {
+    font-size: 11.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  /* ── System dossier card ──────────────────────────── */
+  .dossier { border-radius: 18px; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); overflow: hidden; }
+  .dossier-head { padding: 22px 26px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .dossier[data-sys="a"] .dossier-head { background: var(--accent-a-soft); }
+  .dossier[data-sys="b"] .dossier-head { background: var(--accent-b-soft); }
+  .dossier-title { display: flex; align-items: center; gap: 12px; }
+  .sys-badge {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 15px; color: #fff; flex: none;
+  }
+  .dossier[data-sys="a"] .sys-badge { background: var(--accent-a); }
+  .dossier[data-sys="b"] .sys-badge { background: var(--accent-b); }
+  .dossier-title h3 { margin: 0; font-size: 1.2rem; }
+  .dossier-title .path { display: block; margin-top: 2px; font-size: 12.5px; color: var(--ink-soft); }
+  .dossier-meta { display: flex; gap: 18px; flex-wrap: wrap; }
+  .dossier-meta .m-num { font-size: 1.15rem; font-weight: 800; }
+  .dossier[data-sys="a"] .dossier-meta .m-num { color: var(--accent-a-dark); }
+  .dossier[data-sys="b"] .dossier-meta .m-num { color: var(--accent-b-dark); }
+  .dossier-meta .m-lbl { font-size: 11.5px; color: var(--ink-faint); }
+  .dossier-body { padding: 26px; }
+  .dossier-body p { margin: 0 0 18px; color: var(--ink-soft); }
+  .dossier-body p:last-child { margin-bottom: 0; }
+
+  /* menu map */
+  .menu-map { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin: 18px 0; }
+  .menu-item {
+    border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
+    background: var(--surface-2);
+    font-size: 13.5px; font-weight: 600;
+  }
+  .menu-item .sub { display: block; font-weight: 400; font-size: 11.5px; color: var(--ink-faint); margin-top: 3px; }
+
+  /* deprecated table */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-faint); font-weight: 700; }
+  tr:last-child td { border-bottom: none; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+  .table-wrap table { min-width: 480px; }
+  .table-wrap.pad { padding: 4px; }
+
+  .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+  .pill.good { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
+  .pill.warn { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+
+  /* ── Bridge diagram ────────────────────────────────── */
+  .bridge {
+    border: 1px solid var(--border); border-radius: 18px; background: var(--surface);
+    padding: 32px 26px; box-shadow: var(--shadow);
+  }
+  .bridge-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 18px; }
+  @media (max-width: 620px) { .bridge-row { grid-template-columns: 1fr; } .bridge-arrow { transform: rotate(90deg); margin: 0 auto; } }
+  .bridge-node { border-radius: 14px; padding: 18px 20px; border: 1.5px solid; }
+  .bridge-node.a { background: var(--accent-a-soft); border-color: color-mix(in srgb, var(--accent-a) 35%, transparent); }
+  .bridge-node.b { background: var(--accent-b-soft); border-color: color-mix(in srgb, var(--accent-b) 35%, transparent); }
+  .bridge-node .name { font-weight: 800; font-size: 15px; }
+  .bridge-node.a .name { color: var(--accent-a-dark); }
+  .bridge-node.b .name { color: var(--accent-b-dark); }
+  .bridge-node .desc { font-size: 12.5px; color: var(--ink-soft); margin-top: 4px; }
+  .bridge-arrow { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--ink-faint); font-size: 11px; text-align: center; }
+  .bridge-arrow svg { width: 46px; height: 14px; }
+  .bridge-mid {
+    margin-top: 22px; padding-top: 22px; border-top: 1px dashed var(--border);
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+  }
+  @media (max-width: 620px) { .bridge-mid { grid-template-columns: 1fr; } }
+  .bridge-fact h4 { margin: 0 0 6px; font-size: 13.5px; }
+  .bridge-fact p { margin: 0; font-size: 13.5px; color: var(--ink-soft); }
+
+  .code-block {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 18px; font-size: 13px; overflow-x: auto; margin: 14px 0 0;
+    line-height: 1.6;
+  }
+  .code-block .k { color: var(--accent-a-dark); }
+  :root[data-theme="dark"] .code-block .k, @media (prefers-color-scheme: dark) { .code-block .k { color: var(--accent-a); } }
+  .code-block .s { color: var(--accent-b-dark); }
+  :root[data-theme="dark"] .code-block .s, @media (prefers-color-scheme: dark) { .code-block .s { color: var(--accent-b); } }
+
+  /* ── ADR cards ─────────────────────────────────────── */
+  .adr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .adr-card {
+    border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; background: var(--surface);
+  }
+  .adr-card .adr-id { font-size: 11.5px; font-weight: 700; letter-spacing: .06em; color: var(--ink-faint); }
+  .adr-card h4 { margin: 6px 0 8px; font-size: 15px; }
+  .adr-card p { margin: 0; font-size: 13.5px; color: var(--ink-soft); }
+  .adr-card .why { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--ink-faint); }
+  .adr-card .why b { color: var(--ink-soft); }
+
+  footer { padding: 40px 0 10px; color: var(--ink-faint); font-size: 12.5px; }
+  footer a { color: var(--ink-faint); }
+
+  ::selection { background: color-mix(in srgb, var(--accent-a) 25%, transparent); }
+</style>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-brand">Production · เอกสารระบบ</div>
+    <nav class="topbar-nav">
+      <a href="#overview">ภาพรวม</a>
+      <a href="#sys-a">ทะเบียนเครื่อง</a>
+      <a href="#sys-b">สต็อกอะไหล่</a>
+      <a href="#bridge">จุดเชื่อมต่อ</a>
+      <a href="#decisions">เหตุผลเชิงระบบ</a>
+    </nav>
+  </div>
+</div>
+
+<div class="shell">
+
+  <div class="masthead" id="overview">
+    <div class="eyebrow"><span class="dot"></span> ตรวจสอบจากระบบจริงที่กำลังทำงานอยู่</div>
+    <h1>สองระบบ หนึ่งสายการผลิต — ทะเบียนเครื่องกับสต็อกอะไหล่ทำงานร่วมกันอย่างไร</h1>
+    <p class="lede">
+      โฟลเดอร์ <code>production/</code> รัน 2 เว็บแอปแยกกัน: <b>ระบบทะเบียนเครื่องและซ่อมบำรุง</b> ที่ติดตามเครื่องตั้งแต่ผลิตจนถึงมือลูกค้า
+      และ <b>ระบบจัดการสต็อกอะไหล่</b> ที่ดูแลอะไหล่ในคลัง ทั้งสองไม่ได้แชร์ฐานข้อมูลกันตรงๆ แต่เชื่อมกันผ่านจุดต่อ 2 จุดเท่านั้น —
+      อ่านรายละเอียดได้ในหัวข้อ <a href="#bridge">จุดเชื่อมต่อ</a> ด้านล่าง
+    </p>
+    <div class="snapshot">
+      <div class="cell"><div class="num a tnum">18,214</div><div class="lbl">เครื่องในทะเบียน</div></div>
+      <div class="cell"><div class="num a tnum">33</div><div class="lbl">รุ่นสินค้า</div></div>
+      <div class="cell"><div class="num b tnum">143</div><div class="lbl">รายการอะไหล่</div></div>
+      <div class="cell"><div class="num b tnum">24,877</div><div class="lbl">ชิ้นอะไหล่คงเหลือ</div></div>
+      <div class="cell"><div class="num b tnum">29</div><div class="lbl">อะไหล่ใกล้หมด</div></div>
+    </div>
+  </div>
+
+  <section id="sys-a">
+    <div class="kicker">ระบบที่ 1</div>
+    <div class="section-head"><h2>ระบบทะเบียนเครื่องและซ่อมบำรุง</h2></div>
+    <p class="section-sub">ติดตามเครื่องแต่ละเครื่องตลอดอายุการใช้งาน: บันทึกตอนผลิตเสร็จ ตามด้วยซ่อม บำรุงรักษา (MA) อัปเดตเฟิร์มแวร์/ฮาร์ดแวร์ จนถึงส่งลูกค้า</p>
+
+    <div class="dossier" data-sys="a">
+      <div class="dossier-head">
+        <div class="dossier-title">
+          <div class="sys-badge">FG</div>
+          <div>
+            <h3>finishgoogs_ma_update</h3>
+            <span class="path mono">/production/finishgoogs_ma_update</span>
+          </div>
+        </div>
+        <div class="dossier-meta">
+          <div><div class="m-num tnum">18,214</div><div class="m-lbl">เครื่องทั้งหมด</div></div>
+          <div><div class="m-num tnum">2,154</div><div class="m-lbl">เครื่องเช่า</div></div>
+          <div><div class="m-num tnum">77</div><div class="m-lbl">เครื่องสำรอง</div></div>
+        </div>
+      </div>
+      <div class="dossier-body">
+        <p><b>เข้าใช้งาน:</b> ไม่มีหน้ากรอกรหัสผ่านของตัวเอง — ทุกคนล็อกอินผ่านศูนย์กลาง SSO ของบริษัท (<span class="mono">bit-online.net</span>) เมื่อผ่านแล้วใช้งานฟีเจอร์หลักได้ทั้งหมดเท่ากัน ยกเว้นหน้า “ระบบหลังบ้าน” ที่ต้องใส่ PIN เพิ่ม</p>
+
+        <p><b>เมนูที่ใช้งานจริง</b> (ตรวจจากแถบเมนูของระบบที่รันอยู่):</p>
+        <div class="menu-map">
+          <div class="menu-item">Dashboard<span class="sub">สรุปภาพรวม + กราฟผลิต</span></div>
+          <div class="menu-item">ทะเบียนเครื่องผลิตใหม่<span class="sub">assets.php</span></div>
+          <div class="menu-item">ทะเบียนเครื่อง MA<span class="sub">รวมเครื่องสำรอง/เช่าแล้ว</span></div>
+          <div class="menu-item">ประวัติการอัปเดต FW &amp; HW<span class="sub">updates.php</span></div>
+          <div class="menu-item">อะไหล่ใช้ผลิต<span class="sub">parts.php</span></div>
+          <div class="menu-item">ประวัติซ่อมติดฟิล์มจอ 2 ชั้น<span class="sub">repairs.php · อ่านอย่างเดียว</span></div>
+          <div class="menu-item">สแกน QR<span class="sub">เปิดหน้าเครื่องจากบาร์โค้ด</span></div>
+          <div class="menu-item">ระบบหลังบ้าน<span class="sub">ต้องใส่ PIN</span></div>
+          <div class="menu-item">โปรไฟล์<span class="sub">ข้อมูลจาก session SSO</span></div>
+        </div>
+
+        <p><b>Dashboard เจาะลึกได้เป็นชั้นๆ:</b> กดปีในกราฟ → รายเดือน → การ์ดรุ่นสินค้า (มีรูป) → รายชื่อเครื่อง → timeline ประวัติทั้งหมดของเครื่องนั้น ทุกอย่างเปิดเป็นหน้าต่างลอยไม่ต้องเปลี่ยนหน้า</p>
+
+        <p><b>หน้าที่ถูกยุบรวมแล้ว</b> — ยังเปิด URL เดิมได้ แต่ระบบจะพาไปหน้าใหม่ให้อัตโนมัติ:</p>
+        <div class="table-wrap">
+          <table>
+            <tr><th>หน้าเดิม</th><th>ปัจจุบัน</th></tr>
+            <tr><td class="mono">products.php</td><td>รวมเข้า “ระบบหลังบ้าน” (จัดการรุ่นสินค้า)</td></tr>
+            <tr><td class="mono">stock_compare.php</td><td>รวมเข้าหน้า “ทะเบียนสินค้า” (share.php)</td></tr>
+            <tr><td class="mono">report.php</td><td>รวมเข้า Dashboard หน้าแรก</td></tr>
+            <tr><td class="mono">spares.php</td><td>ย้ายไปจัดการที่ “ทะเบียนเครื่อง MA”</td></tr>
+            <tr><td class="mono">users.php</td><td>ไม่มีระบบผู้ใช้ภายในแล้ว (ใช้ SSO ทั้งหมด)</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="sys-b">
+    <div class="kicker">ระบบที่ 2</div>
+    <div class="section-head"><h2>ระบบจัดการสต็อกอะไหล่</h2></div>
+    <p class="section-sub">คุมยอดอะไหล่อิเล็กทรอนิกส์ในคลัง — รับเข้า เบิกออกทั้งแบบชุด (Set) และรายชิ้น พร้อมแจ้งเตือนของใกล้หมด</p>
+
+    <div class="dossier" data-sys="b">
+      <div class="dossier-head">
+        <div class="dossier-title">
+          <div class="sys-badge">PT</div>
+          <div>
+            <h3>parts</h3>
+            <span class="path mono">/production/parts</span>
+          </div>
+        </div>
+        <div class="dossier-meta">
+          <div><div class="m-num tnum">143</div><div class="m-lbl">รายการอะไหล่</div></div>
+          <div><div class="m-num tnum">8</div><div class="m-lbl">ชุดเบิก (Set)</div></div>
+          <div><div class="m-num tnum">29</div><div class="m-lbl">ใกล้หมด</div></div>
+        </div>
+      </div>
+      <div class="dossier-body">
+        <p><b>เข้าใช้งาน:</b> ไม่มีระบบล็อกอินของตัวเอง และไม่ได้ผูกกับ SSO เหมือนระบบทะเบียนเครื่อง — ใครเข้าถึง URL ได้ก็ใช้งานได้ทันที</p>
+
+        <p><b>เมนูที่ใช้งานจริง:</b></p>
+        <div class="menu-map">
+          <div class="menu-item">Dashboard<span class="sub">คงเหลือรวม + ใกล้หมด + ความเคลื่อนไหว</span></div>
+          <div class="menu-item">อะไหล่<span class="sub">รายการ + เพิ่มอะไหล่ใหม่</span></div>
+          <div class="menu-item">รับเข้า<span class="sub">บวกยอดเข้าคลัง</span></div>
+          <div class="menu-item">เบิกออก (Set)<span class="sub">เบิกเป็นชุดที่กำหนดไว้ล่วงหน้า</span></div>
+          <div class="menu-item">เบิกรายชิ้น<span class="sub">เบิกทีละอะไหล่ ไม่ผ่าน Set</span></div>
+          <div class="menu-item">จัดการ Set<span class="sub">กำหนดว่า Set มีอะไหล่อะไรบ้าง</span></div>
+          <div class="menu-item">ประวัติเบิก<span class="sub">รายการเบิกทั้งหมด + รายละเอียด</span></div>
+        </div>
+
+        <p><b>ตัวอย่างสถานะเตือนจริงในคลังตอนนี้:</b> อะไหล่ 4 รายการเหลือ <span class="pill warn tnum">0 ชิ้น</span> ทั้งที่ยังมียอดขั้นต่ำที่ต้องคงไว้ (เช่น <span class="mono">Switch Power On bitStamp Lite</span> ขั้นต่ำ 50) ส่วนใหญ่ของ 143 รายการยังอยู่ในเกณฑ์ <span class="pill good">ปกติ</span></p>
+
+        <p><b>เบิกออกแบบ Set</b> ตรวจสต็อกของอะไหล่ทุกชิ้นในชุดก่อนตัดจริง — ถ้าชิ้นใดในชุดไม่พอ ระบบจะไม่ตัดสต็อกเลยทั้งชุด กันเบิกได้ไม่ครบ</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="bridge">
+    <div class="kicker">จุดต่อระหว่างสองระบบ</div>
+    <div class="section-head"><h2>ไม่แชร์ฐานข้อมูล เชื่อมกันแค่ 2 เส้นทาง</h2></div>
+    <p class="section-sub">ทั้งสองระบบพัฒนาแยกกัน คนละฐานข้อมูล คนละทีมดูแล การเชื่อมข้อมูลจึงเกิดขึ้นทางเดียวในแต่ละเส้นทาง ไม่ใช่การอ่าน-เขียนตารางร่วมกัน</p>
+
+    <div class="bridge">
+      <div class="bridge-row">
+        <div class="bridge-node a">
+          <div class="name">ทะเบียนเครื่อง (finishgoogs_ma_update)</div>
+          <div class="desc">ฐานข้อมูล biton_production</div>
+        </div>
+        <div class="bridge-arrow">
+          <svg viewBox="0 0 46 14" fill="none"><path d="M0 7H40M40 7L33 1M40 7L33 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          บันทึกเครื่องใหม่
+        </div>
+        <div class="bridge-node b">
+          <div class="name">ทะเบียนสินค้ากลาง</div>
+          <div class="desc">ตาราง stock ใน biton_stockparts</div>
+        </div>
+      </div>
+
+      <div class="bridge-mid">
+        <div class="bridge-fact">
+          <h4>เส้นทางที่ 1 — sync ทะเบียนสินค้า</h4>
+          <p>ทุกครั้งที่บันทึกหรือแก้ไขเครื่องผลิตใหม่ ระบบทะเบียนเครื่องจะเขียนสำเนาเข้า <span class="mono">biton_stockparts.stock</span> ให้อัตโนมัติ ตารางนี้เป็นของทีมสต็อกอะไหล่ ฝั่งทะเบียนเครื่อง<b>ห้ามแก้โครงสร้างตาราง</b> ทำได้แค่อ่าน/เขียนแถวข้อมูล ถ้า sync คลาดเคลื่อนมีหน้าเทียบข้อมูลย้อนหลังให้แก้ด้วยมือ</p>
+        </div>
+        <div class="bridge-fact">
+          <h4>เส้นทางที่ 2 — webhook ตัดสต็อกอะไหล่</h4>
+          <p>เมื่อมีการเบิกใช้อะไหล่ผูกกับเครื่อง ฝั่งทะเบียนเครื่อง<b>เป็นผู้ยิง request ออกไปเอง</b> ไปยัง endpoint ของระบบสต็อกอะไหล่ เพื่อตัดยอดให้อัตโนมัติ โดยไม่ต้องเข้าไปเบิกผ่านหน้าเว็บสต็อกอะไหล่เลย</p>
+          <div class="code-block mono">
+POST /parts/api/webhook-stockout.php<br>
+{ <span class="k">"product_code"</span>: <span class="s">"P001"</span>, <span class="k">"quantity"</span>: 5, <span class="k">"purpose"</span>: <span class="s">"ผลิต"</span> }
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="decisions">
+    <div class="kicker">ทำไมถึงออกแบบแบบนี้</div>
+    <div class="section-head"><h2>เหตุผลเชิงระบบที่ควรรู้ก่อนแก้โค้ด</h2></div>
+    <p class="section-sub">สรุปจากบันทึกการตัดสินใจ (ADR) เต็มอยู่ที่ <code>docs/adr/</code></p>
+
+    <div class="adr-grid">
+      <div class="adr-card">
+        <div class="adr-id">ADR 0001</div>
+        <h4>ล็อกอินผ่าน SSO ภายนอกเท่านั้น</h4>
+        <p>เลิกใช้ระบบ login/role ภายในทั้งหมด เพื่อไม่ต้องดูแลบัญชีผู้ใช้ซ้ำกับระบบอื่นในองค์กร</p>
+        <div class="why"><b>ข้อยกเว้น:</b> หน้าตั้งค่า/ปรับแต่งหน้าตา ยังล็อกด้วย PIN เพิ่มอีกชั้น</div>
+      </div>
+      <div class="adr-card">
+        <div class="adr-id">ADR 0002</div>
+        <h4>ทะเบียนสินค้ามีจุดเดียว</h4>
+        <p>ยกเลิกตารางสำเนาที่เคยมี (shared_assets) เหลือ <span class="mono">biton_stockparts.stock</span> เป็นแหล่งเดียว กันข้อมูลสองชุดไม่ตรงกัน</p>
+        <div class="why"><b>ผลคือ:</b> ฝั่งทะเบียนเครื่อง “ฝาก” ข้อมูลไว้ในตารางของทีมอื่น ไม่ใช่เจ้าของ schema</div>
+      </div>
+      <div class="adr-card">
+        <div class="adr-id">ADR 0003</div>
+        <h4>ล็อกธุรกรรมกันข้อมูลหายเงียบ</h4>
+        <p>เคยเกิดเหตุจริง: บันทึกสำเร็จบนหน้าจอ แต่ข้อมูลหายเพราะ autocommit ปิดอยู่โดยไม่รู้ตัว แก้ด้วยการบังคับ autocommit และใช้ GET_LOCK ตอนออกเลขรันนิ่ง</p>
+        <div class="why"><b>สำคัญ:</b> connection ใหม่ในอนาคตต้องบังคับ autocommit เช่นกัน</div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    ตรวจสอบจากระบบที่รันอยู่จริงที่ <span class="mono">localhost/production/finishgoogs_ma_update</span> และ <span class="mono">localhost/production/parts</span> ประกอบกับซอร์สโค้ดใน <code>docs/</code> — ตัวเลขสแนปช็อตเป็นข้อมูล ณ ขณะตรวจสอบ อาจไม่ตรงกับปัจจุบันหากเวลาผ่านไปนาน
+  </footer>
+
+</div>
