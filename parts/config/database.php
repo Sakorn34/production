@@ -4,6 +4,8 @@
 define('BASE_PATH', '/parts');
 
 require_once 'D:/AppServ/secrets/production/parts.secrets.php';
+// ชี้ error_log ออกนอก web root กันไฟล์ log หลุดออกเว็บได้ (บางจุด require ไฟล์นี้ตรงๆ ไม่ผ่าน config.php)
+ini_set('error_log', 'D:/Ops/logs/php-error.log');
 
 function getDB(): PDO
 {

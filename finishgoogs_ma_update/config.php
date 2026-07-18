@@ -6,6 +6,8 @@ session_start();
 mb_internal_encoding('UTF-8');
 date_default_timezone_set('Asia/Bangkok');
 error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
+// ชี้ error_log ออกนอก web root แทนตำแหน่งเดิม (default ของ php.ini) กันไฟล์ log หลุดออกเว็บได้
+ini_set('error_log', 'D:/Ops/logs/php-error.log');
 
 define('BASE_URL', '/production');
 define('APP_NAME', 'ระบบทะเบียนเครื่องและซ่อมบำรุง');
