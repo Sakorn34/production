@@ -1,0 +1,20 @@
+# secrets — ไม่มีไฟล์เหล่านี้ในโค้ดแล้ว (ย้ายไป D:\AppServ\secrets\production\) แต่กันไว้อีกชั้น
+**/config.local.php
+**/*.secrets.php
+**/sftp.json
+**/.vscode/
+.env
+
+# ไฟล์ที่ generate/runtime ไม่ควร commit
+**/uploads/*
+!**/uploads/.htaccess
+**/logs/*.log
+*.log
+
+# ฐานข้อมูล local/backup ที่ไม่ควรอยู่ใน repo
+*.sql
+*.sql.zip
+**/db.db
+
+# vendor (ยังไม่มี composer แต่กันไว้)
+/vendor/

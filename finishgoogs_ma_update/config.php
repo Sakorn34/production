@@ -1,0 +1,1947 @@
+<?php
+/**
+ * config.php — แกนกลางของระบบ: DB, session, สิทธิ์, helper
+ */
+session_start();
+mb_internal_encoding('UTF-8');
+date_default_timezone_set('Asia/Bangkok');
+error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
+
+define('BASE_URL', '/production');
+define('APP_NAME', 'ระบบทะเบียนเครื่องและซ่อมบำรุง');
+
+function dbStock()
+{
+    static $db;
+
+    if (!$db) {
+
+        $c = require 'D:/AppServ/secrets/production/finishgoogs.secrets.php';
+
+        $db = new mysqli(
+            $c['stockparts']['host'],
+            $c['stockparts']['user'],
+            $c['stockparts']['pass'],
+            $c['stockparts']['db']
+        );
+        if ($db->connect_errno) die('เชื่อมต่อฐานข้อมูล stockparts ไม่ได้: ' . $db->connect_error);
+        $db->set_charset('utf8mb4');
+        // บังคับ autocommit ให้เปิดเสมอ — กันเคสที่ฝั่ง MySQL/user account ถูกตั้ง autocommit=0 ไว้
+        // ซึ่งจะทำให้ query ดูเหมือนสำเร็จ (ไม่ error) แต่ข้อมูลไม่ถูก commit จริง แล้วหายไปเงียบๆ ตอน connection ปิด
+        $db->autocommit(true);
+    }
+
+    return $db;
+}
+
+function db() {
+    static $db = null;
+    if ($db === null) {
+        $c = require 'D:/AppServ/secrets/production/finishgoogs.secrets.php';
+
+        $db = new mysqli(
+            $c['production']['host'],
+            $c['production']['user'],
+            $c['production']['pass'],
+            $c['production']['db']
+        );
+        
+        if ($db->connect_errno) die('เชื่อมต่อฐานข้อมูล production ไม่ได้: ' . $db->connect_error);
+        $db->set_charset('utf8mb4');
+        // เดิมไม่มีการบังคับ autocommit เลย — ถ้า user account (biton_production) ถูกตั้ง autocommit=0
+        // ไว้ที่ฝั่ง server (และในโค้ดทั้งระบบไม่มีการเรียก commit() ที่ไหนเลย) การ insert ทุกอย่างจะ
+        // "สำเร็จ" ในสายตา PHP แต่จริงๆ อยู่ในธุรกรรมที่ไม่เคย commit แล้วถูก rollback ทิ้งเงียบๆ ตอนจบ request
+        // — ตรงกับอาการที่ assets.php ไม่มีข้อมูลใหม่เพิ่มเข้ามาทั้งที่ขึ้น "บันทึกสำเร็จ" ทุกครั้ง
+        $db->autocommit(true);
+    }
+    return $db;
+}
+
+/** prepared query — คืน mysqli_stmt */
+function q($sql, $types = '', $params = [], $conn = null)
+{
+    if ($conn === null) {
+        $conn = db();
+    }
+
+    $st = $conn->prepare($sql);
+
+    if ($st === false) {
+        die('SQL error: ' . $conn->error);
+    }
+
+    if ($types !== '') {
+        $st->bind_param($types, ...$params);
+    }
+
+    if (!$st->execute()) {
+        // เดิมไม่ตรวจผล execute — บางเคส (เช่น FK / duplicate) ดู "ผ่าน" จากฝั่ง PHP แล้ว flash สำเร็จ
+        // ทั้งที่แถวไม่ถูกเขียนจริง
+        die('SQL execute error: ' . $st->error . ' | SQL: ' . $sql);
+    }
+
+    return $st;
+}
+
+/**
+ * execute SQL แบบไม่ die — คืน ['ok'=>bool, 'error'?, 'errno'?, 'insert_id'?]
+ *
+ * @param string $sql
+ * @param string $types
+ * @param array  $params
+ * @return array{ok:bool, error?:string, errno?:int, insert_id?:int, stmt?:mysqli_stmt}
+ */
+function q_try($sql, $types = '', $params = []) {
+    $conn = db();
+    $st = $conn->prepare($sql);
+    if ($st === false) {
+        return ['ok' => false, 'error' => $conn->error, 'errno' => (int)$conn->errno];
+    }
+    if ($types !== '') {
+        $st->bind_param($types, ...$params);
+    }
+    if (!$st->execute()) {
+        return ['ok' => false, 'error' => $st->error, 'errno' => (int)$st->errno];
+    }
+    return ['ok' => true, 'stmt' => $st, 'insert_id' => (int)$conn->insert_id];
+}
+
+/**
+ * แปลง errno MySQL เป็นข้อความที่ผู้ใช้เข้าใจ
+ *
+ * @param int    $errno
+ * @param string $error
+ * @return string
+ */
+function db_error_user_message($errno, $error) {
+    if ((int)$errno === 1062) {
+        if (preg_match("/Duplicate entry '([^']+)' for key '([^']+)'/", $error, $m)) {
+            $val = $m[1];
+            if (strpos($m[2], 'asset_code') !== false) {
+                return 'รหัสเครื่อง "' . $val . '" มีในระบบแล้ว — ไม่สามารถบันทึกซ้ำได้';
+            }
+            return 'ข้อมูล "' . $val . '" ซ้ำในระบบ';
+        }
+        return 'ข้อมูลซ้ำในระบบ — กรุณาตรวจสอบรหัสเครื่อง';
+    }
+    return 'บันทึกไม่สำเร็จ — กรุณาลองใหม่';
+}
+
+function qr($sql, $types = '', $params = [], $conn = null)
+{
+    return q($sql, $types, $params, $conn)->get_result();
+}
+
+function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
+
+// ---------- ตั้งค่าระบบ / ปรับแต่งหน้าตา ----------
+function settings() {
+    static $s = null;
+    if ($s === null) {
+        $s = [];
+        $res = @db()->query("SELECT skey, sval FROM site_settings");
+        if ($res) while ($r = $res->fetch_assoc()) $s[$r['skey']] = $r['sval'];
+    }
+    return $s;
+}
+function setting($k, $default = null) {
+    $s = settings();
+    return (isset($s[$k]) && $s[$k] !== '') ? $s[$k] : $default;
+}
+function set_setting($k, $v) {
+    q("INSERT INTO site_settings (skey,sval) VALUES (?,?) ON DUPLICATE KEY UPDATE sval=VALUES(sval)", 'ss', [$k, (string)$v]);
+}
+/** สีธีม (ตรวจ hex) — คืนค่าปลอดภัยสำหรับใส่ใน CSS */
+function theme_color($k, $default) {
+    $v = (string)setting($k, $default);
+    return preg_match('/^#[0-9a-fA-F]{3,8}$/', $v) ? $v : $default;
+}
+/** เมนูเริ่มต้น: [file, icon(emoji), label, ผู้มีสิทธิ์เห็น] — ไม่จำกัด role แล้ว (ใช้แค่ session profile) */
+function nav_default() {
+    return [
+        ['index.php',      '📊', 'Dashboard',        true],
+        ['assets.php',     '🖥️', 'ทะเบียนเครื่องผลิตใหม่', true],
+        ['updates.php',    '⚙️', 'อัปเดต FW/HW',      true],
+        ['ma.php',         '📅', 'บันทึก MA',         true],
+        ['parts.php',      '🔩', 'อะไหล่',            true],
+        ['customers.php',  '🏢', 'ลูกค้า',            true],
+        ['repairs.php',    '🔧', 'ประวัติซ่อม',        true],
+        ['scan.php',       '📷', 'สแกน QR',           true],
+        ['settings.php',   '🛠️', 'ระบบหลังบ้าน',      true],
+    ];
+}
+/** รวมเมนูเริ่มต้น + override (icon/label/order/hidden) → เมนูที่ใช้จริง */
+function nav_effective() {
+    $ovr = json_decode((string)setting('nav_items', '[]'), true);
+    if (!is_array($ovr)) $ovr = [];
+    $byFile = [];
+    foreach ($ovr as $o) if (isset($o['file'])) $byFile[$o['file']] = $o;
+    $out = [];
+    foreach (nav_default() as $i => $n) {
+        if (!$n[3]) continue;
+        $o = isset($byFile[$n[0]]) ? $byFile[$n[0]] : [];
+        if (!empty($o['hidden'])) continue;
+        $out[] = [
+            'file'  => $n[0],
+            'icon'  => (isset($o['icon']) && $o['icon'] !== '') ? $o['icon'] : $n[1],
+            'label' => (isset($o['label']) && $o['label'] !== '') ? $o['label'] : $n[2],
+            'order' => isset($o['order']) ? (int)$o['order'] : $i,
+        ];
+    }
+    usort($out, function ($a, $b) { return $a['order'] - $b['order']; });
+    return $out;
+}
+
+// ---------- auth (session profile เท่านั้น — ไม่ใช้ตาราง users / role / login ภายใน) ----------
+define('SSO_LOGIN_URL', 'https://bit-online.net/bitlogin/bitlink.php');
+
+require_once __DIR__ . '/includes/session_profile.php';
+
+/**
+ * คืนข้อมูลผู้ใช้จาก `$_SESSION['profile']` (ไม่พึ่งตาราง users)
+ *
+ * @return array{id:null,username:string,display_name:string,role:string}|null
+ */
+function user() {
+    if (!ss_session_has_profile()) {
+        return null;
+    }
+    ss_sync_session_employee_from_profile();
+    $uname = (string)(maintenance_new_profile_login_name() ?: '');
+    $dname = maintenance_new_profile_display_name();
+    if ($dname === '') {
+        $dname = $uname !== '' ? $uname : 'ผู้ใช้งาน';
+    }
+    // id = null เพราะเลิกผูก FK กับตาราง users — คอลัมน์ user_id/created_by ที่เป็น NULL ได้จะเก็บ null
+    return [
+        'id'           => null,
+        'username'     => $uname,
+        'display_name' => $dname,
+        'role'         => 'user',
+    ];
+}
+
+/**
+ * ชื่อที่ใช้บันทึกรายการในระบบ = login_name จาก SSO (เช่น Tom)
+ * ถ้าไม่มี login_name ค่อยใช้ display_name
+ *
+ * @return string
+ */
+function actor_name() {
+    $u = user();
+    if (!$u) {
+        return '';
+    }
+    if ($u['username'] !== '') {
+        return $u['username'];
+    }
+    return (string)$u['display_name'];
+}
+
+/**
+ * ตรวจว่าเข้าหน้าหลังบ้านได้แล้วหรือยัง (PIN 9981)
+ *
+ * @return bool
+ */
+function settings_admin_unlocked() {
+    if (!user()) {
+        return false;
+    }
+    return !empty($_SESSION['settings_unlocked']);
+}
+
+/**
+ * บังคับให้มี session profile จาก SSO ก่อนใช้งานระบบ
+ *
+ * @return void
+ */
+function require_login() {
+    if (!ss_session_has_profile()) {
+        header('Location: ' . SSO_LOGIN_URL);
+        exit;
+    }
+    ss_sync_session_employee_from_profile();
+    ensure_field_input_mode_schema();
+    ensure_asset_serial_identity();
+    // ล้าง cache ของระบบ role/users เก่าใน session ถ้ายังค้างอยู่
+    unset($_SESSION['user']);
+}
+
+/**
+ * ตรวจสิทธิ์ — เปิดให้ทุกคนที่มี profile ใช้ได้ทุกส่วน (ไม่จำกัด role)
+ *
+ * @param string $perm ชื่อสิทธิ์เดิม (เก็บพารามิเตอร์ไว้ให้เรียกเดิมได้)
+ * @return bool
+ */
+function can($perm) {
+    return ss_session_has_profile();
+}
+
+/**
+ * บังคับล็อกอินด้วย session profile (ไม่เช็ค role)
+ *
+ * @param string $perm ชื่อสิทธิ์เดิม (ไม่ใช้ตัดสินใจแล้ว)
+ * @return void
+ */
+function require_can($perm) {
+    require_login();
+}
+
+// ---------- csrf ----------
+function csrf() {
+    if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(16));
+    return $_SESSION['csrf'];
+}
+function csrf_field() { return '<input type="hidden" name="csrf" value="' . csrf() . '">'; }
+function csrf_check() {
+    if (!isset($_POST['csrf']) || $_POST['csrf'] !== csrf()) exit('คำขอไม่ถูกต้อง (CSRF)');
+}
+
+// ---------- flash message ----------
+function flash_set($msg, $type = 'ok') { $_SESSION['flash'] = [$msg, $type]; }
+function flash_get() { $f = isset($_SESSION['flash']) ? $_SESSION['flash'] : null; unset($_SESSION['flash']); return $f; }
+
+// ---------- รูปภาพ ----------
+function img_url($p) {
+    if (!$p) return null;
+    if (preg_match('#^https?://#', $p)) return $p; // ลิงก์ AppSheet เดิม
+    $legacyFolders = ['Update_Images/', 'Parts_Images/', 'Menu Product_Images/', 'model appsheet_Images/',
+                      'model_Images/', 'NamePart_Images/', 'Sub Menu_Images/', 'Sub Product_Images/', 'Thumbnail_Images/'];
+    foreach ($legacyFolders as $lf) {
+        if (strpos($p, $lf) === 0) return BASE_URL . '/uploads/legacy/' . implode('/', array_map('rawurlencode', explode('/', $p)));
+    }
+    return BASE_URL . '/uploads/' . implode('/', array_map('rawurlencode', explode('/', $p)));
+}
+/** แสดงรูปหรือกล่อง placeholder */
+function img_tag($path, $alt = '', $class = 'thumb') {
+    $u = img_url($path);
+    if ($u) return '<img src="' . h($u) . '" alt="' . h($alt) . '" class="' . $class . '" loading="lazy" onerror="this.classList.add(\'broken\')">';
+    return '<span class="' . $class . ' noimg">ไม่มีรูป</span>';
+}
+
+/** รับไฟล์อัปโหลดรูป → คืน path relative ใต้ uploads/ หรือ null */
+function save_upload($field, $subdir, $exts = null) {
+    if (empty($_FILES[$field]['tmp_name']) || $_FILES[$field]['error'] !== UPLOAD_ERR_OK) return null;
+    if ($exts === null) $exts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    $ext = strtolower(pathinfo($_FILES[$field]['name'], PATHINFO_EXTENSION));
+    if (!in_array($ext, $exts, true)) return null;
+    if ($ext === 'svg') {
+        if (stripos((string)@file_get_contents($_FILES[$field]['tmp_name'], false, null, 0, 4096), '<svg') === false) return null;
+    } elseif ($ext === 'ico') {
+        if (@file_get_contents($_FILES[$field]['tmp_name'], false, null, 0, 4) !== "\x00\x00\x01\x00") return null;
+    } else {
+        if (!@getimagesize($_FILES[$field]['tmp_name'])) return null;
+    }
+    $dir = __DIR__ . '/uploads/' . $subdir . '/' . date('Y/m');
+    if (!is_dir($dir)) mkdir($dir, 0755, true);
+    $name = date('His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+    if (!move_uploaded_file($_FILES[$field]['tmp_name'], "$dir/$name")) return null;
+    return $subdir . '/' . date('Y/m') . '/' . $name;
+}
+
+/**
+ * รับไฟล์ font อัปโหลด → คืน path relative ใต้ uploads/fonts/
+ *
+ * @param string $field ชื่อ field ใน $_FILES
+ * @return string|null
+ */
+function save_font_upload($field) {
+    if (empty($_FILES[$field]['tmp_name']) || $_FILES[$field]['error'] !== UPLOAD_ERR_OK) {
+        return null;
+    }
+    $ext = strtolower(pathinfo($_FILES[$field]['name'], PATHINFO_EXTENSION));
+    $exts = ['woff', 'woff2', 'ttf', 'otf'];
+    if (!in_array($ext, $exts, true)) {
+        return null;
+    }
+    $dir = __DIR__ . '/uploads/fonts/' . date('Y/m');
+    if (!is_dir($dir)) {
+        mkdir($dir, 0755, true);
+    }
+    $name = date('His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+    if (!move_uploaded_file($_FILES[$field]['tmp_name'], "$dir/$name")) {
+        return null;
+    }
+    return 'fonts/' . date('Y/m') . '/' . $name;
+}
+
+/**
+ * คืนค่า font-family CSS ตามการตั้งค่าหน้าตาระบบ
+ *
+ * @return array{font:string,google:string,custom_file:string}
+ */
+function theme_font_config() {
+    $preset = setting('font_preset', 'system');
+    $custom = trim((string)setting('font_file', ''));
+    $google = '';
+    $family = "'Segoe UI', Tahoma, sans-serif";
+    if ($custom !== '') {
+        return ['font' => "'AppCustomFont', 'Segoe UI', sans-serif", 'google' => '', 'custom_file' => $custom];
+    }
+    $presets = [
+        'system'  => ['font' => "'Segoe UI', Tahoma, sans-serif", 'google' => ''],
+        'saraban' => ['font' => "'Sarabun', 'Segoe UI', sans-serif", 'google' => 'https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap'],
+        'prompt'  => ['font' => "'Prompt', 'Segoe UI', sans-serif", 'google' => 'https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap'],
+        'kanit'   => ['font' => "'Kanit', 'Segoe UI', sans-serif", 'google' => 'https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700&display=swap'],
+        'noto'    => ['font' => "'Noto Sans Thai', 'Segoe UI', sans-serif", 'google' => 'https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700&display=swap'],
+    ];
+    if (isset($presets[$preset])) {
+        return ['font' => $presets[$preset]['font'], 'google' => $presets[$preset]['google'], 'custom_file' => ''];
+    }
+    return ['font' => $family, 'google' => $google, 'custom_file' => ''];
+}
+
+// ---------- สถานะ ----------
+function status_th($s) {
+    $m = ['new' => 'เครื่องใหม่', 'rental' => 'เครื่องเช่า', 'spare' => 'เครื่องสำรอง'];
+    return isset($m[$s]) ? $m[$s] : $s;
+}
+function status_list() { return ['new', 'rental', 'spare']; }
+function status_badge($s) {
+    return '<span class="badge st-' . h($s) . '">' . h(status_th($s)) . '</span>';
+}
+function role_th($r) {
+    $m = ['admin' => 'ผู้ดูแลระบบ', 'qc' => 'ทีมผลิต/QC', 'technician' => 'ช่างเทคนิค', 'executive' => 'ผู้บริหาร'];
+    return isset($m[$r]) ? $m[$r] : $r;
+}
+function dthai($d) { // แสดงวันที่แบบสั้น
+    if (!$d || $d === '0000-00-00') return '-';
+    $t = strtotime($d);
+    return $t ? date('d/m/Y', $t) : h($d);
+}
+function dthai_full($d) {
+    if (!$d) return '-';
+    $t = strtotime($d);
+    return $t ? date('d/m/Y H:i', $t) : h($d);
+}
+
+// ---------- แจ้งเตือนอะไหล่ครบกำหนดเปลี่ยน (SD Card / Battery Backup RTC) ----------
+/**
+ * เกณฑ์: อายุใช้งาน ≥ 2 ปี = ถึงกำหนด, ≥ 1 ปี 10 เดือน = ใกล้ถึงกำหนด
+ * เคยเปลี่ยนอะไหล่นั้น (จาก MA) → นับจากครั้งล่าสุด · ไม่เคย → นับจากวันผลิต
+ * เช็คทั้งคอลัมน์ replace_items (ระบบใหม่) และ versions_json.Replace (ข้อมูลเก่า AppSheet)
+ */
+function part_watch_alerts($assetId, $producedAt) {
+    $watch = [
+        'SD Card'            => ['SD Card', 'SD-card', 'SDcard'],
+        'Battery Backup RTC' => ['Battery Backup RTC', 'Battery RTC', 'RTC Battery', 'CR2032'],
+    ];
+    $out = [];
+    foreach ($watch as $name => $pats) {
+        $base = ($producedAt && $producedAt !== '0000-00-00') ? $producedAt : null;
+        $conds = []; $types = 'i'; $params = [$assetId];
+        foreach ($pats as $p) {
+            $conds[] = 'replace_items LIKE ?';
+            $conds[] = 'JSON_UNQUOTE(JSON_EXTRACT(versions_json, \'$.Replace\')) LIKE ?';
+            $types .= 'ss'; $params[] = "%$p%"; $params[] = "%$p%";
+        }
+        $r = qr("SELECT MAX(visited_at) d FROM ma_records WHERE asset_id=? AND (" . implode(' OR ', $conds) . ")",
+                $types, $params)->fetch_assoc();
+        if ($r && $r['d']) $base = $r['d'];
+        if (!$base) continue;
+        try { $d1 = new DateTime($base); } catch (Exception $e) { continue; }
+        $diff = $d1->diff(new DateTime('today'));
+        $months = $diff->y * 12 + $diff->m;
+        if ($months < 22) continue;
+        $ageTxt = ($diff->y ? $diff->y . ' ปี ' : '') . $diff->m . ' เดือน';
+        $fromTxt = ($base !== $producedAt) ? 'นับจากเปลี่ยนล่าสุด ' . dthai($base) : 'นับจากวันผลิต ' . dthai($base);
+        if ($months >= 24) $out[] = ['level' => 'danger', 'html' => "🔴 <b>ถึงกำหนดเปลี่ยน $name แล้ว</b> — ใช้งาน $ageTxt ($fromTxt)"];
+        else               $out[] = ['level' => 'warn',   'html' => "🟠 <b>ใกล้ถึงกำหนดเปลี่ยน $name</b> — ใช้งาน $ageTxt ($fromTxt)"];
+    }
+    return $out;
+}
+/** แปลงผล part_watch_alerts เป็นกล่องแจ้งเตือน HTML */
+function part_alerts_html($assetId, $producedAt) {
+    $out = '';
+    foreach (part_watch_alerts($assetId, $producedAt) as $al) {
+        $st = $al['level'] === 'danger'
+            ? 'background:#fbe4e4;color:#90312c;border:1px solid #f0bcbc'
+            : 'background:#fdf3dd;color:#8a5f0b;border:1px solid #f0d9a0';
+        $out .= '<div class="flash" style="' . $st . '">' . $al['html'] . '</div>';
+    }
+    return $out;
+}
+
+// ---------- sync ทะเบียนสินค้า biton_stockparts.stock ----------
+// ข้อมูลรายการสินค้าเก็บที่ biton_stockparts.stock ที่เดียว (ตกลง 2026-07-13 — เลิกใช้ shared_assets แล้ว)
+// เพิ่ม/แก้ไข/ลบเครื่องในระบบหลักแล้วสะท้อนไปตาราง stock อัตโนมัติ (ดู share.php)
+// ตั้งใจให้ fail-soft: ถ้าตารางปลายทางมีปัญหา งานผลิตหลักต้องไม่ล้ม
+
+/** upsert เครื่องลงตาราง stock ตามข้อมูลปัจจุบัน — เรียกหลังเพิ่มหรือแก้ไขเครื่อง ($oldCode = รหัสเดิมถ้ามีการเปลี่ยนรหัส) */
+function share_upsert_asset($assetId, $oldCode = null) {
+    $a = qr("SELECT a.asset_code, a.produced_at, p.name model,
+                    (SELECT pr.made_by FROM production_records pr WHERE pr.asset_id=a.id AND pr.made_by IS NOT NULL AND pr.made_by<>''
+                     ORDER BY pr.recorded_at DESC, pr.id DESC LIMIT 1) made_by,
+                    COALESCE((SELECT MAX(pr2.recorded_at) FROM production_records pr2 WHERE pr2.asset_id=a.id), a.produced_at) last_dt
+             FROM assets a JOIN products p ON p.id=a.product_id WHERE a.id=?", 'i', [$assetId])->fetch_assoc();
+    if (!$a) return;
+    if ($oldCode !== null && $oldCode !== $a['asset_code']) share_delete_asset($oldCode); // เปลี่ยนรหัส: เอาแถว serial เดิมออกก่อน
+    $ts = $a['last_dt'] ?: $a['produced_at'];
+    $conn = dbStock();
+
+    // เดิม: คำนวณ id ใหม่ด้วย COALESCE(MAX(s.id),0)+1 ในคำสั่งเดียวกับ INSERT โดยไม่มีล็อกกันชน
+    // ถ้าเขียนพร้อมกันหลายเครื่อง id ที่คำนวณได้อาจชนกับแถวอื่นที่เพิ่งถูกเขียนไปหมาดๆ
+    // ผลคือ ON DUPLICATE KEY UPDATE จะไป "แก้แถวอื่น" แทนที่จะ insert แถวใหม่จริงๆ — แบบไม่มี error ใดๆ เลย
+    // (เครื่องที่เพิ่งผลิตหายไปเงียบๆ ทั้งที่ฝั่งระบบหลักบันทึกสำเร็จจริง)
+    // แก้ไข: ครอบด้วย GET_LOCK ให้ "อ่าน id ถัดไป + insert" เป็น atomic เหมือนตอนออกรหัสเครื่อง (create_produced_asset)
+    $lockKey = 'biton_stockparts_stock_id_seq';
+    try {
+        $lockRow = $conn->query("SELECT GET_LOCK('$lockKey', 10) l");
+        $lockRow = $lockRow ? $lockRow->fetch_assoc() : null;
+    } catch (\mysqli_sql_exception $e) {
+        error_log("[share_upsert_asset] GET_LOCK query error: " . $e->getMessage() . " asset_id=$assetId code={$a['asset_code']}");
+        return;
+    }
+    if (!$lockRow || (int)$lockRow['l'] !== 1) {
+        error_log("[share_upsert_asset] GET_LOCK ไม่สำเร็จ asset_id=$assetId code={$a['asset_code']} — ข้อมูลจะไม่ถูก sync ไป stock รอบนี้");
+        return; // fail-soft ตามเจตนาเดิม แต่ log ไว้ให้ตรวจสอบย้อนหลังได้ (เดิมไม่ log อะไรเลย)
+    }
+    try {
+        $madeBy = trim((string)($a['made_by'] ?? ''));
+        $st = $conn->prepare("INSERT INTO stock (`timestamp`, serial_number, model, id, create_name, setup_id, active)
+            SELECT ?, ?, ?, COALESCE(MAX(s.id),0)+1, ?, NULL, 1 FROM stock s
+            ON DUPLICATE KEY UPDATE `timestamp`=VALUES(`timestamp`), model=VALUES(model),
+                                    create_name=IF(VALUES(create_name)='', create_name, VALUES(create_name))");
+        if ($st === false) {
+            error_log("[share_upsert_asset] prepare ล้มเหลว: " . $conn->error . " asset_id=$assetId code={$a['asset_code']}");
+            return;
+        }
+        $st->bind_param('ssss', $ts, $a['asset_code'], $a['model'], $a['made_by']);
+        try {
+            $st->execute();
+        } catch (\mysqli_sql_exception $e) {
+            // @ ไม่ได้กัน exception จริงบน PHP 8.1+ (ค่า default ของ mysqli เปลี่ยนไปโยน exception) — ครอบ try/catch จริงแทน
+            error_log("[share_upsert_asset] execute ล้มเหลว: " . $e->getMessage() . " asset_id=$assetId code={$a['asset_code']}");
+        }
+    } finally {
+        $conn->query("SELECT RELEASE_LOCK('$lockKey')");
+    }
+}
+/** อัปเดต model + timestamp + ชื่อผู้ผลิต ใน stock จากข้อมูล production ตาม serial ที่มีในระบบ */
+function share_refresh_meta_from_production() {
+    $prod = db();
+    $stock = dbStock();
+    $res = $prod->query("SELECT a.asset_code, p.name model,
+                                COALESCE((SELECT MAX(pr.recorded_at) FROM production_records pr WHERE pr.asset_id=a.id), a.produced_at) ts,
+                                (SELECT pr.made_by FROM production_records pr WHERE pr.asset_id=a.id
+                                 AND pr.made_by IS NOT NULL AND TRIM(pr.made_by)<>'' 
+                                 ORDER BY pr.recorded_at DESC, pr.id DESC LIMIT 1) made_by
+                         FROM assets a JOIN products p ON p.id=a.product_id");
+    if (!$res) return 0;
+    $st = $stock->prepare("UPDATE stock SET model=?, `timestamp`=?, create_name=IF(?='', create_name, ?) WHERE serial_number=?");
+    if (!$st) return 0;
+    $n = 0;
+    while ($r = $res->fetch_assoc()) {
+        $madeBy = trim((string)($r['made_by'] ?? ''));
+        $st->bind_param('sssss', $r['model'], $r['ts'], $madeBy, $madeBy, $r['asset_code']);
+        $st->execute();
+        if ($st->affected_rows > 0) $n++;
+    }
+    return $n;
+}
+
+/**
+ * สถิติความครบถ้วนของ stock เทียบกับทะเบียนเครื่องผลิต
+ *
+ * @return array{assets:int,in_stock:int,missing_in_stock:int,incomplete:int,needs_sync:bool}
+ */
+function share_sync_stats() {
+    $assetCodes = [];
+    $res = qr("SELECT asset_code FROM assets");
+    while ($r = $res->fetch_assoc()) {
+        $assetCodes[$r['asset_code']] = true;
+    }
+    $inStock = [];
+    $incomplete = 0;
+    $stock = dbStock();
+    $res2 = qr("SELECT serial_number, `timestamp`, model, create_name FROM stock", '', [], $stock);
+    while ($r = $res2->fetch_assoc()) {
+        $inStock[$r['serial_number']] = true;
+        if ($r['timestamp'] === null || trim((string)$r['model']) === '' || trim((string)$r['create_name']) === '') {
+            $incomplete++;
+        }
+    }
+    $missing = 0;
+    foreach ($assetCodes as $code => $_) {
+        if (!isset($inStock[$code])) {
+            $missing++;
+        }
+    }
+    return [
+        'assets' => count($assetCodes),
+        'in_stock' => count($inStock),
+        'missing_in_stock' => $missing,
+        'incomplete' => $incomplete,
+        'needs_sync' => $missing > 0 || $incomplete > 0,
+    ];
+}
+
+/**
+ * ซิงก์ข้อมูล stock ทั้งหมดจากทะเบียนเครื่องผลิต — เพิ่มรายการที่ขาด + อัปเดต meta ที่ยังไม่ครบ
+ *
+ * @return array{assets:int,added:int,updated_meta:int,incomplete_remaining:int,missing_remaining:int}
+ */
+function share_sync_all_from_production() {
+    $stock = dbStock();
+    $existing = [];
+    $res0 = qr("SELECT serial_number FROM stock", '', [], $stock);
+    while ($x = $res0->fetch_assoc()) {
+        $existing[$x['serial_number']] = true;
+    }
+    $added = 0;
+    $res = qr("SELECT id FROM assets ORDER BY id");
+    while ($r = $res->fetch_assoc()) {
+        $aid = (int)$r['id'];
+        $code = qr("SELECT asset_code FROM assets WHERE id=?", 'i', [$aid])->fetch_assoc();
+        if (!$code) {
+            continue;
+        }
+        $wasThere = isset($existing[$code['asset_code']]);
+        share_upsert_asset($aid);
+        if (!$wasThere) {
+            $added++;
+            $existing[$code['asset_code']] = true;
+        }
+    }
+    $updatedMeta = share_refresh_meta_from_production();
+    $stats = share_sync_stats();
+    return [
+        'assets' => $stats['assets'],
+        'added' => $added,
+        'updated_meta' => $updatedMeta,
+        'incomplete_remaining' => $stats['incomplete'],
+        'missing_remaining' => $stats['missing_in_stock'],
+    ];
+}
+
+/**
+ * ปรับ timestamp ให้เทียบกันได้ (ตัดวินาที/รูปแบบต่างกัน)
+ *
+ * @param mixed $v
+ * @return string
+ */
+function share_norm_ts($v) {
+    if ($v === null || $v === '') {
+        return '';
+    }
+    $ts = strtotime((string)$v);
+    return $ts ? date('Y-m-d H:i:s', $ts) : trim((string)$v);
+}
+
+/**
+ * เปรียบเทียบ meta ระหว่าง assets กับ stock — คืนรายการฟิลด์ที่ต่างกัน
+ *
+ * @param array $asset แถวจาก assets (model, ts, made_by)
+ * @param array $stock แถวจาก stock (model, timestamp, create_name)
+ * @return string[] ชื่อฟิลด์ที่ต่าง เช่น model, timestamp, create_name
+ */
+function share_meta_diff_fields(array $asset, array $stock) {
+    $diff = [];
+    $aModel = trim((string)($asset['model'] ?? ''));
+    $sModel = trim((string)($stock['model'] ?? ''));
+    if ($aModel !== $sModel && ($aModel !== '' || $sModel !== '')) {
+        $diff[] = 'model';
+    }
+    if (share_norm_ts($asset['ts'] ?? null) !== share_norm_ts($stock['timestamp'] ?? null)) {
+        $diff[] = 'timestamp';
+    }
+    $aName = trim((string)($asset['made_by'] ?? ''));
+    $sName = trim((string)($stock['create_name'] ?? ''));
+    if ($aName !== $sName && ($aName !== '' || $sName !== '')) {
+        $diff[] = 'create_name';
+    }
+    return $diff;
+}
+
+/**
+ * โหลดดัชนีเปรียบเทียบ assets ↔ stock (cache ต่อ request)
+ *
+ * @return array{assets_by_code:array,stock_by_sn:array,rows:array,counts:array}
+ */
+function share_reconcile_index() {
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+
+    $stockBySn = [];
+    $resS = qr("SELECT serial_number, model, `timestamp`, create_name, active, id batch_id FROM stock", '', [], dbStock());
+    while ($r = $resS->fetch_assoc()) {
+        $stockBySn[$r['serial_number']] = $r;
+    }
+
+    $assetsByCode = [];
+    $resA = qr("SELECT a.id asset_id, a.asset_code, p.name model, a.produced_at,
+                       COALESCE((SELECT MAX(pr.recorded_at) FROM production_records pr WHERE pr.asset_id=a.id), a.produced_at) ts,
+                       (SELECT pr.made_by FROM production_records pr WHERE pr.asset_id=a.id
+                        AND pr.made_by IS NOT NULL AND TRIM(pr.made_by)<>'' 
+                        ORDER BY pr.recorded_at DESC, pr.id DESC LIMIT 1) made_by
+                FROM assets a JOIN products p ON p.id=a.product_id");
+    while ($r = $resA->fetch_assoc()) {
+        $assetsByCode[$r['asset_code']] = $r;
+    }
+
+    $rows = [];
+    $counts = ['assets_only' => 0, 'stock_only' => 0, 'meta_diff' => 0, 'total_diff' => 0];
+
+    foreach ($assetsByCode as $code => $a) {
+        if (!isset($stockBySn[$code])) {
+            $counts['assets_only']++;
+            $rows[] = [
+                'type' => 'assets_only',
+                'serial' => $code,
+                'asset_id' => (int)$a['asset_id'],
+                'a_model' => $a['model'],
+                'a_ts' => $a['ts'],
+                'a_name' => $a['made_by'] ?? '',
+                's_model' => '',
+                's_ts' => null,
+                's_name' => '',
+                's_active' => null,
+                's_batch' => null,
+                'diffs' => [],
+            ];
+        }
+    }
+
+    foreach ($stockBySn as $sn => $s) {
+        if (!isset($assetsByCode[$sn])) {
+            $counts['stock_only']++;
+            $rows[] = [
+                'type' => 'stock_only',
+                'serial' => $sn,
+                'asset_id' => null,
+                'a_model' => '',
+                'a_ts' => null,
+                'a_name' => '',
+                's_model' => $s['model'] ?? '',
+                's_ts' => $s['timestamp'],
+                's_name' => $s['create_name'] ?? '',
+                's_active' => (int)$s['active'],
+                's_batch' => $s['batch_id'],
+                'diffs' => [],
+            ];
+        }
+    }
+
+    foreach ($assetsByCode as $code => $a) {
+        if (!isset($stockBySn[$code])) {
+            continue;
+        }
+        $s = $stockBySn[$code];
+        $diffs = share_meta_diff_fields($a, $s);
+        if (!$diffs) {
+            continue;
+        }
+        $counts['meta_diff']++;
+        $rows[] = [
+            'type' => 'meta_diff',
+            'serial' => $code,
+            'asset_id' => (int)$a['asset_id'],
+            'a_model' => $a['model'],
+            'a_ts' => $a['ts'],
+            'a_name' => $a['made_by'] ?? '',
+            's_model' => $s['model'] ?? '',
+            's_ts' => $s['timestamp'],
+            's_name' => $s['create_name'] ?? '',
+            's_active' => (int)$s['active'],
+            's_batch' => $s['batch_id'],
+            'diffs' => $diffs,
+        ];
+    }
+
+    usort($rows, function ($x, $y) {
+        $ord = ['assets_only' => 0, 'meta_diff' => 1, 'stock_only' => 2];
+        $dx = $ord[$x['type']] ?? 9;
+        $dy = $ord[$y['type']] ?? 9;
+        if ($dx !== $dy) {
+            return $dx - $dy;
+        }
+        return strcmp($x['serial'], $y['serial']);
+    });
+
+    $counts['total_diff'] = count($rows);
+    $cache = [
+        'assets_by_code' => $assetsByCode,
+        'stock_by_sn' => $stockBySn,
+        'rows' => $rows,
+        'counts' => $counts,
+    ];
+    return $cache;
+}
+
+/**
+ * ดึงรายการที่ไม่ตรงกันแบบแบ่งหน้า
+ *
+ * @param string $filter assets_only|stock_only|meta_diff|'' (ทุกประเภทที่ต่าง)
+ * @param string $search ค้นหา serial / รุ่น / ชื่อ
+ * @param int    $page
+ * @param int    $per
+ * @return array{rows:array,total:int,page:int,pages:int}
+ */
+function share_reconcile_list($filter, $search, $page, $per) {
+    $idx = share_reconcile_index();
+    $rows = $idx['rows'];
+    if ($filter !== '' && in_array($filter, ['assets_only', 'stock_only', 'meta_diff'], true)) {
+        $rows = array_values(array_filter($rows, function ($r) use ($filter) {
+            return $r['type'] === $filter;
+        }));
+    }
+    $search = trim((string)$search);
+    if ($search !== '') {
+        $q = mb_strtolower($search);
+        $rows = array_values(array_filter($rows, function ($r) use ($q) {
+            $blob = mb_strtolower($r['serial'] . ' ' . ($r['a_model'] ?? '') . ' ' . ($r['s_model'] ?? '')
+                . ' ' . ($r['a_name'] ?? '') . ' ' . ($r['s_name'] ?? ''));
+            return mb_strpos($blob, $q) !== false;
+        }));
+    }
+    $total = count($rows);
+    $pages = max(1, (int)ceil($total / $per));
+    $page = max(1, min($page, $pages));
+    $off = ($page - 1) * $per;
+    return [
+        'rows' => array_slice($rows, $off, $per),
+        'total' => $total,
+        'page' => $page,
+        'pages' => $pages,
+    ];
+}
+
+/**
+ * ซิงก์เครื่องเดียวจากระบบหลักไป stock ตาม serial
+ *
+ * @param string $serial
+ * @return bool สำเร็จถ้ามีใน assets
+ */
+function share_sync_one_serial($serial) {
+    $serial = trim($serial);
+    if ($serial === '' || mb_strlen($serial) > 80) {
+        return false;
+    }
+    $row = qr("SELECT id FROM assets WHERE asset_code=?", 's', [$serial])->fetch_assoc();
+    if (!$row) {
+        return false;
+    }
+    share_upsert_asset((int)$row['id']);
+    return true;
+}
+
+/**
+ * ซิงก์เครื่องเดียวจาก stock ไปสร้างในระบบหลัก (assets) ตาม serial
+ *
+ * ใช้ข้อมูล model / timestamp / create_name จาก stock จับคู่ products.name
+ * แล้ว INSERT assets + production_records (ถ้ามีผู้ผลิต/เวลา)
+ *
+ * @param string $serial  serial_number ใน stock (= asset_code ที่ต้องการ)
+ * @return array{ok:bool, asset_id?:int, error?:string}
+ */
+function share_sync_stock_one_serial($serial) {
+    $serial = trim($serial);
+    if ($serial === '' || mb_strlen($serial) > 80) {
+        return ['ok' => false, 'error' => 'serial ไม่ถูกต้อง'];
+    }
+    if (qr("SELECT id FROM assets WHERE asset_code=?", 's', [$serial])->fetch_assoc()) {
+        return ['ok' => false, 'error' => 'มีในระบบหลักแล้ว'];
+    }
+
+    $stockDb = dbStock();
+    $s = qr("SELECT serial_number, model, `timestamp`, create_name FROM stock WHERE serial_number=?", 's', [$serial], $stockDb)->fetch_assoc();
+    if (!$s) {
+        return ['ok' => false, 'error' => 'ไม่พบใน stock'];
+    }
+
+    $model = trim((string)($s['model'] ?? ''));
+    if ($model === '') {
+        return ['ok' => false, 'error' => 'ไม่มีรุ่นใน stock'];
+    }
+
+    $p = qr("SELECT id, code_mode FROM products WHERE name=? AND is_active=1 ORDER BY id LIMIT 1", 's', [$model])->fetch_assoc();
+    if (!$p) {
+        $p = qr("SELECT id, code_mode FROM products WHERE name=? ORDER BY id LIMIT 1", 's', [$model])->fetch_assoc();
+    }
+    if (!$p) {
+        return ['ok' => false, 'error' => "ไม่พบรุ่น \"$model\" ในระบบ"];
+    }
+
+    $ts = $s['timestamp'];
+    $producedDate = $ts ? date('Y-m-d', strtotime((string)$ts)) : date('Y-m-d');
+    $madeBy = trim((string)($s['create_name'] ?? ''));
+    $note = 'sync จาก stock';
+    $productId = (int)$p['id'];
+
+    if ($p['code_mode'] === 'factory_serial') {
+        $r = create_produced_asset($productId, $producedDate, $serial, $note, null);
+        if (isset($r['error'])) {
+            return ['ok' => false, 'error' => $r['error']];
+        }
+        $aid = (int)$r['asset_id'];
+    } else {
+        $ins = q_try("INSERT INTO assets (asset_code, factory_serial, product_id, produced_at, status, note) VALUES (?,?,?,?,'new',?)",
+            'ssiss', [$serial, $serial, $productId, $producedDate, $note]);
+        if (!$ins['ok']) {
+            return ['ok' => false, 'error' => db_error_user_message($ins['errno'], $ins['error'])];
+        }
+        $aid = (int)$ins['insert_id'];
+        if ($aid <= 0) {
+            return ['ok' => false, 'error' => 'บันทึกเครื่องไม่สำเร็จ'];
+        }
+        share_upsert_asset($aid);
+    }
+
+    if ($madeBy !== '' || $ts) {
+        $recordedAt = $ts ? date('Y-m-d H:i:s', strtotime((string)$ts)) : date('Y-m-d H:i:s');
+        q("INSERT INTO production_records (asset_id, recorded_at, made_by) VALUES (?,?,?)",
+          'iss', [$aid, $recordedAt, $madeBy !== '' ? $madeBy : null]);
+        share_upsert_asset($aid);
+    }
+
+    return ['ok' => true, 'asset_id' => $aid];
+}
+
+/**
+ * เติม production_records.made_by ในระบบหลักจาก stock.create_name
+ *
+ * ใช้เมื่อเครื่องมีใน assets แล้วแต่ยังไม่มีชื่อผู้ผลิต ขณะที่ stock มี create_name
+ *
+ * @param string     $serial   serial_number / asset_code
+ * @param array|null $stockRow แถว stock ที่มี create_name, timestamp (ถ้ามีแล้วจะไม่ query ซ้ำ)
+ * @return array{ok:bool, skip?:bool, asset_id?:int, error?:string}
+ */
+function share_fill_asset_made_by_from_stock($serial, ?array $stockRow = null) {
+    $serial = trim($serial);
+    if ($serial === '' || mb_strlen($serial) > 80) {
+        return ['ok' => false, 'error' => 'serial ไม่ถูกต้อง'];
+    }
+
+    $asset = qr("SELECT a.id, a.produced_at FROM assets a WHERE a.asset_code=?", 's', [$serial])->fetch_assoc();
+    if (!$asset) {
+        return ['ok' => false, 'skip' => true, 'error' => 'ไม่พบในระบบหลัก'];
+    }
+    $aid = (int)$asset['id'];
+
+    if (qr("SELECT id FROM production_records WHERE asset_id=? AND made_by IS NOT NULL AND TRIM(made_by)<>'' LIMIT 1", 'i', [$aid])->fetch_assoc()) {
+        return ['ok' => false, 'skip' => true, 'error' => 'มีผู้ผลิตในระบบหลักแล้ว'];
+    }
+
+    if ($stockRow === null) {
+        $stockRow = qr("SELECT create_name, `timestamp` FROM stock WHERE serial_number=?", 's', [$serial], dbStock())->fetch_assoc();
+    }
+    if (!$stockRow) {
+        return ['ok' => false, 'error' => 'ไม่พบใน stock'];
+    }
+
+    $name = trim((string)($stockRow['create_name'] ?? ''));
+    if ($name === '') {
+        return ['ok' => false, 'skip' => true, 'error' => 'ไม่มีชื่อใน stock'];
+    }
+    if (mb_strlen($name) > 100) {
+        $name = mb_substr($name, 0, 100);
+    }
+
+    $recordedAt = !empty($stockRow['timestamp'])
+        ? date('Y-m-d H:i:s', strtotime((string)$stockRow['timestamp']))
+        : ($asset['produced_at'] ? date('Y-m-d H:i:s', strtotime((string)$asset['produced_at'])) : date('Y-m-d H:i:s'));
+
+    q("INSERT INTO production_records (asset_id, recorded_at, made_by) VALUES (?,?,?)",
+      'iss', [$aid, $recordedAt, $name]);
+
+    return ['ok' => true, 'asset_id' => $aid];
+}
+
+/**
+ * เติม made_by ในระบบหลักจาก stock ทุกรายการที่ยังว่าง
+ *
+ * @return array{ok:int, skip:int, fail:int}
+ */
+function share_fill_all_asset_made_by_from_stock() {
+    $stock = dbStock();
+    $res = qr("SELECT serial_number, create_name, `timestamp` FROM stock WHERE TRIM(COALESCE(create_name,''))<>''", '', [], $stock);
+    $stats = ['ok' => 0, 'skip' => 0, 'fail' => 0];
+    while ($row = $res->fetch_assoc()) {
+        $r = share_fill_asset_made_by_from_stock($row['serial_number'], $row);
+        if (!empty($r['ok'])) {
+            $stats['ok']++;
+        } elseif (!empty($r['skip'])) {
+            $stats['skip']++;
+        } else {
+            $stats['fail']++;
+        }
+    }
+    return $stats;
+}
+
+/**
+ * ลบเครื่องจากระบบหลักพร้อมประวัติ (ใช้ในหน้าหลังบ้านเท่านั้น)
+ *
+ * @param int $assetId
+ * @return bool
+ */
+function asset_delete_full($assetId) {
+    $assetId = (int)$assetId;
+    if ($assetId <= 0) {
+        return false;
+    }
+    $a = qr("SELECT asset_code FROM assets WHERE id=?", 'i', [$assetId])->fetch_assoc();
+    if (!$a) {
+        return false;
+    }
+    q("UPDATE part_movements SET ref_asset_id=NULL WHERE ref_asset_id=?", 'i', [$assetId]);
+    q("DELETE FROM spare_loans WHERE spare_asset_id=? OR replaces_asset_id=?", 'ii', [$assetId, $assetId]);
+    q("DELETE FROM assets WHERE id=?", 'i', [$assetId]);
+    share_delete_asset($a['asset_code']);
+    return true;
+}
+
+/**
+ * พาร์สวันที่จากหลายรูปแบบสำหรับ import CSV (ISO หรือ AppSheet)
+ *
+ * @param string      $s
+ * @param string|null $slashFmt 'mdy'|'dmy' สำหรับรูปแบบ วัน/เดือน/ปี
+ * @return string|null 'Y-m-d H:i:s'
+ */
+function share_parse_import_dt($s, $slashFmt = 'mdy') {
+    $s = trim((string)$s);
+    if ($s === '') {
+        return null;
+    }
+    if (preg_match('#^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?#', $s)) {
+        $norm = str_replace('T', ' ', $s);
+        if (preg_match('#^\d{4}-\d{2}-\d{2}$#', $norm)) {
+            $norm .= ' 00:00:00';
+        } elseif (strlen($norm) === 16) {
+            $norm .= ':00';
+        }
+        $ts = strtotime($norm);
+        return $ts ? date('Y-m-d H:i:s', $ts) : null;
+    }
+    if (!preg_match('#^(\d{1,2})/(\d{1,2})/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM|น\.)?)?#iu', $s, $m)) {
+        return null;
+    }
+    list(, $a, $b, $y) = $m;
+    $mo = $slashFmt === 'dmy' ? (int)$b : (int)$a;
+    $d  = $slashFmt === 'dmy' ? (int)$a : (int)$b;
+    if ($mo < 1 || $mo > 12 || $d < 1 || $d > 31) {
+        return null;
+    }
+    $h = isset($m[4]) ? (int)$m[4] : 0;
+    $i = isset($m[5]) ? (int)$m[5] : 0;
+    $sec = isset($m[6]) ? (int)$m[6] : 0;
+    $ap = strtoupper($m[7] ?? '');
+    if ($ap === 'PM' && $h < 12) {
+        $h += 12;
+    }
+    if ($ap === 'AM' && $h === 12) {
+        $h = 0;
+    }
+    return sprintf('%04d-%02d-%02d %02d:%02d:%02d', $y, $mo, $d, $h, $i, $sec);
+}
+
+/**
+ * ตรวจรูปแบบวันที่แบบ slash ในไฟล์ import
+ *
+ * @param array<int, string> $values
+ * @return string 'mdy'|'dmy'
+ */
+function share_detect_import_dt_fmt(array $values) {
+    foreach ($values as $v) {
+        if (!preg_match('#^(\d{1,2})/(\d{1,2})/\d{4}#', trim((string)$v), $m)) {
+            continue;
+        }
+        if ((int)$m[1] > 12) {
+            return 'dmy';
+        }
+        if ((int)$m[2] > 12) {
+            return 'mdy';
+        }
+    }
+    return 'mdy';
+}
+
+/**
+ * ดึง model / วันที่ / ผู้ผลิต จากทะเบียนเครื่องผลิตตามหมายเลขสินค้า
+ *
+ * @param string $assetCode
+ * @return array{model:string,ts:?string,made_by:string}
+ */
+function share_lookup_production_meta($assetCode) {
+    $r = qr("SELECT p.name model,
+                    COALESCE((SELECT MAX(pr.recorded_at) FROM production_records pr WHERE pr.asset_id=a.id), a.produced_at) ts,
+                    (SELECT pr.made_by FROM production_records pr WHERE pr.asset_id=a.id
+                     AND pr.made_by IS NOT NULL AND TRIM(pr.made_by)<>'' 
+                     ORDER BY pr.recorded_at DESC, pr.id DESC LIMIT 1) made_by
+             FROM assets a JOIN products p ON p.id=a.product_id WHERE a.asset_code=?", 's', [$assetCode])->fetch_assoc();
+    if (!$r) {
+        return ['model' => '', 'ts' => null, 'made_by' => ''];
+    }
+    return [
+        'model' => trim((string)$r['model']),
+        'ts' => $r['ts'] ?: null,
+        'made_by' => trim((string)($r['made_by'] ?? '')),
+    ];
+}
+
+/**
+ * แมปหัวคอลัมน์ CSV → ฟิลด์มาตรฐาน (serial / timestamp / user / model)
+ *
+ * @param array<int, string> $headerRow
+ * @return array<string, int>
+ */
+function share_normalize_import_header(array $headerRow) {
+    $aliases = [
+        'serial' => ['serial_number', 'serialnumber', 'serial', 'serial_no', 'serialno', 'asset_code', 'code', 'หมายเลขสินค้า', 'เลขเครื่อง'],
+        'timestamp' => ['timestamp', 'date', 'datetime', 'time', 'วันที่', 'วันที่ผลิต', 'เวลา'],
+        'user' => ['create_name', 'user', 'username', 'name', 'ผู้ผลิต', 'ผู้บันทึก', 'ชื่อผู้บันทึก'],
+        'model' => ['model', 'รุ่น', 'product', 'product_name'],
+    ];
+    $col = [];
+    foreach ($headerRow as $i => $raw) {
+        $key = strtolower(trim(preg_replace('/^\xEF\xBB\xBF/', '', (string)$raw)));
+        $key = preg_replace('/[\s\-]+/', '_', $key);
+        foreach ($aliases as $field => $names) {
+            if (in_array($key, $names, true) || $key === $field) {
+                $col[$field] = $i;
+            }
+        }
+    }
+    return $col;
+}
+
+/**
+ * เติมเฉพาะฟิลด์ที่ยังว่างใน stock จากทะเบียนเครื่องผลิต
+ *
+ * @param array<int, string> $serials รายการ serial_number
+ * @return int จำนวนแถวที่ถูกอัปเดต
+ */
+function share_fill_stock_gaps(array $serials) {
+    if (!$serials) {
+        return 0;
+    }
+    $stock = dbStock();
+    $st = $stock->prepare("UPDATE stock SET
+        model = IF(TRIM(COALESCE(model,''))='', ?, model),
+        `timestamp` = IF(`timestamp` IS NULL, ?, `timestamp`),
+        create_name = IF(TRIM(COALESCE(create_name,''))='', ?, create_name)
+        WHERE serial_number=? AND (TRIM(COALESCE(model,''))='' OR `timestamp` IS NULL OR TRIM(COALESCE(create_name,''))='')");
+    if (!$st) {
+        return 0;
+    }
+    $n = 0;
+    foreach ($serials as $sn) {
+        $sn = trim((string)$sn);
+        if ($sn === '') {
+            continue;
+        }
+        $meta = share_lookup_production_meta($sn);
+        if ($meta['model'] === '' && $meta['ts'] === null && $meta['made_by'] === '') {
+            continue;
+        }
+        $st->bind_param('ssss', $meta['model'], $meta['ts'], $meta['made_by'], $sn);
+        $st->execute();
+        if ($st->affected_rows > 0) {
+            $n++;
+        }
+    }
+    return $n;
+}
+
+/**
+ * Import CSV พื้นฐาน: timestamp + serial_number + ผู้ผลิต/ผู้บันทึก
+ * ค่าที่ยังว่างหลัง import จะถูกเติมจากทะเบียนเครื่องผลิตอัตโนมัติ
+ *
+ * @param string $filePath path ไฟล์ CSV ชั่วคราว
+ * @return array<string, mixed>
+ */
+function share_import_basic_csv($filePath) {
+    $fh = fopen($filePath, 'r');
+    if (!$fh) {
+        return ['error' => 'เปิดไฟล์ไม่ได้'];
+    }
+    $head = fgetcsv($fh);
+    if (!$head) {
+        fclose($fh);
+        return ['error' => 'ไฟล์ว่าง'];
+    }
+    $col = share_normalize_import_header($head);
+    if (!isset($col['serial'])) {
+        fclose($fh);
+        return ['error' => 'ต้องมีคอลัมน์ serial_number (หรือ serialnumber / หมายเลขสินค้า)'];
+    }
+    $rows = [];
+    while (($r = fgetcsv($fh)) !== false) {
+        $rows[] = $r;
+    }
+    fclose($fh);
+
+    $tsIdx = $col['timestamp'] ?? null;
+    $tsSamples = [];
+    if ($tsIdx !== null) {
+        foreach ($rows as $r) {
+            $tsSamples[] = $r[$tsIdx] ?? '';
+        }
+    }
+    $fmt = share_detect_import_dt_fmt($tsSamples);
+
+    $stock = dbStock();
+    $batch = (int)qr("SELECT COALESCE(MAX(id),0)+1 m FROM stock", '', [], $stock)->fetch_assoc()['m'];
+
+    $stIns = $stock->prepare("INSERT INTO stock (`timestamp`, serial_number, model, id, create_name, setup_id, active) VALUES (?,?,?,?,?,NULL,1)");
+    $stUpd = $stock->prepare("UPDATE stock SET `timestamp`=?, model=?, create_name=? WHERE serial_number=?");
+    $stSel = $stock->prepare("SELECT `timestamp`, model, create_name FROM stock WHERE serial_number=? LIMIT 1");
+    if (!$stIns || !$stUpd || !$stSel) {
+        return ['error' => 'เตรียมคำสั่งฐานข้อมูลไม่สำเร็จ'];
+    }
+
+    $added = 0;
+    $updated = 0;
+    $skipped = 0;
+    $noProd = 0;
+    $importedSerials = [];
+
+    foreach ($rows as $r) {
+        $sn = trim((string)($r[$col['serial']] ?? ''));
+        if ($sn === '') {
+            $skipped++;
+            continue;
+        }
+        $importedSerials[] = $sn;
+
+        $importTs = null;
+        if ($tsIdx !== null) {
+            $importTs = share_parse_import_dt($r[$tsIdx] ?? '', $fmt);
+        }
+        $importUser = isset($col['user']) ? trim((string)($r[$col['user']] ?? '')) : '';
+        $importModel = isset($col['model']) ? trim((string)($r[$col['model']] ?? '')) : '';
+
+        $prod = share_lookup_production_meta($sn);
+        if ($prod['model'] === '' && $prod['ts'] === null && $prod['made_by'] === '') {
+            $noProd++;
+        }
+
+        $stSel->bind_param('s', $sn);
+        $stSel->execute();
+        $existing = $stSel->get_result()->fetch_assoc();
+
+        if ($existing) {
+            $ts = $importTs ?: ($existing['timestamp'] ?: $prod['ts']);
+            $name = $importUser !== '' ? $importUser
+                : (trim((string)$existing['create_name']) !== '' ? $existing['create_name'] : $prod['made_by']);
+            $model = $importModel !== '' ? $importModel
+                : (trim((string)$existing['model']) !== '' ? $existing['model'] : $prod['model']);
+            $stUpd->bind_param('ssss', $ts, $model, $name, $sn);
+            $stUpd->execute();
+            if ($stUpd->affected_rows > 0) {
+                $updated++;
+            } else {
+                $skipped++;
+            }
+        } else {
+            $ts = $importTs ?: $prod['ts'];
+            $name = $importUser !== '' ? $importUser : $prod['made_by'];
+            $model = $importModel !== '' ? $importModel : $prod['model'];
+            $stIns->bind_param('sssis', $ts, $sn, $model, $batch, $name);
+            $stIns->execute();
+            if ($stIns->affected_rows > 0) {
+                $added++;
+            } else {
+                $skipped++;
+            }
+        }
+    }
+
+    $filled = share_fill_stock_gaps($importedSerials);
+
+    return [
+        'added' => $added,
+        'updated' => $updated,
+        'filled_from_production' => $filled,
+        'skipped' => $skipped,
+        'not_in_production' => $noProd,
+        'total_rows' => count($rows),
+        'date_fmt' => $fmt,
+    ];
+}
+
+/** ลบเครื่องออกจากตาราง stock ตามรหัส — เรียกตอนลบเครื่องออกจากระบบ */
+function share_delete_asset($code) {
+    $conn = dbStock();
+    try {
+        $st = $conn->prepare("DELETE FROM stock WHERE serial_number=?");
+        if ($st === false) { error_log("[share_delete_asset] prepare ล้มเหลว: " . $conn->error . " code=$code"); return; }
+        $st->bind_param('s', $code);
+        try {
+            $st->execute();
+        } catch (\mysqli_sql_exception $e) {
+            error_log("[share_delete_asset] execute ล้มเหลว: " . $e->getMessage() . " code=$code");
+        }
+    } catch (\mysqli_sql_exception $e) {
+        error_log("[share_delete_asset] prepare ล้มเหลว (exception): " . $e->getMessage() . " code=$code");
+    }
+}
+
+// ---------- สร้างรหัสเครื่องใหม่ ----------
+
+/**
+ * ตรวจและเพิ่มคอลัมน์ตั้งค่ารูปแบบรหัสสินค้า (รันครั้งเดียวต่อ request)
+ *
+ * @return void
+ */
+function ensure_product_code_schema() {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    $have = [];
+    $res = db()->query("SHOW COLUMNS FROM products");
+    if (!$res) return;
+    while ($c = $res->fetch_assoc()) $have[$c['Field']] = true;
+    $add = [];
+    if (!isset($have['code_use_prefix'])) $add[] = "ADD COLUMN code_use_prefix TINYINT(1) NOT NULL DEFAULT 1 AFTER code_year_era";
+    if (!isset($have['code_use_year']))   $add[] = "ADD COLUMN code_use_year TINYINT(1) NOT NULL DEFAULT 1 AFTER code_use_prefix";
+    if (!isset($have['code_use_month']))  $add[] = "ADD COLUMN code_use_month TINYINT(1) NOT NULL DEFAULT 1 AFTER code_use_year";
+    if (!$add) return;
+    foreach ($add as $sql) {
+        try {
+            db()->query("ALTER TABLE products $sql");
+        } catch (\mysqli_sql_exception $e) {
+            error_log('[ensure_product_code_schema] ' . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * ซิงก์ factory_serial ให้ตรงกับ asset_code — หมายเลขสินค้าคือตัวเดียวกัน ต่างแค่วิธีออกเลข
+ *
+ * @return void
+ */
+function ensure_asset_serial_identity() {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        db()->query("UPDATE assets SET factory_serial = asset_code
+                      WHERE factory_serial IS NULL OR TRIM(factory_serial) = '' OR factory_serial <> asset_code");
+    } catch (\mysqli_sql_exception $e) {
+        error_log('[ensure_asset_serial_identity] ' . $e->getMessage());
+    }
+}
+
+/**
+ * ค่าเริ่มต้นส่วนประกอบรหัสจากแถว products
+ *
+ * @param array<string, mixed> $p
+ * @return array{code_use_prefix:int,code_use_year:int,code_use_month:int,running_digits:int,code_year_era:string}
+ */
+function product_code_normalize(array $p) {
+    return [
+        'code_use_prefix' => (int)(isset($p['code_use_prefix']) ? $p['code_use_prefix'] : 1),
+        'code_use_year'   => (int)(isset($p['code_use_year']) ? $p['code_use_year'] : 1),
+        'code_use_month'  => (int)(isset($p['code_use_month']) ? $p['code_use_month'] : 1),
+        'running_digits'  => max(1, min(8, (int)(isset($p['running_digits']) ? $p['running_digits'] : 4) ?: 4)),
+        'code_year_era'   => (isset($p['code_year_era']) && $p['code_year_era'] === 'be') ? 'be' : 'ce',
+        'code_prefix'     => isset($p['code_prefix']) ? (string)$p['code_prefix'] : '',
+    ];
+}
+
+/**
+ * สร้างรหัสเครื่องแบบ generated จากส่วนประกอบที่ตั้งค่า
+ *
+ * @param array<string, mixed> $p           แถว/ค่า products (code_prefix, code_year_era, running_digits, code_use_*)
+ * @param string             $producedDate วันที่ผลิต Y-m-d
+ * @param int                $runNo        เลข running
+ * @return string
+ */
+function build_generated_asset_code(array $p, $producedDate, $runNo) {
+    $cfg = product_code_normalize($p);
+    $ts = strtotime($producedDate ?: date('Y-m-d'));
+    $out = '';
+    if ($cfg['code_use_prefix'] && $cfg['code_prefix'] !== '') {
+        $out .= $cfg['code_prefix'];
+    }
+    if ($cfg['code_use_year']) {
+        $y = (int)date('Y', $ts);
+        if ($cfg['code_year_era'] === 'be') $y += 543;
+        $out .= substr((string)$y, -2);
+    }
+    if ($cfg['code_use_month']) {
+        $out .= date('m', $ts);
+    }
+    $digits = max((int)$cfg['running_digits'], strlen((string)$runNo));
+    $out .= str_pad((string)$runNo, $digits, '0', STR_PAD_LEFT);
+    return $out;
+}
+
+/**
+ * คำอธิบายรูปแบบรหัสสำหรับแสดงใน UI
+ *
+ * @param array<string, mixed> $p
+ * @return string
+ */
+function product_code_format_label(array $p) {
+    if (($p['code_mode'] ?? '') !== 'generated') {
+        return 'กรอกหมายเลขสินค้าเอง / สแกน QR';
+    }
+    $cfg = product_code_normalize($p);
+    $parts = [];
+    if ($cfg['code_use_prefix'] && $cfg['code_prefix'] !== '') $parts[] = $cfg['code_prefix'];
+    if ($cfg['code_use_year']) $parts[] = 'ปี' . ($cfg['code_year_era'] === 'be' ? 'พ.ศ.' : 'ค.ศ.') . '(2)';
+    if ($cfg['code_use_month']) $parts[] = 'เดือน(2)';
+    $parts[] = 'รันนิ่ง(' . $cfg['running_digits'] . ')';
+    return implode(' + ', $parts);
+}
+
+/**
+ * ดึงเลข running จากท้ายรหัสเครื่อง (ใช้ตอนแก้ไขรหัส manual)
+ *
+ * @param array<string, mixed> $p
+ * @param string             $assetCode
+ * @return int|null
+ */
+function parse_running_from_asset_code(array $p, $assetCode) {
+    $digits = product_code_normalize($p)['running_digits'];
+    if (preg_match('/(\d{' . $digits . ',})$/', $assetCode, $m)) {
+        return (int)$m[1];
+    }
+    return null;
+}
+
+/**
+ * คำนวณรหัส generated ที่จะออกสำหรับ batch บันทึกผลิต (ยังไม่ INSERT)
+ *
+ * @param int    $productId
+ * @param string $producedDate Y-m-d
+ * @param int    $count        จำนวนเครื่อง
+ * @return array{codes?:array<int,string>, start_run?:int, error?:string, conflicts?:array<int,string>}
+ */
+function preview_generated_asset_codes($productId, $producedDate, $count) {
+    ensure_product_code_schema();
+    $count = min(200, max(1, (int)$count));
+    $p = qr("SELECT id, code_mode, code_prefix, code_year_era, running_digits, code_use_prefix, code_use_year, code_use_month FROM products WHERE id=?", 'i', [$productId])->fetch_assoc();
+    if (!$p) return ['error' => 'ไม่พบรุ่นสินค้า'];
+    if ($p['code_mode'] !== 'generated') return ['error' => 'รุ่นนี้ไม่ได้ใช้ระบบออกรหัสอัตโนมัติ'];
+
+    $cfg = product_code_normalize($p);
+    if ($cfg['code_use_prefix'] && trim((string)$p['code_prefix']) === '') {
+        return ['error' => 'รุ่นนี้ยังไม่ได้ตั้งชื่อย่อ (prefix) ในหลังบ้าน'];
+    }
+
+    if (trim((string)$p['code_prefix']) !== '') {
+        $r = qr("SELECT MAX(a.running_no) m FROM assets a JOIN products pr ON pr.id=a.product_id WHERE pr.code_prefix=?", 's', [$p['code_prefix']])->fetch_assoc();
+    } else {
+        $r = qr("SELECT MAX(running_no) m FROM assets WHERE product_id=?", 'i', [$productId])->fetch_assoc();
+    }
+    $run = (int)$r['m'] + 1;
+    $codes = [];
+    $conflicts = [];
+
+    for ($i = 0; $i < $count; $i++) {
+        $found = false;
+        for ($try = 0; $try < 200; $try++) {
+            $code = build_generated_asset_code($p, $producedDate, $run);
+            $dup = qr("SELECT id FROM assets WHERE asset_code=?", 's', [$code])->fetch_assoc();
+            if (!$dup && !in_array($code, $codes, true)) {
+                $codes[] = $code;
+                $run++;
+                $found = true;
+                break;
+            }
+            if ($dup && !in_array($code, $conflicts, true)) $conflicts[] = $code;
+            $run++;
+        }
+        if (!$found) {
+            return ['error' => 'หาเลข running ว่างไม่ได้ — รหัสในช่วงนี้ถูกใช้ครบแล้ว กรุณาติดต่อ admin'];
+        }
+    }
+
+    $out = ['codes' => $codes, 'start_run' => (int)$r['m'] + 1];
+    if ($conflicts) $out['conflicts'] = $conflicts;
+    return $out;
+}
+
+/**
+ * ตรวจรหัสก่อนบันทึกผลิต — ใช้รหัสตามที่แสดงในฟอร์ม (ยังไม่ข้ามเลข)
+ *
+ * @param int                   $productId
+ * @param string                $producedDate
+ * @param int                   $count
+ * @param array<int, string>    $serials  รายการ S/N (โหมด factory_serial)
+ * @return array{ok:bool, message?:string, codes?:array<int,string>, dupes?:array<int,string>}
+ */
+function precheck_production_save($productId, $producedDate, $count, array $serials = []) {
+    $p = qr("SELECT id, code_mode, code_prefix, code_year_era, running_digits, code_use_prefix, code_use_year, code_use_month FROM products WHERE id=?", 'i', [$productId])->fetch_assoc();
+    if (!$p) return ['ok' => false, 'message' => 'ยังไม่ได้เลือกรุ่นสินค้า'];
+
+    if ($p['code_mode'] === 'generated') {
+        $count = min(200, max(1, (int)$count));
+        if (trim((string)$p['code_prefix']) === '' && product_code_normalize($p)['code_use_prefix']) {
+            return ['ok' => false, 'message' => 'รุ่นนี้ยังไม่ได้ตั้งชื่อย่อ (prefix) ในหลังบ้าน'];
+        }
+        if (trim((string)$p['code_prefix']) !== '') {
+            $r = qr("SELECT MAX(a.running_no) m FROM assets a JOIN products pr ON pr.id=a.product_id WHERE pr.code_prefix=?", 's', [$p['code_prefix']])->fetch_assoc();
+        } else {
+            $r = qr("SELECT MAX(running_no) m FROM assets WHERE product_id=?", 'i', [$productId])->fetch_assoc();
+        }
+        $startRun = (int)$r['m'] + 1;
+        $codes = [];
+        for ($i = 0; $i < $count; $i++) {
+            $codes[] = build_generated_asset_code($p, $producedDate, $startRun + $i);
+        }
+    } else {
+        $codes = array_values(array_unique(array_filter(array_map('trim', $serials))));
+        if (!$codes) return ['ok' => false, 'message' => 'ยังไม่ได้กรอกหมายเลขสินค้า'];
+    }
+
+    $dupes = [];
+    foreach ($codes as $code) {
+        if (qr("SELECT id FROM assets WHERE asset_code=?", 's', [$code])->fetch_assoc()) {
+            $dupes[] = $code;
+        }
+    }
+    if ($dupes) {
+        $list = implode(', ', $dupes);
+        $msg = count($dupes) === 1
+            ? 'รหัสเครื่อง "' . $dupes[0] . '" มีในระบบแล้ว — ไม่สามารถบันทึกซ้ำได้'
+            : 'รหัสเครื่องเหล่านี้มีในระบบแล้ว: ' . $list;
+        $msg .= "\n\nสาเหตุที่เป็นไปได้: เคยบันทึกหรือนำเข้าแล้ว · เลข running ไม่ตรงกับรหัสที่มีอยู่\n";
+        $msg .= 'แนวทางแก้: ตรวจใน「ทะเบียนเครื่อง」หรือให้ admin ปรับเลข running ในระบบหลังบ้าน';
+        return ['ok' => false, 'message' => $msg, 'codes' => $codes, 'dupes' => $dupes];
+    }
+
+    return ['ok' => true, 'codes' => $codes];
+}
+
+/**
+ * สร้างเครื่องผลิตใหม่พร้อม gen รหัส (ล็อกกันเลขชนเมื่อบันทึกพร้อมกัน)
+ * running นับต่อเนื่องทั้ง "ตระกูล prefix" (ทุกรุ่นที่ใช้ prefix เดียวกัน)
+ *
+ * @param int         $productId     รุ่นสินค้า
+ * @param string      $producedDate  วันที่ผลิต Y-m-d
+ * @param string|null $factorySerial หมายเลขสินค้า (กรอกเอง/สแกน เมื่อ code_mode=factory_serial)
+ * @param string|null $note          หมายเหตุ
+ * @param mixed       $userId        ไม่ใช้แล้ว (เก็บพารามิเตอร์ไว้ไม่ให้ call site พัง) — ไม่เขียน created_by
+ * @return array{code?:string,asset_id?:int,error?:string}
+ */
+function create_produced_asset($productId, $producedDate, $factorySerial, $note, $userId = null) {
+    ensure_product_code_schema();
+    $d = db();
+    $p = qr("SELECT id, code_mode, code_prefix, code_year_era, running_digits, code_use_prefix, code_use_year, code_use_month FROM products WHERE id=?", 'i', [$productId])->fetch_assoc();
+    if (!$p) return ['error' => 'ไม่พบรุ่นสินค้า'];
+
+    if ($p['code_mode'] !== 'generated') {
+        // กรอกหมายเลขสินค้าเอง / สแกน QR — ใช้เป็นรหัสเครื่องและ S/N เดียวกัน
+        if (trim((string)$factorySerial) === '') return ['error' => 'รุ่นนี้ต้องกรอกหมายเลขสินค้า (กรอกเองหรือสแกน QR)'];
+        $code = trim($factorySerial);
+        $dup = qr("SELECT id FROM assets WHERE asset_code=?", 's', [$code])->fetch_assoc();
+        if ($dup) return ['error' => db_error_user_message(1062, "Duplicate entry '$code' for key 'asset_code'")];
+        $ins = q_try("INSERT INTO assets (asset_code,factory_serial,product_id,produced_at,status,note) VALUES (?,?,?,?,'new',?)",
+          'ssiss', [$code, $code, $productId, $producedDate, $note]);
+        if (!$ins['ok']) {
+            return ['error' => db_error_user_message($ins['errno'], $ins['error'])];
+        }
+        $aid = (int)$ins['insert_id'];
+        if ($aid <= 0) {
+            return ['error' => 'บันทึกเครื่องไม่สำเร็จ (ไม่ได้รับ asset id)'];
+        }
+        // ยืนยันว่าแถวจริงอยู่ใน DB (กันเคส autocommit/rollback เงียบๆ)
+        $chk = qr("SELECT id FROM assets WHERE id=?", 'i', [$aid])->fetch_assoc();
+        if (!$chk) {
+            return ['error' => 'บันทึกเครื่องไม่สำเร็จ (ข้อมูลไม่ถูก commit)'];
+        }
+        share_upsert_asset($aid); // sync ตารางแชร์ข้อมูลสินค้า
+        return ['code' => $code, 'asset_id' => $aid];
+    }
+
+    $cfg = product_code_normalize($p);
+    if ($cfg['code_use_prefix'] && trim((string)$p['code_prefix']) === '') {
+        return ['error' => 'ติ๊กใช้ชื่อย่อแล้ว กรุณากรอกค่าชื่อย่อ (prefix)'];
+    }
+    $lockKey = trim((string)$p['code_prefix']) !== ''
+        ? 'gencode_' . $p['code_prefix']
+        : 'gencode_pid_' . $productId;
+    $lock = qr("SELECT GET_LOCK(?,10) l", 's', [$lockKey])->fetch_assoc();
+    if (!$lock || (int)$lock['l'] !== 1) return ['error' => 'ระบบกำลังออกเลขให้ผู้อื่น กรุณาลองใหม่'];
+    try {
+        if (trim((string)$p['code_prefix']) !== '') {
+            $r = qr("SELECT MAX(a.running_no) m FROM assets a JOIN products pr ON pr.id=a.product_id WHERE pr.code_prefix=?", 's', [$p['code_prefix']])->fetch_assoc();
+        } else {
+            $r = qr("SELECT MAX(running_no) m FROM assets WHERE product_id=?", 'i', [$productId])->fetch_assoc();
+        }
+        $run = (int)$r['m'] + 1;
+        $code = null;
+        for ($try = 0; $try < 200; $try++) {
+            $candidate = build_generated_asset_code($p, $producedDate, $run);
+            if (!qr("SELECT id FROM assets WHERE asset_code=?", 's', [$candidate])->fetch_assoc()) {
+                $code = $candidate;
+                break;
+            }
+            $run++;
+        }
+        if ($code === null) {
+            return ['error' => 'หาเลข running ว่างไม่ได้ — รหัสในช่วงนี้ถูกใช้ครบแล้ว กรุณาติดต่อ admin'];
+        }
+        $fs = $code;
+        $ins = q_try("INSERT INTO assets (asset_code,factory_serial,product_id,running_no,produced_at,status,note) VALUES (?,?,?,?,?,'new',?)",
+          'ssiiss', [$code, $fs, $productId, $run, $producedDate, $note]);
+        if (!$ins['ok']) {
+            return ['error' => db_error_user_message($ins['errno'], $ins['error'])];
+        }
+        $aid = (int)$ins['insert_id'];
+        if ($aid <= 0) {
+            return ['error' => 'บันทึกเครื่องไม่สำเร็จ (ไม่ได้รับ asset id)'];
+        }
+        $chk = qr("SELECT id FROM assets WHERE id=?", 'i', [$aid])->fetch_assoc();
+        if (!$chk) {
+            return ['error' => 'บันทึกเครื่องไม่สำเร็จ (ข้อมูลไม่ถูก commit)'];
+        }
+        share_upsert_asset($aid); // sync ตารางแชร์ข้อมูลสินค้า
+        return ['code' => $code, 'asset_id' => $aid];
+    } finally {
+        qr("SELECT RELEASE_LOCK(?)", 's', [$lockKey]);
+    }
+}
+
+// ============================================================
+//  ระบบตั้งค่าฟิลด์รายรุ่น (admin หลังบ้าน)
+//  context: 'production' (บันทึกผลิต), 'ma' (การ MA), 'update' (อัปเดต FW/HW)
+// ============================================================
+
+/** รูปแบบช่องกรอกที่รองรับใน product_field_config.input_mode */
+const FIELD_INPUT_MODES = [
+    'chip_multi_free'  => 'เลือกหลายค่า + พิมพ์เองได้',
+    'chip_single_free' => 'เลือกค่าเดียว + พิมพ์เองได้',
+    'chip_multi'       => 'เลือกหลายค่า (รายการเท่านั้น)',
+    'chip_single'      => 'เลือกค่าเดียว (รายการเท่านั้น)',
+    'text'             => 'ช่องข้อความ (ไม่มี dropdown)',
+];
+
+/**
+ * ตรวจและเพิ่มคอลัมน์ input_mode ใน product_field_config
+ *
+ * @return void
+ */
+function ensure_field_input_mode_schema() {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+    $have = [];
+    $res = db()->query("SHOW COLUMNS FROM product_field_config");
+    if (!$res) {
+        return;
+    }
+    while ($c = $res->fetch_assoc()) {
+        $have[$c['Field']] = true;
+    }
+    if (isset($have['input_mode'])) {
+        return;
+    }
+    try {
+        db()->query("ALTER TABLE product_field_config ADD COLUMN input_mode VARCHAR(24) NOT NULL DEFAULT 'chip_multi_free' AFTER options_text");
+    } catch (\mysqli_sql_exception $e) {
+        error_log('[ensure_field_input_mode_schema] ' . $e->getMessage());
+    }
+}
+
+/**
+ * คืนค่า input_mode ที่ถูกต้อง — ค่าไม่รู้จักใช้ chip_multi_free
+ *
+ * @param string|null $mode
+ * @return string
+ */
+function normalize_input_mode($mode) {
+    $mode = trim((string)$mode);
+    return isset(FIELD_INPUT_MODES[$mode]) ? $mode : 'chip_multi_free';
+}
+
+/**
+ * ป้ายไทยของ input_mode สำหรับหน้าหลังบ้าน
+ *
+ * @param string|null $mode
+ * @return string
+ */
+function input_mode_label($mode) {
+    $mode = normalize_input_mode($mode);
+    return FIELD_INPUT_MODES[$mode];
+}
+
+/** แตกข้อความหลายบรรทัด → array (ตัดว่าง/ซ้ำ) */
+function split_lines($text) {
+    $out = [];
+    foreach (preg_split('/\r\n|\r|\n/', (string)$text) as $line) {
+        $line = trim($line);
+        if ($line !== '' && !in_array($line, $out, true)) $out[] = $line;
+    }
+    return $out;
+}
+
+/** อ่าน config ที่ admin ตั้งไว้ของรุ่น — คืน array ['name','kind','options'=>[]] เรียงตาม sort_order */
+function product_config_fields($productId, $context) {
+    ensure_field_input_mode_schema();
+    $res = qr("SELECT field_name, field_kind, options_text, input_mode FROM product_field_config
+               WHERE product_id=? AND context=? AND is_active=1 ORDER BY sort_order, id", 'is', [$productId, $context]);
+    $out = [];
+    while ($r = $res->fetch_assoc()) {
+        $out[] = [
+            'name' => $r['field_name'],
+            'kind' => $r['field_kind'],
+            'options' => split_lines($r['options_text']),
+            'input_mode' => normalize_input_mode($r['input_mode'] ?? ''),
+        ];
+    }
+    return $out;
+}
+
+/** มี config ที่ตั้งเองไหม */
+function has_product_config($productId, $context) {
+    $r = qr("SELECT COUNT(*) c FROM product_field_config WHERE product_id=? AND context=? AND is_active=1", 'is', [$productId, $context])->fetch_assoc();
+    return (int)$r['c'] > 0;
+}
+
+/** ดึงฟิลด์ "บันทึกผลิต" จากประวัติจริงของรุ่น (component + extra) */
+function derive_production_fields($productId) {
+    $fields = [];
+    // ชิ้นส่วนฮาร์ดแวร์
+    $res = qr("SELECT ac.component_name FROM asset_components ac JOIN assets a ON a.id=ac.asset_id
+               WHERE a.product_id=? GROUP BY ac.component_name ORDER BY MAX(ac.id) DESC LIMIT 30", 'i', [$productId]);
+    $names = [];
+    while ($r = $res->fetch_assoc()) $names[] = $r['component_name'];
+    foreach ($names as $cn) {
+        $opts = [];
+        $r2 = qr("SELECT ac.component_value v FROM asset_components ac JOIN assets a ON a.id=ac.asset_id
+                  WHERE a.product_id=? AND ac.component_name=? AND ac.component_value IS NOT NULL AND ac.component_value<>''
+                  GROUP BY ac.component_value ORDER BY MAX(ac.id) DESC LIMIT 20", 'is', [$productId, $cn]);
+        while ($x = $r2->fetch_assoc()) $opts[] = $x['v'];
+        $fields[] = ['name' => $cn, 'kind' => 'component', 'options' => $opts, 'input_mode' => 'chip_multi_free'];
+    }
+    // ข้อมูลเฉพาะรุ่น (extra_json)
+    $extraVals = [];
+    $res = qr("SELECT pr.extra_json FROM production_records pr JOIN assets a ON a.id=pr.asset_id
+               WHERE a.product_id=? AND pr.extra_json IS NOT NULL ORDER BY pr.id DESC LIMIT 400", 'i', [$productId]);
+    while ($r = $res->fetch_assoc()) {
+        $j = json_decode($r['extra_json'], true);
+        if (!is_array($j)) continue;
+        foreach ($j as $k => $v) {
+            if ($k === 'ประเภทบันทึก' || $v === '' || $v === null) continue;
+            if (!isset($extraVals[$k])) $extraVals[$k] = [];
+            if (!in_array((string)$v, $extraVals[$k], true) && count($extraVals[$k]) < 20) $extraVals[$k][] = (string)$v;
+        }
+    }
+    foreach ($extraVals as $k => $opts) {
+        $fields[] = ['name' => $k, 'kind' => 'extra', 'options' => $opts, 'input_mode' => 'chip_multi_free'];
+    }
+    return $fields;
+}
+
+/** ดึงรายการตรวจ/อะไหล่ MA จากประวัติจริงของรุ่น (เรียงตามความถี่) */
+function derive_ma_pool($productId) {
+    $freq = [];
+    $res = qr("SELECT m.ok_items, m.replace_items, m.repair_items FROM ma_records m
+               JOIN assets a ON a.id=m.asset_id WHERE a.product_id=? ORDER BY m.id DESC LIMIT 500", 'i', [$productId]);
+    while ($r = $res->fetch_assoc()) {
+        foreach (['ok_items', 'replace_items', 'repair_items'] as $col) {
+            foreach (split_lines(str_replace(',', "\n", (string)$r[$col])) as $it) {
+                if ($it === '-') continue;
+                $freq[$it] = (isset($freq[$it]) ? $freq[$it] : 0) + 1;
+            }
+        }
+    }
+    arsort($freq);
+    return array_slice(array_keys($freq), 0, 60);
+}
+
+/** ดึงชื่อชิ้นส่วนที่เคยอัปเดต (สำหรับหน้าอัปเดต FW/HW) พร้อมตัวเลือกค่า */
+function derive_update_fields($productId) {
+    // ใช้ชิ้นส่วนฮาร์ดแวร์ชุดเดียวกับบันทึกผลิต (component) เป็นตัวเลือกช่อง "ชิ้นส่วน"
+    $fields = [];
+    foreach (derive_production_fields($productId) as $f) {
+        if ($f['kind'] === 'component') $fields[] = $f;
+    }
+    return $fields;
+}
+
+/**
+ * อ่านค่ามาตรฐาน FW / Lot ที่ตั้งต่อรุ่นในหลังบ้าน
+ *
+ * field_kind: fw|lot = เปิดใช้, fw_off|lot_off = ตั้งใจปิด
+ *
+ * @param int $productId
+ * @return array{fw:?array,lot:?array,decided:bool}
+ */
+function product_std_fields($productId) {
+    ensure_field_input_mode_schema();
+    $out = ['fw' => null, 'lot' => null, 'made_by' => null, 'decided' => false];
+    // อ่านรวมถึงแถวปิดด้วย — query ตรง ๆ ไม่ผ่าน product_config_fields (กรอง is_active อย่างเดียว แต่ยังได้ทุก kind)
+    $res = qr("SELECT field_name, field_kind, options_text, input_mode FROM product_field_config
+               WHERE product_id=? AND context='production' AND field_kind IN ('fw','lot','fw_off','lot_off','made_by','made_by_off') AND is_active=1
+               ORDER BY sort_order, id", 'i', [$productId]);
+    while ($r = $res->fetch_assoc()) {
+        $out['decided'] = true;
+        $opts = split_lines($r['options_text']);
+        $mode = normalize_input_mode($r['input_mode'] ?? '');
+        if ($r['field_kind'] === 'fw') {
+            $out['fw'] = ['name' => $r['field_name'], 'kind' => 'fw', 'options' => $opts, 'input_mode' => $mode];
+        } elseif ($r['field_kind'] === 'lot') {
+            $out['lot'] = ['name' => $r['field_name'], 'kind' => 'lot', 'options' => $opts, 'input_mode' => $mode];
+        } elseif ($r['field_kind'] === 'made_by') {
+            $out['made_by'] = ['name' => $r['field_name'], 'kind' => 'made_by', 'options' => $opts, 'input_mode' => $mode];
+        }
+    }
+    return $out;
+}
+
+/**
+ * รวม config จากหลังบ้าน + ประวัติจริง → ชุดฟิลด์ที่ใช้จริงในฟอร์ม
+ *
+ * - ถ้าตั้งค่าหลังบ้านไว้แล้ว (production): ใช้เฉพาะฟิลด์จาก config ตามลำดับที่ตั้ง
+ *   แล้วเติม options จากประวัติเข้าไปในแต่ละฟิลด์ (ยังพิมพ์ค่าใหม่ได้อิสระที่ฟอร์ม)
+ * - ข้ามชนิด fw/lot (เป็นช่องมาตรฐานแยกแสดงตามสวิตช์หลังบ้าน)
+ * - context อื่น: พฤติกรรมเดิม (config ก่อน แล้วต่อด้วยฟิลด์ประวัติที่ไม่มีใน config)
+ * - ถ้าไม่ได้ตั้ง: ใช้ประวัติล้วน
+ *
+ * @param int    $productId รุ่นสินค้า
+ * @param string $context   production|ma|update
+ * @return array<int, array{name:string,kind:string,options:array}>
+ */
+function effective_fields($productId, $context) {
+    $derived = $context === 'ma' ? [] : ($context === 'update' ? derive_update_fields($productId) : derive_production_fields($productId));
+    $derivedByName = [];
+    foreach ($derived as $f) {
+        $derivedByName[$f['name']] = $f;
+    }
+
+    $cfg = product_config_fields($productId, $context);
+    if (!$cfg) {
+        return $derived;
+    }
+
+    $out = [];
+    $used = [];
+    foreach ($cfg as $c) {
+        // ข้ามชนิด fw/lot/made_by และสถานะปิด (จัดการแยกด้วยสวิตช์หลังบ้าน)
+        if (in_array($c['kind'], ['fw', 'lot', 'fw_off', 'lot_off', 'made_by', 'made_by_off'], true)) {
+            continue;
+        }
+        $histOpts = isset($derivedByName[$c['name']]) ? $derivedByName[$c['name']]['options'] : [];
+        $merged = $c['options'];
+        foreach ($histOpts as $o) {
+            if (!in_array($o, $merged, true)) {
+                $merged[] = $o;
+            }
+        }
+        $out[] = [
+            'name' => $c['name'],
+            'kind' => $c['kind'],
+            'options' => $merged,
+            'input_mode' => normalize_input_mode($c['input_mode'] ?? ''),
+        ];
+        $used[$c['name']] = true;
+    }
+    // หน้าบันทึกผลิต: ยึดฟิลด์จากหลังบ้านเป็นหลัก ไม่ปะปนฟิลด์ประวัติเกิน config
+    if ($context === 'production') {
+        return $out;
+    }
+    foreach ($derived as $f) {
+        if (empty($used[$f['name']])) {
+            if (!isset($f['input_mode'])) {
+                $f['input_mode'] = 'chip_multi_free';
+            }
+            $out[] = $f;
+        }
+    }
+    return $out;
+}
+
+/** pool รายการ MA ที่ใช้จริง (config ∪ ประวัติ) — แยกตามช่อง ok/replace/repair หรือรวมทั้งหมด */
+function effective_ma_pool($productId, $group = null) {
+    $hist = derive_ma_pool($productId);
+    $kindFor = ['ok' => 'ma_ok', 'replace' => 'ma_replace', 'repair' => 'ma_repair'];
+    if (!has_product_config($productId, 'ma')) {
+        return $hist;
+    }
+    $mergeCfg = function ($targetKind) use ($productId) {
+        $cfg = [];
+        foreach (product_config_fields($productId, 'ma') as $c) {
+            if ($c['kind'] === $targetKind || $c['kind'] === 'ma_item') {
+                if ($c['kind'] === 'ma_item' && $c['name'] !== 'items' && trim($c['name']) !== '') {
+                    $cfg[] = $c['name'];
+                }
+                $cfg = array_merge($cfg, $c['options']);
+            }
+        }
+        return array_values(array_filter(array_unique($cfg), function ($x) {
+            return trim($x) !== '' && $x !== 'items';
+        }));
+    };
+    if ($group !== null && isset($kindFor[$group])) {
+        $cfg = $mergeCfg($kindFor[$group]);
+        foreach ($hist as $h) {
+            if (!in_array($h, $cfg, true)) {
+                $cfg[] = $h;
+            }
+        }
+        return $cfg;
+    }
+    $cfg = [];
+    foreach (product_config_fields($productId, 'ma') as $c) {
+        if (in_array($c['kind'], ['ma_ok', 'ma_replace', 'ma_repair', 'ma_item'], true)) {
+            if ($c['name'] !== 'items' && trim($c['name']) !== '') {
+                $cfg[] = $c['name'];
+            }
+            $cfg = array_merge($cfg, $c['options']);
+        }
+    }
+    $cfg = array_values(array_filter(array_unique($cfg), function ($x) {
+        return $x !== 'items' && trim($x) !== '';
+    }));
+    foreach ($hist as $h) {
+        if (!in_array($h, $cfg, true)) {
+            $cfg[] = $h;
+        }
+    }
+    return $cfg;
+}
+
+/** ตัวเลือก Firmware ในฟอร์ม MA (จาก config หลังบ้าน) */
+function effective_ma_fw_options($productId) {
+    $opts = [];
+    if (has_product_config($productId, 'ma')) {
+        foreach (product_config_fields($productId, 'ma') as $c) {
+            if ($c['kind'] === 'ma_fw') {
+                $opts = array_merge($opts, $c['options']);
+            }
+        }
+    }
+    $res = qr("SELECT DISTINCT m.fw_version v FROM ma_records m
+               JOIN assets a ON a.id=m.asset_id
+               WHERE a.product_id=? AND m.fw_version IS NOT NULL AND TRIM(m.fw_version)<>'' 
+               ORDER BY m.id DESC LIMIT 30", 'i', [$productId]);
+    while ($r = $res->fetch_assoc()) {
+        if (!in_array($r['v'], $opts, true)) {
+            $opts[] = $r['v'];
+        }
+    }
+    return $opts;
+}
+
+/** ฟิลด์ฟอร์ม MA สำหรับแสดงในหลังบ้าน (preview / default) */
+function derive_ma_form_fields($productId) {
+    $pool = derive_ma_pool($productId);
+    $fw = effective_ma_fw_options($productId);
+    return [
+        ['name' => 'รายการ ✅ ปกติ', 'kind' => 'ma_ok', 'options' => $pool, 'input_mode' => 'chip_multi_free'],
+        ['name' => 'รายการ 🔄 เปลี่ยนอะไหล่', 'kind' => 'ma_replace', 'options' => $pool, 'input_mode' => 'chip_multi_free'],
+        ['name' => 'รายการ 🔧 ซ่อม', 'kind' => 'ma_repair', 'options' => $pool, 'input_mode' => 'chip_multi_free'],
+        ['name' => 'Firmware หลังตรวจ', 'kind' => 'ma_fw', 'options' => $fw, 'input_mode' => 'chip_single_free'],
+        ['name' => 'สถานะเครื่อง', 'kind' => 'ma_status', 'options' => ['เครื่องเช่า', 'เครื่องสำรอง'], 'input_mode' => 'chip_single'],
+        ['name' => 'หมายเหตุ', 'kind' => 'ma_remark', 'options' => [], 'input_mode' => 'text'],
+    ];
+}
+
+/** อ่าน config ฟิลด์ MA ที่ใช้จริงในฟอร์ม */
+function effective_ma_form_fields($productId) {
+    if (!has_product_config($productId, 'ma')) {
+        return derive_ma_form_fields($productId);
+    }
+    $cfg = product_config_fields($productId, 'ma');
+    return $cfg ?: derive_ma_form_fields($productId);
+}
