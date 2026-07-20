@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UX/UI Audit 2026-07-20 — จุดที่ยังไม่เหมาะสมทั้ง 2 ระบบ + แผนรวมหน้าเดียว</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#211a2e; --muted:#6f6a7d; --line:#e9e5f2; --paper:#fff; --bg:#f6f4fa;
+    --accent:#4e2985; --pink:#e11d74;
+    --ok:#15803d; --warn:#a16207; --bad:#b91c1c;
+    --radius:12px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Noto Sans Thai','Segoe UI',sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.65;padding-bottom:80px}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+  header.hero{background:linear-gradient(120deg,#2a1650,#4e2985 60%,#7a2c8f);color:#fff;padding:44px 0 36px;margin-bottom:30px}
+  header.hero h1{font-size:25px;font-weight:800;margin-bottom:6px}
+  header.hero p{opacity:.85;font-size:14px;max-width:760px}
+  header.hero .meta{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+  header.hero .meta span{background:rgba(255,255,255,.14);padding:4px 12px;border-radius:999px;font-size:12.5px}
+  h2{font-size:19px;font-weight:800;margin:42px 0 6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  h2 .part{font-size:11px;font-weight:700;letter-spacing:.06em;background:var(--accent);color:#fff;padding:3px 10px;border-radius:999px;white-space:nowrap}
+  h3{font-size:15.5px;font-weight:700;margin:24px 0 8px}
+  .lede{color:var(--muted);font-size:14px;margin-bottom:16px}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:18px 22px;margin:12px 0}
+  table.cmp{width:100%;border-collapse:collapse;font-size:13.5px;margin:8px 0}
+  table.cmp th{background:#f7f5fb;color:#5b5470;text-align:left;font-size:12px;padding:8px 12px;border-bottom:2px solid var(--line);white-space:nowrap}
+  table.cmp td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.cmp tr:last-child td{border-bottom:none}
+  .mono{font-family:Consolas,monospace;font-size:12px;background:#f1eef8;padding:1px 6px;border-radius:4px;white-space:nowrap}
+  .sev{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 10px;border-radius:999px;white-space:nowrap}
+  .sev.high{background:#fee2e2;color:var(--bad)}
+  .sev.med{background:#fef9c3;color:var(--warn)}
+  .sev.low{background:#dcfce7;color:var(--ok)}
+  .sev.bug{background:#e11d74;color:#fff}
+  ul.tick{list-style:none;margin:8px 0}
+  ul.tick li{padding-left:24px;position:relative;margin:5px 0;font-size:14px}
+  ul.tick li::before{content:'✓';position:absolute;left:2px;color:var(--ok);font-weight:700}
+  .toc{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:16px 22px;font-size:14px}
+  .toc a{color:var(--accent);text-decoration:none;font-weight:600}
+  .toc li{margin:4px 0 4px 18px}
+  .callout{border-left:4px solid var(--pink);background:#fdeef5;border-radius:0 10px 10px 0;padding:12px 18px;font-size:13.5px;margin:12px 0}
+  .callout b{color:#9d2b66}
+  .mockup-link{display:inline-flex;align-items:center;gap:8px;background:var(--pink);color:#fff;font-weight:700;font-size:14px;padding:10px 22px;border-radius:999px;text-decoration:none;box-shadow:0 4px 14px rgba(225,29,116,.35)}
+  .note{font-size:12.5px;color:var(--muted);margin-top:6px}
+  /* feedback widget */
+  .fb{background:#fff;border:1.5px dashed #c9b8e8;border-radius:var(--radius);padding:14px 18px;margin:8px 0 24px}
+  .fb .fb-title{font-size:12.5px;font-weight:700;color:#7c3aed;margin-bottom:8px}
+  .fb .fb-title::before{content:'🗳️ '}
+  .fb .fb-choices{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+  .fb .fb-choices label{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--line);border-radius:999px;padding:5px 13px;font-size:13px;cursor:pointer;user-select:none;background:#fafbfd}
+  .fb .fb-choices label.sel-new{border-color:var(--ok);background:#dcfce7;color:var(--ok);font-weight:600}
+  .fb .fb-choices label.sel-adjust{border-color:var(--warn);background:#fef9c3;color:var(--warn);font-weight:600}
+  .fb .fb-choices label.sel-keep{border-color:var(--bad);background:#fee2e2;color:var(--bad);font-weight:600}
+  .fb textarea{width:100%;min-height:54px;border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-family:inherit;font-size:13px;resize:vertical;background:#fafbfd}
+  .fb textarea:focus{outline:none;border-color:var(--pink)}
+  .fb .fb-saved{font-size:11px;color:var(--ok);min-height:15px;margin-top:4px;transition:opacity .4s}
+  .sumpanel{background:#241640;color:#e6dff5;border-radius:var(--radius);padding:20px 22px;margin:24px 0}
+  .sumpanel h3{color:#fff;margin-top:0}
+  .sumpanel .cnt{font-size:12.5px;color:#a99cc9}
+  .sumpanel .sumbtns{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .sumpanel button{font-family:inherit;font-size:13px;font-weight:600;border:none;border-radius:8px;padding:8px 16px;cursor:pointer}
+  .sumpanel button.primary{background:var(--pink);color:#fff}
+  .sumpanel button.ghost{background:rgba(255,255,255,.12);color:#e6dff5}
+  .sumpanel pre{background:rgba(255,255,255,.08);border-radius:8px;padding:12px;font-size:12px;white-space:pre-wrap;max-height:300px;overflow:auto;margin-top:10px;display:none;font-family:Consolas,monospace}
+  footer{margin-top:50px;text-align:center;color:var(--muted);font-size:12.5px}
+  @media(max-width:700px){.wrap{padding:0 14px}.card{padding:14px}}
+  .tblwrap{overflow-x:auto}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>UX/UI Audit — จุดที่ยังไม่เหมาะสม + แผนรวมเป็นหน้าเดียว</h1>
+    <p>ตรวจทุกหน้าของระบบทะเบียนเครื่อง (finishgoogs_ma_update, 22 หน้า) และระบบสต็อกอะไหล่ (parts, 9 หน้า) หลัง rollout theme v2 — พบทั้งบั๊กธีม, ไอคอนตกค้าง, และองค์ประกอบที่ไม่คอมม่อน พร้อมข้อเสนอ Dashboard รวมแบบพรีเมี่ยม</p>
+    <div class="meta">
+      <span>ตรวจเมื่อ 20 ก.ค. 2026</span>
+      <span>อ้างอิงโค้ดจริง (path + บรรทัด)</span>
+      <span>โฟลเดอร์ ux-review/ — ไม่ deploy</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<div class="toc">
+  <b>สารบัญ</b>
+  <ol>
+    <li><a href="#p0">สรุป: 3 เรื่องใหญ่ที่ควรจัดการก่อน</a></li>
+    <li><a href="#p1">Part 1 · ปัญหาระดับระบบ (กระทบทั้งคู่)</a></li>
+    <li><a href="#p2">Part 2 · finishgoogs_ma_update รายหน้า</a></li>
+    <li><a href="#p3">Part 3 · parts รายหน้า</a></li>
+    <li><a href="#p4">Part 4 · Mockup Dashboard รวม + Roadmap</a></li>
+  </ol>
+</div>
+
+<!-- ============================================ -->
+<h2 id="p0"><span class="part">สรุป</span>3 เรื่องใหญ่ที่ควรจัดการก่อน</h2>
+<div class="card">
+  <ul class="tick">
+    <li><b>บั๊กธีม: theme-v2.css ทับค่าที่ตั้งใน appearance.php</b> — เปลี่ยนสีธีม/พรีเซ็ต navy/teal แล้วไม่มีผลจริง เพราะไฟล์ v2 hardcode สีชมพู-ม่วงและโหลดท้ายสุด (รายละเอียด B1)</li>
+    <li><b>Sidebar ของ parts ไม่คอมม่อน</b> — เมนูซ่อนสนิท ต้อง hover ขอบจอซ้ายถึงจะ "พลิก" ออกมา ผู้ใช้ใหม่ไม่มีทางรู้ (รายละเอียด B2)</li>
+    <li><b>งานแปลง emoji → SVG ยังไม่จบ</b> — ระบบมีชุดไอคอนกลางแล้ว (shared/ui_icons.php, 44 ไอคอน) แต่ finishgoogs ยังฝัง emoji ดิบ ~300 จุด โดยเฉพาะ system_doc / ma / settings (รายละเอียด B3)</li>
+  </ul>
+  <p style="margin-top:14px"><a class="mockup-link" href="mockup-unified-dashboard.html">🎨 เปิดดู Mockup — Dashboard รวม 2 ระบบ ›</a></p>
+</div>
+
+<!-- ============================================ -->
+<h2 id="p1"><span class="part">Part 1</span>ปัญหาระดับระบบ (กระทบทั้ง 2 แอป)</h2>
+<div class="card tblwrap">
+  <table class="cmp">
+    <tr><th>#</th><th>ปัญหา</th><th>หลักฐานในโค้ด</th><th>ระดับ</th></tr>
+    <tr><td>B1</td><td><b>theme-v2.css ทับค่าธีมจาก DB</b> — ลำดับโหลดคือ style.css → inline <span class="mono">#theme-vars</span> (ค่าจาก site_settings) → theme-v2.css ท้ายสุด ซึ่ง hardcode <span class="mono">--primary:#e11d74</span>, <span class="mono">--sidebar-bg:#4e2985</span> ฯลฯ ใน <span class="mono">:root</span> เดียวกัน → ค่าที่ผู้ใช้ตั้งถูกทับ พรีเซ็ต navy/teal ในหน้า appearance เพี้ยน (เปลี่ยนได้เฉพาะ token ที่ v2 ไม่ได้ระบุ)</td><td><span class="mono">finishgoogs.../includes/layout.php:126-145</span><br><span class="mono">finishgoogs.../assets/theme-v2.css:8-18</span><br><span class="mono">parts/includes/header.php:72-74</span></td><td><span class="sev bug">บั๊ก</span></td></tr>
+    <tr><td>B2</td><td><b>Sidebar คนละ paradigm</b> — finishgoogs เป็น sidebar ตรึงปกติ แต่ parts ซ่อนเมนูด้วย <span class="mono">rotateY(-88deg)</span> ต้อง hover แถบขอบ 14px ถึงจะกางออก — ไม่มี affordance, ใช้บนจอสัมผัส/แท็บเล็ตไม่ได้, สลับ 2 ระบบแล้วงง</td><td><span class="mono">parts/assets/style.css:101-125</span><br><span class="mono">parts/includes/header.php:77-99</span></td><td><span class="sev high">สูง</span></td></tr>
+    <tr><td>B3</td><td><b>emoji ตกค้างทั้งที่มีไอคอนกลางแล้ว</b> — ui_icons.php มี converter emoji→SVG ให้ แต่หลายหน้า render emoji ดิบ: system_doc (~108), ma (~54), settings, activity_logs; parts เหลือ 3 จุด</td><td><span class="mono">shared/ui_icons.php:74-92</span> (converter)<br>ดูรายหน้าใน Part 2-3</td><td><span class="sev med">กลาง</span></td></tr>
+    <tr><td>B4</td><td><b>สีสถานะ/กราฟยัง hardcode ไม่ผ่าน token</b> — inline style ที่มีสีรวม ~94 จุดใน 17 ไฟล์ (finishgoogs) ทำให้เปลี่ยนธีมแล้วจุดเหล่านี้ไม่ตาม</td><td><span class="mono">index.php:43</span> (PALETTE 12 สี), <span class="mono">ma.php:49-51</span>, <span class="mono">system_doc.php:200</span></td><td><span class="sev med">กลาง</span></td></tr>
+    <tr><td>B5</td><td><b>ฟอร์มถูก copy โครงซ้ำ</b> — parts: stock-in / stock-out / stock-out-item มีบล็อก POST-handling โครง identical โดยไม่มี partial กลาง (ประเด็นดูแลรักษาระยะยาว ไม่กระทบผู้ใช้ทันที)</td><td><span class="mono">parts/pages/stock-in.php:9-30</span> ฯลฯ</td><td><span class="sev low">ต่ำ</span></td></tr>
+  </table>
+</div>
+<div class="fb" data-topic="B1 แก้ theme-v2 ไม่ให้ทับค่าธีมจาก appearance.php"></div>
+<div class="fb" data-topic="B2 ปรับ sidebar ของ parts เป็นแบบตรึงปกติเหมือนระบบหลัก"></div>
+<div class="fb" data-topic="B3 กวาด emoji ที่เหลือให้เป็น SVG ทั้งหมด"></div>
+
+<!-- ============================================ -->
+<h2 id="p2"><span class="part">Part 2</span>finishgoogs_ma_update — รายหน้า</h2>
+<p class="lede">22 หน้า UI — หน้าหลัก (assets, asset, updates, parts, repairs, scan, share) อยู่ในเกณฑ์ดี สอดคล้อง theme v2 แล้ว ตารางนี้เก็บเฉพาะหน้าที่มีประเด็น</p>
+<div class="card tblwrap">
+  <table class="cmp">
+    <tr><th>หน้า</th><th>ประเด็น</th><th>ระดับ</th></tr>
+    <tr><td><span class="mono">index.php</span><br>Dashboard</td><td>heading กระโดด h1 → h3 ทั้งหน้า (ข้าม h2) · PALETTE กราฟ 12 สี hardcode · donut/legend ใช้สี <span class="mono">#3b82f6 #8b5cf6...</span> ตรง ไม่ใช่ token · stat-tile ยังส่งสี gradient เป็น inline var</td><td><span class="sev med">กลาง</span></td></tr>
+    <tr><td><span class="mono">ma.php</span></td><td>label สถานะเป็น emoji ในข้อความ (<span class="mono">'✅ ปกติ' '🔄 เปลี่ยนอะไหล่' '🔧 ซ่อม'</span> บรรทัด 49-51) ควรเป็น badge + SVG · สีสถานะ hardcode <span class="mono">#1d6b2a #8a5f0b #90312c</span> ไม่ตรงชุด token (<span class="mono">--success:#15803d</span>...) · emoji ~54 จุด</td><td><span class="sev med">กลาง</span></td></tr>
+    <tr><td><span class="mono">settings.php</span><br>ฮับหลังบ้าน</td><td>ปนสไตล์ 2 ยุคในหน้าเดียว: การ์ดฮับใช้ <span class="mono">ui_heading()</span>+SVG แล้ว แต่ล่างลงไปเป็น <span class="mono">&lt;h2&gt;➕ เพิ่มรุ่นสินค้าใหม่&lt;/h2&gt;</span> emoji ดิบ (บรรทัด 254, 288) · การ์ดฮับ 7 ใบเขียน inline flex ซ้ำ 7 บล็อกแทน class เดียว</td><td><span class="sev med">กลาง</span></td></tr>
+    <tr><td><span class="mono">system_doc.php</span></td><td>inline style เยอะสุดในโปรเจกต์ (~40 จุด) + emoji ~108 จุด + สีฝังตรง (<span class="mono">background:#047857</span>) — เป็นหน้าเอกสารจึงกระทบน้อย แต่ควรทยอยเก็บ</td><td><span class="sev low">ต่ำ</span></td></tr>
+    <tr><td><span class="mono">activity_logs.php</span></td><td>ตาราง override <span class="mono">style="font-size:13px"</span> + th inline ราย cell — หลุดมาตรฐาน table.list · ยืม badge <span class="mono">st-new</span> (ความหมาย "เครื่องใหม่") มาแสดงชื่อระบบ · ปุ่ม <span class="mono">⬇ Export CSV</span> เป็น emoji</td><td><span class="sev med">กลาง</span></td></tr>
+    <tr><td><span class="mono">share.php · share_admin.php</span></td><td>inline style สี 7-8 จุด/หน้า ควรย้ายเข้า class กลาง</td><td><span class="sev low">ต่ำ</span></td></tr>
+  </table>
+</div>
+<div class="fb" data-topic="F-Dashboard จัด heading h1→h2 + ย้ายสีกราฟเข้า token"></div>
+<div class="fb" data-topic="F-ma.php เปลี่ยน label emoji เป็น badge + SVG และใช้สีสถานะชุดกลาง"></div>
+<div class="fb" data-topic="F-settings/activity_logs เก็บสไตล์ให้เป็นยุคเดียว (ui_heading + class กลาง)"></div>
+
+<!-- ============================================ -->
+<h2 id="p3"><span class="part">Part 3</span>parts — รายหน้า</h2>
+<p class="lede">9 หน้า UI — ผ่านการยกเครื่องแล้วเกือบหมด (SVG icon ครบ, token ครบ, component สม่ำเสมอ) เหลือประเด็นเด่นที่หน้าใหม่ล่าสุดกับ sidebar</p>
+<div class="card tblwrap">
+  <table class="cmp">
+    <tr><th>หน้า</th><th>ประเด็น</th><th>ระดับ</th></tr>
+    <tr><td><span class="mono">pages/year-end-summary.php</span><br>(หน้าใหม่ล่าสุด)</td><td>สไตล์หลุดจากพวกมากที่สุด: inline style 9 จุด + สี hardcode 7 จุด (<span class="mono">#f59e0b #92400e #fffbeb</span>) · <span class="mono">&lt;style&gt;</span> ฝังในหน้า กำหนด <span class="mono">.price-input</span> เอง (radius 6px, font 13px — เล็กกว่า input มาตรฐาน 44px) · fallback <span class="mono">var(--primary,#6366f1)</span> เป็นสี indigo ที่ไม่มีในธีม (จุดเดียวกันโผล่ใน index.php:42 ด้วย)</td><td><span class="sev high">สูง</span></td></tr>
+    <tr><td><span class="mono">includes/header.php</span><br>sidebar</td><td>เมนูซ่อนแบบ hover-flip (ดู B2) — ควรเปลี่ยนเป็น sidebar ตรึง + ปุ่ม ☰ บนมือถือ เหมือนระบบหลัก</td><td><span class="sev high">สูง</span></td></tr>
+    <tr><td><span class="mono">pages/history.php · stock-out-item.php</span></td><td>emoji 🔗 ตกค้างใน <span class="mono">.sync-badge</span> (history.php:244, stock-out-item.php:82) — เปลี่ยนเป็นไอคอน <span class="mono">external-link</span>/<span class="mono">switch</span> จากชุดกลาง</td><td><span class="sev low">ต่ำ</span></td></tr>
+    <tr><td><span class="mono">pages/stock-out.php · sets.php</span></td><td>inline margin กระจาย 5 จุด — เพิ่ม utility class (<span class="mono">.mt-*</span>) หรือย้ายเข้า CSS กลาง</td><td><span class="sev low">ต่ำ</span></td></tr>
+  </table>
+</div>
+<div class="callout"><b>ข้อสังเกตด้านบวก:</b> parts มีระบบ token ที่ครบและ helper <span class="mono">actionIcon()</span> ที่ทำให้ปุ่มในตารางเหมือนกันทุกหน้า — เป็นแบบอย่างที่ควรยกไปใช้ฝั่ง finishgoogs ด้วย</div>
+<div class="fb" data-topic="P-year-end-summary จัดสไตล์ให้เข้าระบบ token เดียวกับหน้าอื่น"></div>
+
+<!-- ============================================ -->
+<h2 id="p4"><span class="part">Part 4</span>Mockup Dashboard รวม + Roadmap</h2>
+<div class="card">
+  <h3>แนวคิด "รวม 2 ระบบไว้หน้าเดียว" ที่เสนอ</h3>
+  <ul class="tick">
+    <li><b>Sidebar เดียว 3 หมวด</b> — ภาพรวม / ทะเบียนเครื่อง (5 เมนู) / สต็อกอะไหล่ (7 เมนู) / ระบบหลังบ้าน — ทำได้จริงเพราะ SSO แชร์ session กันอยู่แล้ว แค่ลิงก์ข้ามโฟลเดอร์</li>
+    <li><b>Dashboard รวม</b> — KPI 6 ใบ (เครื่อง 3 + อะไหล่ 2 + ความเคลื่อนไหววันนี้ 1) เห็นครบทุกสถานะ: ใหม่/เช่า/สำรอง/ซ่อม/คงเหลือ/ใกล้หมด + กราฟผลิต + donut + ตารางใกล้หมด + activity feed รวม (ใช้ <span class="mono">shared/activity_log_core.php</span> ที่รวม 2 ระบบให้อยู่แล้ว)</li>
+    <li><b>พรีเมี่ยมโดยคงสีธีม</b> — ชมพู/ม่วงเป็น accent บนพื้นขาว, ตัวเลข tabular-nums ตัวหนา, เงา 2 ระดับ, radius 12/8, badge pill ชุดสีเดียว — เลิก gradient แข่งกันหลายใบ</li>
+  </ul>
+  <p style="margin-top:12px"><a class="mockup-link" href="mockup-unified-dashboard.html">🎨 เปิด Mockup แบบ interactive ›</a></p>
+</div>
+
+<div class="card">
+  <h3>Roadmap ถ้าอนุมัติ mockup (เรียงตามลำดับ)</h3>
+  <div class="tblwrap"><table class="cmp">
+    <tr><th>ลำดับ</th><th>งาน</th><th>ไฟล์หลัก</th><th>แรง</th></tr>
+    <tr><td>1</td><td>แก้บั๊ก B1: ย้าย hardcode ใน theme-v2.css เป็น fallback (ให้ <span class="mono">#theme-vars</span> ชนะ) ทั้ง 2 แอป</td><td><span class="mono">*/assets/theme-v2.css</span>, <span class="mono">layout.php</span>, <span class="mono">header.php</span></td><td>น้อย</td></tr>
+    <tr><td>2</td><td>ปรับ sidebar parts เป็นตรึงปกติ + เมนูรวม 3 หมวดทั้ง 2 แอป (ลิงก์ข้ามระบบราย เมนู)</td><td><span class="mono">parts/includes/header.php</span>, <span class="mono">finishgoogs.../config.php</span> (nav)</td><td>กลาง</td></tr>
+    <tr><td>3</td><td>สร้าง Dashboard รวมตาม mockup (query 2 DB ผ่าน <span class="mono">production_db()</span>/<span class="mono">getDB()</span> ที่มีแล้ว)</td><td><span class="mono">finishgoogs.../index.php</span> + partial ใหม่</td><td>กลาง-มาก</td></tr>
+    <tr><td>4</td><td>กวาด emoji ที่เหลือ (B3) + สีสถานะเข้า token (B4) + จัดระเบียบ year-end-summary</td><td>รายหน้าใน Part 2-3</td><td>กลาง</td></tr>
+  </table></div>
+</div>
+<div class="fb" data-topic="R-Roadmap ลำดับงาน 4 ขั้น"></div>
+
+<!-- summary -->
+<div class="sumpanel">
+  <h3>📋 สรุปความเห็นของคุณ</h3>
+  <p class="cnt" id="sum-count">ยังไม่ได้เลือก</p>
+  <div class="sumbtns">
+    <button class="primary" id="btn-copy">คัดลอกสรุปทั้งหมด</button>
+    <button class="ghost" id="btn-show">แสดง/ซ่อนสรุป</button>
+    <button class="ghost" id="btn-clear" style="color:#f9a8c9">ล้างคำตอบ</button>
+  </div>
+  <pre id="sum-pre"></pre>
+</div>
+
+</div>
+
+<footer>UX/UI Audit · 20 กรกฎาคม 2026 · ไฟล์อยู่ที่ <b>production/ux-review/</b> (ไม่ deploy ขึ้น server)</footer>
+
+<script>
+(function(){
+  var KEY='ux-audit-2026-07-20';
+  var CHOICES=[
+    {val:'new',label:'👍 เห็นด้วย ทำเลย',cls:'sel-new'},
+    {val:'adjust',label:'✏️ ทำ แต่ขอปรับ',cls:'sel-adjust'},
+    {val:'keep',label:'❌ ยังไม่ทำ',cls:'sel-keep'}
+  ];
+  var LABELS={new:'เห็นด้วย ทำเลย',adjust:'ทำ แต่ขอปรับ',keep:'ยังไม่ทำ'};
+  function load(){try{return JSON.parse(localStorage.getItem(KEY))||{}}catch(e){return{}}}
+  function save(d){localStorage.setItem(KEY,JSON.stringify(d))}
+  var data=load();
+  var blocks=document.querySelectorAll('.fb');
+  blocks.forEach(function(fb,i){
+    var topic=fb.getAttribute('data-topic');
+    var saved=data[topic]||{};
+    var html='<div class="fb-title">ความเห็น — '+topic+'</div><div class="fb-choices">';
+    CHOICES.forEach(function(c){
+      html+='<label class="'+(saved.choice===c.val?c.cls:'')+'"><input type="radio" name="fb'+i+'" value="'+c.val+'"'+(saved.choice===c.val?' checked':'')+'>'+c.label+'</label>';
+    });
+    html+='</div><textarea placeholder="ความคิดเห็นเพิ่มเติม...">'+(saved.comment||'')+'</textarea><div class="fb-saved"></div>';
+    fb.innerHTML=html;
+    var savedMsg=fb.querySelector('.fb-saved');
+    function persist(){
+      var choice=(fb.querySelector('input:checked')||{}).value||null;
+      var comment=fb.querySelector('textarea').value.trim();
+      if(choice||comment){data[topic]={choice:choice,comment:comment}}else{delete data[topic]}
+      save(data);updateCount();
+      savedMsg.textContent='✓ บันทึกแล้ว';savedMsg.style.opacity=1;
+      clearTimeout(savedMsg._t);savedMsg._t=setTimeout(function(){savedMsg.style.opacity=0},1500);
+      fb.querySelectorAll('.fb-choices label').forEach(function(l){
+        var input=l.querySelector('input');
+        l.className=input.checked?CHOICES.find(function(c){return c.val===input.value}).cls:'';
+      });
+    }
+    fb.querySelectorAll('input').forEach(function(r){r.addEventListener('change',persist)});
+    var ta=fb.querySelector('textarea');var t;
+    ta.addEventListener('input',function(){clearTimeout(t);t=setTimeout(persist,600)});
+    ta.addEventListener('blur',persist);
+  });
+  function buildSummary(){
+    var lines=['สรุปความเห็น UX/UI Audit — '+new Date().toLocaleString('th-TH'),''];var n=0;
+    blocks.forEach(function(fb){
+      var topic=fb.getAttribute('data-topic');var d=data[topic];if(!d)return;n++;
+      lines.push('■ '+topic);
+      if(d.choice)lines.push('   ตัดสินใจ: '+LABELS[d.choice]);
+      if(d.comment)lines.push('   ความเห็น: '+d.comment);
+      lines.push('');
+    });
+    if(!n)lines.push('(ยังไม่ได้เลือก)');
+    return lines.join('\n');
+  }
+  function updateCount(){
+    var n=Object.keys(data).length;
+    document.getElementById('sum-count').textContent=n?('ตอบแล้ว '+n+' จาก '+blocks.length+' หัวข้อ'):'ยังไม่ได้เลือก';
+    var pre=document.getElementById('sum-pre');
+    if(pre.style.display==='block')pre.textContent=buildSummary();
+  }
+  updateCount();
+  document.getElementById('btn-copy').addEventListener('click',function(){
+    var txt=buildSummary();
+    (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(function(){
+      var b=document.getElementById('btn-copy');b.textContent='✓ คัดลอกแล้ว';
+      setTimeout(function(){b.textContent='คัดลอกสรุปทั้งหมด'},1500);
+    }).catch(function(){
+      var pre=document.getElementById('sum-pre');pre.style.display='block';pre.textContent=txt;
+    });
+  });
+  document.getElementById('btn-show').addEventListener('click',function(){
+    var pre=document.getElementById('sum-pre');
+    pre.style.display=pre.style.display==='block'?'none':'block';
+    pre.textContent=buildSummary();
+  });
+  document.getElementById('btn-clear').addEventListener('click',function(){
+    if(!confirm('ล้างคำตอบทั้งหมด?'))return;
+    data={};save(data);
+    blocks.forEach(function(fb){
+      fb.querySelectorAll('input').forEach(function(r){r.checked=false});
+      fb.querySelectorAll('.fb-choices label').forEach(function(l){l.className=''});
+      fb.querySelector('textarea').value='';
+    });
+    updateCount();
+  });
+})();
+</script>
+</body>
+</html>
