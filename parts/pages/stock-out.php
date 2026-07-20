@@ -40,7 +40,7 @@ $history = $stock->getSetOutHistory(20);
 ?>
 
 <div class="page-header">
-    <h1>📤 เบิกออก (Set)</h1>
+    <?= ui_heading('stock-out-set', 'เบิกออก (Set)', 'h1') ?>
     <p>เบิกอะไหล่ออกเป็น Set ชุด — ระบุ S/N ได้ถ้าเบิกไปใช้กับเครื่อง</p>
 </div>
 

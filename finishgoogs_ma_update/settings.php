@@ -47,6 +47,7 @@ function ma_kind_save($raw) {
     global $MA_KIND_SAVE;
     $raw = trim((string)$raw);
     if (isset($MA_KIND_SAVE[$raw])) return $MA_KIND_SAVE[$raw];
+    if ($raw === 'รายการตรวจ') return 'ma_item';
     return $raw !== '' ? mb_substr($raw, 0, 30) : 'ma_item';
 }
 
@@ -84,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $pid) {
         }
         flash_set('บันทึกฟิลด์ "บันทึก MA" แล้ว (' . $saved . ' ฟิลด์)');
     } elseif (in_array($ctx, ['production', 'update'], true)) {
-        q("DELETE FROM product_field_config WHERE product_id=? AND context=?", 'is', [$pid, $ctx]);
+        q("DELETE FROM product_field_config WHERE product_id=? AND context=? AND field_kind NOT IN ('checklist','watch_alert','watch_alert_cfg')", 'is', [$pid, $ctx]);
         $names = (array)(isset($_POST['field_name']) ? $_POST['field_name'] : []);
         $kinds = (array)(isset($_POST['field_kind']) ? $_POST['field_kind'] : []);
         $opts  = (array)(isset($_POST['field_options']) ? $_POST['field_options'] : []);
@@ -135,6 +136,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $pid) {
                 q("INSERT INTO product_field_config (product_id,context,field_name,field_kind,options_text,input_mode,sort_order)
                    VALUES (?,'production','Lot','lot_off','','chip_single_free',?)", 'ii', [$pid, $sort++]);
             }
+            // Checklist ตรวจก่อนส่งมอบ (หน้าบันทึกผลิต)
+            q("DELETE FROM product_field_config WHERE product_id=? AND context='production' AND field_kind='checklist'", 'i', [$pid]);
+            $chkLines = split_lines(isset($_POST['production_checklist']) ? $_POST['production_checklist'] : '');
+            if ($chkLines) {
+                $chkText = implode("\n", $chkLines);
+                q("INSERT INTO product_field_config (product_id,context,field_name,field_kind,options_text,input_mode,sort_order)
+                   VALUES (?,'production','Checklist ตรวจก่อนส่งมอบ','checklist',?,'',?)", 'isi', [$pid, $chkText, $sort++]);
+                $saved++;
+            }
+            // แจ้งเตือน SD Card / Battery Backup RTC ต่อรุ่น
+            q("DELETE FROM product_field_config WHERE product_id=? AND context='production' AND field_kind IN ('watch_alert','watch_alert_cfg')", 'i', [$pid]);
+            q("INSERT INTO product_field_config (product_id,context,field_name,field_kind,options_text,input_mode,sort_order)
+               VALUES (?,'production','แจ้งเตือนอะไหล่','watch_alert_cfg','','',?)", 'ii', [$pid, $sort++]);
+            $watchCatalog = part_watch_catalog();
+            $watchPosted = (array)(isset($_POST['watch_alert']) ? $_POST['watch_alert'] : []);
+            foreach (array_keys($watchCatalog) as $alertName) {
+                if (in_array($alertName, $watchPosted, true)) {
+                    q("INSERT INTO product_field_config (product_id,context,field_name,field_kind,options_text,input_mode,sort_order)
+                       VALUES (?,'production',?,'watch_alert','','',?)", 'isi', [$pid, $alertName, $sort++]);
+                    $saved++;
+                }
+            }
         }
         flash_set('บันทึกฟิลด์ "' . ($ctx === 'production' ? 'บันทึกผลิต' : 'อัปเดต FW/HW') . '" แล้ว (' . $saved . ' ฟิลด์)');
     } elseif ($ctx === 'reset') {
@@ -159,21 +182,33 @@ if ($pid) {
 page_header('ระบบหลังบ้าน — ตั้งค่ารุ่นและฟิลด์');
 ?>
 <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px">
+  <a class="card clickable" href="<?= BASE_URL ?>/line_notify_settings.php" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; min-width:auto">
+    <?= ui_icon_html('bell', 28, 'h-svg') ?>
+    <div><b>แจ้งเตือน LINE</b><div class="muted">Token · Group ID · เปิด/ปิด event · ทดสอบส่ง · Outbox</div></div>
+  </a>
+  <a class="card clickable" href="<?= BASE_URL ?>/server_config.php" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; min-width:auto">
+    <?= ui_icon_html('settings', 28, 'h-svg') ?>
+    <div><b>ตั้งค่า Server / Deploy</b><div class="muted">Path secrets · DB ทั้ง 3 ตัว · SSO · ทดสอบการเชื่อมต่อ</div></div>
+  </a>
   <a class="card clickable" href="<?= BASE_URL ?>/appearance.php" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; min-width:auto">
-    <span style="font-size:24px">🎨</span>
+    <?= ui_icon_html('palette', 28, 'h-svg') ?>
     <div><b>ปรับแต่งหน้าตาระบบ</b><div class="muted">ข้อความ · โลโก้ · สีธีม · เมนู (ไอคอน/ลำดับ/ตำแหน่ง)</div></div>
   </a>
   <a class="card clickable" href="<?= BASE_URL ?>/share_admin.php" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; min-width:auto">
-    <span style="font-size:24px">🔀</span>
+    <?= ui_icon_html('switch', 28, 'h-svg') ?>
     <div><b>เปรียบเทียบ assets ↔ stock</b><div class="muted">รายการไม่ตรงกัน · ค้นหา · แก้ไข · ลบ · Sync · Import</div></div>
   </a>
   <a class="card clickable" href="<?= BASE_URL ?>/share.php" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; min-width:auto">
-    <span style="font-size:24px">📋</span>
+    <?= ui_icon_html('clipboard', 28, 'h-svg') ?>
     <div><b>ทะเบียนสินค้า (stock)</b><div class="muted">ดู · ค้นหา · แก้ไข · ลบรายการประจำวัน</div></div>
   </a>
   <a class="card clickable" href="<?= BASE_URL ?>/system_doc.php" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; min-width:auto">
-    <span style="font-size:24px">📋</span>
+    <?= ui_icon_html('book', 28, 'h-svg') ?>
     <div><b>หลักการทำงานของระบบ</b><div class="muted">DB · ตาราง · Data flow · ฟังก์ชัน · สิทธิ์ผู้ใช้</div></div>
+  </a>
+  <a class="card clickable" href="<?= BASE_URL ?>/activity_logs.php" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; min-width:auto">
+    <?= ui_icon_html('history', 28, 'h-svg') ?>
+    <div><b>Activity Log</b><div class="muted">ความเคลื่อนไหวผู้ใช้ · Production + Parts · Export CSV</div></div>
   </a>
 </div>
 <p class="muted" style="margin-bottom:14px">
@@ -181,7 +216,7 @@ page_header('ระบบหลังบ้าน — ตั้งค่าร�
   · ถ้าไม่ตั้งค่าฟิลด์ ระบบจะใช้ฟิลด์อัตโนมัติจากประวัติการใช้งานจริง
 </p>
 
-<h2>📦 รุ่นสินค้า</h2>
+<?= ui_heading('box', 'รุ่นสินค้า', 'h2') ?>
 <form method="get" class="filter" style="margin-bottom:10px">
   <label style="align-self:center">เลือกรุ่นเพื่อตั้งค่า:</label>
   <select name="product" onchange="this.form.submit()" style="min-width:280px">
@@ -196,7 +231,7 @@ page_header('ระบบหลังบ้าน — ตั้งค่าร�
     $rows = product_admin_list_query();
 ?>
 <div style="margin-bottom:12px">
-  <input type="text" id="prod-list-search" placeholder="🔍 ค้นหาชื่อรุ่น / รหัสสินค้า / prefix" style="width:min(360px,100%)">
+  <input type="text" id="prod-list-search" placeholder="ค้นหาชื่อรุ่น / รหัสสินค้า / prefix" style="width:min(360px,100%)">
 </div>
 <div class="grid-products" id="prod-list-grid" style="margin-bottom:24px">
 <?php while ($r = $rows->fetch_assoc()) { ?>
@@ -264,7 +299,7 @@ productCodeToggle('new');
     <?php if ($product['icon_path']) echo img_tag($product['icon_path'], '', 'thumb') . ' ';
     ?><input type="file" name="icon" accept="image/*">
   </div>
-  <div class="full"><button type="submit">💾 บันทึกข้อมูลรุ่น</button></div>
+  <div class="full"><button type="submit" class="btn-with-icon"><?= ui_btn_label('save', 'บันทึกข้อมูลรุ่น') ?></button></div>
 </form>
 
 <?php
@@ -281,13 +316,20 @@ $madeByMode = $stdFields['made_by'] ? $stdFields['made_by']['input_mode'] : 'chi
 $fwInputMode = $showFwCfg ? $showFwCfg['input_mode'] : 'chip_single_free';
 $lotInputMode = $showLotCfg ? $showLotCfg['input_mode'] : 'chip_single_free';
 $madeByChecked = $stdFields['decided'] ? ($stdFields['made_by'] !== null) : true;
-// แสดงในตารางเฉพาะฟิลด์กำหนดเอง (ไม่รวมช่องมาตรฐาน made_by / fw / lot)
+// แสดงในตารางเฉพาะฟิลด์กำหนดเอง (ไม่รวมช่องมาตรฐาน made_by / fw / lot / checklist / watch)
 $prodEff = [];
+$checklistText = '';
 foreach ($prodEffAll as $f) {
-    if (in_array($f['kind'], ['fw', 'lot', 'fw_off', 'lot_off', 'made_by', 'made_by_off'], true)) continue;
+    if ($f['kind'] === 'checklist') {
+        $checklistText = implode("\n", $f['options']);
+        continue;
+    }
+    if (in_array($f['kind'], ['fw', 'lot', 'fw_off', 'lot_off', 'made_by', 'made_by_off', 'watch_alert', 'watch_alert_cfg'], true)) continue;
     $prodEff[] = $f;
 }
 if (!$prodEff && !$prodIsConfigured) $prodEff = derive_production_fields($pid); // แสดง preview จากประวัติถ้ายังไม่ตั้ง
+$watchCatalog = part_watch_catalog();
+$watchEnabled = product_watch_alerts_enabled($pid);
 ?>
 <h2>① ฟิลด์หน้า "บันทึกผลิตใหม่"
   <?= $prodIsConfigured ? '<span class="badge st-new">ตั้งค่าเองแล้ว</span>' : '<span class="badge st-spare">อัตโนมัติจากประวัติ</span>' ?>
@@ -345,6 +387,25 @@ foreach ($prodEff as $f) if (!isset($KIND_LABELS[$f['kind']]) && $f['kind'] !== 
     </div>
   </div>
 
+  <div class="panel" style="margin-bottom:14px; padding:12px 14px">
+    <b>Checklist ตรวจก่อนส่งมอบ</b>
+    <p class="muted" style="margin:4px 0 10px; font-size:13px">รายการที่แสดงในหน้า "บันทึกผลิตใหม่" — บรรทัดละ 1 ข้อ · ผู้บันทึกติ๊กเฉพาะข้อที่ตรวจแล้ว · ถ้าว่าง ระบบจะดึงจาก checklist ของเครื่องล่าสุดในรุ่นนี้</p>
+    <textarea name="production_checklist" rows="6" style="width:100%; max-width:560px" placeholder="เช่น&#10;ทดสอบ Boot ผ่าน&#10;ทดสอบ Network&#10;ติดสตicker S/N"><?= h($checklistText) ?></textarea>
+  </div>
+
+  <div class="panel" style="margin-bottom:14px; padding:12px 14px">
+    <b>แจ้งเตือนอะไหล่ที่ควรเปลี่ยน</b>
+    <p class="muted" style="margin:4px 0 10px; font-size:13px">เลือกว่ารุ่นนี้จะแสดงข้อความ "ถึงกำหนดเปลี่ยน …" อะไรบ้าง (นับจากวันผลิตหรือวันเปลี่ยนล่าสุดใน MA) · รุ่นที่ยังไม่เคยบันทึกจะเปิดทุกรายการไว้เป็นค่าเริ่ม</p>
+    <div style="display:grid; gap:8px">
+      <?php foreach ($watchCatalog as $alertName => $_aliases) { ?>
+      <label style="display:flex; align-items:center; gap:8px; font-weight:500">
+        <input type="checkbox" name="watch_alert[]" value="<?= h($alertName) ?>" <?= !empty($watchEnabled[$alertName]) ? 'checked' : '' ?>>
+        <?= h($alertName) ?>
+      </label>
+      <?php } ?>
+    </div>
+  </div>
+
   <table class="list" id="tbl-production">
     <tr><th style="width:34px"></th><th>ชื่อฟิลด์</th><th style="width:170px">ชนิด</th><th style="width:200px">รูปแบบช่องกรอก</th><th>ตัวเลือก (บรรทัดละ 1 ค่า)</th><th style="width:50px"></th></tr>
     <?php foreach ($prodEff as $i => $f) { ?>
@@ -360,7 +421,7 @@ foreach ($prodEff as $f) if (!isset($KIND_LABELS[$f['kind']]) && $f['kind'] !== 
   </table>
   <div style="margin:8px 0; display:flex; gap:8px">
     <button type="button" class="btn btn-line" onclick="addRow('tbl-production','production')">➕ เพิ่มฟิลด์</button>
-    <button type="submit">💾 บันทึกฟิลด์ผลิต</button>
+    <button type="submit" class="btn-with-icon"><?= ui_btn_label('save', 'บันทึกฟิลด์ผลิต') ?></button>
     <?php if ($prodIsConfigured) { ?>
     <button type="submit" form="reset-production" class="btn-line" onclick="return confirm('ล้าง config แล้วกลับไปใช้ฟิลด์อัตโนมัติ?')">↺ ใช้ค่าอัตโนมัติ</button>
     <?php } ?>
@@ -403,7 +464,7 @@ if (!$maEff) $maEff = derive_ma_form_fields($pid);
   </table>
   <div style="margin:8px 0; display:flex; gap:8px; flex-wrap:wrap">
     <button type="button" class="btn btn-line" onclick="addRow('tbl-ma','ma')">➕ เพิ่มฟิลด์</button>
-    <button type="submit">💾 บันทึกฟิลด์ MA</button>
+    <button type="submit" class="btn-with-icon"><?= ui_btn_label('save', 'บันทึกฟิลด์ MA') ?></button>
     <?php if ($maConfigured) { ?>
     <button type="submit" form="reset-ma" class="btn-line" onclick="return confirm('ล้าง config แล้วกลับไปใช้ฟิลด์อัตโนมัติ?')">↺ ใช้ค่าอัตโนมัติ</button>
     <?php } ?>
@@ -440,7 +501,7 @@ if (!$updEff) $updEff = derive_update_fields($pid);
   </table>
   <div style="margin:8px 0; display:flex; gap:8px">
     <button type="button" class="btn btn-line" onclick="addRow('tbl-update','update')">➕ เพิ่มชิ้นส่วน</button>
-    <button type="submit">💾 บันทึกฟิลด์อัปเดต</button>
+    <button type="submit" class="btn-with-icon"><?= ui_btn_label('save', 'บันทึกฟิลด์อัปเดต') ?></button>
     <?php if ($updConfigured) { ?>
     <button type="submit" form="reset-update" class="btn-line" onclick="return confirm('ล้าง config แล้วกลับไปใช้อัตโนมัติ?')">↺ ใช้ค่าอัตโนมัติ</button>
     <?php } ?>
@@ -448,7 +509,7 @@ if (!$updEff) $updEff = derive_update_fields($pid);
 </form>
 <form method="post" id="reset-update"><?= csrf_field() ?><input type="hidden" name="product_id" value="<?= $pid ?>"><input type="hidden" name="context" value="reset"><input type="hidden" name="reset_ctx" value="update"></form>
 
-<p class="muted" style="margin-top:22px">🔩 <b>ชุดอะไหล่ประจำรุ่น</b> ย้ายไปจัดที่หน้า "บันทึกผลิตใหม่" แล้ว (เลือกรุ่น → ช่อง "ชุดอะไหล่ที่จะเบิก")</p>
+<p class="muted h-with-icon" style="margin-top:22px"><?= ui_icon_html('parts', 16, 'h-svg') ?><span><b>ชุดอะไหล่ประจำรุ่น</b> ย้ายไปจัดที่หน้า "บันทึกผลิตใหม่" แล้ว (เลือกรุ่น → ช่อง "ชุดอะไหล่ที่จะเบิก")</span></p>
 
 <script>
 var INPUT_MODE_OPTS = <?= json_encode(FIELD_INPUT_MODES, JSON_UNESCAPED_UNICODE) ?>;

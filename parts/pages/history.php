@@ -7,6 +7,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'sn_basket') {
     session_start();
     require_once __DIR__ . '/../config/database.php';
     require_once __DIR__ . '/../includes/helpers.php';
+    require_once dirname(__DIR__, 2) . '/shared/ui_icons.php';
     parts_localhost_bootstrap_session();
     if (!isset($_SESSION['profile'])) {
         http_response_code(403);
@@ -100,31 +101,111 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_stock_out'])) 
 
 $detailId = isset($_GET['id']) ? (int) $_GET['id'] : null;
 $detail = $detailId ? $stock->getStockOutDetail($detailId) : null;
-$grouped = $stock->getStockOutHistoryGrouped();
+$grouped = $stock->getStockOutHistoryGroupedBySn();
 
 /**
- * สรุปชื่อรายการเบิกสำหรับแถวกลุ่ม S/N
+ * สรุปรายการเบิกของ S/N (แถวยุบ)
  *
- * @param array<int,array<string,mixed>> $items
+ * @param array<string,mixed> $g
  * @return string
  */
-function history_group_label(array $items): string
+function history_sn_summary(array $g): string
 {
-    $count = count($items);
-    if ($count === 1) {
-        $h = $items[0];
-        if ($h['set_id']) {
-            return '[Set] [' . e($h['set_code']) . '] ' . e($h['set_name']);
+    $docCount = (int) ($g['doc_count'] ?? $g['count']);
+    if ($docCount <= 1) {
+        $itemCount = count($g['items'] ?? []);
+        if ($itemCount > 1) {
+            return '<span class="history-sn-summary">' . $itemCount . ' รายการอะไหล่</span>';
         }
-        return '<span class="badge badge-info">รายชิ้น</span> [' . e($h['single_product_code']) . '] ' . e($h['single_product_name']);
+        return history_row_label($g['latest']);
     }
-    return '<strong>' . $count . ' ใบเบิก</strong> <span class="text-muted">(S/N เดียวกัน)</span>';
+
+    $seen = [];
+    $sets = 0;
+    $singles = 0;
+    foreach ($g['items'] as $h) {
+        $id = (int) $h['id'];
+        if (isset($seen[$id])) {
+            continue;
+        }
+        $seen[$id] = true;
+        if (!empty($h['set_id'])) {
+            $sets++;
+        } else {
+            $singles++;
+        }
+    }
+
+    $label = $docCount . ' ใบเบิก';
+    if ($sets && $singles) {
+        $label .= ' (Set ' . $sets . ', รายชิ้น ' . $singles . ')';
+    } elseif ($sets) {
+        $label .= ' (Set)';
+    } elseif ($singles) {
+        $label .= ' (รายชิ้น)';
+    }
+
+    return '<span class="history-sn-summary">' . e($label)
+        . ' <span class="text-muted">— คลิกดูรายละเอียด</span></span>';
+}
+
+/**
+ * ใบเบิกล่าสุดในกลุ่ม S/N
+ *
+ * @param array<string,mixed> $g
+ * @return array<string,mixed>
+ */
+function history_sn_latest(array $g): array
+{
+    $latest = $g['latest'];
+    foreach ($g['items'] as $h) {
+        if (strcmp((string) ($h['created_at'] ?? ''), (string) ($latest['created_at'] ?? '')) > 0) {
+            $latest = $h;
+        }
+    }
+    return $latest;
+}
+
+/**
+ * ป้ายรายการเบิก (Set / รายชิ้น)
+ *
+ * @param array<string,mixed> $h
+ * @return string
+ */
+function history_row_label(array $h): string
+{
+    if (!empty($h['set_id'])) {
+        return '[Set] [' . e($h['set_code']) . '] ' . e($h['set_name']);
+    }
+    return '<span class="badge badge-info">รายชิ้น</span> [' . e($h['single_product_code']) . '] ' . e($h['single_product_name']);
+}
+
+/**
+ * ปุ่มจัดการใบเบิกหนึ่งรายการ
+ *
+ * @param array<string,mixed> $h
+ * @return string
+ */
+function history_row_actions(array $h): string
+{
+    $view = actionIcon('view', url('/pages/history.php?id=' . (int) $h['id']), 'ดูรายละเอียด');
+    if (empty($h['set_id'])) {
+        $edit = actionIcon('edit', url('/pages/stock-out-item.php?edit_out=' . (int) $h['id']), 'แก้ไข');
+    } else {
+        $edit = actionIcon('edit', url('/pages/stock-out.php?edit_out=' . (int) $h['id']), 'แก้ไข');
+    }
+    $delete = '<form method="POST" onsubmit="return confirm(\'ลบรายการเบิกนี้?\')">'
+        . '<input type="hidden" name="delete_stock_out" value="1">'
+        . '<input type="hidden" name="id" value="' . (int) $h['id'] . '">'
+        . actionIcon('delete', '', 'ลบ')
+        . '</form>';
+    return '<div class="table-actions">' . $view . $edit . $delete . '</div>';
 }
 ?>
 
 <div class="page-header">
-    <h1>📜 ประวัติการเบิก</h1>
-    <p>รายการเบิกออกทั้งหมด — จัดกลุ่มตาม S/N เครื่อง</p>
+    <?= ui_heading('history', 'ประวัติการเบิก', 'h1') ?>
+    <p>รายการเบิกออกทั้งหมด — 1 แถวต่อ S/N (คลิกแถวเพื่อดูรายละเอียด)</p>
 </div>
 
 <?php if ($detail): ?>
@@ -222,46 +303,40 @@ function history_group_label(array $items): string
             <tr><td colspan="8" class="text-center text-muted">ยังไม่มีประวัติการเบิก</td></tr>
             <?php else: ?>
             <?php foreach ($grouped as $g): ?>
-            <?php $h = $g['latest']; ?>
-            <tr>
+            <?php if ($g['type'] === 'sn'): ?>
+            <?php $latest = history_sn_latest($g); ?>
+            <tr class="history-sn-row" data-sn-basket-row="<?= e($g['sn']) ?>" title="คลิกดูรายการเบิกทั้งหมดของ S/N นี้">
                 <td>
-                    <?php if ($g['type'] === 'sn' && $g['count'] > 1): ?>
-                        <span class="text-muted"><?= $g['count'] ?> ใบ</span><br>
-                        <span style="font-size:0.82rem"><?= e($h['doc_no']) ?> …</span>
+                    <?php if (($g['doc_count'] ?? $g['count']) > 1): ?>
+                    <span class="text-muted"><?= (int) ($g['doc_count'] ?? $g['count']) ?> ใบเบิก</span>
                     <?php else: ?>
-                        <strong><?= e($h['doc_no']) ?></strong>
+                    <strong><?= e($latest['doc_no']) ?></strong>
                     <?php endif; ?>
                 </td>
-                <td>
-                    <span><?= history_group_label($g['items']) ?></span>
-                </td>
-                <td><?= e($g['sn'] ?: '-') ?></td>
+                <td><?= history_sn_summary($g) ?></td>
+                <td><strong><?= e($g['sn']) ?></strong></td>
                 <td class="text-right"><?= formatNumber($g['total_qty']) ?></td>
+                <td><?= e($latest['issued_by'] ?: '-') ?></td>
+                <td class="text-muted"><?= e($latest['note'] ?: '-') ?></td>
+                <td class="text-muted"><?= formatDate($latest['created_at']) ?></td>
+                <td class="col-actions">
+                    <?= actionIcon('basket', $g['sn'], 'ดูรายการเบิกทั้งหมด') ?>
+                </td>
+            </tr>
+            <?php else: ?>
+            <?php foreach ($g['items'] as $h): ?>
+            <tr>
+                <td><strong><?= e($h['doc_no']) ?></strong></td>
+                <td><?= history_row_label($h) ?></td>
+                <td>-</td>
+                <td class="text-right"><?= formatNumber($h['display_qty'] ?? $h['total_qty'] ?? 0) ?></td>
                 <td><?= e($h['issued_by'] ?: '-') ?></td>
                 <td class="text-muted"><?= e($h['note'] ?: '-') ?></td>
                 <td class="text-muted"><?= formatDate($h['created_at']) ?></td>
-                <td class="col-actions">
-                    <?php if ($g['type'] === 'single'): ?>
-                    <div class="table-actions">
-                        <?= actionIcon('view', url('/pages/history.php?id=' . $h['id']), 'ดูรายละเอียด') ?>
-                        <?php if (empty($h['set_id'])): ?>
-                        <?= actionIcon('edit', url('/pages/stock-out-item.php?edit_out=' . (int) $h['id']), 'แก้ไข') ?>
-                        <?php else: ?>
-                        <?= actionIcon('edit', url('/pages/stock-out.php?edit_out=' . (int) $h['id']), 'แก้ไข') ?>
-                        <?php endif; ?>
-                        <form method="POST" onsubmit="return confirm('ลบรายการเบิกนี้?')">
-                            <input type="hidden" name="delete_stock_out" value="1">
-                            <input type="hidden" name="id" value="<?= (int) $h['id'] ?>">
-                            <?= actionIcon('delete', '', 'ลบ') ?>
-                        </form>
-                    </div>
-                    <?php else: ?>
-                    <div class="table-actions">
-                        <?= actionIcon('basket', $g['sn'], 'ดูรายละเอียดทั้งหมด', false) ?>
-                    </div>
-                    <?php endif; ?>
-                </td>
+                <td class="col-actions"><?= history_row_actions($h) ?></td>
             </tr>
+            <?php endforeach; ?>
+            <?php endif; ?>
             <?php endforeach; ?>
             <?php endif; ?>
         </tbody>
@@ -272,7 +347,7 @@ function history_group_label(array $items): string
 <div id="sn-basket-modal" class="modal-overlay" hidden>
     <div class="modal-box">
         <div class="modal-header">
-            <h3>🧺 อะไหล่ที่เบิกตาม S/N</h3>
+            <h3 class="h-with-icon"><?= ui_icon_html('basket', 18, 'h-svg') ?><span>อะไหล่ที่เบิกตาม S/N</span></h3>
             <button type="button" class="modal-close" aria-label="ปิด">&times;</button>
         </div>
         <div id="sn-basket-body" class="modal-body"></div>

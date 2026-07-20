@@ -6,23 +6,28 @@ session_start();
 mb_internal_encoding('UTF-8');
 date_default_timezone_set('Asia/Bangkok');
 error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
-// ชี้ error_log ออกนอก web root แทนตำแหน่งเดิม (default ของ php.ini) กันไฟล์ log หลุดออกเว็บได้
-ini_set('error_log', 'D:/Ops/logs/php-error.log');
+require_once dirname(__DIR__) . '/shared/app_paths.php';
+ini_set('error_log', app_error_log_path());
 
 /**
- * คืน BASE_URL ตาม environment — localhost ใช้ path จริงของ finishgoogs_ma_update
+ * คืน BASE_URL จาก SCRIPT_NAME — รองรับ localhost, LAN IP, และ production
  *
  * @return string
  */
 function app_base_url() {
-    $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
-    $localIp = in_array($ip, ['127.0.0.1', '::1'], true);
-    $host = (string)($_SERVER['HTTP_HOST'] ?? '');
-    $localHost = (bool)preg_match('/^(localhost|127\.0\.0\.1)(:\d+)?$/', $host);
-    if ($localIp && $localHost) {
-        return '/production/finishgoogs_ma_update';
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
     }
-    return '/production';
+    $script = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    $marker = '/finishgoogs_ma_update';
+    $pos = strpos($script, $marker);
+    if ($pos !== false) {
+        $cached = substr($script, 0, $pos + strlen($marker));
+        return $cached;
+    }
+    $cached = '/production';
+    return $cached;
 }
 
 define('BASE_URL', app_base_url());
@@ -36,7 +41,15 @@ define('APP_NAME', 'ระบบทะเบียนเครื่องแล
 function db_secrets() {
     static $c = null;
     if ($c === null) {
-        $c = require 'D:/AppServ/secrets/production/finishgoogs.secrets.php';
+        $path = app_finishgoogs_secrets_path();
+        if (!is_file($path)) {
+            die('ไม่พบไฟล์ secrets: ' . htmlspecialchars($path, ENT_QUOTES, 'UTF-8')
+                . ' — ตั้งค่าที่หลังบ้าน → ตั้งค่า Server / Deploy');
+        }
+        $c = require $path;
+        if (!is_array($c)) {
+            die('ไฟล์ secrets รูปแบบไม่ถูกต้อง: ' . htmlspecialchars($path, ENT_QUOTES, 'UTF-8'));
+        }
     }
     return $c;
 }
@@ -234,18 +247,37 @@ function theme_color($k, $default) {
 /** เมนูเริ่มต้น: [file, icon(emoji), label, ผู้มีสิทธิ์เห็น] — ไม่จำกัด role แล้ว (ใช้แค่ session profile) */
 function nav_default() {
     return [
-        ['index.php',      '📊', 'Dashboard',        true],
-        ['assets.php',     '🖥️', 'ทะเบียนเครื่องผลิตใหม่', true],
-        ['updates.php',    '⚙️', 'อัปเดต FW/HW',      true],
-        ['ma.php',         '📅', 'บันทึก MA',         true],
-        ['parts.php',      '🔩', 'อะไหล่',            true],
-        ['customers.php',  '🏢', 'ลูกค้า',            true],
-        ['repairs.php',    '🔧', 'ประวัติซ่อม',        true],
-        ['scan.php',       '📷', 'สแกน QR',           true],
-        ['settings.php',   '🛠️', 'ระบบหลังบ้าน',      true],
+        ['index.php',      'dashboard', 'Dashboard',        true],
+        ['assets.php',     'assets',    'ทะเบียนเครื่องผลิตใหม่', true],
+        ['updates.php',    'updates',   'อัปเดต FW/HW',      true],
+        ['ma.php',         'ma',        'บันทึก MA',         true],
+        ['parts.php',      'parts',     'อะไหล่',            true],
+        ['repairs.php',    'repairs',   'ประวัติซ่อม',        true],
+        ['scan.php',       'scan',      'สแกน QR',           true],
+        ['settings.php',   'settings',  'ระบบหลังบ้าน',      true],
     ];
 }
-/** รวมเมนูเริ่มต้น + override (icon/label/order/hidden) → เมนูที่ใช้จริง */
+/** คืน icon key มาตรฐานตามไฟล์เมนู */
+function nav_icon_for_file(string $file): string {
+    foreach (nav_default() as $n) {
+        if ($n[0] === $file) {
+            return $n[1];
+        }
+    }
+    return 'dashboard';
+}
+
+/** คืน label มาตรฐานตามไฟล์เมนู (ตาม mockup v2) */
+function nav_label_for_file(string $file): string {
+    foreach (nav_default() as $n) {
+        if ($n[0] === $file) {
+            return $n[2];
+        }
+    }
+    return $file;
+}
+
+/** รวมเมนูเริ่มต้น + override (order/hidden) → เมนูที่ใช้จริง — icon/label มาตรฐาน v2 */
 function nav_effective() {
     $ovr = json_decode((string)setting('nav_items', '[]'), true);
     if (!is_array($ovr)) $ovr = [];
@@ -258,8 +290,8 @@ function nav_effective() {
         if (!empty($o['hidden'])) continue;
         $out[] = [
             'file'  => $n[0],
-            'icon'  => (isset($o['icon']) && $o['icon'] !== '') ? $o['icon'] : $n[1],
-            'label' => (isset($o['label']) && $o['label'] !== '') ? $o['label'] : $n[2],
+            'icon'  => nav_icon_for_file($n[0]),
+            'label' => nav_label_for_file($n[0]),
             'order' => isset($o['order']) ? (int)$o['order'] : $i,
         ];
     }
@@ -267,10 +299,44 @@ function nav_effective() {
     return $out;
 }
 
+/** ชื่อเดือนย่อภาษาไทย จาก Y-m */
+function thai_month_short(string $ym): string {
+    static $names = [
+        '01' => 'ม.ค.', '02' => 'ก.พ.', '03' => 'มี.ค.', '04' => 'เม.ย.',
+        '05' => 'พ.ค.', '06' => 'มิ.ย.', '07' => 'ก.ค.', '08' => 'ส.ค.',
+        '09' => 'ก.ย.', '10' => 'ต.ค.', '11' => 'พ.ย.', '12' => 'ธ.ค.',
+    ];
+    $parts = explode('-', $ym);
+    if (count($parts) !== 2) {
+        return $ym;
+    }
+    return ($names[$parts[1]] ?? $parts[1]);
+}
+
+/**
+ * ป้ายช่วงเดือนสำหรับหัวข้อ modal / รายงาน — เช่น "ก.ค. 2568"
+ *
+ * @param string $ym รูปแบบ Y-m
+ * @return string
+ */
+function thai_month_period_label(string $ym): string {
+    $parts = explode('-', $ym);
+    if (count($parts) !== 2) {
+        return $ym;
+    }
+    return thai_month_short($ym) . ' ' . ((int)$parts[0] + 543);
+}
+
+/** แปลงปี ค.ศ. เป็น พ.ศ. สำหรับแสดงผล */
+function thai_buddhist_year(int $year): int {
+    return $year + 543;
+}
+
 // ---------- auth (session profile เท่านั้น — ไม่ใช้ตาราง users / role / login ภายใน) ----------
-define('SSO_LOGIN_URL', 'https://bit-online.net/bitlogin/bitlink.php');
+define('SSO_LOGIN_URL', app_sso_production_login_url());
 
 require_once __DIR__ . '/includes/session_profile.php';
+require_once dirname(__DIR__) . '/shared/ui_icons.php';
 
 /**
  * Dev localhost — auto-login เป็น Tom แทน SSO (ห้ามใช้บน production)
@@ -397,7 +463,21 @@ function csrf_check() {
 }
 
 // ---------- flash message ----------
-function flash_set($msg, $type = 'ok') { $_SESSION['flash'] = [$msg, $type]; }
+function flash_set($msg, $type = 'ok', $logSummary = null) {
+    $_SESSION['flash'] = [$msg, $type];
+    if ($logSummary !== null) {
+        if (!function_exists('activity_log_write')) {
+            require_once dirname(__DIR__) . '/shared/activity_log_core.php';
+        }
+        activity_log_write([
+            'system_key' => 'production',
+            'actor_name' => actor_name(),
+            'action_key' => 'save:' . preg_replace('/\.php$/', '', basename((string)($_SERVER['SCRIPT_NAME'] ?? 'app'))),
+            'summary'    => mb_substr((string)$logSummary, 0, 500) ?: mb_substr((string)$msg, 0, 500),
+            'detail'     => activity_log_sanitize_post_detail(),
+        ]);
+    }
+}
 function flash_get() { $f = isset($_SESSION['flash']) ? $_SESSION['flash'] : null; unset($_SESSION['flash']); return $f; }
 
 // ---------- รูปภาพ ----------
@@ -470,15 +550,15 @@ function save_font_upload($field) {
  * @return array{font:string,google:string,custom_file:string}
  */
 function theme_font_config() {
-    $preset = setting('font_preset', 'system');
+    $preset = setting('font_preset', 'noto');
     $custom = trim((string)setting('font_file', ''));
     $google = '';
-    $family = "'Segoe UI', Tahoma, sans-serif";
+    $family = "'Noto Sans Thai', 'Segoe UI', Tahoma, sans-serif";
     if ($custom !== '') {
-        return ['font' => "'AppCustomFont', 'Segoe UI', sans-serif", 'google' => '', 'custom_file' => $custom];
+        return ['font' => "'AppCustomFont', 'Noto Sans Thai', 'Segoe UI', sans-serif", 'google' => '', 'custom_file' => $custom];
     }
     $presets = [
-        'system'  => ['font' => "'Segoe UI', Tahoma, sans-serif", 'google' => ''],
+        'system'  => ['font' => "'Noto Sans Thai', 'Segoe UI', Tahoma, sans-serif", 'google' => 'https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap'],
         'saraban' => ['font' => "'Sarabun', 'Segoe UI', sans-serif", 'google' => 'https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap'],
         'prompt'  => ['font' => "'Prompt', 'Segoe UI', sans-serif", 'google' => 'https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap'],
         'kanit'   => ['font' => "'Kanit', 'Segoe UI', sans-serif", 'google' => 'https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700&display=swap'],
@@ -515,18 +595,135 @@ function dthai_full($d) {
 }
 
 // ---------- แจ้งเตือนอะไหล่ครบกำหนดเปลี่ยน (SD Card / Battery Backup RTC) ----------
+
+/**
+ * รายการแจ้งเตือนที่ระบบรองรับ — key = ชื่อแสดง, value = alias สำหรับค้นใน MA
+ *
+ * @return array<string,array<int,string>>
+ */
+function part_watch_catalog() {
+    return [
+        'SD Card'            => ['SD Card', 'SD-card', 'SDcard'],
+        'Battery Backup RTC' => ['Battery Backup RTC', 'Battery RTC', 'RTC Battery', 'CR2032'],
+    ];
+}
+
+/**
+ * ตรวจว่ารุ่นนี้ตั้งค่าแจ้งเตือนแล้วหรือยัง
+ *
+ * @param int $productId
+ * @return bool
+ */
+function product_watch_alerts_configured($productId) {
+    $productId = (int)$productId;
+    if ($productId <= 0) {
+        return false;
+    }
+    return (bool)qr(
+        "SELECT 1 FROM product_field_config
+         WHERE product_id=? AND context='production' AND field_kind='watch_alert_cfg' AND is_active=1 LIMIT 1",
+        'i',
+        [$productId]
+    )->fetch_assoc();
+}
+
+/**
+ * อ่านว่ารุ่นนี้เปิดแจ้งเตือนอะไรบ้าง — ยังไม่ตั้งค่า = เปิดทั้งหมด (backward compatible)
+ *
+ * @param int $productId
+ * @return array<string,bool>
+ */
+function product_watch_alerts_enabled($productId) {
+    $productId = (int)$productId;
+    $catalog = part_watch_catalog();
+    $enabled = [];
+    if ($productId <= 0) {
+        foreach (array_keys($catalog) as $k) {
+            $enabled[$k] = true;
+        }
+        return $enabled;
+    }
+    if (!product_watch_alerts_configured($productId)) {
+        foreach (array_keys($catalog) as $k) {
+            $enabled[$k] = true;
+        }
+        return $enabled;
+    }
+    foreach (array_keys($catalog) as $k) {
+        $enabled[$k] = false;
+    }
+    $res = qr(
+        "SELECT field_name FROM product_field_config
+         WHERE product_id=? AND context='production' AND field_kind='watch_alert' AND is_active=1",
+        'i',
+        [$productId]
+    );
+    while ($r = $res->fetch_assoc()) {
+        $enabled[(string)$r['field_name']] = true;
+    }
+    return $enabled;
+}
+
+/**
+ * รายการ Checklist หน้าบันทึกผลิต — จากหลังบ้าน หรือดึงจากประวัติล่าสุด
+ *
+ * @param int $productId
+ * @return array<int,string>
+ */
+function effective_production_checklist($productId) {
+    $productId = (int)$productId;
+    if ($productId <= 0) {
+        return [];
+    }
+    foreach (product_config_fields($productId, 'production') as $f) {
+        if ($f['kind'] === 'checklist' && $f['options']) {
+            return $f['options'];
+        }
+    }
+    $last = qr(
+        "SELECT pr.checklist FROM production_records pr
+         JOIN assets a ON a.id=pr.asset_id
+         WHERE a.product_id=? AND pr.checklist IS NOT NULL AND TRIM(pr.checklist)<>'' AND pr.checklist<>'-'
+         ORDER BY pr.recorded_at DESC, pr.id DESC LIMIT 1",
+        'i',
+        [$productId]
+    )->fetch_assoc();
+    if (!$last || trim((string)$last['checklist']) === '') {
+        return [];
+    }
+    $items = [];
+    foreach (preg_split('/\s*,\s*/', (string)$last['checklist']) as $it) {
+        $it = trim($it);
+        if ($it !== '' && $it !== '-') {
+            $items[] = $it;
+        }
+    }
+    return $items;
+}
+
 /**
  * เกณฑ์: อายุใช้งาน ≥ 2 ปี = ถึงกำหนด, ≥ 1 ปี 10 เดือน = ใกล้ถึงกำหนด
  * เคยเปลี่ยนอะไหล่นั้น (จาก MA) → นับจากครั้งล่าสุด · ไม่เคย → นับจากวันผลิต
  * เช็คทั้งคอลัมน์ replace_items (ระบบใหม่) และ versions_json.Replace (ข้อมูลเก่า AppSheet)
+ *
+ * @param int         $assetId
+ * @param string|null $producedAt
+ * @param int|null    $productId ถ้ารู้ product_id จะกรองตามการตั้งค่ารุ่น
+ * @return array<int,array{level:string,html:string}>
  */
-function part_watch_alerts($assetId, $producedAt) {
-    $watch = [
-        'SD Card'            => ['SD Card', 'SD-card', 'SDcard'],
-        'Battery Backup RTC' => ['Battery Backup RTC', 'Battery RTC', 'RTC Battery', 'CR2032'],
-    ];
+function part_watch_alerts($assetId, $producedAt, $productId = null) {
+    $assetId = (int)$assetId;
+    if ($productId === null && $assetId > 0) {
+        $row = qr('SELECT product_id FROM assets WHERE id=? LIMIT 1', 'i', [$assetId])->fetch_assoc();
+        $productId = $row ? (int)$row['product_id'] : 0;
+    }
+    $enabled = product_watch_alerts_enabled((int)$productId);
+    $watch = part_watch_catalog();
     $out = [];
     foreach ($watch as $name => $pats) {
+        if (empty($enabled[$name])) {
+            continue;
+        }
         $base = ($producedAt && $producedAt !== '0000-00-00') ? $producedAt : null;
         $conds = []; $types = 'i'; $params = [$assetId];
         foreach ($pats as $p) {
@@ -1954,57 +2151,51 @@ function effective_fields($productId, $context) {
     return $out;
 }
 
-/** pool รายการ MA ที่ใช้จริง (config ∪ ประวัติ) — แยกตามช่อง ok/replace/repair หรือรวมทั้งหมด */
-function effective_ma_pool($productId, $group = null) {
-    $hist = derive_ma_pool($productId);
-    $kindFor = ['ok' => 'ma_ok', 'replace' => 'ma_replace', 'repair' => 'ma_repair'];
-    if (!has_product_config($productId, 'ma')) {
-        return $hist;
+/**
+ * จับคู่ฟิลด์ config MA → ช่อง ok/replace/repair (รองรับชนิดเก่า "รายการตรวจ")
+ *
+ * @return 'ok'|'replace'|'repair'|'all'|null
+ */
+function ma_config_field_group($kind, $fieldName) {
+    $kind = trim((string)$kind);
+    $name = trim((string)$fieldName);
+    if ($kind === 'ma_ok' || mb_strpos($name, 'ปกติ') !== false) {
+        return 'ok';
     }
-    $mergeCfg = function ($targetKind) use ($productId) {
-        $cfg = [];
-        foreach (product_config_fields($productId, 'ma') as $c) {
-            if ($c['kind'] === $targetKind || $c['kind'] === 'ma_item') {
-                if ($c['kind'] === 'ma_item' && $c['name'] !== 'items' && trim($c['name']) !== '') {
-                    $cfg[] = $c['name'];
-                }
-                $cfg = array_merge($cfg, $c['options']);
-            }
-        }
-        return array_values(array_filter(array_unique($cfg), function ($x) {
-            return trim($x) !== '' && $x !== 'items';
-        }));
-    };
-    if ($group !== null && isset($kindFor[$group])) {
-        $cfg = $mergeCfg($kindFor[$group]);
-        foreach ($hist as $h) {
-            if (!in_array($h, $cfg, true)) {
-                $cfg[] = $h;
-            }
-        }
-        return $cfg;
+    if ($kind === 'ma_replace' || mb_strpos($name, 'เปลี่ยน') !== false) {
+        return 'replace';
+    }
+    if ($kind === 'ma_repair' || (mb_strpos($name, 'ซ่อม') !== false && mb_strpos($name, 'เปลี่ยน') === false)) {
+        return 'repair';
+    }
+    if ($kind === 'ma_item' || $kind === 'รายการตรวจ' || mb_strpos($kind, 'รายการ') === 0) {
+        return 'all';
+    }
+    return null;
+}
+
+/** pool รายการ MA สำหรับ dropdown — ใช้เฉพาะ config หลังบ้าน (ไม่ปะประวัติเก่า) */
+function effective_ma_pool($productId, $group = null) {
+    if (!has_product_config($productId, 'ma')) {
+        return derive_ma_pool($productId);
     }
     $cfg = [];
     foreach (product_config_fields($productId, 'ma') as $c) {
-        if (in_array($c['kind'], ['ma_ok', 'ma_replace', 'ma_repair', 'ma_item'], true)) {
-            if ($c['name'] !== 'items' && trim($c['name']) !== '') {
-                $cfg[] = $c['name'];
-            }
-            $cfg = array_merge($cfg, $c['options']);
+        $fg = ma_config_field_group($c['kind'], $c['name']);
+        if ($fg === null) {
+            continue;
         }
+        if ($group !== null && $fg !== 'all' && $fg !== $group) {
+            continue;
+        }
+        $cfg = array_merge($cfg, $c['options']);
     }
-    $cfg = array_values(array_filter(array_unique($cfg), function ($x) {
-        return $x !== 'items' && trim($x) !== '';
+    return array_values(array_filter(array_unique($cfg), function ($x) {
+        return trim($x) !== '' && $x !== 'items';
     }));
-    foreach ($hist as $h) {
-        if (!in_array($h, $cfg, true)) {
-            $cfg[] = $h;
-        }
-    }
-    return $cfg;
 }
 
-/** ตัวเลือก Firmware ในฟอร์ม MA (จาก config หลังบ้าน) */
+/** ตัวเลือก Firmware ในฟอร์ม MA — จาก config หลังบ้านเท่านั้น */
 function effective_ma_fw_options($productId) {
     $opts = [];
     if (has_product_config($productId, 'ma')) {
@@ -2014,16 +2205,9 @@ function effective_ma_fw_options($productId) {
             }
         }
     }
-    $res = qr("SELECT DISTINCT m.fw_version v FROM ma_records m
-               JOIN assets a ON a.id=m.asset_id
-               WHERE a.product_id=? AND m.fw_version IS NOT NULL AND TRIM(m.fw_version)<>'' 
-               ORDER BY m.id DESC LIMIT 30", 'i', [$productId]);
-    while ($r = $res->fetch_assoc()) {
-        if (!in_array($r['v'], $opts, true)) {
-            $opts[] = $r['v'];
-        }
-    }
-    return $opts;
+    return array_values(array_filter(array_unique($opts), function ($x) {
+        return trim($x) !== '';
+    }));
 }
 
 /** ฟิลด์ฟอร์ม MA สำหรับแสดงในหลังบ้าน (preview / default) */
@@ -2050,3 +2234,13 @@ function effective_ma_form_fields($productId) {
 }
 
 require_once __DIR__ . '/includes/part_stock_bridge.php';
+
+require_once dirname(__DIR__) . '/shared/activity_log_core.php';
+require_once dirname(__DIR__) . '/shared/line_notify_core.php';
+require_once dirname(__DIR__) . '/shared/line_flex_templates.php';
+require_once dirname(__DIR__) . '/shared/line_notify_jobs.php';
+activity_log_ensure_schema();
+line_notify_ensure_schema();
+if (PHP_SAPI !== 'cli' && session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION['profile'])) {
+    activity_log_register_post_shutdown('production', actor_name());
+}

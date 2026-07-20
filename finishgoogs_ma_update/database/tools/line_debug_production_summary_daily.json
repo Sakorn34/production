@@ -1,0 +1,184 @@
+{
+    "to": "test",
+    "messages": [
+        {
+            "type": "flex",
+            "altText": "📦 รายงานการผลิตสินค้า",
+            "contents": {
+                "type": "carousel",
+                "contents": [
+                    {
+                        "type": "bubble",
+                        "size": "mega",
+                        "header": {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "backgroundColor": "#1a8a4a",
+                            "paddingAll": "lg",
+                            "contents": [
+                                {
+                                    "type": "box",
+                                    "layout": "vertical",
+                                    "flex": 3,
+                                    "contents": [
+                                        {
+                                            "type": "text",
+                                            "text": "PRODUCTION REPORT",
+                                            "size": "xxs",
+                                            "color": "#aaffcc",
+                                            "weight": "bold"
+                                        },
+                                        {
+                                            "type": "text",
+                                            "text": "📦 รายงานการผลิตสินค้า",
+                                            "size": "sm",
+                                            "color": "#ffffff",
+                                            "weight": "bold",
+                                            "wrap": true
+                                        },
+                                        {
+                                            "type": "text",
+                                            "text": "🕐 19\/07\/2026 19:41",
+                                            "size": "xs",
+                                            "color": "#ddffdd",
+                                            "margin": "sm"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "box",
+                                    "layout": "vertical",
+                                    "flex": 2,
+                                    "contents": [
+                                        {
+                                            "type": "image",
+                                            "url": "D:\/AppServ\/www\/production\/finishgoogs_ma_update\/uploads\/legacy\/Menu%20Product_Images\/bitVisitor%20M.Icon.041411.png",
+                                            "size": "full",
+                                            "aspectMode": "cover",
+                                            "aspectRatio": "1:1"
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        "body": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "paddingAll": "14px",
+                            "contents": [
+                                {
+                                    "type": "box",
+                                    "layout": "vertical",
+                                    "backgroundColor": "#f0f7ff",
+                                    "cornerRadius": "10px",
+                                    "paddingAll": "10px",
+                                    "contents": [
+                                        {
+                                            "type": "text",
+                                            "text": "bitVisitor M",
+                                            "size": "sm",
+                                            "color": "#1a5fa8",
+                                            "weight": "bold",
+                                            "align": "center",
+                                            "wrap": true
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "box",
+                                    "layout": "horizontal",
+                                    "paddingTop": "6px",
+                                    "contents": [
+                                        {
+                                            "type": "text",
+                                            "text": "1.",
+                                            "size": "sm",
+                                            "color": "#aaaaaa",
+                                            "flex": 1,
+                                            "align": "center"
+                                        },
+                                        {
+                                            "type": "text",
+                                            "text": "BM26071422",
+                                            "size": "sm",
+                                            "color": "#333333",
+                                            "flex": 6,
+                                            "align": "center",
+                                            "weight": "bold",
+                                            "wrap": true
+                                        },
+                                        {
+                                            "type": "text",
+                                            "text": "Tom",
+                                            "size": "sm",
+                                            "color": "#555555",
+                                            "flex": 3,
+                                            "align": "end",
+                                            "wrap": true
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        "footer": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "paddingAll": "12px",
+                            "backgroundColor": "#f8fdf9",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "📋 สรุป — 1 รายการ",
+                                    "size": "sm",
+                                    "align": "center",
+                                    "weight": "bold",
+                                    "color": "#1a8a4a"
+                                },
+                                {
+                                    "type": "separator",
+                                    "margin": "sm",
+                                    "color": "#c8ecd5"
+                                },
+                                {
+                                    "type": "box",
+                                    "layout": "horizontal",
+                                    "margin": "sm",
+                                    "contents": [
+                                        {
+                                            "type": "text",
+                                            "text": "Tom",
+                                            "size": "xs",
+                                            "color": "#888888",
+                                            "flex": 4
+                                        },
+                                        {
+                                            "type": "text",
+                                            "text": "1 รายการ",
+                                            "size": "xs",
+                                            "color": "#333333",
+                                            "flex": 6,
+                                            "align": "end",
+                                            "wrap": true,
+                                            "weight": "bold"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "button",
+                                    "style": "primary",
+                                    "height": "sm",
+                                    "color": "#1a5fa8",
+                                    "action": {
+                                        "type": "uri",
+                                        "label": "เปิดระบบ Production",
+                                        "uri": "D:\/AppServ\/www\/production\/finishgoogs_ma_update\/index.php"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    ]
+}

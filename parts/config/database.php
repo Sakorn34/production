@@ -7,8 +7,9 @@
  * - standalone XAMPP: /parts
  */
 
-require_once 'D:/AppServ/secrets/production/parts.secrets.php';
-ini_set('error_log', 'D:/Ops/logs/php-error.log');
+require_once dirname(__DIR__, 2) . '/shared/app_paths.php';
+require_once app_parts_secrets_path();
+ini_set('error_log', app_error_log_path());
 
 /**
  * คืน web path ของแอป parts จาก request ปัจจุบัน

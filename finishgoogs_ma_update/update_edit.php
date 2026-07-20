@@ -84,8 +84,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_update'])) {
     exit;
 }
 
-page_header('แก้ไขรายการอัปเดต FW/HW');
 if (!$log) {
+    page_header('แก้ไขรายการอัปเดต FW/HW');
     echo '<p class="muted">ไม่พบรายการ — <a href="' . h(BASE_URL . '/updates.php') . '">กลับหน้ารายการ</a></p>';
     page_footer();
     exit;
@@ -95,6 +95,8 @@ $backUrl = isset($_GET['back']) ? $_GET['back'] : (BASE_URL . '/updates.php?prod
 if (strpos($backUrl, BASE_URL) !== 0) {
     $backUrl = BASE_URL . '/updates.php?product=' . (int)$log['product_id'];
 }
+
+page_header('แก้ไขรายการอัปเดต FW/HW', true, '', $backUrl);
 $dtLocal = $log['updated_at'] ? date('Y-m-d\TH:i', strtotime($log['updated_at'])) : '';
 
 $comps = qr("SELECT component_name, component_value FROM asset_components WHERE asset_id=?", 'i', [(int)$log['asset_id']]);

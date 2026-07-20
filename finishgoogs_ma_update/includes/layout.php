@@ -1,12 +1,113 @@
 <?php
 /** layout.php — โครงหน้าเว็บ: header + sidebar + popup แจ้งเตือน/บันทึกสำเร็จ + modal เจาะลึก */
 
-function page_header($title, $showBack = true) {
+/**
+ * ตรวจว่า URL ย้อนกลับอยู่ในแอปนี้และปลอดภัย
+ *
+ * @param string $url
+ * @return bool
+ */
+function page_back_url_is_allowed($url) {
+    $url = trim((string)$url);
+    if ($url === '' || preg_match('#^(javascript|data):#i', $url)) {
+        return false;
+    }
+    if ($url[0] === '/' && strpos($url, BASE_URL) === 0) {
+        return true;
+    }
+    if (strpos($url, BASE_URL) === 0) {
+        return true;
+    }
+    $refHost = parse_url($url, PHP_URL_HOST);
+    $reqHost = (string)($_SERVER['HTTP_HOST'] ?? '');
+    if ($refHost !== '' && $reqHost !== '' && strcasecmp($refHost, $reqHost) === 0) {
+        $refPath = parse_url($url, PHP_URL_PATH) ?: '';
+        $basePath = parse_url(BASE_URL, PHP_URL_PATH) ?: BASE_URL;
+        return $refPath !== '' && strpos($refPath, $basePath) === 0;
+    }
+    return false;
+}
+
+/**
+ * ตรวจว่าเป็นหน้าเมนูงานหลักใน sidebar (ไม่ต้องแสดงปุ่มย้อนกลับ)
+ *
+ * @param string|null $cur basename ของสคริปต์ปัจจุบัน
+ * @return bool
+ */
+function page_is_menu_page($cur = null) {
+    $cur = $cur ?: basename((string)($_SERVER['SCRIPT_NAME'] ?? 'index.php'));
+    if ($cur === 'updates.php' && (int)(isset($_GET['product']) ? $_GET['product'] : 0) > 0) {
+        return false;
+    }
+    if ($cur === 'ma.php' && (int)(isset($_GET['product']) ? $_GET['product'] : 0) > 0) {
+        return false;
+    }
+    static $menus = [
+        'index.php', 'assets.php', 'updates.php', 'ma.php', 'parts.php',
+        'repairs.php', 'scan.php', 'settings.php',
+    ];
+    return in_array($cur, $menus, true);
+}
+
+/**
+ * คำนวณ URL ปลายทางเมื่อกดย้อนกลับ — ไปหน้าเมนูงานของโมดูลนั้นเสมอ
+ *
+ * @param string $override URL ที่หน้าเรียกส่งมา (เช่น รายการอัปเดตของรุ่น)
+ * @return string
+ */
+function page_back_url($override = '') {
+    if ($override !== '' && page_back_url_is_allowed($override)) {
+        return $override;
+    }
+    return page_back_url_default();
+}
+
+/**
+ * URL หน้าเมนูงานตามโมดูลของหน้าปัจจุบัน
+ *
+ * @return string
+ */
+function page_back_url_default() {
+    $cur = basename((string)($_SERVER['SCRIPT_NAME'] ?? 'index.php'));
+    $b = BASE_URL;
+    $productId = (int)(isset($_GET['product']) ? $_GET['product'] : 0);
+
+    switch ($cur) {
+        case 'asset.php':
+        case 'asset_new.php':
+            return $b . '/assets.php';
+        case 'update_edit.php':
+        case 'update_new.php':
+            return $productId > 0 ? $b . '/updates.php?product=' . $productId : $b . '/updates.php';
+        case 'updates_import.php':
+            return $b . '/updates.php';
+        case 'updates.php':
+            return $b . '/updates.php';
+        case 'ma.php':
+            return $b . '/ma.php';
+        case 'appearance.php':
+        case 'server_config.php':
+        case 'line_notify_settings.php':
+        case 'activity_logs.php':
+        case 'share_admin.php':
+        case 'system_doc.php':
+            return $b . '/settings.php';
+        case 'share.php':
+            return $b . '/settings.php';
+        case 'profile.php':
+            return $b . '/index.php';
+        default:
+            return $b . '/index.php';
+    }
+}
+
+function page_header($title, $showBack = true, $subtitle = '', $backUrl = '') {
     $u = user();
     $cur = basename($_SERVER['SCRIPT_NAME']);
     $nav = nav_effective();
     $flash = flash_get();
     $fontCfg = theme_font_config();
+    $backHref = page_back_url($backUrl);
     ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -24,14 +125,24 @@ function page_header($title, $showBack = true) {
 } ?>
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/style.css?v=<?= filemtime(__DIR__ . '/../assets/style.css') ?>">
 <style id="theme-vars">:root{
-  --primary: <?= theme_color('color_primary', '#2c4a7c') ?>;
-  --primary-dark: <?= theme_color('color_primary_dark', '#1d3a68') ?>;
-  --sidebar-bg: <?= theme_color('color_sidebar', '#17233a') ?>;
-  --sidebar-active: <?= theme_color('color_sidebar_active', '#2c4a7c') ?>;
-  --page-bg: <?= theme_color('color_page_bg', '#f2f4f8') ?>;
+  --primary: <?= theme_color('color_primary', '#e11d74') ?>;
+  --primary-dark: <?= theme_color('color_primary_dark', '#c01862') ?>;
+  --sidebar-bg: <?= theme_color('color_sidebar', '#4e2985') ?>;
+  --sidebar-active: <?= theme_color('color_sidebar_active', '#ffffff') ?>;
+  --page-bg: <?= theme_color('color_page_bg', '#f4f1fb') ?>;
   --logo-h: <?= max(20, min(160, (int)setting('brand_logo_h', 56))) ?>px;
   --app-font: <?= $fontCfg['font'] ?>;
+  --success:#16a34a; --success-soft:#dcfce7;
+  --info:#1d4ed8; --info-soft:#dbeafe;
+  --warning:#a16207; --warning-soft:#fef9c3;
+  --danger:#b91c1c; --danger-soft:#fee2e2;
+  --radius:12px; --radius-sm:8px;
+  --shadow-sm:0 1px 2px rgba(15,23,42,.06);
+  --shadow-md:0 4px 16px rgba(15,23,42,.08);
+  --input-h:40px; --transition:.18s ease;
+  --fs-body:15px; --fs-h1:22px; --fs-table:13.5px; --fs-badge:12px;
 }</style>
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/theme-v2.css?v=<?= @filemtime(__DIR__ . '/../assets/theme-v2.css') ?: time() ?>">
 </head>
 <body>
 <div class="sidebar-edge" id="fg-sidebar-edge" aria-hidden="true"></div>
@@ -43,13 +154,14 @@ $sideClass = $side === 'right' ? ' sidebar-right' : ($side === 'top' ? ' sidebar
 <div class="app nav-hidden<?= $sideClass ?>">
   <aside class="sidebar">
     <div class="brand">
-      <?php if ($brandLogo) { ?><img src="<?= h(img_url($brandLogo)) ?>" alt="โลโก้" class="brand-logo"><?php } else { ?><?= h(setting('app_name', APP_NAME)) ?><?php } ?>
+      <?php if ($brandLogo) { ?><img src="<?= h(img_url($brandLogo)) ?>" alt="โลโก้" class="brand-logo"><?php } else { ?><?= ui_nav_icon_html('assets', 20, 'brand-icon') ?><span class="brand-text"><?= h(setting('app_name', APP_NAME)) ?></span><?php } ?>
     </div>
     <nav>
       <?php foreach ($nav as $n) { ?>
-        <a href="<?= BASE_URL . '/' . $n['file'] ?>" class="<?= $cur === $n['file'] ? 'active' : '' ?>"><span class="nav-ico"><?= h($n['icon']) ?></span> <?= h($n['label']) ?></a>
+        <a href="<?= BASE_URL . '/' . $n['file'] ?>" class="<?= $cur === $n['file'] ? 'active' : '' ?>"><span class="nav-ico"><?= ui_nav_icon_html($n['icon']) ?></span> <?= h($n['label']) ?></a>
       <?php } ?>
     </nav>
+    <?= ui_sidebar_cross_link(ui_parts_app_url(), 'ไปที่ระบบสต็อกอะไหล่') ?>
     <div class="userbox">
       <?php
         $actor = $u ? actor_name() : '';
@@ -71,10 +183,13 @@ $sideClass = $side === 'right' ? ' sidebar-right' : ($side === 'top' ? ' sidebar
   <div class="nav-backdrop" id="fg-nav-backdrop" aria-hidden="true"></div>
   <main class="content">
     <div class="pagehead">
-      <?php if ($showBack && $cur !== 'index.php') { ?>
-        <a href="javascript:history.back()" class="btn btn-line btn-sm backbtn">← ย้อนกลับ</a>
+      <?php if ($showBack && !page_is_menu_page($cur)) { ?>
+        <a href="<?= h($backHref) ?>" class="btn btn-line btn-sm backbtn">← ย้อนกลับ</a>
       <?php } ?>
-      <h1><?= h($title) ?></h1>
+      <div class="pagehead-titles">
+        <h1><?= h($title) ?></h1>
+        <?php if ($subtitle !== '') { ?><p class="pagehead-sub"><?= h($subtitle) ?></p><?php } ?>
+      </div>
     </div>
     <?php if ($flash) { ?>
     <script>window.__flash = <?= json_encode(['msg' => $flash[0], 'type' => $flash[1]], JSON_UNESCAPED_UNICODE) ?>;</script>
@@ -90,20 +205,14 @@ function page_footer() {
 <!-- popup แจ้งเตือน -->
 <div id="notif-overlay" class="notif-overlay" hidden>
   <div class="notif-box">
-    <h2>🔔 แจ้งเตือน</h2>
+    <h2 class="h-with-icon"><?= ui_icon_html('bell', 20, 'h-svg') ?><span>แจ้งเตือน</span></h2>
     <ul id="notif-list"></ul>
     <button onclick="closeOverlay('notif-overlay')">รับทราบ</button>
   </div>
 </div>
 
-<!-- popup บันทึกสำเร็จ / ข้อผิดพลาด -->
-<div id="flash-overlay" class="notif-overlay" hidden>
-  <div class="notif-box" style="text-align:center">
-    <div id="flash-icon" style="font-size:44px; margin-bottom:8px">✅</div>
-    <div id="flash-msg" style="font-size:16px; margin-bottom:16px; word-break:break-word"></div>
-    <button onclick="closeOverlay('flash-overlay')">ตกลง</button>
-  </div>
-</div>
+<!-- toast แจ้งเตือนสถานะ (จางหายอัตโนมัติ) -->
+<div id="flash-toast-host" class="flash-toast-host" aria-live="polite" aria-atomic="true"></div>
 
 <!-- modal รายการเจาะลึก (dashboard ฯลฯ) — เจาะได้หลายชั้น มีปุ่มย้อนกลับ -->
 <div id="list-overlay" class="notif-overlay" hidden>
@@ -111,7 +220,7 @@ function page_footer() {
     <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px">
       <button id="list-back" class="btn-sm btn-line" onclick="modalBack()" hidden>← ย้อน</button>
       <h2 id="list-title" style="margin:0; flex:1; font-size:16px"></h2>
-      <button class="btn-sm btn-line" onclick="closeOverlay('list-overlay')">✕ ปิด</button>
+      <button class="btn-sm btn-line btn-icon-only" onclick="closeOverlay('list-overlay')" aria-label="ปิด"><?= ui_icon_html('close', 16, 'btn-svg') ?></button>
     </div>
     <div id="list-body" style="overflow:auto; max-height:64vh">กำลังโหลด…</div>
     <div id="list-more" style="margin-top:10px"></div>
@@ -152,7 +261,7 @@ function closeOverlay(id){ document.getElementById(id).hidden = true; }
   });
   if (backdrop) backdrop.addEventListener('click', hideNav);
 
-  document.querySelectorAll('.sidebar nav a').forEach(function(a){
+  document.querySelectorAll('.sidebar nav a, .sidebar .sidebar-cross-link').forEach(function(a){
     a.addEventListener('click', hideNav);
   });
 
@@ -215,12 +324,29 @@ document.querySelectorAll('input.list-live-filter').forEach(function(input){
   });
 })();
 
-// popup บันทึกสำเร็จ
+// toast แจ้งเตือนสถานะ — แสดงแล้วจางหาย (ไม่ต้องกด OK)
+window.__flashToast = function(msg, type, duration){
+  type = type || 'ok';
+  duration = duration || (type === 'err' ? 5200 : 3600);
+  var host = document.getElementById('flash-toast-host');
+  if (!host || !msg) return;
+  var el = document.createElement('div');
+  el.className = 'flash-toast flash-toast-' + type;
+  el.setAttribute('role', 'status');
+  el.textContent = msg;
+  host.appendChild(el);
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){ el.classList.add('flash-toast-show'); });
+  });
+  setTimeout(function(){
+    el.classList.remove('flash-toast-show');
+    el.classList.add('flash-toast-hide');
+    setTimeout(function(){ if (el.parentNode) el.parentNode.removeChild(el); }, 420);
+  }, duration);
+};
 (function(){
   if (!window.__flash) return;
-  document.getElementById('flash-icon').textContent = window.__flash.type === 'err' ? '⚠️' : '✅';
-  document.getElementById('flash-msg').textContent = window.__flash.msg;
-  document.getElementById('flash-overlay').hidden = false;
+  __flashToast(window.__flash.msg, window.__flash.type);
 })();
 
 // popup แจ้งเตือนครั้งแรกของ session
@@ -414,6 +540,8 @@ function modalBack(){
     var btn = e.target.closest('.chip-dd-btn');
     if (btn){
       var dd = btn.closest('.chip-dd');
+      // ปล่อยให้ asset_new / ma จัดการ dropdown อะไหล่เอง (มี UI แยกจาก chip-dd ทั่วไป)
+      if (dd && (dd.classList.contains('bom-part-dd') || dd.classList.contains('ma-part-dd'))) return;
       var list = dd.querySelector('.chip-dd-list');
       var filt = dd.querySelector('.chip-dd-filter');
       if (list.hidden) showChipList(dd, filt ? filt.value.trim().toLowerCase() : '', true);

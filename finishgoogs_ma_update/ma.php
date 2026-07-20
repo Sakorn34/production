@@ -322,7 +322,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'history') {
         while ($m = $res->fetch_assoc()) {
             echo '<tr><td style="white-space:nowrap">' . dthai($m['visited_at']) . '</td>'
                . '<td>' . h($m['fw_version'] ?: '-') . '</td>'
-               . '<td style="max-width:420px">' . ma_items_html($m) . '</td>'
+               . '<td style="max-width:420px">' . ma_items_html($m) . ma_parts_withdrawn_html((int)$m['id']) . '</td>'
                . '<td>' . h($m['done_by'] ?: '-') . '</td>'
                . ($canMa ? '<td style="white-space:nowrap"><a class="btn btn-sm btn-line" href="' . BASE_URL . '/ma.php?edit=' . $m['id'] . '">แก้ไข</a> '
                     . '<form method="post" style="display:inline" onsubmit="return confirm(\'ลบรายการ MA นี้?\')">' . csrf_field()
@@ -362,7 +362,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'items') {
     $a = qr("SELECT id, product_id, status FROM assets WHERE asset_code=? OR factory_serial=?", 'ss', [$code, $code])->fetch_assoc();
     if (!$a) { echo json_encode(['found' => false]); exit; }
 
-    // pool รายการ = config admin (ถ้ามี) รวมกับประวัติจริงของรุ่น — แยกตามช่อง
+    // pool รายการ = config หลังบ้านเท่านั้น (ไม่รวมประวัติเก่า) — แยกตามช่อง
     $poolOk = effective_ma_pool($a['product_id'], 'ok');
     $poolReplace = effective_ma_pool($a['product_id'], 'replace');
     $poolRepair = effective_ma_pool($a['product_id'], 'repair');
@@ -380,6 +380,35 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'items') {
         'fw_options' => effective_ma_fw_options($a['product_id']),
         'prefill_ok' => $lastMa ? ma_record_items($lastMa, 'ok_items', 'OK') : [],
     ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// ---------------------------------------------------------------
+// AJAX: รายการอะไหล่สำหรับฟอร์มเบิก MA
+// ---------------------------------------------------------------
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'parts') {
+    header('Content-Type: application/json; charset=utf-8');
+    $rows = [];
+    $rp = qr("SELECT id, name, unit, part_code, stock_code, icon_path FROM parts WHERE is_active=1 ORDER BY name");
+    while ($r = $rp->fetch_assoc()) {
+        $rows[] = $r;
+    }
+    $qtyMap = tech_parts_qty_map_for_parts($rows);
+    $out = ['all_parts' => []];
+    foreach ($rows as $r) {
+        $codeKey = part_row_stock_code($r);
+        if ($codeKey === '') {
+            $codeKey = trim((string)($r['part_code'] ?? ''));
+        }
+        $out['all_parts'][] = [
+            'id'        => (int)$r['id'],
+            'name'      => (string)$r['name'],
+            'unit'      => (string)($r['unit'] ?? ''),
+            'icon'      => img_url($r['icon_path'] ?? '') ?: '',
+            'stock_qty' => ($codeKey !== '' && isset($qtyMap[$codeKey])) ? (int)$qtyMap[$codeKey] : null,
+        ];
+    }
+    echo json_encode($out, JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -413,10 +442,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_ma'])) {
       [$a['id'], $round, $visited, $result, $okItems ?: null, $repItems ?: null, $fixItems ?: null,
        $fw ?: null, trim($_POST['remark']) ?: null, actor_name()]);
 
+    $maRecordId = (int)db()->insert_id;
+    $withdrawLines = ma_parse_withdraw_lines(
+        (array)($_POST['ma_part_id'] ?? []),
+        (array)($_POST['ma_part_qty'] ?? [])
+    );
+    $w = ['count' => 0];
+    if ($withdrawLines) {
+        $w = ma_withdraw_parts($maRecordId, (int)$a['id'], $a['asset_code'], $withdrawLines, actor_name());
+        if (!$w['ok']) {
+            q("DELETE FROM ma_records WHERE id=?", 'i', [$maRecordId]);
+            flash_set($w['error'], 'err');
+            header('Location: ' . BASE_URL . '/ma.php?product=' . (int)(qr("SELECT product_id FROM assets WHERE id=?", 'i', [$a['id']])->fetch_assoc()['product_id'] ?? 0));
+            exit;
+        }
+    }
+
     q("UPDATE assets SET status=? WHERE id=?", 'si', [$newStatus, $a['id']]);
     if ($fw !== '') q("UPDATE assets SET current_fw_version=? WHERE id=?", 'si', [$fw, $a['id']]);
 
-    flash_set("บันทึก MA ของ {$a['asset_code']} สำเร็จแล้ว — สถานะเครื่อง: " . status_th($newStatus));
+    $flashMsg = "บันทึก MA ของ {$a['asset_code']} สำเร็จแล้ว — สถานะเครื่อง: " . status_th($newStatus);
+    if (!empty($w['count'])) {
+        $flashMsg .= ' · เบิกอะไหล่ ' . (int)$w['count'] . ' รายการ';
+    }
+    if ($result === 'repair' && function_exists('line_notify_dispatch') && date('Y-m-d', strtotime($visited)) === date('Y-m-d')) {
+        line_notify_dispatch('ma.repair_required', [
+            'asset_id'     => (int)$a['id'],
+            'asset_code'   => (string)$a['asset_code'],
+            'ma_round'     => (int)$round,
+            'visited_at'   => $visited,
+            'repair_items' => (string)$fixItems,
+            'remark'       => trim((string)($_POST['remark'] ?? '')),
+            'done_by'      => actor_name(),
+            'entity_id'    => $maRecordId,
+        ], [
+            'dedup_key' => 'ma.repair_required:' . $maRecordId,
+        ]);
+    }
+    flash_set($flashMsg);
     header('Location: ' . BASE_URL . '/asset.php?id=' . $a['id']); exit;
 }
 
@@ -445,6 +508,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_ma'])) {
     $newStatus = in_array($_POST['machine_status'], ['rental', 'spare'], true) ? $_POST['machine_status'] : null;
     if ($newStatus) q("UPDATE assets SET status=? WHERE id=?", 'si', [$newStatus, $rec['asset_id']]);
     if ($fw !== '') q("UPDATE assets SET current_fw_version=? WHERE id=?", 'si', [$fw, $rec['asset_id']]);
+    $assetRow = qr('SELECT asset_code FROM assets WHERE id=?', 'i', [(int)$rec['asset_id']])->fetch_assoc();
+    $withdrawLines = ma_parse_withdraw_edit_lines(
+        (array)($_POST['ma_w_movement_id'] ?? []),
+        (array)($_POST['ma_part_id'] ?? []),
+        (array)($_POST['ma_part_qty'] ?? [])
+    );
+    $sync = ma_sync_withdrawals_on_edit(
+        $mid,
+        (int)$rec['asset_id'],
+        (string)($assetRow['asset_code'] ?? ''),
+        $withdrawLines,
+        actor_name()
+    );
+    if (!$sync['ok']) {
+        flash_set($sync['error'] ?? 'แก้ไขรายการเบิก MA ไม่สำเร็จ', 'err');
+        header('Location: ' . BASE_URL . '/ma.php?edit=' . $mid);
+        exit;
+    }
     flash_set('แก้ไขรายการ MA เรียบร้อยแล้ว');
     header('Location: ' . BASE_URL . '/asset.php?id=' . $rec['asset_id']); exit;
 }
@@ -455,6 +536,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_ma'])) {
     csrf_check(); require_can('ma');
     $mid = (int)$_POST['ma_id'];
     $rec = qr("SELECT asset_id FROM ma_records WHERE id=?", 'i', [$mid])->fetch_assoc();
+    if ($rec && ma_withdrawal_count($mid) > 0) {
+        $rb = ma_rollback_withdrawals($mid, actor_name());
+        if (!$rb['ok']) {
+            flash_set($rb['error'], 'err');
+            $back = (isset($_POST['back']) && $_POST['back'] !== '') ? $_POST['back']
+                  : BASE_URL . '/asset.php?id=' . $rec['asset_id'];
+            header('Location: ' . $back);
+            exit;
+        }
+    }
     q("DELETE FROM ma_records WHERE id=?", 'i', [$mid]);
     flash_set('ลบรายการ MA เรียบร้อยแล้ว');
     $back = (isset($_POST['back']) && $_POST['back'] !== '') ? $_POST['back']
@@ -745,6 +836,22 @@ require __DIR__ . '/includes/list_search.php';
       <label class="ma-lbl-top">🔧 ซ่อม</label>
       <div class="ma-field" id="mf-repair"></div>
 
+      <?php if (!$ea) { ?>
+      <label class="ma-lbl-top">🔩 อะไหล่ที่เบิกในรอบ MA</label>
+      <div class="ma-field ma-parts-section">
+        <p class="muted ma-field-hint">ไม่บังคับ — เลือกเมื่อมีการเปลี่ยน/ซ่อมที่ใช้อะไหล่จริง (ตัดสต็อก Stock ช่างทันที)</p>
+        <div id="ma-parts-fields"><div id="ma-parts-list"></div></div>
+        <button type="button" class="btn btn-line btn-sm" id="ma-parts-add" style="margin-top:6px">➕ เพิ่มอะไหล่ที่เบิก</button>
+      </div>
+      <?php } elseif ($editId) { ?>
+      <label class="ma-lbl-top">🔩 อะไหล่ที่เบิกในรอบ MA</label>
+      <div class="ma-field ma-parts-section">
+        <p class="muted ma-field-hint">แก้ไขจำนวนหรือเพิ่ม/ลบรายการได้ — บันทึกแล้วจะ sync Stock ช่างอัตโนมัติ</p>
+        <div id="ma-parts-fields"><div id="ma-parts-list"></div></div>
+        <button type="button" class="btn btn-line btn-sm" id="ma-parts-add" style="margin-top:6px">➕ เพิ่มอะไหล่ที่เบิก</button>
+      </div>
+      <?php } ?>
+
       <label>สถานะเครื่อง</label>
       <select name="machine_status" id="machine_status" required>
         <option value="rental" <?= $ea && $ea['ast_status'] === 'rental' ? 'selected' : '' ?>>เครื่องเช่า</option>
@@ -783,6 +890,8 @@ require __DIR__ . '/includes/list_search.php';
 </div><!-- /ma-form-wrap -->
 
 <script>
+<?php $maEditWithdrawLines = $editId ? ma_withdrawal_lines($editId) : []; ?>
+var maEditWithdrawLines = <?= json_encode($maEditWithdrawLines, JSON_UNESCAPED_UNICODE) ?>;
 var BASE = '<?= BASE_URL ?>';
 var MA_FW_OPTS = <?= json_encode(array_values($maFwOpts), JSON_UNESCAPED_UNICODE) ?>;
 var itemPools = { ok: [], replace: [], repair: [] };
@@ -902,6 +1011,152 @@ function addChip(key, val, silent){
   return true;
 }
 FIELDS.forEach(initField);
+
+// ---------- อะไหล่ที่เบิกในรอบ MA ----------
+var maPartsAll = [];
+function maPartById(id){
+  id = parseInt(id, 10) || 0;
+  for (var i = 0; i < maPartsAll.length; i++) if (maPartsAll[i].id === id) return maPartsAll[i];
+  return null;
+}
+function maPartThumbHtml(partId){
+  var p = maPartById(partId);
+  if (p && p.icon) return '<img src="' + esc(p.icon) + '" alt="" class="thumb-sm ma-part-opt-thumb" loading="lazy" onerror="this.classList.add(\'broken\')">';
+  return '<span class="thumb-sm noimg ma-part-opt-thumb">—</span>';
+}
+function maPartStockHtml(p){
+  if (!p || p.stock_qty == null) return '<span class="ma-part-opt-stock ma-part-opt-stock-na">ไม่มีใน Stock ช่าง</span>';
+  var cls = 'ma-part-opt-stock';
+  if (p.stock_qty <= 0) cls += ' ma-part-opt-stock-out';
+  else if (p.stock_qty <= 5) cls += ' ma-part-opt-stock-low';
+  var unit = p.unit ? ' ' + esc(p.unit) : '';
+  return '<span class="' + cls + '">คงเหลือ ' + p.stock_qty + unit + '</span>';
+}
+function maPartSelectedChipHtml(partId){
+  var p = maPartById(partId);
+  if (!p) return '';
+  var label = p.name + (p.unit ? ' (' + p.unit + ')' : '');
+  return '<span class="chip chip-pick ma-part-chip-sel">'
+    + maPartThumbHtml(partId)
+    + '<span class="ma-part-chip-label">' + esc(label) + '</span></span>';
+}
+function maPartOptsHtml(selId, filter){
+  filter = (filter || '').toLowerCase();
+  var list = maPartsAll.filter(function(p){
+    return !filter || p.name.toLowerCase().indexOf(filter) !== -1;
+  });
+  if (!list.length) {
+    return '<div class="ma-part-opt-empty muted">ไม่พบอะไหล่' + (filter ? ' ที่ตรงกับ "' + esc(filter) + '"' : '') + '</div>';
+  }
+  return '<div class="ma-part-opt-items">' + list.map(function(p){
+    var sel = p.id === selId ? ' is-selected' : '';
+    return '<div class="ma-part-opt-row' + sel + '" data-pid="' + p.id + '" role="button" tabindex="0">'
+      + maPartThumbHtml(p.id)
+      + '<div class="ma-part-opt-body">'
+      + '<span class="ma-part-opt-name">' + esc(p.name) + '</span>'
+      + maPartStockHtml(p)
+      + '</div></div>';
+  }).join('') + '</div>';
+}
+function maPartChipHtml(partId){
+  var label = maPartById(partId);
+  return '<div class="chip-dd ma-part-dd" data-pid="' + (partId || 0) + '">'
+    + '<input type="hidden" name="ma_part_id[]" value="' + (partId || '') + '">'
+    + '<div class="chip-dd-box">'
+    + '<div class="chip-dd-chips">' + (label ? maPartSelectedChipHtml(partId) : '') + '</div>'
+    + '<input type="text" class="chip-dd-filter ma-part-filter" placeholder="' + (label ? '' : 'ค้นหาอะไหล่…') + '" autocomplete="off">'
+    + '<button type="button" class="chip-dd-btn" tabindex="-1">▾</button>'
+    + '</div>'
+    + '<div class="chip-dd-list" hidden><div class="chip-dd-opts">' + maPartOptsHtml(partId, '') + '</div></div>'
+    + '</div>';
+}
+function setMaPart(dd, partId){
+  var hid = dd.querySelector('input[type=hidden][name="ma_part_id[]"]');
+  hid.value = partId || '';
+  dd.dataset.pid = partId || 0;
+  var chips = dd.querySelector('.chip-dd-chips');
+  chips.innerHTML = partId ? maPartSelectedChipHtml(partId) : '';
+  var filt = dd.querySelector('.ma-part-filter');
+  if (filt) filt.placeholder = partId ? '' : 'ค้นหาอะไหล่…';
+  dd.querySelector('.chip-dd-opts').innerHTML = maPartOptsHtml(partId, filt ? filt.value.trim() : '');
+}
+function maPartRowHtml(partId, qty, movementId){
+  var mid = movementId ? parseInt(movementId, 10) : 0;
+  return '<div class="ma-parts-row">'
+    + '<input type="hidden" name="ma_w_movement_id[]" value="' + (mid > 0 ? mid : '0') + '">'
+    + maPartChipHtml(partId)
+    + '<input type="text" class="ma-parts-qty" name="ma_part_qty[]" value="' + esc(String(qty != null ? qty : 1)) + '" inputmode="decimal" autocomplete="off" placeholder="จำนวน" title="จำนวนที่เบิก">'
+    + '<button type="button" class="btn-sm btn-line" onclick="this.closest(\'.ma-parts-row\').remove()">ลบ</button>'
+    + '</div>';
+}
+function initMaEditWithdrawLines(lines){
+  var list = document.getElementById('ma-parts-list');
+  if (!list || !lines || !lines.length) return;
+  list.innerHTML = '';
+  lines.forEach(function(row){
+    list.insertAdjacentHTML('beforeend', maPartRowHtml(row.part_id, row.qty, row.movement_id || 0));
+  });
+}
+function addMaPartRow(){
+  var list = document.getElementById('ma-parts-list');
+  if (!list) return;
+  list.insertAdjacentHTML('beforeend', maPartRowHtml(0, 1));
+}
+function initMaPartsPicker(){
+  var addBtn = document.getElementById('ma-parts-add');
+  if (!addBtn) return;
+  fetch(BASE + '/ma.php?ajax=parts')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      maPartsAll = d.all_parts || [];
+      if (typeof maEditWithdrawLines !== 'undefined' && maEditWithdrawLines.length) {
+        initMaEditWithdrawLines(maEditWithdrawLines);
+      }
+    })
+    .catch(function(){});
+  addBtn.addEventListener('click', addMaPartRow);
+}
+document.addEventListener('focusin', function(e){
+  if (!e.target.classList || !e.target.classList.contains('ma-part-filter')) return;
+  var dd = e.target.closest('.ma-part-dd');
+  if (!dd) return;
+  var selId = parseInt(dd.dataset.pid, 10) || 0;
+  dd.querySelector('.chip-dd-opts').innerHTML = maPartOptsHtml(selId, e.target.value.trim());
+  dd.querySelector('.chip-dd-list').hidden = false;
+  dd.classList.add('chip-dd-open');
+});
+document.addEventListener('click', function(e){
+  var mbtn = e.target.closest('.ma-part-dd .chip-dd-btn');
+  if (mbtn) {
+    var dd = mbtn.closest('.ma-part-dd');
+    var list = dd.querySelector('.chip-dd-list');
+    var selId = parseInt(dd.dataset.pid, 10) || 0;
+    var filtInp = dd.querySelector('.ma-part-filter');
+    if (list.hidden) {
+      dd.querySelector('.chip-dd-opts').innerHTML = maPartOptsHtml(selId, filtInp ? filtInp.value.trim() : '');
+      list.hidden = false;
+      dd.classList.add('chip-dd-open');
+    } else { list.hidden = true; dd.classList.remove('chip-dd-open'); }
+    return;
+  }
+  var mchip = e.target.closest('.ma-part-dd .ma-part-opt-row[data-pid]');
+  if (mchip) {
+    var dd2 = mchip.closest('.ma-part-dd');
+    setMaPart(dd2, parseInt(mchip.dataset.pid, 10));
+    dd2.querySelector('.chip-dd-list').hidden = true;
+    dd2.classList.remove('chip-dd-open');
+    return;
+  }
+});
+document.addEventListener('input', function(e){
+  if (!e.target.classList || !e.target.classList.contains('ma-part-filter')) return;
+  var dd = e.target.closest('.ma-part-dd');
+  var selId = parseInt(dd.dataset.pid, 10) || 0;
+  dd.querySelector('.chip-dd-opts').innerHTML = maPartOptsHtml(selId, e.target.value.trim());
+  dd.querySelector('.chip-dd-list').hidden = false;
+  dd.classList.add('chip-dd-open');
+});
+initMaPartsPicker();
 
 // FW — อัปเกรดเป็น chip-dd หลัง footer โหลด chipDdHtml (DOMContentLoaded)
 function initMaFwField(){

@@ -1,0 +1,197 @@
+{
+    "to": "test",
+    "messages": [
+        {
+            "type": "flex",
+            "altText": "⚠️ พบปัญหาตอนผลิต MC26071879",
+            "contents": {
+                "type": "bubble",
+                "size": "kilo",
+                "header": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "backgroundColor": "#c0392b",
+                    "paddingAll": "14px",
+                    "contents": [
+                        {
+                            "type": "text",
+                            "text": "⚠️ พบปัญหาตอนผลิต",
+                            "color": "#ffffff",
+                            "weight": "bold",
+                            "size": "sm"
+                        }
+                    ]
+                },
+                "body": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "paddingAll": "14px",
+                    "contents": [
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "รุ่น",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "Magnetic Reader",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "หมายเลข",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "MC26071879",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "วันที่ผลิต",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "2026-07-08",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "ผู้บันทึก",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "Ice",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "ปัญหา",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "-",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "วิธีแก้",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "-",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "footer": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "paddingAll": "12px",
+                    "contents": [
+                        {
+                            "type": "button",
+                            "style": "primary",
+                            "height": "sm",
+                            "color": "#1a5fa8",
+                            "action": {
+                                "type": "uri",
+                                "label": "ดูรายละเอียดเครื่อง",
+                                "uri": "D:\/AppServ\/www\/production\/finishgoogs_ma_update\/asset.php?id=2"
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

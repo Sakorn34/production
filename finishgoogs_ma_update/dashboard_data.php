@@ -15,7 +15,7 @@ function drill_onclick($title, $url) {
 }
 
 function asset_table($res, $clickTimeline = false) {
-    echo '<table class="list"><tr><th>รหัสเครื่อง</th><th>รุ่น</th><th>สถานะ</th><th>ลูกค้า</th><th>ผลิตเมื่อ</th></tr>';
+    echo '<table class="list"><tr><th>รหัสเครื่อง</th><th>รุ่น</th><th>สถานะ</th><th>ผลิตเมื่อ</th></tr>';
     $n = 0;
     while ($r = $res->fetch_assoc()) {
         $n++;
@@ -26,7 +26,6 @@ function asset_table($res, $clickTimeline = false) {
         }
         echo "<tr$attr><td><a href=\"" . BASE_URL . '/asset.php?id=' . $r['id'] . '" onclick="event.stopPropagation()"><b>' . h($r['asset_code']) . '</b></a></td>'
            . '<td>' . h($r['pname']) . '</td><td>' . status_badge($r['status']) . '</td>'
-           . '<td>' . h(isset($r['cust']) && $r['cust'] !== null ? $r['cust'] : '-') . '</td>'
            . '<td>' . dthai($r['produced_at']) . '</td></tr>';
     }
     echo '</table>';
@@ -52,9 +51,8 @@ function model_grid($res, $periodLabel, $nextType, $periodVal) {
     else echo '<p class="muted" style="margin-top:8px; font-size:12px">กดการ์ดรุ่นเพื่อดูรายการเครื่อง</p>';
 }
 
-$ASSET_SQL = "SELECT a.id, a.asset_code, a.status, a.produced_at, p.name pname, c.name cust
-              FROM assets a JOIN products p ON p.id=a.product_id
-              LEFT JOIN customers c ON c.id=a.current_customer_id";
+$ASSET_SQL = "SELECT a.id, a.asset_code, a.status, a.produced_at, p.name pname
+              FROM assets a JOIN products p ON p.id=a.product_id";
 
 /** แปลง 'YYYY-MM' เป็นช่วงวันที่ [start, end) เพื่อให้ query ใช้ idx_assets_produced_at ได้
  *  (แทนการห่อคอลัมน์ด้วย DATE_FORMAT()/YEAR() ซึ่งทำให้ index ใช้ไม่ได้) */
@@ -100,17 +98,17 @@ switch ($type) {
         echo '<div class="barchart" style="border:0; height:190px; padding:22px 0 24px">';
         for ($m = 1; $m <= 12; $m++) {
             $ym = sprintf('%04d-%02d', $y, $m);
-            $title = '🏷️ รุ่นที่ผลิตเดือน ' . sprintf('%02d/%04d', $m, $y);
+            $title = '🏷️ รุ่นที่ผลิตเดือน ' . thai_month_period_label($ym);
             echo '<div class="bar" style="height:' . round($byM[$m] / $mx * 100) . '%; background:linear-gradient(180deg,#3b82f6,#06b6d4); cursor:pointer" '
                . 'title="' . h("$ym : {$byM[$m]} เครื่อง") . '" onclick="' . drill_onclick($title, BASE_URL . '/dashboard_data.php?type=month_models&v=' . $ym) . '">'
-               . '<b>' . ($byM[$m] ?: '') . '</b><span>' . sprintf('%02d', $m) . '</span></div>';
+               . '<b>' . ($byM[$m] ?: '') . '</b><span>' . h(thai_month_short($ym)) . '</span></div>';
         }
         echo '</div><p class="muted" style="font-size:12px">กดแท่งเดือนเพื่อดูรุ่นสินค้าที่ผลิตในเดือนนั้น</p>';
         break;
 
     case 'month_models': // เดือน → รุ่นสินค้าที่ผลิต พร้อมรูป+จำนวน (ชั้น 2)
         if (!preg_match('/^\d{4}-\d{2}$/', $v)) exit('เดือนไม่ถูกต้อง');
-        $lbl = 'เดือน ' . date('m/Y', strtotime($v . '-01'));
+        $lbl = thai_month_period_label($v);
         [$ms, $me] = ym_range($v);
         model_grid(qr("SELECT p.name, p.icon_path, COUNT(*) c FROM assets a JOIN products p ON p.id=a.product_id
                        WHERE a.produced_at>=? AND a.produced_at<? GROUP BY p.id ORDER BY c DESC", 'ss', [$ms, $me]), $lbl, 'month_product', $v);
@@ -125,9 +123,8 @@ switch ($type) {
 
     case 'timeline': // เครื่อง → timeline ประวัติทั้งหมด (ชั้น 4)
         $aid = (int)$v;
-        $a = qr("SELECT a.asset_code, a.status, a.produced_at, a.current_fw_version, p.name pname, p.icon_path, c.name cust
-                 FROM assets a JOIN products p ON p.id=a.product_id
-                 LEFT JOIN customers c ON c.id=a.current_customer_id WHERE a.id=?", 'i', [$aid])->fetch_assoc();
+        $a = qr("SELECT a.asset_code, a.status, a.produced_at, a.current_fw_version, p.name pname, p.icon_path
+                 FROM assets a JOIN products p ON p.id=a.product_id WHERE a.id=?", 'i', [$aid])->fetch_assoc();
         if (!$a) exit('<p class="muted">ไม่พบเครื่องนี้</p>');
         require __DIR__ . '/includes/timeline.php';
         $tlData = asset_timeline_items($aid);
@@ -135,8 +132,7 @@ switch ($type) {
            . img_tag($a['icon_path'], $a['pname'], 'thumb')
            . '<div><b>' . h($a['asset_code']) . '</b> · ' . h($a['pname']) . ' · ' . status_badge($a['status'])
            . '<div class="muted" style="font-size:12px">ผลิต ' . dthai($a['produced_at'])
-           . ($a['current_fw_version'] ? ' · FW ' . h($a['current_fw_version']) : '')
-           . ($a['cust'] ? ' · ลูกค้า: ' . h($a['cust']) : '') . '</div></div>'
+           . ($a['current_fw_version'] ? ' · FW ' . h($a['current_fw_version']) : '') . '</div></div>'
            . '<a class="btn btn-sm btn-line" style="margin-left:auto" href="' . BASE_URL . '/asset.php?id=' . $aid . '">เปิดหน้าเครื่องเต็ม →</a></div>';
         echo asset_timeline_html($tlData['tl']);
         break;
@@ -188,10 +184,10 @@ switch ($type) {
         echo '<div class="barchart" style="border:0; height:190px; padding:22px 0 24px">';
         for ($m = 1; $m <= 12; $m++) {
             $ym = sprintf('%04d-%02d', $y, $m);
-            $title = '🏷️ ' . $prod['name'] . ' — เดือน ' . sprintf('%02d/%04d', $m, $y);
+            $title = '🏷️ ' . $prod['name'] . ' — เดือน ' . thai_month_period_label($ym);
             echo '<div class="bar" style="height:' . round($byM[$m] / $mx * 100) . '%; background:linear-gradient(180deg,#3b82f6,#06b6d4); cursor:pointer" '
                . 'title="' . h("$ym : {$byM[$m]} เครื่อง") . '" onclick="' . drill_onclick($title, BASE_URL . '/dashboard_data.php?type=product_month&v=' . $ym . '&p=' . $pid) . '">'
-               . '<b>' . ($byM[$m] ?: '') . '</b><span>' . sprintf('%02d', $m) . '</span></div>';
+               . '<b>' . ($byM[$m] ?: '') . '</b><span>' . h(thai_month_short($ym)) . '</span></div>';
         }
         echo '</div><p class="muted" style="font-size:12px">กดแท่งเดือนเพื่อดูหมายเลขเครื่องที่ผลิตในเดือนนั้น</p>';
         break;
@@ -203,14 +199,13 @@ switch ($type) {
         if (!$prod) exit('พารามิเตอร์ไม่ถูกต้อง');
         [$ms, $me] = ym_range($v);
         $res = qr("$ASSET_SQL WHERE a.product_id=? AND a.produced_at>=? AND a.produced_at<? ORDER BY a.asset_code LIMIT $LIMIT", 'iss', [$pid, $ms, $me]);
-        echo '<table class="list"><tr><th>หมายเลขเครื่อง</th><th>สถานะ</th><th>ลูกค้า</th><th>ผลิตเมื่อ</th></tr>';
+        echo '<table class="list"><tr><th>หมายเลขเครื่อง</th><th>สถานะ</th><th>ผลิตเมื่อ</th></tr>';
         $n = 0;
         while ($r = $res->fetch_assoc()) {
             $n++;
             echo '<tr class="clickable" style="cursor:pointer" onclick="location.href=\'' . BASE_URL . '/asset.php?id=' . (int)$r['id'] . '\'">'
                . '<td><b>' . h($r['asset_code']) . '</b></td>'
                . '<td>' . status_badge($r['status']) . '</td>'
-               . '<td>' . h(isset($r['cust']) && $r['cust'] !== null ? $r['cust'] : '-') . '</td>'
                . '<td>' . dthai($r['produced_at']) . '</td></tr>';
         }
         echo '</table>';
@@ -219,17 +214,16 @@ switch ($type) {
         break;
 
     case 'repairs_open':
-        $res = qr("SELECT r.id, r.opened_at, r.reported_issue, r.status, a.id aid, a.asset_code, p.name pname, c.name cust
+        $res = qr("SELECT r.id, r.opened_at, r.reported_issue, r.status, a.id aid, a.asset_code, p.name pname
                    FROM repairs r JOIN assets a ON a.id=r.asset_id JOIN products p ON p.id=a.product_id
-                   LEFT JOIN customers c ON c.id=r.customer_id
                    WHERE r.status IN ('received','in_progress') ORDER BY r.opened_at LIMIT $LIMIT");
-        echo '<table class="list"><tr><th>รับแจ้ง</th><th>เครื่อง</th><th>รุ่น</th><th>ลูกค้า</th><th>อาการ</th></tr>';
+        echo '<table class="list"><tr><th>รับแจ้ง</th><th>เครื่อง</th><th>รุ่น</th><th>อาการ</th></tr>';
         $n = 0;
         while ($r = $res->fetch_assoc()) {
             $n++;
             echo '<tr><td>' . dthai($r['opened_at']) . '</td>'
                . '<td><a href="' . BASE_URL . '/asset.php?id=' . $r['aid'] . '"><b>' . h($r['asset_code']) . '</b></a></td>'
-               . '<td>' . h($r['pname']) . '</td><td>' . h($r['cust'] ?: '-') . '</td>'
+               . '<td>' . h($r['pname']) . '</td>'
                . '<td>' . h(mb_strimwidth((string)$r['reported_issue'], 0, 80, '…')) . '</td></tr>';
         }
         echo '</table>';

@@ -1,0 +1,99 @@
+/* ═══════════════════════════════════════════════════════════════
+   theme-v2.css — สกิน v2 (ชมพู–ม่วง) ระบบสต็อกอะไหล่ parts
+   ติดตั้ง: วางไฟล์นี้ที่ assets/theme-v2.css แล้วเพิ่มใน includes/header.php
+   โหลดหลังบล็อก theme-vars (ก่อนปิด head)
+   <link rel="stylesheet" href="<?= url('/assets/theme-v2.css') ?>?v=1">
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  --primary: #e11d74;
+  --primary-dark: #c01862;
+  --primary-soft: #fce7f3;
+  --sidebar: #4e2985;
+  --sidebar-bg: #4e2985;
+  --sidebar-active: rgba(255, 255, 255, .16);
+  --bg: #f4f1fb;
+  --page-bg: #f4f1fb;
+  --text: #2a2440;
+  --border: #e7e0f5;
+  --border-focus: #e5a3c6;
+  --shadow-sm: 0 1px 2px rgba(46, 26, 90, .07);
+  --shadow-md: 0 4px 16px rgba(46, 26, 90, .12);
+  --shadow-lg: 0 8px 28px rgba(46, 26, 90, .14);
+}
+
+a { color: #7c3aed; }
+a:hover { color: #e11d74; }
+
+/* ── Sidebar ── */
+.sidebar-brand { border-bottom: 1px solid rgba(255, 255, 255, .15); color: #fff; }
+.nav-links a { color: rgba(255, 255, 255, .82); }
+.nav-links a:hover { background: rgba(255, 255, 255, .12); color: #fff; }
+.nav-links a.active { background: var(--sidebar-active); color: #fff; font-weight: 600; }
+
+/* ── Stat cards → tile สีเต็มแบบ v2 ── */
+.stat-card {
+  border: 0; border-left: 0;
+  background: linear-gradient(135deg, #4e2985, #7c4dbe);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(78, 41, 133, .2);
+}
+.stat-card .label { color: rgba(255, 255, 255, .92); }
+.stat-card .value { color: #fff; }
+.stat-card.success { background: linear-gradient(135deg, #16a34a, #4ade80); border-left: 0; }
+.stat-card.warning { background: linear-gradient(135deg, #d97706, #fbbf24); border-left: 0; }
+.stat-card.danger  { background: linear-gradient(135deg, #e11d74, #f472b6); border-left: 0; }
+.stat-card:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(78, 41, 133, .28); }
+
+/* ── การ์ด / ตาราง ── */
+.card { border-color: var(--border); box-shadow: var(--shadow-sm); }
+table th { background: #f7f4fd; color: #6b6480; }
+table td { border-top-color: #f1edfa; }
+table tbody tr:hover td { background: #faf8fe; }
+
+/* ── ปุ่ม ── */
+.btn-primary:hover { background: var(--primary-dark); box-shadow: 0 2px 8px rgba(225, 29, 116, .35); }
+.btn-outline { color: var(--primary); border-color: var(--primary); }
+.btn-outline:hover { background: var(--primary-soft); }
+
+/* ── ฟอร์ม ── */
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(225, 29, 116, .12);
+}
+
+/* ── อื่นๆ ── */
+.set-card:hover { border-color: #d9c9f2; }
+.detail-link { color: #7c3aed; }
+.modal-box { border-radius: 12px; }
+
+/* ── Brand ── */
+.sidebar-brand { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* ── Sidebar cross-system link ── */
+.sidebar {
+  display: flex; flex-direction: column;
+}
+.nav-links { flex: 1; }
+.sidebar-cross-link {
+  display: flex; align-items: center; gap: 8px;
+  margin: 8px 12px 16px; padding: 10px 12px;
+  border: 1px dashed rgba(255, 255, 255, .35); border-radius: 8px;
+  color: rgba(255, 255, 255, .92); text-decoration: none; font-size: 13px;
+  transition: background .15s, border-color .15s;
+}
+.sidebar-cross-link:hover { background: rgba(255, 255, 255, .1); border-color: rgba(255, 255, 255, .5); color: #fff; }
+.sidebar-cross-link .cross-label { flex: 1; line-height: 1.35; }
+.sidebar-cross-link .cross-arrow { opacity: .8; flex-shrink: 0; margin-left: auto; }
+.sidebar-cross-link .cross-svg { flex-shrink: 0; opacity: .92; }
+.sidebar-cross-link { margin-top: auto; }
+
+/* ── Heading / button icons ── */
+.h-with-icon { display: flex; align-items: center; gap: 8px; }
+.h-with-icon .h-svg { flex-shrink: 0; color: var(--primary); }
+.btn-svg { vertical-align: middle; }
+.btn-icon { display: inline-flex; align-items: center; justify-content: center; }
+.btn-with-icon { display: inline-flex; align-items: center; gap: 6px; }
+.btn-with-icon .btn-svg { flex-shrink: 0; }
+.alert.h-with-icon { align-items: flex-start; }
+.alert.h-with-icon .h-svg { margin-top: 2px; }

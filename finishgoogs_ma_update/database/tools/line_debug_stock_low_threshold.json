@@ -1,0 +1,307 @@
+{
+    "to": "test",
+    "messages": [
+        {
+            "type": "flex",
+            "altText": "🟠 อะไหล่ใกล้หมด 29 รายการ",
+            "contents": {
+                "type": "bubble",
+                "size": "kilo",
+                "header": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "backgroundColor": "#e67e22",
+                    "paddingAll": "14px",
+                    "contents": [
+                        {
+                            "type": "text",
+                            "text": "🟠 สรุปอะไหล่ใกล้หมด",
+                            "color": "#ffffff",
+                            "weight": "bold",
+                            "size": "sm"
+                        },
+                        {
+                            "type": "text",
+                            "text": "29 รายการ",
+                            "color": "#ffe0b2",
+                            "size": "xs",
+                            "margin": "xs"
+                        }
+                    ]
+                },
+                "body": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "paddingAll": "14px",
+                    "contents": [
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "Switch Power On bitStamp Lite",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "0 \/ min 50",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "C10000 35v",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "0 \/ min 40",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "ท่อหด 1.2 มม. แดง",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "0 \/ min 2",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "สายไฟแข็ง เบอร์ 24 น้ำเงิน",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "0 \/ min 1",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "ท่อหด 2.5 มม. ดำ",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "0 \/ min 1",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "ลำโพง 2 นิ้ว",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "0 \/ min 30",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "ยางกันลื่น 4 เหลี่ยม",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "0 \/ min 100",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "หมุดย้ำสายสะพาย",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "0 \/ min 80",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "หมุดติดเคสมือถือ",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "0 \/ min 30",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "Cable TIE",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "0 \/ min 2",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "text",
+                            "text": "และอีก 19 รายการ",
+                            "size": "xs",
+                            "color": "#888888",
+                            "margin": "md"
+                        }
+                    ]
+                },
+                "footer": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "paddingAll": "12px",
+                    "contents": [
+                        {
+                            "type": "button",
+                            "style": "primary",
+                            "height": "sm",
+                            "color": "#1a5fa8",
+                            "action": {
+                                "type": "uri",
+                                "label": "เปิด Dashboard Parts",
+                                "uri": "\/production\/parts\/index.php"
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

@@ -27,7 +27,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fields') {
         'made_by_input_mode' => 'chip_single_free',
         'fw_input_mode' => 'chip_single_free',
         'lot_input_mode' => 'chip_single_free',
-        'checklist_last' => '', 'lot_last' => '',
+        'checklist_last' => '', 'checklist_items' => [], 'lot_last' => '',
         'last_asset_code' => '',
     ];
     if ($p['code_mode'] === 'generated' && $p['code_prefix']) {
@@ -38,8 +38,8 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fields') {
         $r = qr("SELECT MAX(running_no) m FROM assets WHERE product_id=?", 'i', [$pid])->fetch_assoc();
         $out['nextRun'] = (int)$r['m'] + 1;
     }
+    $out['checklist_items'] = effective_production_checklist($pid);
 
-    // หมายเลขสินค้าล่าสุดของรุ่น (อ้างอิงค่าเริ่มต้น)
     $la = qr("SELECT asset_code FROM assets WHERE product_id=? ORDER BY id DESC LIMIT 1", 'i', [$pid])->fetch_assoc();
     if ($la) $out['last_asset_code'] = (string)$la['asset_code'];
 
@@ -87,13 +87,23 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fields') {
 
     // รายการอะไหล่ทั้งหมด + ชุดอะไหล่ประจำรุ่น (BOM) — จัดชุดเบิกได้ในหน้านี้เลย
     $out['all_parts'] = [];
-    $rp = qr("SELECT id, name, unit, icon_path FROM parts WHERE is_active=1 ORDER BY name");
+    $partRows = [];
+    $rp = qr("SELECT id, name, unit, part_code, stock_code, icon_path FROM parts WHERE is_active=1 ORDER BY name");
     while ($r = $rp->fetch_assoc()) {
+        $partRows[] = $r;
+    }
+    $qtyMap = tech_parts_qty_map_for_parts($partRows);
+    foreach ($partRows as $r) {
+        $codeKey = part_row_stock_code($r);
+        if ($codeKey === '') {
+            $codeKey = trim((string)($r['part_code'] ?? ''));
+        }
         $out['all_parts'][] = [
-            'id'   => (int)$r['id'],
-            'name' => $r['name'],
-            'unit' => $r['unit'],
-            'icon' => img_url($r['icon_path']),
+            'id'        => (int)$r['id'],
+            'name'      => (string)$r['name'],
+            'unit'      => (string)($r['unit'] ?? ''),
+            'icon'      => img_url($r['icon_path'] ?? '') ?: '',
+            'stock_qty' => ($codeKey !== '' && isset($qtyMap[$codeKey])) ? (int)$qtyMap[$codeKey] : null,
         ];
     }
     $out['bom'] = [];
@@ -270,6 +280,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $bomBy = $madeBy;
 
     $codes = []; $err = null;
+    $notifyAssets = [];
     foreach ($units as $serial) {
         // ไม่ส่ง user id เข้า DB แล้ว — เก็บเฉพาะชื่อจาก profile/ฟอร์มใน made_by
         $r = create_produced_asset($pid, $pdate, $serial, $note ?: null, null);
@@ -291,6 +302,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ($bomList as $bi) {
             $bq = (float)$bi['qty_per_unit'];
             $partId = (int)$bi['part_id'];
+            $existMv = qr(
+                "SELECT id FROM part_movements WHERE ref_asset_id=? AND part_id=? AND direction='out' AND mode=? LIMIT 1",
+                'iis',
+                [(int)$r['asset_id'], $partId, 'เบิกอัตโนมัติ (ชุดอะไหล่รุ่น)']
+            )->fetch_assoc();
+            if ($existMv) {
+                continue;
+            }
             $bomAssetCode = null;
             if (!empty($r['asset_id'])) {
                 $acRow = qr('SELECT asset_code FROM assets WHERE id=?', 'i', [(int)$r['asset_id']])->fetch_assoc();
@@ -316,6 +335,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($fw !== '') q("UPDATE assets SET current_fw_version=? WHERE id=?", 'si', [$fw, $r['asset_id']]);
         if ($lot !== '') q("UPDATE assets SET lot_label=? WHERE id=?", 'si', [$lot, $r['asset_id']]);
+        if ($problems !== '') {
+            $notifyAssets[] = [
+                'asset_id'    => (int)$r['asset_id'],
+                'asset_code'  => (string)$r['code'],
+                'model'       => (string)$p['name'],
+                'produced_at' => $pdate,
+                'made_by'     => $madeBy,
+                'problems'    => $problems,
+                'fix'         => $fix,
+            ];
+        }
+    }
+    if (!$err && $notifyAssets !== [] && function_exists('line_notify_dispatch')) {
+        foreach ($notifyAssets as $na) {
+            line_notify_dispatch('production.problem_found', $na, [
+                'dedup_key' => 'production.problem_found:' . (int)$na['asset_id'] . ':' . date('Y-m-d'),
+            ]);
+        }
     }
     if ($err) {
         $msg = $err;
@@ -487,7 +524,7 @@ function loadProduct(pid){
         hintEl.style.display = 'none';
       }
       renderFields(d);
-      renderChecklist(d.checklist_last || '');
+      renderChecklist(d.checklist_items || [], d.checklist_last || '');
       renderBom(d);
       addUnit();
     })
@@ -595,12 +632,25 @@ function renderFields(d){
 }
 
 // ---------- checklist ติ๊กถูก ----------
-function renderChecklist(text){
-  var items = text.split(',').map(function(s){ return s.trim(); }).filter(function(s){ return s !== '' && s !== '-'; });
+function renderChecklist(items, lastText){
+  items = Array.isArray(items) ? items : [];
+  var lastSet = {};
+  if (lastText) {
+    lastText.split(',').map(function(s){ return s.trim(); }).filter(function(s){ return s !== '' && s !== '-'; })
+      .forEach(function(s){ lastSet[s] = true; });
+  }
+  if (!items.length && lastText) {
+    items = Object.keys(lastSet);
+  }
   var box = document.getElementById('chk-list');
-  if (!items.length) { box.innerHTML = '<span class="muted">รุ่นนี้ไม่มี checklist ต้นแบบ — เพิ่มข้อเองได้ด้านล่าง</span>'; return; }
+  if (!items.length) {
+    box.innerHTML = '<span class="muted">รุ่นนี้ยังไม่มี checklist — ตั้งค่าได้ที่ระบบหลังบ้าน หรือเพิ่มข้อเองด้านล่าง</span>';
+    return;
+  }
+  var hasLast = Object.keys(lastSet).length > 0;
   box.innerHTML = items.map(function(it){
-    return '<label class="chk-item"><input type="checkbox" checked data-item="' + esc(it) + '"><span>' + esc(it) + '</span></label>';
+    var checked = hasLast ? !!lastSet[it] : true;
+    return '<label class="chk-item"><input type="checkbox"' + (checked ? ' checked' : '') + ' data-item="' + esc(it) + '"><span>' + esc(it) + '</span></label>';
   }).join('');
 }
 function addChkItem(){
@@ -625,29 +675,57 @@ function bomPartById(id){
 }
 function bomThumbHtml(partId){
   var p = bomPartById(partId);
-  if (p && p.icon) return '<img src="' + esc(p.icon) + '" alt="" class="thumb-sm bom-thumb" loading="lazy" onerror="this.classList.add(\'broken\')">';
-  return '<span class="thumb-sm noimg bom-thumb">—</span>';
+  if (p && p.icon) return '<img src="' + esc(p.icon) + '" alt="" class="thumb-sm ma-part-opt-thumb" loading="lazy" onerror="this.classList.add(\'broken\')">';
+  return '<span class="thumb-sm noimg ma-part-opt-thumb">—</span>';
 }
 function bomPartLabel(partId){
   var p = bomPartById(partId);
   if (!p) return '';
   return p.name + (p.unit ? ' (' + p.unit + ')' : '');
 }
+function bomPartStockHtml(p){
+  if (!p || p.stock_qty == null) return '<span class="ma-part-opt-stock ma-part-opt-stock-na">ไม่มีใน Stock ช่าง</span>';
+  var cls = 'ma-part-opt-stock';
+  if (p.stock_qty <= 0) cls += ' ma-part-opt-stock-out';
+  else if (p.stock_qty <= 5) cls += ' ma-part-opt-stock-low';
+  var unit = p.unit ? ' ' + esc(p.unit) : '';
+  return '<span class="' + cls + '">คงเหลือ ' + p.stock_qty + unit + '</span>';
+}
+function bomPartSelectedChipHtml(partId){
+  var label = bomPartLabel(partId);
+  if (!label) return '';
+  return '<span class="chip chip-pick ma-part-chip-sel">'
+    + bomThumbHtml(partId)
+    + '<span class="ma-part-chip-label">' + esc(label) + '</span></span>';
+}
 function bomPartOptsHtml(selId, filter){
   filter = (filter || '').toLowerCase();
-  return bomAllParts.filter(function(p){
+  if (!bomAllParts.length) {
+    return '<div class="ma-part-opt-empty muted">เลือกรุ่นสินค้าก่อน หรือกำลังโหลดรายการอะไหล่…</div>';
+  }
+  var list = bomAllParts.filter(function(p){
     return !filter || p.name.toLowerCase().indexOf(filter) !== -1;
-  }).map(function(p){
-    return '<span class="chip chip-pick' + (p.id === selId ? ' sel' : '') + '" data-pid="' + p.id + '">' + esc(p.name) + '</span>';
-  }).join('');
+  });
+  if (!list.length) {
+    return '<div class="ma-part-opt-empty muted">ไม่พบอะไหล่' + (filter ? ' ที่ตรงกับ "' + esc(filter) + '"' : '') + '</div>';
+  }
+  return '<div class="ma-part-opt-items">' + list.map(function(p){
+    var sel = p.id === selId ? ' is-selected' : '';
+    return '<div class="ma-part-opt-row' + sel + '" data-pid="' + p.id + '" role="button" tabindex="0">'
+      + bomThumbHtml(p.id)
+      + '<div class="ma-part-opt-body">'
+      + '<span class="ma-part-opt-name">' + esc(p.name) + '</span>'
+      + bomPartStockHtml(p)
+      + '</div></div>';
+  }).join('') + '</div>';
 }
 function bomPartChipHtml(partId){
-  var label = bomPartLabel(partId);
-  return '<div class="chip-dd bom-part-dd" data-pid="' + (partId || 0) + '">'
+  var hasPart = !!bomPartById(partId);
+  return '<div class="chip-dd bom-part-dd ma-part-dd" data-pid="' + (partId || 0) + '">'
     + '<input type="hidden" name="bom_part_id[]" value="' + (partId || '') + '">'
     + '<div class="chip-dd-box">'
-    + '<div class="chip-dd-chips">' + (label ? '<span class="chip chip-pick">' + esc(label) + '</span>' : '') + '</div>'
-    + '<input type="text" class="chip-dd-filter bom-part-filter" placeholder="' + (label ? '' : 'ค้นหาอะไหล่…') + '" autocomplete="off">'
+    + '<div class="chip-dd-chips">' + (hasPart ? bomPartSelectedChipHtml(partId) : '') + '</div>'
+    + '<input type="text" class="chip-dd-filter bom-part-filter" placeholder="' + (hasPart ? '' : 'ค้นหาอะไหล่…') + '" autocomplete="off">'
     + '<button type="button" class="chip-dd-btn" tabindex="-1">▾</button>'
     + '</div>'
     + '<div class="chip-dd-list" hidden><div class="chip-dd-opts">' + bomPartOptsHtml(partId, '') + '</div></div>'
@@ -658,17 +736,28 @@ function setBomPart(dd, partId){
   hid.value = partId || '';
   dd.dataset.pid = partId || 0;
   var chips = dd.querySelector('.chip-dd-chips');
-  var label = bomPartLabel(partId);
-  chips.innerHTML = label ? '<span class="chip chip-pick">' + esc(label) + '</span>' : '';
+  chips.innerHTML = partId ? bomPartSelectedChipHtml(partId) : '';
   var filt = dd.querySelector('.bom-part-filter');
-  if (filt) filt.placeholder = label ? '' : 'ค้นหาอะไหล่…';
-  dd.querySelector('.chip-dd-opts').innerHTML = bomPartOptsHtml(partId, filt ? filt.value.trim() : '');
+  if (filt) {
+    filt.value = '';
+    filt.placeholder = partId ? '' : 'ค้นหาอะไหล่…';
+  }
+  dd.querySelector('.chip-dd-opts').innerHTML = bomPartOptsHtml(partId, '');
   var row = dd.closest('.bom-row');
   if (row) {
     var slot = row.querySelector('.bom-thumb-wrap');
     if (slot) slot.innerHTML = bomThumbHtml(partId);
   }
 }
+document.addEventListener('focusin', function(e){
+  if (!e.target.classList || !e.target.classList.contains('bom-part-filter')) return;
+  var dd = e.target.closest('.bom-part-dd');
+  if (!dd) return;
+  var selId = parseInt(dd.dataset.pid, 10) || 0;
+  dd.querySelector('.chip-dd-opts').innerHTML = bomPartOptsHtml(selId, e.target.value.trim());
+  dd.querySelector('.chip-dd-list').hidden = false;
+  dd.classList.add('chip-dd-open');
+});
 document.addEventListener('click', function(e){
   var btn = e.target.closest('.bom-part-dd .chip-dd-btn');
   if (btn) {
@@ -679,15 +768,21 @@ document.addEventListener('click', function(e){
     if (list.hidden) {
       dd.querySelector('.chip-dd-opts').innerHTML = bomPartOptsHtml(selId, filtInp ? filtInp.value.trim() : '');
       list.hidden = false;
-    } else list.hidden = true;
+      dd.classList.add('chip-dd-open');
+      if (filtInp) filtInp.focus();
+    } else {
+      list.hidden = true;
+      dd.classList.remove('chip-dd-open');
+    }
     e.preventDefault();
     return;
   }
-  var chip = e.target.closest('.bom-part-dd .chip-dd-opts .chip[data-pid]');
-  if (chip) {
-    var dd = chip.closest('.bom-part-dd');
-    setBomPart(dd, parseInt(chip.dataset.pid, 10));
-    dd.querySelector('.chip-dd-list').hidden = true;
+  var row = e.target.closest('.bom-part-dd .ma-part-opt-row[data-pid]');
+  if (row) {
+    var dd2 = row.closest('.bom-part-dd');
+    setBomPart(dd2, parseInt(row.dataset.pid, 10));
+    dd2.querySelector('.chip-dd-list').hidden = true;
+    dd2.classList.remove('chip-dd-open');
     return;
   }
 });
@@ -697,6 +792,7 @@ document.addEventListener('input', function(e){
   var selId = parseInt(dd.dataset.pid, 10) || 0;
   dd.querySelector('.chip-dd-opts').innerHTML = bomPartOptsHtml(selId, e.target.value.trim());
   dd.querySelector('.chip-dd-list').hidden = false;
+  dd.classList.add('chip-dd-open');
 });
 function bomRowHtml(partId, qty){
   return '<div class="bom-row">'
@@ -848,13 +944,27 @@ function addUnit(){
     document.getElementById('gen_count').value = unitCount;
   } else {
     row.innerHTML = '<span class="badge st-new">#' + unitCount + '</span>'
-      + '<input type="text" name="serials[]" placeholder="หมายเลขสินค้า" style="flex:1" required>'
+      + '<input type="text" name="serials[]" placeholder="หมายเลขสินค้า" style="flex:1" required autocomplete="off">'
       + '<button type="button" class="btn-sm btn-line" onclick="scanInto(this)">📷 สแกน</button>'
       + '<button type="button" class="btn-sm btn-line" onclick="removeUnit(this)">ลบ</button>';
+    list.appendChild(row);
+    var serialInp = row.querySelector('input[name="serials[]"]');
+    if (serialInp) serialInp.focus();
+    refreshPreviews();
+    return;
   }
   list.appendChild(row);
   refreshPreviews();
 }
+document.getElementById('unit-list').addEventListener('keydown', function(e){
+  if (e.key !== 'Enter') return;
+  var inp = e.target;
+  if (!inp.matches || !inp.matches('input[name="serials[]"]')) return;
+  if (!cfg || cfg.mode === 'generated') return;
+  e.preventDefault();
+  e.stopPropagation();
+  addUnit();
+});
 function removeUnit(btn){
   btn.parentNode.remove();
   var rows = document.getElementById('unit-list').children;

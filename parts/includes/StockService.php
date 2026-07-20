@@ -67,6 +67,37 @@ class StockService
         )->fetchAll();
     }
 
+    /**
+     * รายการอะไหล่ที่มีคงเหลือในคลัง สำหรับสรุปมูลค่าสิ้นปี
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    public function getStockValuationRows(): array
+    {
+        return $this->db->query(
+            'SELECT id, code, name, unit, quantity, price FROM products WHERE quantity > 0 ORDER BY name'
+        )->fetchAll();
+    }
+
+    /**
+     * อัปเดตราคาต่อหน่วยของอะไหล่
+     *
+     * @param int        $productId
+     * @param float|null $price
+     * @return void
+     */
+    public function updateProductPrice(int $productId, float $price): void
+    {
+        if ($productId <= 0) {
+            throw new InvalidArgumentException('รหัสอะไหล่ไม่ถูกต้อง');
+        }
+        if ($price < 0) {
+            throw new InvalidArgumentException('ราคาต้องไม่ติดลบ');
+        }
+        $stmt = $this->db->prepare('UPDATE products SET price = ? WHERE id = ?');
+        $stmt->execute([round($price, 2), $productId]);
+    }
+
     public function getRecentMovements(int $limit = 10): array
     {
         $sql = "
@@ -114,6 +145,9 @@ class StockService
         } catch (Exception $e) {
             $this->db->rollBack();
             throw $e;
+        }
+        if (function_exists('line_notify_check_low_stock_product')) {
+            line_notify_check_low_stock_product($productId);
         }
     }
 
@@ -216,6 +250,11 @@ class StockService
 
             $this->db->commit();
             $this->syncProductionAfterSetOut($outId, $insertedItems, $assetCode, $note, $issuedBy);
+            if (function_exists('line_notify_check_low_stock_product')) {
+                foreach ($insertedItems as $ins) {
+                    line_notify_check_low_stock_product((int)$ins['product_id']);
+                }
+            }
             return $docNo;
         } catch (Exception $e) {
             $this->db->rollBack();
@@ -271,6 +310,9 @@ class StockService
                 $note,
                 $issuedBy
             );
+            if (function_exists('line_notify_check_low_stock_product')) {
+                line_notify_check_low_stock_product($productId);
+            }
             return $docNo;
         } catch (Exception $e) {
             $this->db->rollBack();
@@ -709,6 +751,7 @@ class StockService
         ?string $issuedBy
     ): void {
         $mode = $note ?: 'เบิกใช้';
+        $firstMid = 0;
         foreach ($items as $row) {
             $partId = production_part_id_by_product_code((string) $row['product_code']);
             if ($partId === null) {
@@ -722,13 +765,116 @@ class StockService
                     $mode,
                     $issuedBy ?? 'parts',
                     $note,
-                    null
+                    $stockOutId
                 );
                 production_link_stock_out_item($this->db, (int) $row['item_id'], $mid);
+                if ($firstMid === 0) {
+                    $firstMid = $mid;
+                }
             } catch (Throwable $e) {
                 error_log('[syncProductionAfterSetOut] ' . $e->getMessage());
             }
         }
+        if ($firstMid > 0) {
+            try {
+                production_link_stock_out($this->db, $stockOutId, $firstMid, $assetCode);
+            } catch (Throwable $e) {
+                error_log('[syncProductionAfterSetOut link] ' . $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * ประวัติเบิกขยายทีละ S/N (range → รหัสจากทะเบียนเครื่อง)
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    public function getStockOutHistoryExpandedBySn(): array
+    {
+        if (!function_exists('expand_asset_codes')) {
+            require_once __DIR__ . '/production_sync.php';
+        }
+
+        $expanded = [];
+        foreach ($this->getStockOutHistory() as $row) {
+            $rawSn = trim((string) ($row['asset_code'] ?? ''));
+            $sns = expand_asset_codes($rawSn);
+            if ($sns === ['']) {
+                $sns = [''];
+            }
+            $n = count($sns);
+            $totalQty = (int) ($row['total_qty'] ?? 0);
+            $displayQty = $n > 0 ? (int) round($totalQty / $n) : $totalQty;
+
+            foreach ($sns as $sn) {
+                $copy = $row;
+                $copy['asset_code'] = $sn;
+                $copy['asset_code_raw'] = $rawSn;
+                $copy['display_qty'] = $displayQty;
+                $expanded[] = $copy;
+            }
+        }
+        return $expanded;
+    }
+
+    /**
+     * จัดกลุ่มประวัติเบิกตาม S/N เดี่ยว (หลังขยาย range แล้ว)
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    public function getStockOutHistoryGroupedBySn(): array
+    {
+        $rows = $this->getStockOutHistoryExpandedBySn();
+        $groups = [];
+        $order = [];
+
+        foreach ($rows as $row) {
+            $sn = trim((string) ($row['asset_code'] ?? ''));
+            if ($sn === '') {
+                $key = 'doc:' . (int) $row['id'];
+            } else {
+                $key = 'sn:' . mb_strtoupper($sn);
+            }
+            if (!isset($groups[$key])) {
+                $groups[$key] = [
+                    'type' => $sn === '' ? 'doc' : 'sn',
+                    'sn'   => $sn,
+                    'items' => [],
+                ];
+                $order[] = $key;
+            }
+            $groups[$key]['items'][] = $row;
+        }
+
+        $result = [];
+        foreach ($order as $key) {
+            $g = $groups[$key];
+            $items = $g['items'];
+            $docIds = [];
+            $totalQty = 0;
+            foreach ($items as $it) {
+                $docIds[(int) $it['id']] = true;
+                $totalQty += (int) ($it['display_qty'] ?? 0);
+            }
+            $result[] = [
+                'type'      => $g['type'],
+                'sn'        => $g['sn'],
+                'items'     => $items,
+                'count'     => count($items),
+                'doc_count' => count($docIds),
+                'total_qty' => $totalQty,
+                'latest'    => $items[0],
+            ];
+        }
+        return $result;
+    }
+
+    /**
+     * @deprecated ใช้ getStockOutHistoryGroupedBySn() แทน
+     */
+    public function getStockOutHistoryGrouped(): array
+    {
+        return $this->getStockOutHistoryGroupedBySn();
     }
 
     /**
@@ -736,7 +882,7 @@ class StockService
      *
      * @return array<int,array<string,mixed>>
      */
-    public function getStockOutHistoryGrouped(): array
+    public function getStockOutHistoryGroupedLegacy(): array
     {
         $rows = $this->getStockOutHistory();
         $groups = [];
@@ -791,6 +937,13 @@ class StockService
             return [];
         }
 
+        if (!function_exists('expand_asset_codes')) {
+            require_once __DIR__ . '/production_sync.php';
+        }
+
+        $seenIds = [];
+        $outs = [];
+
         $st = $this->db->prepare('
             SELECT so.*, s.name AS set_name, s.code AS set_code
             FROM stock_out so
@@ -799,7 +952,34 @@ class StockService
             ORDER BY so.created_at DESC
         ');
         $st->execute([$assetCode]);
-        $outs = $st->fetchAll();
+        foreach ($st->fetchAll() as $row) {
+            $seenIds[(int) $row['id']] = true;
+            $outs[] = $row;
+        }
+
+        $rangeSt = $this->db->query("
+            SELECT so.*, s.name AS set_name, s.code AS set_code
+            FROM stock_out so
+            LEFT JOIN sets s ON s.id = so.set_id
+            WHERE so.asset_code LIKE '% - %'
+            ORDER BY so.created_at DESC
+        ");
+        while ($row = $rangeSt->fetch()) {
+            $id = (int) $row['id'];
+            if (isset($seenIds[$id])) {
+                continue;
+            }
+            $codes = expand_asset_codes(trim((string) ($row['asset_code'] ?? '')));
+            if (!in_array($assetCode, $codes, true)) {
+                continue;
+            }
+            $seenIds[$id] = true;
+            $outs[] = $row;
+        }
+
+        usort($outs, function ($a, $b) {
+            return strcmp((string) $b['created_at'], (string) $a['created_at']);
+        });
 
         $itemSt = $this->db->prepare('
             SELECT soi.*, p.code, p.name, p.unit

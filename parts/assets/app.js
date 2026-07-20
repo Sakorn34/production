@@ -47,7 +47,7 @@
         backdrop.addEventListener('click', hideSidebar);
     }
 
-    document.querySelectorAll('.sidebar .nav-links a').forEach(function (a) {
+    document.querySelectorAll('.sidebar .nav-links a, .sidebar .sidebar-cross-link').forEach(function (a) {
         a.addEventListener('click', hideSidebar);
     });
 
@@ -83,7 +83,13 @@
         var btn = e.target.closest('[data-sn-basket]');
         if (btn) {
             e.preventDefault();
+            e.stopPropagation();
             openBasket(btn.getAttribute('data-sn-basket'));
+            return;
+        }
+        var row = e.target.closest('[data-sn-basket-row]');
+        if (row && !e.target.closest('.table-actions, a, button, form')) {
+            openBasket(row.getAttribute('data-sn-basket-row'));
             return;
         }
         if (e.target.closest('.modal-close') || e.target === modal) {

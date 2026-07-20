@@ -1,0 +1,131 @@
+{
+    "to": "test",
+    "messages": [
+        {
+            "type": "flex",
+            "altText": "📤 เบิกอะไหล่: IC MAX232 Printer",
+            "contents": {
+                "type": "bubble",
+                "size": "kilo",
+                "header": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "backgroundColor": "#2980b9",
+                    "paddingAll": "14px",
+                    "contents": [
+                        {
+                            "type": "text",
+                            "text": "📤 เบิกอะไหล่",
+                            "color": "#ffffff",
+                            "weight": "bold",
+                            "size": "sm"
+                        }
+                    ]
+                },
+                "body": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "paddingAll": "14px",
+                    "contents": [
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "อะไหล่",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "IC MAX232 Printer",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "จำนวน",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "1.00",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "ผู้เบิก",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "Tom",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "อ้างอิงเครื่อง",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "BP26072024",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

@@ -1,0 +1,166 @@
+/* ═══════════════════════════════════════════════════════════════
+   theme-v2.css — สกิน v2 (ชมพู–ม่วง) ระบบทะเบียนเครื่อง finishgoogs_ma_update
+   ติดตั้ง: วางไฟล์นี้ที่ assets/theme-v2.css แล้วเพิ่มใน includes/layout.php
+   โหลดหลังบล็อก theme-vars (ก่อนปิด head)
+   <link rel="stylesheet" href="<?= BASE_URL ?>/assets/theme-v2.css?v=<?= filemtime(__DIR__ . '/../assets/theme-v2.css') ?>">
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  --primary: #e11d74;
+  --primary-dark: #c01862;
+  --sidebar-bg: #4e2985;
+  --sidebar-active: rgba(255, 255, 255, .16);
+  --page-bg: #f4f1fb;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow-sm: 0 1px 2px rgba(46, 26, 90, .07);
+  --shadow-md: 0 4px 16px rgba(46, 26, 90, .12);
+}
+
+body { background: var(--page-bg); color: #2a2440; }
+a { color: #7c3aed; }
+a:hover { color: #e11d74; }
+
+/* ── Sidebar ── */
+.sidebar { color: #fff; }
+.brand { border-bottom: 1px solid rgba(255, 255, 255, .15); }
+.sidebar nav a { color: rgba(255, 255, 255, .82); }
+.sidebar nav a:hover { background: rgba(255, 255, 255, .12); color: #fff; }
+.sidebar nav a.active { background: var(--sidebar-active); color: #fff; box-shadow: none; font-weight: 600; }
+.userbox { border-top: 1px solid rgba(255, 255, 255, .15); }
+.userbox a { color: rgba(255, 255, 255, .75); }
+.userbox a:hover { color: #fff; }
+.ub-avatar { background: #e11d74; color: #fff; }
+.ub-name { color: #fff; }
+.ub-info .muted { color: rgba(255, 255, 255, .6); }
+
+/* ── การ์ด / กรอบ ── */
+.card, .panel, .asset-head, .timeline li, .pcard {
+  border-color: #e7e0f5;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+.card.clickable:hover { box-shadow: var(--shadow-md); border-color: #d9c9f2; }
+.card .lbl { color: #8b83a5; }
+
+/* ── ตาราง ── */
+table.list { border-color: #e7e0f5; border-radius: var(--radius); }
+table.list th { background: #f7f4fd; color: #6b6480; }
+table.list td { border-top-color: #f1edfa; }
+table.list tr:hover td { background: #faf8fe; }
+
+/* ── ปุ่ม ── */
+.btn, button { border-radius: var(--radius-sm); }
+.btn-line { color: var(--primary); border-color: var(--primary); }
+.btn-line:hover { background: #fce7f3; }
+.btn-danger { background: #b91c1c; }
+.pager a:hover { background: #f1ecfe; }
+.pager .cur { background: var(--primary); border-color: var(--primary); }
+.pager a, .pager span { border-color: #e7e0f5; border-radius: 7px; }
+
+/* ── กราฟ Dashboard ── */
+.barchart { border-color: #e7e0f5; border-radius: var(--radius); }
+.barchart .bar { background: linear-gradient(180deg, #e11d74, #8b5cf6); border-radius: 4px 4px 0 0; }
+.hbar-track { background: #f6f3fd; border-radius: 999px; }
+.hbar-fill { border-radius: 999px; }
+.stat-tile { border-radius: var(--radius); box-shadow: 0 4px 14px rgba(225, 29, 116, .18); }
+
+/* ── ฟอร์ม ── */
+input[type=text], input[type=number], input[type=date], input[type=url],
+input[type=password], select, textarea { border-radius: var(--radius-sm); }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
+  outline: 2px solid var(--primary); outline-offset: 1px;
+}
+.prod-pick .pp.sel { border-color: var(--primary); background: #fce7f3; }
+.prod-pick .pp:hover { border-color: #d9a4c4; }
+.combo-list > div:hover, .ma-pick-row:hover { background: #f6f3fd; }
+.combo-btn:hover { background: #f6f3fd; }
+
+/* ── timeline / อื่นๆ ── */
+.timeline { border-left-color: #d9c9f2; }
+.timeline li::before { background: var(--primary); }
+.tl-col-head { background: linear-gradient(#f6f3fd, #efe8fc); border-bottom-color: #e7e0f5; }
+.tl-col { background: #f6f3fd; border-color: #e7e0f5; }
+.tl-sec { background: #faf8fe; border-color: #f1edfa; }
+
+/* ── login ── */
+.login-wrap { background: var(--sidebar-bg); }
+.login-box { border-radius: var(--radius); }
+
+/* ── Brand ── */
+.brand { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* ── Sidebar cross-system link ── */
+.sidebar-cross-link {
+  display: flex; align-items: center; gap: 8px;
+  margin: 8px 12px 12px; padding: 10px 12px;
+  border: 1px dashed rgba(255, 255, 255, .35); border-radius: var(--radius-sm);
+  color: rgba(255, 255, 255, .92); text-decoration: none; font-size: 13px;
+  transition: background .15s, border-color .15s;
+}
+.sidebar-cross-link:hover { background: rgba(255, 255, 255, .1); border-color: rgba(255, 255, 255, .5); color: #fff; }
+.sidebar-cross-link .cross-label { flex: 1; line-height: 1.35; }
+.sidebar-cross-link .cross-arrow { opacity: .8; flex-shrink: 0; margin-left: auto; }
+.brand-icon { flex-shrink: 0; opacity: .95; }
+
+/* ── Heading / button icons ── */
+.h-with-icon { display: flex; align-items: center; gap: 8px; }
+.h-with-icon .h-svg { flex-shrink: 0; color: var(--primary); }
+.btn-svg, .flash-svg { vertical-align: middle; }
+.flash-icon-wrap { margin-bottom: 8px; display: flex; justify-content: center; }
+.flash-svg { color: var(--success, #16a34a); }
+.btn-icon-only { display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; }
+.btn-with-icon { display: inline-flex; align-items: center; gap: 6px; }
+.btn-with-icon .btn-svg { flex-shrink: 0; }
+.alert.h-with-icon { align-items: flex-start; }
+.alert.h-with-icon .h-svg { margin-top: 2px; }
+
+/* ── Page header subtitle ── */
+.pagehead { align-items: flex-start; }
+.pagehead-titles { min-width: 0; }
+.pagehead-sub { margin: 2px 0 0; font-size: 13px; color: #6b6480; font-weight: 400; }
+.panel-meta { font-weight: 400; font-size: 12px; }
+
+/* ── Dashboard v2 layout ── */
+.dash-charts-2col {
+  display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; margin-bottom: 16px;
+}
+@media (max-width: 900px) { .dash-charts-2col { grid-template-columns: 1fr; } }
+.dash-barchart { border: 0; padding: 8px 4px 0; height: 160px; background: transparent; }
+.year-hbar-list { display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }
+.year-hbar-row {
+  display: grid; grid-template-columns: 52px 1fr 48px; gap: 8px; align-items: center;
+  font-size: 13px; cursor: pointer; border-radius: 8px; padding: 4px 6px; margin: 0 -6px;
+}
+.year-hbar-row:hover { background: #faf8fe; }
+.year-hbar-row .hbar-fill { background: linear-gradient(90deg, #e11d74, #8b5cf6); }
+.year-hbar-label { color: #6b6480; font-weight: 600; }
+.year-hbar-val { text-align: right; font-weight: 600; color: #2a2440; }
+
+.model-card-grid {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;
+}
+@media (max-width: 1100px) { .model-card-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .model-card-grid { grid-template-columns: 1fr; } }
+.model-card {
+  display: flex; gap: 10px; align-items: center;
+  background: #fff; border: 1px solid #e7e0f5; border-radius: var(--radius-sm);
+  padding: 10px 12px; cursor: pointer; transition: box-shadow .15s, border-color .15s;
+}
+.model-card:hover { box-shadow: var(--shadow-md); border-color: #d9c9f2; }
+.model-card-img { flex-shrink: 0; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: #f7f4fd; border-radius: 8px; overflow: hidden; }
+.model-thumb { width: 40px; height: 40px; object-fit: contain; }
+.model-card-body { min-width: 0; flex: 1; }
+.model-card-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px; }
+.model-card-bar { height: 6px; background: #f1edfa; border-radius: 999px; overflow: hidden; margin-bottom: 4px; }
+.model-card-fill { height: 100%; border-radius: 999px; }
+.model-card-num { font-size: 12px; color: #6b6480; font-weight: 600; }
+
+.dash-extra { margin-bottom: 16px; }
+.dash-extra summary { cursor: pointer; font-weight: 600; color: #6b6480; padding: 4px 0 10px; }
+.dash-extra-body { padding-top: 8px; }
+.dash-extra-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.tl-type-label .tl-svg { color: var(--primary); }
+.tl-col-head .h-with-icon { display: inline-flex; }
+@media (max-width: 760px) { .dash-extra-cols { grid-template-columns: 1fr; } }
+.donut-wrap { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }

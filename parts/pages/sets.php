@@ -43,7 +43,7 @@ $products = $stock->getAllProducts();
 ?>
 
 <div class="page-header">
-    <h1>🧩 จัดการ Set</h1>
+    <?= ui_heading('sets', 'จัดการ Set', 'h1') ?>
     <p>สร้างและจัดการชุดเบิกอะไหล่</p>
 </div>
 

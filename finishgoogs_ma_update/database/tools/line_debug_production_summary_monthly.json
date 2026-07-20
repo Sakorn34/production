@@ -1,0 +1,644 @@
+{
+    "to": "test",
+    "messages": [
+        {
+            "type": "flex",
+            "altText": "🗓️ สรุปยอดผลิตรายเดือน",
+            "contents": {
+                "type": "bubble",
+                "size": "mega",
+                "header": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "backgroundColor": "#6d3bbf",
+                    "paddingAll": "lg",
+                    "contents": [
+                        {
+                            "type": "text",
+                            "text": "สรุปยอดผลิตรายเดือน",
+                            "size": "sm",
+                            "color": "#ffffff",
+                            "weight": "bold"
+                        },
+                        {
+                            "type": "text",
+                            "text": "📆 เดือน 07\/2026",
+                            "size": "xs",
+                            "color": "#ccddff",
+                            "margin": "sm"
+                        }
+                    ]
+                },
+                "body": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "paddingAll": "14px",
+                    "contents": [
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "backgroundColor": "#f0f7ff",
+                            "cornerRadius": "10px",
+                            "paddingAll": "12px",
+                            "contents": [
+                                {
+                                    "type": "box",
+                                    "layout": "vertical",
+                                    "flex": 1,
+                                    "contents": [
+                                        {
+                                            "type": "text",
+                                            "text": "ยอดรวม",
+                                            "size": "xs",
+                                            "color": "#888888"
+                                        },
+                                        {
+                                            "type": "text",
+                                            "text": "211",
+                                            "size": "xl",
+                                            "color": "#6d3bbf",
+                                            "weight": "bold"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "box",
+                                    "layout": "vertical",
+                                    "flex": 1,
+                                    "contents": [
+                                        {
+                                            "type": "text",
+                                            "text": "จำนวน Model",
+                                            "size": "xs",
+                                            "color": "#888888"
+                                        },
+                                        {
+                                            "type": "text",
+                                            "text": "16",
+                                            "size": "xl",
+                                            "color": "#6d3bbf",
+                                            "weight": "bold"
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "มีปัญหา",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "132 เครื่อง",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "bitStamp Factory Dual",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "6 รายการ (3%)",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "bitStamp Factory Single",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "12 รายการ (6%)",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "bitVisitor Plus",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "38 รายการ (18%)",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "Portable Printer",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "24 รายการ (11%)",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "Smart Card Reader",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "31 รายการ (15%)",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "bitSupply 1212 Paperless",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "30 รายการ (14%)",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "bitSupply 1206 Paperless Router",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "10 รายการ (5%)",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "bitRealtime Monitor",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "3 รายการ (1%)",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "bitQueue Monitor",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "4 รายการ (2%)",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "bitQueue Control",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "2 รายการ (1%)",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "Card Camera",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "5 รายการ (2%)",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "Smart Card Reader S",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "6 รายการ (3%)",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "Magnetic Reader",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "18 รายการ (9%)",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "bitScan",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "10 รายการ (5%)",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "Adapter 24V",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "10 รายการ (5%)",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "bitVisitor M",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "2 รายการ (1%)",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "footer": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "paddingAll": "12px",
+                    "contents": [
+                        {
+                            "type": "text",
+                            "text": "🏆 บันทึกมากสุด: Kong",
+                            "size": "xs",
+                            "color": "#888888",
+                            "margin": "sm"
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "Kong",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "89 รายการ",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "48 รายการ",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "Ice",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "28 รายการ",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "Tom",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "26 รายการ",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "Don",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "20 รายการ",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "button",
+                            "style": "primary",
+                            "height": "sm",
+                            "color": "#1a5fa8",
+                            "action": {
+                                "type": "uri",
+                                "label": "เปิดระบบ Production",
+                                "uri": "D:\/AppServ\/www\/production\/finishgoogs_ma_update\/index.php"
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

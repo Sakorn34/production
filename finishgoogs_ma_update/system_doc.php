@@ -69,14 +69,15 @@ $B = BASE_URL;
   <b style="font-size:13px">เนื้อหา</b>
   <div style="display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:8px; font-size:13px">
     <a href="#overview">① ภาพรวม</a>
-    <a href="#databases">② ฐานข้อมูล</a>
-    <a href="#pages">③ หน้าระบบ</a>
-    <a href="#lifecycle">④ วงจรชีวิตเครื่อง</a>
-    <a href="#tables">⑤ รายละเอียดตาราง</a>
-    <a href="#relations">⑥ ความสัมพันธ์ตาราง</a>
-    <a href="#helpers">⑦ ฟังก์ชันหลัก</a>
-    <a href="#permissions">⑧ สิทธิ์ผู้ใช้</a>
-    <a href="#import">⑨ การนำเข้าข้อมูล</a>
+    <a href="#status">② สถานะเครื่อง</a>
+    <a href="#databases">③ ฐานข้อมูล</a>
+    <a href="#pages">④ หน้าระบบ</a>
+    <a href="#lifecycle">⑤ วงจรชีวิตเครื่อง</a>
+    <a href="#tables">⑥ รายละเอียดตาราง</a>
+    <a href="#relations">⑦ ความสัมพันธ์ตาราง</a>
+    <a href="#helpers">⑧ ฟังก์ชันหลัก</a>
+    <a href="#permissions">⑨ สิทธิ์ / Login</a>
+    <a href="#import">⑩ การนำเข้าข้อมูล</a>
   </div>
 </div>
 
@@ -84,8 +85,14 @@ $B = BASE_URL;
 <div class="panel doc-section" id="overview">
   <h2>① ภาพรวมระบบ</h2>
   <p style="font-size:13px; color:#4b5563; margin-bottom:12px">
-    ระบบบันทึกข้อมูลการผลิตและการจัดการสินค้า (Production &amp; Asset Management) พัฒนาด้วย <b>PHP 7.3</b> บน <b>AppServ (Windows)</b> ใช้ <b>MySQL</b> เป็น database ผ่าน <b>mysqli</b> (prepared statements ทุกจุด)
+    ระบบบันทึกข้อมูลการผลิตและการจัดการสินค้า (Production &amp; Asset Management) พัฒนาด้วย <b>PHP</b> บน <b>AppServ (Windows)</b> ใช้ <b>MySQL</b> ผ่าน <b>mysqli / PDO</b> (prepared statements) · Login ผ่าน <b>SSO bit-online</b> (localhost dev = Tom อัตโนมัติ)
   </p>
+  <div class="section-note" style="margin-bottom:12px">
+    <b>2 ระบบงานใน monorepo นี้</b><br>
+    • <span class="inline-code">finishgoogs_ma_update/</span> — ทะเบียนเครื่อง, บันทึกผลิต, MA, อัปเดต FW/HW, เบิกอะไหล่ต่อเครื่อง<br>
+    • <span class="inline-code">parts/</span> — สต็อกอะไหล่ช่าง (รับเข้า / เบิก Set / เบิกรายชิ้น) ใช้ DB <b>biton_tech_parts</b> โดยตรง<br>
+    สต็อกจริง single source of truth = <span class="inline-code">biton_tech_parts.products.quantity</span> · Production map ผ่าน <span class="inline-code">parts.stock_code</span>
+  </div>
   <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px">
     <div class="page-card" style="border-left:3px solid #3b82f6">
       <div style="font-size:20px">🖥️</div>
@@ -104,67 +111,97 @@ $B = BASE_URL;
     </div>
     <div class="page-card" style="border-left:3px solid #10b981">
       <div style="font-size:20px">🔩</div>
-      <div style="font-weight:700; margin-top:4px">อะไหล่ใช้ผลิต</div>
-      <div class="pdesc">stock อะไหล่, BOM/เบิกใช้, แจ้งเตือน stock ต่ำ</div>
+      <div style="font-weight:700; margin-top:4px">อะไหล่ / เบิกใช้</div>
+      <div class="pdesc">BOM ต่อรุ่น, เบิกอัตโนมัติตอนผลิต/MA, sync กับ biton_tech_parts</div>
     </div>
     <div class="page-card" style="border-left:3px solid #f59e0b">
       <div style="font-size:20px">🛠️</div>
       <div style="font-weight:700; margin-top:4px">ประวัติซ่อม</div>
-      <div class="pdesc">บันทึกการซ่อมแต่ละรอบ: อาการ, ผลวินิจฉัย, ช่าง, ลูกค้า</div>
+      <div class="pdesc">ข้อมูล legacy จาก AppSheet — ดูได้ที่ repairs.php</div>
     </div>
     <div class="page-card" style="border-left:3px solid #ec4899">
       <div style="font-size:20px">📊</div>
       <div style="font-weight:700; margin-top:4px">Dashboard</div>
-      <div class="pdesc">กราฟผลิตรายเดือน/ปี, สถิติรายรุ่น, Drill-down Modal</div>
+      <div class="pdesc">กราฟผลิตรายเดือน/ปี (เดือนย่อไทย), สถิติรายรุ่น, Drill-down Modal</div>
     </div>
     <div class="page-card" style="border-left:3px solid #6366f1">
       <div style="font-size:20px">📦</div>
-      <div style="font-weight:700; margin-top:4px">ทะเบียนสินค้า (stock)</div>
-      <div class="pdesc">sync อัตโนมัติไปยัง biton_stockparts.stock ทีมอะไหล่</div>
+      <div style="font-weight:700; margin-top:4px">ทะเบียน S/N (stock)</div>
+      <div class="pdesc">sync อัตโนมัติไป biton_stockparts.stock + หน้า share/share_admin</div>
     </div>
     <div class="page-card" style="border-left:3px solid #14b8a6">
-      <div style="font-size:20px">👥</div>
-      <div style="font-weight:700; margin-top:4px">ลูกค้า / ผู้ใช้</div>
-      <div class="pdesc">ทะเบียนลูกค้า, ผู้ใช้งาน, สิทธิ์แยกตามบทบาท</div>
+      <div style="font-size:20px">📜</div>
+      <div style="font-weight:700; margin-top:4px">Activity Log</div>
+      <div class="pdesc">บันทึกการใช้งาน Production + Parts, ดู/Export CSV ที่หลังบ้าน</div>
     </div>
   </div>
 </div>
 
-<!-- ② ฐานข้อมูล -->
+<!-- ② สถานะเครื่อง -->
+<div class="panel doc-section" id="status">
+  <h2>② สถานะเครื่อง (ผลิตใหม่ / เช่า / สำรอง)</h2>
+  <div class="section-note">
+    เก็บที่คอลัมน์ <span class="inline-code">assets.status</span> ในฐานข้อมูลหลัก (production DB) · ไม่มีตารางแยก
+  </div>
+  <table class="schema-table" style="max-width:720px; margin-bottom:12px">
+    <tr><th>ค่าใน DB</th><th>แสดงผล (ไทย)</th><th>ความหมาย</th><th>CSS badge</th></tr>
+    <tr><td class="col-key">new</td><td>เครื่องใหม่</td><td>อยู่ในคลัง / ผลิตใหม่ยังไม่ออกไปเช่า</td><td><span class="inline-code">st-new</span></td></tr>
+    <tr><td class="col-key">rental</td><td>เครื่องเช่า</td><td>ออกไปเช่าลูกค้า</td><td><span class="inline-code">st-rental</span></td></tr>
+    <tr><td class="col-key">spare</td><td>เครื่องสำรอง</td><td>เครื่องสำรอง / ยืมทดแทน</td><td><span class="inline-code">st-spare</span></td></tr>
+  </table>
+  <ul style="font-size:13px; color:#4b5563; margin:0 0 0 18px; line-height:1.75">
+    <li><b>ประเภท DB:</b> <span class="inline-code">ENUM('new','rental','spare')</span> DEFAULT 'new'</li>
+    <li><b>ตอนผลิตใหม่:</b> <span class="inline-code">create_produced_asset()</span> INSERT ด้วย <span class="inline-code">status='new'</span> เสมอ</li>
+    <li><b>เปลี่ยนสถานะ:</b> หน้า <span class="inline-code">asset.php</span> (dropdown + บันทึก) หรือ <span class="inline-code">ma.php</span> (เลือกสถานะหลังบันทึก MA)</li>
+    <li><b>Dashboard / assets.php:</b> นับ GROUP BY status · filter <span class="inline-code">?status=new|rental|spare</span></li>
+    <li><b>Helper:</b> <span class="inline-code">status_th()</span>, <span class="inline-code">status_badge()</span>, <span class="inline-code">status_list()</span> ใน config.php</li>
+    <li><b>Audit (ถ้ามี):</b> การเปลี่ยนสถานะบางครั้งบันทึกใน <span class="inline-code">stock_movements</span> (direction in/out)</li>
+  </ul>
+</div>
+
+<!-- ③ ฐานข้อมูล -->
 <div class="panel doc-section" id="databases">
-  <h2>② ฐานข้อมูล</h2>
-  <p class="section-note">ระบบใช้ 2 database ต่างกัน: <b>bit_production</b> (ฐานหลักของระบบนี้) และ <b>biton_stockparts</b> (ของทีมอะไหล่ — เชื่อมต่อข้ามฐาน)</p>
+  <h2>③ ฐานข้อมูล</h2>
+  <p class="section-note">ระบบใช้ <b>3 database</b>: <b>bit_production</b> (ฐานหลัก), <b>biton_stockparts</b> (ทะเบียน S/N ทีม stock), <b>biton_tech_parts</b> (สต็อกอะไหล่ช่าง — single source of truth)</p>
   <div class="db-grid">
     <!-- bit_production -->
     <div class="db-box">
       <div class="db-box-head primary">🗄️ bit_production &nbsp;<span style="font-weight:400; font-size:11px; opacity:.85">(ฐานหลัก — ระบบผลิต)</span></div>
       <div class="db-box-body">
-        <div class="tbl-item"><span class="tbl-name">assets</span><div><div class="tbl-desc">ตารางกลาง: 1 แถว = เครื่อง 1 เครื่อง รหัสเครื่อง, รุ่น, สถานะ, ลูกค้าปัจจุบัน, FW ล่าสุด</div></div></div>
+        <div class="tbl-item"><span class="tbl-name">assets</span><div><div class="tbl-desc">ตารางกลาง: 1 แถว = เครื่อง 1 เครื่อง — รหัส, รุ่น, <b>status</b> (new/rental/spare), FW ล่าสุด, วันผลิต</div></div></div>
         <div class="tbl-item"><span class="tbl-name">products</span><div><div class="tbl-desc">รุ่นสินค้า: รหัส, prefix, โหมดสร้างรหัส (generated/factory_serial), รูปสินค้า</div></div></div>
         <div class="tbl-item"><span class="tbl-name">production_records</span><div><div class="tbl-desc">ประวัติการผลิต: ผู้ประกอบ, FW ณ ผลิต, checklist, ฟิลด์พิเศษ (JSON), QC ผ่าน/ไม่ผ่าน</div></div></div>
         <div class="tbl-item"><span class="tbl-name">asset_components</span><div><div class="tbl-desc">ชิ้นส่วนปัจจุบันของเครื่อง: Display, HUB, Main Board ฯลฯ (1 แถว/ชิ้นส่วน/เครื่อง)</div></div></div>
         <div class="tbl-item"><span class="tbl-name">update_logs</span><div><div class="tbl-desc">ประวัติอัปเดต FW/HW: เวอร์ชันก่อน-หลัง, รูปถ่าย, ช่าง</div></div></div>
         <div class="tbl-item"><span class="tbl-name">ma_records</span><div><div class="tbl-desc">บันทึก MA รายรอบ: อุปกรณ์ OK/เปลี่ยน/ซ่อม (comma-separated), FW, ช่าง, รอบที่</div></div></div>
         <div class="tbl-item"><span class="tbl-name">repairs</span><div><div class="tbl-desc">ประวัติซ่อม: อาการ, การวินิจฉัย, สถานะซ่อม (received/in_progress/done/returned)</div></div></div>
-        <div class="tbl-item"><span class="tbl-name">deployments</span><div><div class="tbl-desc">ประวัติส่งเครื่องให้ลูกค้า: วันเริ่ม-สิ้นสุด, ประเภท (rental/sale/install)</div></div></div>
-        <div class="tbl-item"><span class="tbl-name">customers</span><div><div class="tbl-desc">ทะเบียนลูกค้า: ชื่อ, สาขา, บริษัทรักษาความปลอดภัย, เบอร์โทร</div></div></div>
-        <div class="tbl-item"><span class="tbl-name">parts</span><div><div class="tbl-desc">อะไหล่: รหัส, ชื่อ, จำนวน stock (คำนวณสะสม), แจ้งเตือนต่ำ, ผู้จำหน่าย</div></div></div>
-        <div class="tbl-item"><span class="tbl-name">part_movements</span><div><div class="tbl-desc">การเคลื่อนไหว stock อะไหล่: รับ/เบิก, เชื่อมกับเครื่องที่ใช้ หรือใบซ่อม</div></div></div>
+        <div class="tbl-item"><span class="tbl-name">deployments</span><div><div class="tbl-desc">ประวัติส่งเครื่องให้ลูกค้า: วันเริ่ม-สิ้นสุด, ประเภท (rental/sale/install) — legacy</div></div></div>
+        <div class="tbl-item"><span class="tbl-name">parts</span><div><div class="tbl-desc">ทะเบียนอะไหล่ใน Production: รหัส, ชื่อ, stock_code (map → tech_parts), icon — จำนวนคงเหลืออ่านจาก biton_tech_parts</div></div></div>
+        <div class="tbl-item"><span class="tbl-name">part_movements</span><div><div class="tbl-desc">ประวัติเบิก/คืนอะไหล่ต่อเครื่อง: ref_asset_id, ma_record_id, qty, mode</div></div></div>
         <div class="tbl-item"><span class="tbl-name">bom_items</span><div><div class="tbl-desc">Bill of Materials: อะไหล่ต่อรุ่น (product → parts) จำนวน/เครื่อง</div></div></div>
         <div class="tbl-item"><span class="tbl-name">stock_movements</span><div><div class="tbl-desc">ประวัติเปลี่ยนสถานะเครื่อง in/out (เก็บไว้เพื่อ audit)</div></div></div>
         <div class="tbl-item"><span class="tbl-name">spare_loans</span><div><div class="tbl-desc">บันทึกยืม-คืนเครื่องสำรอง (เชื่อมกับ repairs ถ้ายืมแทนเครื่องเสีย)</div></div></div>
-        <div class="tbl-item"><span class="tbl-name">product_field_config</span><div><div class="tbl-desc">config ฟิลด์บันทึกแต่ละรุ่น: ชื่อฟิลด์, ชนิด (component/extra/text), dropdown options, context (production/ma/update)</div></div></div>
-        <div class="tbl-item"><span class="tbl-name">users</span><div><div class="tbl-desc">ผู้ใช้งาน: username, password_hash (bcrypt), display_name, role, LINE UID</div></div></div>
-        <div class="tbl-item"><span class="tbl-name">notifications</span><div><div class="tbl-desc">แจ้งเตือน: MA ครบกำหนด, เครื่องเช่าเกินกำหนด, อะไหล่ต่ำ</div></div></div>
-        <div class="tbl-item"><span class="tbl-name">site_settings</span><div><div class="tbl-desc">key-value store: สีธีม, โลโก้, ชื่อแอป, เมนูหลังบ้าน, config ย้าย online</div></div></div>
+        <div class="tbl-item"><span class="tbl-name">product_field_config</span><div><div class="tbl-desc">config ฟิลด์ต่อรุ่น: production/ma/update + checklist + watch_alert (SD Card/RTC) + fw/lot/made_by</div></div></div>
+        <div class="tbl-item"><span class="tbl-name">activity_logs</span><div><div class="tbl-desc">Activity log ร่วม Production + Parts: ผู้ใช้, action, สรุป, รายละเอียด POST (ดูที่ activity_logs.php)</div></div></div>
+        <div class="tbl-item"><span class="tbl-name">site_settings</span><div><div class="tbl-desc">key-value: สีธีม, โลโก้, ชื่อแอป, เมนู, ฟอนต์ (ใช้ร่วม parts ผ่าน main_theme)</div></div></div>
+        <div class="tbl-item"><span class="tbl-name">customers</span><div><div class="tbl-desc">ข้อมูล legacy (AppSheet) — ยังมี FK ใน assets/repairs แต่<strong>ไม่มีหน้ UI จัดการแล้ว</strong></div></div></div>
+        <div class="tbl-item"><span class="tbl-name">users</span><div><div class="tbl-desc">legacy — ปัจจุบัน login ใช้ SSO session profile ไม่ได้ auth จากตารางนี้</div></div></div>
       </div>
     </div>
-    <!-- biton_stockparts -->
+    <!-- biton_stockparts + tech_parts -->
     <div>
       <div class="db-box" style="margin-bottom:12px">
-        <div class="db-box-head secondary">📦 biton_stockparts &nbsp;<span style="font-weight:400; font-size:11px; opacity:.85">(ฐานทีมอะไหล่ — เข้าถึง 1 ตาราง)</span></div>
+        <div class="db-box-head secondary">📦 biton_stockparts &nbsp;<span style="font-weight:400; font-size:11px; opacity:.85">(ทะเบียน S/N)</span></div>
         <div class="db-box-body">
           <div class="tbl-item"><span class="tbl-name">stock</span><div><div class="tbl-desc">ทะเบียน serial number สินค้าทุกเครื่อง: serial_number (PK), model, timestamp (วันผลิต), create_name (ผู้บันทึก), id (รหัสชุด), active (1/0)</div><div class="tbl-rows">⚠️ เค้าโครงของทีมอะไหล่ — ห้าม ALTER เพิ่มฟิลด์</div></div></div>
+        </div>
+      </div>
+      <div class="db-box" style="margin-bottom:12px">
+        <div class="db-box-head secondary" style="background:#047857">🔩 biton_tech_parts &nbsp;<span style="font-weight:400; font-size:11px; opacity:.85">(สต็อกอะไหล่ช่าง — Parts app)</span></div>
+        <div class="db-box-body">
+          <div class="tbl-item"><span class="tbl-name">products</span><div><div class="tbl-desc">อะไหล่: code, name, quantity (คงเหลือจริง), รูป, ราคา</div></div></div>
+          <div class="tbl-item"><span class="tbl-name">stock_in / stock_out</span><div><div class="tbl-desc">รับเข้า / เบิกออก (Set หรือรายชิ้น) — จัดการที่ <span class="inline-code">/production/parts/</span></div></div></div>
+          <div class="tbl-item"><span class="tbl-name">sets</span><div><div class="tbl-desc">ชุดเบิก (BOM ช่าง) สำหรับเบิกหลายชิ้นพร้อมกัน</div></div></div>
         </div>
       </div>
       <div class="section-note">
@@ -187,19 +224,19 @@ $B = BASE_URL;
   </div>
 </div>
 
-<!-- ③ หน้าระบบ -->
+<!-- ④ หน้าระบบ -->
 <div class="panel doc-section" id="pages">
-  <h2>③ หน้าระบบ — แต่ละหน้าทำอะไร อ่านข้อมูลจากไหน</h2>
+  <h2>④ หน้าระบบ — แต่ละหน้าทำอะไร อ่านข้อมูลจากไหน</h2>
   <div class="page-grid">
     <div class="page-card" style="border-top:3px solid #ec4899">
       <div class="pfile">index.php</div>
       <div class="pdesc">Dashboard หลัก: stat tiles (เครื่องทั้งหมด/ใหม่/เช่า/สำรอง), กราฟรายเดือน/ปี, โดนัท, รายรุ่น</div>
-      <div class="pread">อ่าน: assets, products, (AJAX→dashboard_data.php)</div>
+      <div class="pread">อ่าน: assets JOIN products (AJAX→dashboard_data.php)</div>
     </div>
     <div class="page-card" style="border-top:3px solid #3b82f6">
       <div class="pfile">assets.php</div>
       <div class="pdesc">รายการเครื่องทั้งหมด: ค้นหา, filter สถานะ/รุ่น, paginate 50/หน้า, AJAX suggest</div>
-      <div class="pread">อ่าน: assets JOIN products LEFT JOIN customers</div>
+      <div class="pread">อ่าน: assets JOIN products</div>
     </div>
     <div class="page-card" style="border-top:3px solid #3b82f6">
       <div class="pfile">asset.php</div>
@@ -208,8 +245,8 @@ $B = BASE_URL;
     </div>
     <div class="page-card" style="border-top:3px solid #10b981">
       <div class="pfile">asset_new.php</div>
-      <div class="pdesc">บันทึกผลิตใหม่: เลือกรุ่น, วันที่, ชิ้นส่วน, FW, ผู้ประกอบ; รองรับหลายเครื่อง (ถ้า generated-code)</div>
-      <div class="pread">อ่าน: products, parts (BOM), product_field_config / เขียน: assets, production_records, asset_components, part_movements</div>
+      <div class="pdesc">บันทึกผลิตใหม่: เลือกรุ่น, BOM picker, checklist/watch alerts ตาม settings, รองรับหลายเครื่อง (generated-code)</div>
+      <div class="pread">อ่าน: products, parts, product_field_config / เขียน: assets, production_records, asset_components, part_movements + tech_parts เบิก BOM</div>
     </div>
     <div class="page-card" style="border-top:3px solid #8b5cf6">
       <div class="pfile">ma.php</div>
@@ -228,18 +265,18 @@ $B = BASE_URL;
     </div>
     <div class="page-card" style="border-top:3px solid #f59e0b">
       <div class="pfile">repairs.php</div>
-      <div class="pdesc">รายการซ่อมทั้งหมด: filter ลูกค้า/ค้นหา (นำเข้าจาก AppSheet legacy)</div>
-      <div class="pread">อ่าน: repairs JOIN assets JOIN products LEFT JOIN customers (ROW_NUMBER() นับครั้งซ่อมต่อเครื่อง)</div>
+      <div class="pdesc">รายการซ่อมทั้งหมด: filter/ค้นหา (นำเข้าจาก AppSheet legacy) — แสดงชื่อลูกค้าเป็นข้อความ ไม่มีลิงก์ไปหน้าจัดการลูกค้า</div>
+      <div class="pread">อ่าน: repairs JOIN assets JOIN products LEFT JOIN customers (legacy)</div>
     </div>
     <div class="page-card" style="border-top:3px solid #10b981">
       <div class="pfile">parts.php</div>
-      <div class="pdesc">คลัง stock อะไหล่: รับเข้า/เบิกออก/เบิกซ่อม, BOM, แจ้งเตือน stock ต่ำ; กดดูว่าเครื่องไหนใช้อะไหล่นี้</div>
-      <div class="pread">อ่าน: parts, part_movements, bom_items / เขียน: parts (stock_qty±), part_movements</div>
+      <div class="pdesc">ทะเบียนอะไหล่ Production + ประวัติเบิกต่อเครื่อง; จำนวนคงเหลืออ่านจาก biton_tech_parts; เบิก/ปรับผ่าน part_stock_bridge</div>
+      <div class="pread">อ่าน: parts, part_movements, bom_items, tech_parts (qty) / เขียน: parts, part_movements, biton_tech_parts</div>
     </div>
-    <div class="page-card" style="border-top:3px solid #14b8a6">
-      <div class="pfile">customers.php / customer.php</div>
-      <div class="pdesc">ทะเบียนลูกค้า: จำนวนเครื่อง/deployment/ซ่อม; รายละเอียดลูกค้า 1 ราย</div>
-      <div class="pread">อ่าน: customers, assets, deployments, repairs</div>
+    <div class="page-card" style="border-top:3px solid #047857">
+      <div class="pfile">/production/parts/</div>
+      <div class="pdesc">แอปสต็อกอะไหล่ช่างแยก: รับเข้า, เบิก Set, เบิกรายชิ้น, ประวัติ — ใช้ DB biton_tech_parts โดยตรง</div>
+      <div class="pread">อ่าน+เขียน: biton_tech_parts (products, stock_in, stock_out, sets)</div>
     </div>
     <div class="page-card" style="border-top:3px solid #6366f1">
       <div class="pfile">products.php</div>
@@ -248,7 +285,7 @@ $B = BASE_URL;
     </div>
     <div class="page-card" style="border-top:3px solid #6366f1">
       <div class="pfile">settings.php</div>
-      <div class="pdesc">หลังบ้าน: config ฟิลด์รายรุ่น (production/MA/update), reset กลับอัตโนมัติ</div>
+      <div class="pdesc">หลังบ้าน (PIN 9981): config ฟิลด์รายรุ่น, checklist ผลิต, watch alerts SD/RTC, input_mode, reset อัตโนมัติ</div>
       <div class="pread">อ่าน: product_field_config, products / เขียน: product_field_config</div>
     </div>
     <div class="page-card" style="border-top:3px solid #ec4899">
@@ -257,9 +294,14 @@ $B = BASE_URL;
       <div class="pread">อ่าน+เขียน: site_settings</div>
     </div>
     <div class="page-card" style="border-top:3px solid #9d174d">
-      <div class="pfile">share.php</div>
-      <div class="pdesc">ทะเบียนสินค้า (stock): ดู/เพิ่ม/แก้ไข/ลบ ใน biton_stockparts.stock, Import CSV, Sync จากระบบ</div>
-      <div class="pread">อ่าน+เขียน: biton_stockparts.stock (query แยกจาก bit_production)</div>
+      <div class="pfile">share_admin.php</div>
+      <div class="pdesc">หลังบ้านทะเบียน S/N: เปรียบเทียบ assets ↔ stock, Import CSV, Sync, แก้ไข/ลบ (PIN 9981)</div>
+      <div class="pread">อ่าน+เขียน: biton_stockparts.stock + อ่าน assets/products</div>
+    </div>
+    <div class="page-card" style="border-top:3px solid #14b8a6">
+      <div class="pfile">activity_logs.php</div>
+      <div class="pdesc">Activity Log ร่วม Production + Parts: filter ผู้ใช้/ระบบ/วันที่, Export CSV (PIN 9981)</div>
+      <div class="pread">อ่าน: activity_logs (bit_production)</div>
     </div>
     <div class="page-card" style="border-top:3px solid #64748b">
       <div class="pfile">scan.php</div>
@@ -267,16 +309,26 @@ $B = BASE_URL;
       <div class="pread">ไม่อ่าน DB (client-side scan ด้วย html5-qrcode)</div>
     </div>
     <div class="page-card" style="border-top:3px solid #64748b">
-      <div class="pfile">users.php / profile.php</div>
-      <div class="pdesc">จัดการผู้ใช้ (admin): เพิ่ม/แก้ role/รีเซ็ต password, เปลี่ยน password ตัวเอง</div>
-      <div class="pread">อ่าน+เขียน: users</div>
+      <div class="pfile">share.php</div>
+      <div class="pdesc">ทะเบียนสินค้า (stock) แบบอ่าน/ค้นหา — จัดการเต็มรูปแบบอยู่ที่ share_admin.php</div>
+      <div class="pread">อ่าน: biton_stockparts.stock</div>
+    </div>
+    <div class="page-card" style="border-top:3px solid #64748b">
+      <div class="pfile">system_doc.php</div>
+      <div class="pdesc">เอกสารหลักการทำงานของระบบ (หน้านี้)</div>
+      <div class="pread">ไม่อ่าน DB</div>
+    </div>
+    <div class="page-card" style="border-top:3px solid #9ca3af; opacity:.75">
+      <div class="pfile">customers.php / users.php</div>
+      <div class="pdesc"><s>legacy</s> — ไม่อยู่ในเมนูแล้ว · login ใช้ SSO profile · ลูกค้าไม่มี UI จัดการ</div>
+      <div class="pread">(ไฟล์อาจยังอยู่ใน repo แต่ไม่ใช้งานหลัก)</div>
     </div>
   </div>
 </div>
 
-<!-- ④ วงจรชีวิตเครื่อง -->
+<!-- ⑤ วงจรชีวิตเครื่อง -->
 <div class="panel doc-section" id="lifecycle">
-  <h2>④ วงจรชีวิตของเครื่อง — บันทึกอย่างไร เก็บที่ไหน</h2>
+  <h2>⑤ วงจรชีวิตของเครื่อง — บันทึกอย่างไร เก็บที่ไหน</h2>
 
   <h3>🏭 การสร้างเครื่องใหม่ (asset_new.php → create_produced_asset)</h3>
   <div class="section-note" style="margin-bottom:10px">
@@ -290,7 +342,7 @@ $B = BASE_URL;
     <div class="flow-step"><div class="flow-num">3</div><div class="flow-body"><b>create_produced_asset()</b> — INSERT เข้า assets (asset_code, product_id, produced_at, status='new', created_by) แล้วเรียก share_upsert_asset()<div class="flow-writes"><span class="flow-write">เขียน: assets</span><span class="flow-write">sync: biton_stockparts.stock (active=1)</span></div></div></div>
     <div class="flow-step"><div class="flow-num">4</div><div class="flow-body"><b>บันทึก production_records</b> — ผู้ประกอบ, FW ณ เวลาผลิต, checklist, ฟิลด์พิเศษ (JSON)<div class="flow-writes"><span class="flow-write">เขียน: production_records (extra_json)</span></div></div></div>
     <div class="flow-step"><div class="flow-num">5</div><div class="flow-body"><b>บันทึกชิ้นส่วน</b> — ฟิลด์ชนิด 'component' (Display, HUB ฯลฯ) → upsert ทีละชิ้น<div class="flow-writes"><span class="flow-write">เขียน: asset_components (ON DUPLICATE KEY UPDATE)</span></div></div></div>
-    <div class="flow-step"><div class="flow-num">6</div><div class="flow-body"><b>เบิกอะไหล่ตาม BOM</b> — ลด parts.stock_qty + บันทึก part_movements (mode='ผลิต', ref_asset_id)<div class="flow-writes"><span class="flow-write">เขียน: part_movements, parts.stock_qty−</span></div></div></div>
+    <div class="flow-step"><div class="flow-num">6</div><div class="flow-body"><b>เบิกอะไหล่ตาม BOM</b> — <span class="inline-code">tech_parts_stock_out_by_part_id()</span> ลด quantity ใน biton_tech_parts + INSERT part_movements (mode='ผลิต', ref_asset_id)<div class="flow-writes"><span class="flow-write">เขียน: part_movements</span><span class="flow-write">sync: biton_tech_parts.quantity−</span></div></div></div>
   </div>
 
   <h3>✏️ การแก้ไขเครื่อง (asset.php)</h3>
@@ -318,7 +370,8 @@ $B = BASE_URL;
     <div class="flow-step"><div class="flow-num">1</div><div class="flow-body">ค้นหาเครื่องด้วย รหัส หรือ factory_serial → ดึง asset_id<div class="flow-writes"><span class="flow-write">อ่าน: assets</span></div></div></div>
     <div class="flow-step"><div class="flow-num">2</div><div class="flow-body">คำนวณ ma_round = MAX(ma_round)+1 ของเครื่องนั้น<div class="flow-writes"><span class="flow-write">อ่าน: ma_records</span></div></div></div>
     <div class="flow-step"><div class="flow-num">3</div><div class="flow-body">INSERT ma_records: ok_items, replace_items, repair_items เก็บเป็น comma-separated string<div class="flow-writes"><span class="flow-write">เขียน: ma_records</span></div></div></div>
-    <div class="flow-step"><div class="flow-num">4</div><div class="flow-body">ถ้ามี FW ใหม่ → UPDATE assets.current_fw_version<div class="flow-writes"><span class="flow-write">เขียน: assets.current_fw_version (ถ้ามีการเปลี่ยน)</span></div></div></div>
+    <div class="flow-step"><div class="flow-num">4</div><div class="flow-body"><b>เบิกอะไหล่ (ถ้าเลือก)</b> — tech_parts_stock_out + INSERT part_movements mode=MA, ma_record_id<div class="flow-writes"><span class="flow-write">เขียน: part_movements, biton_tech_parts.quantity−</span></div></div></div>
+    <div class="flow-step"><div class="flow-num">5</div><div class="flow-body">ถ้ามี FW ใหม่ → UPDATE assets.current_fw_version<div class="flow-writes"><span class="flow-write">เขียน: assets.current_fw_version (ถ้ามีการเปลี่ยน)</span></div></div></div>
   </div>
 
   <h3>⬆️ การบันทึก FW/HW Update (update_new.php)</h3>
@@ -327,16 +380,17 @@ $B = BASE_URL;
     <div class="flow-step"><div class="flow-num">2</div><div class="flow-body">ถ้า FW → UPDATE assets.current_fw_version; ถ้า HW → Upsert asset_components (ชิ้นส่วนปัจจุบัน)<div class="flow-writes"><span class="flow-write">เขียน: assets.current_fw_version และ/หรือ asset_components</span></div></div></div>
   </div>
 
-  <h3>🔩 การรับ/เบิกอะไหล่ (parts.php)</h3>
+  <h3>🔩 การเบิก/ปรับอะไหล่ (parts.php / part_stock_bridge.php)</h3>
   <div class="flow-steps">
-    <div class="flow-step"><div class="flow-num">1</div><div class="flow-body">INSERT part_movements: direction in/out, qty, mode (ผลิต/ซ่อม/สั่งซื้อ), ref_asset_id (ถ้าเบิกผลิต)<div class="flow-writes"><span class="flow-write">เขียน: part_movements</span></div></div></div>
-    <div class="flow-step"><div class="flow-num">2</div><div class="flow-body">UPDATE parts.stock_qty ± qty → เป็นจำนวนสะสมปัจจุบัน<div class="flow-writes"><span class="flow-write">เขียน: parts.stock_qty</span></div></div></div>
+    <div class="flow-step"><div class="flow-num">1</div><div class="flow-body">INSERT part_movements: direction out, qty, mode, ref_asset_id / ma_record_id (ถ้ามี)<div class="flow-writes"><span class="flow-write">เขียน: part_movements</span></div></div></div>
+    <div class="flow-step"><div class="flow-num">2</div><div class="flow-body"><span class="inline-code">tech_parts_stock_out_by_part_id()</span> หรือ <span class="inline-code">tech_parts_stock_in_by_part_id()</span> — map ผ่าน <span class="inline-code">parts.stock_code</span> → <span class="inline-code">biton_tech_parts.products.code</span><div class="flow-writes"><span class="flow-write">sync: biton_tech_parts.products.quantity</span></div></div></div>
+    <div class="flow-step"><div class="flow-num">3</div><div class="flow-body">รับเข้าสต็อกจริงทำที่แอป <span class="inline-code">/production/parts/</span> (stock-in.php) — ไม่ใช่ parts.php<div class="flow-writes"><span class="flow-write">เขียน: biton_tech_parts.stock_in</span></div></div></div>
   </div>
 </div>
 
-<!-- ⑤ รายละเอียดตาราง -->
+<!-- ⑥ รายละเอียดตาราง -->
 <div class="panel doc-section" id="tables">
-  <h2>⑤ รายละเอียดคอลัมน์ตารางสำคัญ</h2>
+  <h2>⑥ รายละเอียดคอลัมน์ตารางสำคัญ</h2>
 
   <h3>🗃️ assets (ตารางกลาง)</h3>
   <div style="overflow-x:auto">
@@ -349,7 +403,7 @@ $B = BASE_URL;
     <tr><td>running_no</td><td>INT UNSIGNED NULL</td><td>ตัวเลขวิ่งใน รหัส (ใช้ generated mode)</td></tr>
     <tr><td>produced_at</td><td>DATE NULL</td><td>วันที่ผลิต (ขึ้น YY/MM ในรหัส)</td></tr>
     <tr><td>status</td><td>ENUM('new','rental','spare')</td><td>new=คลัง, rental=เช่า, spare=สำรอง</td></tr>
-    <tr><td class="col-fk">current_customer_id</td><td>BIGINT UNSIGNED NULL</td><td>FK → customers(id)</td></tr>
+    <tr><td class="col-fk">current_customer_id</td><td>BIGINT UNSIGNED NULL</td><td>FK → customers(id) — legacy, ไม่มี UI จัดการแล้ว</td></tr>
     <tr><td>current_fw_version</td><td>VARCHAR(50) NULL</td><td>FW ล่าสุดที่ทราบ (อัปเดตตอน update/MA)</td></tr>
     <tr><td>ma_interval_months</td><td>TINYINT UNSIGNED NULL</td><td>ระยะ MA เป็นเดือน</td></tr>
     <tr><td>next_ma_date</td><td>DATE NULL</td><td>วัน MA ครั้งถัดไป</td></tr>
@@ -413,8 +467,9 @@ $B = BASE_URL;
     <tr><td class="col-fk col-key">product_id</td><td>BIGINT UNSIGNED</td><td>FK → products(id)</td></tr>
     <tr><td>context</td><td>ENUM('production','ma','update')</td><td>ฟิลด์นี้ใช้ในฟอร์มไหน</td></tr>
     <tr><td>field_name</td><td>VARCHAR(150)</td><td>ชื่อฟิลด์ เช่น "Display", "Battery By"</td></tr>
-    <tr><td>field_kind</td><td>VARCHAR(30)</td><td>component = ชิ้นส่วน HW / extra = เก็บใน JSON / text / ma_item</td></tr>
-    <tr><td>options_text</td><td>TEXT NULL</td><td>ตัวเลือก dropdown (1 ตัวเลือก/บรรทัด)</td></tr>
+    <tr><td>field_kind</td><td>VARCHAR(30)</td><td>component / extra / text / ma_item / <b>checklist</b> / <b>watch_alert</b> / <b>watch_alert_cfg</b> / fw / lot / made_by</td></tr>
+    <tr><td>input_mode</td><td>VARCHAR(40) NULL</td><td>chip_single_free, chip_multi, text, … — ควบคุม UI ฟิลด์ (settings.php)</td></tr>
+    <tr><td>options_text</td><td>TEXT NULL</td><td>ตัวเลือก dropdown (1 ตัวเลือก/บรรทัด) หรือรายการ checklist / รหัส watch alert</td></tr>
     <tr><td>sort_order</td><td>INT</td><td>ลำดับแสดง (drag-reorder ได้)</td></tr>
   </table>
   </div>
@@ -423,9 +478,9 @@ $B = BASE_URL;
   </div>
 </div>
 
-<!-- ⑥ ความสัมพันธ์ตาราง -->
+<!-- ⑦ ความสัมพันธ์ตาราง -->
 <div class="panel doc-section" id="relations">
-  <h2>⑥ ความสัมพันธ์ของตาราง (Foreign Keys &amp; JOINs)</h2>
+  <h2>⑦ ความสัมพันธ์ของตาราง (Foreign Keys &amp; JOINs)</h2>
   <div class="rel-grid">
     <div class="rel-box">
       <b>assets</b> → เชื่อมออกไป
@@ -484,15 +539,24 @@ $B = BASE_URL;
       </ul>
     </div>
     <div class="rel-box">
-      <b>parts</b> ↔ BOM
+      <b>parts</b> ↔ BOM / tech_parts
       <ul>
         <li>← <b>bom_items</b>.part_id (CASCADE)</li>
         <li>← <b>part_movements</b>.part_id</li>
+        <li>stock_code → <b>biton_tech_parts.products</b>.code (logical, PHP bridge)</li>
         <li>bom_items: product_id × part_id (UNIQUE)</li>
       </ul>
     </div>
     <div class="rel-box">
-      <b>users</b> ← ถูกอ้างอิง
+      <b>activity_logs</b>
+      <ul>
+        <li>standalone — ไม่ FK ไปตารางอื่น</li>
+        <li>system_key = 'production' | 'parts'</li>
+        <li>เขียนอัตโนมัติทุก POST (และ flash_set ที่ส่ง logSummary)</li>
+      </ul>
+    </div>
+    <div class="rel-box">
+      <b>users</b> ← legacy FK
       <ul>
         <li>← production_records.user_id</li>
         <li>← update_logs.user_id</li>
@@ -514,9 +578,9 @@ $B = BASE_URL;
   </div>
 </div>
 
-<!-- ⑦ ฟังก์ชันหลัก -->
+<!-- ⑧ ฟังก์ชันหลัก -->
 <div class="panel doc-section" id="helpers">
-  <h2>⑦ ฟังก์ชันหลักใน config.php</h2>
+  <h2>⑧ ฟังก์ชันหลักใน config.php (+ shared)</h2>
   <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:10px">
     <?php
     $fns = [
@@ -524,20 +588,25 @@ $B = BASE_URL;
       ['q($sql, $types, $params)', 'Prepared statement: execute แล้วคืน mysqli_stmt. Die ถ้า prepare ล้มเหลว'],
       ['qr($sql, $types, $params)', 'เหมือน q() แต่คืน result set (mysqli_result) ใช้ fetch_assoc/fetch_row'],
       ['h($s)', 'htmlspecialchars() ป้องกัน XSS ใช้ทุกที่ที่ echo ข้อมูลจาก DB หรือ User'],
-      ['create_produced_asset($pid,$date,$serial,$note,$uid)', 'สร้างเครื่องใหม่: generated code (GET_LOCK) หรือ factory_serial; เรียก share_upsert_asset(); คืน [\'code\'=>...] หรือ [\'error\'=>...]'],
-      ['share_upsert_asset($assetId, $oldCode)', 'Sync 1 เครื่องไป biton_stockparts.stock (INSERT … ON DUPLICATE KEY UPDATE); ถ้ารหัสเปลี่ยน→ลบแถวเก่าก่อน; fail-soft'],
-      ['share_delete_asset($code)', 'DELETE จาก biton_stockparts.stock WHERE serial_number=?; fail-soft'],
-      ['can($perm)', 'ตรวจสิทธิ์: admin=ทุกอย่าง; qc=production; technician=update/repair/ma/spare/parts'],
-      ['effective_fields($pid, $ctx)', 'ดึง config ฟิลด์ฟอร์ม: ถ้ามี product_field_config ใช้นั้น, ไม่มี → auto-derive จากประวัติ'],
-      ['derive_production_fields($pid)', 'Auto-derive ชิ้นส่วนจาก asset_components + extra keys จาก production_records.extra_json'],
-      ['derive_ma_pool($pid)', 'Auto-derive รายการ MA จาก ma_records ok/replace/repair_items จัดลำดับตามความถี่'],
-      ['part_watch_alerts($assetId, $producedAt)', 'ตรวจ SD Card / Battery Backup RTC: เตือน 22 เดือน, แจ้งเตือน 24 เดือน (ดูจาก ma_records.replace_items)'],
-      ['img_url($path)', 'แปลง path ที่เก็บใน DB เป็น URL สาธารณะ (รองรับ legacy AppSheet paths 9 แบบ)'],
-      ['save_upload($field,$subdir,$exts)', 'รับ upload ไฟล์ภาพ, ตรวจ type/getimagesize, บันทึกเป็น uploads/{subdir}/{Y/m}/{timestamp_hex}.ext'],
-      ['dthai($d)', 'แปลงวันที่เป็น d/m/Y (คืน "-" ถ้า null)'],
-      ['setting($key,$default)', 'อ่านค่าจาก site_settings (cached static)'],
-      ['set_setting($key,$val)', 'เขียน site_settings (INSERT … ON DUPLICATE KEY UPDATE)'],
-      ['nav_effective()', 'Build sidebar nav รวม overrides จาก site_settings.nav_items JSON'],
+      ['require_login()', 'บังคับ SSO session profile (localhost dev → Tom อัตโนมัติ)'],
+      ['can($perm) / require_can($perm)', 'เปิดให้ทุก profile ใช้ได้ — พารามิเตอร์ perm เก็บไว้เพื่อ backward compat'],
+      ['actor_name()', 'ชื่อผู้ใช้จาก $_SESSION profile สำหรับบันทึก/เบิก/activity log'],
+      ['status_th($s) / status_badge($s) / status_list()', 'แปลง/แสดงสถานะเครื่อง new/rental/spare'],
+      ['thai_month_short($ym) / thai_month_period_label($ym)', 'ป้ายเดือนย่อไทย + พ.ศ. สำหรับ Dashboard'],
+      ['create_produced_asset($pid,$date,$serial,$note,$uid)', 'สร้างเครื่องใหม่ status=new; GET_LOCK สำหรับ generated code; share_upsert_asset()'],
+      ['share_upsert_asset($assetId, $oldCode)', 'Sync → biton_stockparts.stock (fail-soft)'],
+      ['share_delete_asset($code)', 'DELETE จาก biton_stockparts.stock (fail-soft)'],
+      ['tech_parts_stock_out_by_part_id(...)', 'เบิกอะไหล่ผ่าน part_stock_bridge.php → biton_tech_parts'],
+      ['effective_fields($pid, $ctx)', 'config ฟิลด์ฟอร์ม หรือ auto-derive จากประวัติ'],
+      ['effective_production_checklist($pid)', 'รายการ checklist จาก product_field_config field_kind=checklist'],
+      ['product_watch_alerts_enabled($pid)', 'เปิด/ปิด watch alert SD Card / Battery RTC ต่อรุ่น'],
+      ['part_watch_alerts($assetId, $producedAt)', 'คำนวณแจ้งเตือนอายุ SD/RTC จาก ma_records.replace_items'],
+      ['activity_log_write([...])', 'shared/activity_log_core.php — บันทึก activity_logs'],
+      ['img_url($path)', 'แปลง path ใน DB เป็น URL (รองรับ legacy AppSheet)'],
+      ['save_upload($field,$subdir,$exts)', 'รับ upload ภาพ → uploads/{subdir}/'],
+      ['dthai($d)', 'วันที่ d/m/Y'],
+      ['setting($key) / set_setting($key,$val)', 'อ่าน/เขียน site_settings'],
+      ['nav_effective()', 'Build sidebar จาก site_settings.nav_items'],
     ];
     foreach ($fns as $f) {
         echo '<div class="rel-box"><b style="color:#92400e">' . h($f[0]) . '</b><ul><li style="list-style:none; margin-left:0; color:#374151">' . h($f[1]) . '</li></ul></div>';
@@ -546,49 +615,47 @@ $B = BASE_URL;
   </div>
 </div>
 
-<!-- ⑧ สิทธิ์ผู้ใช้ -->
+<!-- ⑨ สิทธิ์ผู้ใช้ -->
 <div class="panel doc-section" id="permissions">
-  <h2>⑧ สิทธิ์ผู้ใช้งาน (Role-Based Access)</h2>
+  <h2>⑨ การ Login และสิทธิ์</h2>
+  <div class="section-note" style="margin-bottom:12px">
+    <b>Login:</b> SSO bit-online → session <span class="inline-code">$_SESSION['profile']</span> (display name, employee id ฯลฯ)<br>
+    <b>Localhost dev:</b> bootstrap เป็น Tom อัตโนมัติถ้ายังไม่มี profile<br>
+    <b>Role เก่า (admin/qc/technician):</b> ตาราง users ยังมีใน DB แต่<strong>ไม่ใช้ตัดสินใจสิทธิ์แล้ว</strong> — ทุกคนที่ login ได้ใช้ฟีเจอร์หลักได้<br>
+    <b>หลังบ้าน (settings, share_admin, activity_logs):</b> ต้องปลดล็อก PIN <span class="inline-code">9981</span> หรือชื่อ Tom (ดู <span class="inline-code">includes/settings_gate.php</span>)
+  </div>
   <div class="perm-grid">
     <div class="perm-box">
-      <div class="perm-head" style="background:#1d4ed8">👑 admin</div>
+      <div class="perm-head" style="background:#1d4ed8">🔐 SSO profile</div>
       <div class="perm-list"><ul>
-        <li>ทุกฟีเจอร์ทั้งหมด</li>
-        <li>ลบเครื่อง / จัดการผู้ใช้</li>
-        <li>หลังบ้าน / ทะเบียนสินค้า</li>
-        <li>ปรับแต่งธีม / Config ย้าย</li>
+        <li>Dashboard, ทะเบียนเครื่อง, ผลิต, MA, Update</li>
+        <li>อะไหล่ Production, ซ่อม (อ่าน), สแกน QR</li>
+        <li>Activity log เขียนอัตโนมัติทุก POST</li>
       </ul></div>
     </div>
     <div class="perm-box">
-      <div class="perm-head" style="background:#065f46">🔬 qc</div>
+      <div class="perm-head" style="background:#92400e">🔑 PIN 9981 / Tom</div>
       <div class="perm-list"><ul>
-        <li>บันทึกผลิตใหม่ (production)</li>
-        <li>ดู Dashboard, รายการเครื่อง</li>
+        <li>settings.php — config รุ่น/checklist/watch alerts</li>
+        <li>share_admin.php — Sync stock, Import CSV</li>
+        <li>activity_logs.php — ดู log + Export CSV</li>
+        <li>appearance.php — ธีม/เมนู</li>
       </ul></div>
     </div>
     <div class="perm-box">
-      <div class="perm-head" style="background:#6d28d9">🔧 technician</div>
+      <div class="perm-head" style="background:#047857">🔩 Parts app</div>
       <div class="perm-list"><ul>
-        <li>บันทึก MA, FW/HW update</li>
-        <li>บันทึกซ่อม</li>
-        <li>จัดการอะไหล่ (เบิก/รับ)</li>
-        <li>เครื่องสำรอง</li>
-      </ul></div>
-    </div>
-    <div class="perm-box">
-      <div class="perm-head" style="background:#92400e">📊 executive</div>
-      <div class="perm-list"><ul>
-        <li>ดู Dashboard, รายการเครื่อง</li>
-        <li>ดู-อย่างเดียว (read-only)</li>
-        <li>ไม่มีสิทธิ์บันทึกอะไร</li>
+        <li>แอป <span class="inline-code">/production/parts/</span> แยก login SSO เดียวกัน</li>
+        <li>จัดการสต็อกจริง biton_tech_parts</li>
+        <li>Activity log system_key = 'parts'</li>
       </ul></div>
     </div>
   </div>
 </div>
 
-<!-- ⑨ การนำเข้าข้อมูล -->
+<!-- ⑩ การนำเข้าข้อมูล -->
 <div class="panel doc-section" id="import">
-  <h2>⑨ การนำเข้าข้อมูล</h2>
+  <h2>⑩ การนำเข้าข้อมูล</h2>
   <h3>🗂️ import_legacy.php (CLI — นำเข้าจาก AppSheet ครั้งแรก)</h3>
   <div class="section-note">รันผ่าน Command Line เท่านั้น (<span class="inline-code">php database/import_legacy.php</span>) — idempotent: ล้างตารางแล้ว reload ใหม่ได้เสมอ</div>
   <div class="flow-steps">
@@ -598,8 +665,8 @@ $B = BASE_URL;
     <div class="flow-step"><div class="flow-num">4</div><div class="flow-body"><b>บันทึก log</b> แถวที่ข้ามหรือมีปัญหา ไว้ที่ database/import_log/*.csv เพื่อตรวจสอบ</div></div>
   </div>
 
-  <h3 style="margin-top:16px">📥 share.php → Import CSV (Web UI)</h3>
-  <div class="section-note">Admin กด "Import CSV" บนหน้าทะเบียนสินค้า — นำเข้าเข้า biton_stockparts.stock โดยตรง</div>
+  <h3 style="margin-top:16px">📥 share_admin.php → Import CSV (Web UI)</h3>
+  <div class="section-note">Admin กด Import บนหน้า share_admin (PIN 9981) — นำเข้าเข้า biton_stockparts.stock โดยตรง</div>
   <ul style="font-size:13px; color:#4b5563; margin: 6px 0 0 20px; line-height:1.8">
     <li>คอลัมน์ที่คาดหวัง: timestamp, serial_number, model, id, create_name, setup_id, active</li>
     <li>active Y/y → 1, N/n → 0</li>
@@ -607,7 +674,7 @@ $B = BASE_URL;
     <li>serial_number ซ้ำ → ข้าม (SKIP) และรายงาน</li>
   </ul>
 
-  <h3 style="margin-top:16px">🔄 share.php → Sync จากระบบ (Web UI)</h3>
+  <h3 style="margin-top:16px">🔄 share_admin.php → Sync จากระบบ (Web UI)</h3>
   <ul style="font-size:13px; color:#4b5563; margin: 6px 0 0 20px; line-height:1.8">
     <li>ดึงเครื่องทุกเครื่องจาก assets ที่ยังไม่มีใน stock</li>
     <li>ใช้ <span class="inline-code">INSERT IGNORE</span> ป้องกัน duplicate</li>

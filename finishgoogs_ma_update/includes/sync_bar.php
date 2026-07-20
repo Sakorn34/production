@@ -13,10 +13,10 @@ $syncStats = share_sync_stats();
     <?php } ?>
   </span>
   <?php } ?>
-  <button type="button" class="btn btn-sm btn-line" id="btn-share-sync" title="ซิงก์ผู้ผลิต วันที่ผลิต และรุ่นจากทะเบียนเครื่องผลิต">
-    🔄 Sync ข้อมูลที่ยังไม่ครบ
+  <button type="button" class="btn btn-sm btn-line btn-with-icon" id="btn-share-sync" title="ซิงก์ผู้ผลิต วันที่ผลิต และรุ่นจากทะเบียนเครื่องผลิต">
+    <?= ui_btn_label('refresh', 'Sync ข้อมูลที่ยังไม่ครบ') ?>
   </button>
-  <a href="<?= BASE_URL ?>/share_admin.php#import-basic" class="btn btn-sm btn-line" title="Import CSV: timestamp, serial_number, ผู้ผลิต">📥 Import stock</a>
+  <a href="<?= BASE_URL ?>/share_admin.php#import-basic" class="btn btn-sm btn-line btn-with-icon" title="Import CSV: timestamp, serial_number, ผู้ผลิต"><?= ui_btn_label('stock-in', 'Import stock') ?></a>
   <span id="sync-status" class="muted" style="font-size:12px"></span>
 </div>
 <script>

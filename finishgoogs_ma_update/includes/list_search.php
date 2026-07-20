@@ -37,7 +37,7 @@ function list_search_form(array $fields, $clearUrl = '', array $hidden = []) {
            . ' placeholder="' . h(isset($f['placeholder']) ? $f['placeholder'] : '') . '"'
            . ' style="width:' . h($w) . '">';
     }
-    echo '<button type="submit">🔍 ค้นหา</button>';
+    echo '<button type="submit" class="btn-with-icon">' . ui_btn_label('search', 'ค้นหา') . '</button>';
     if ($hasValue && $clearUrl !== '') {
         echo ' <a href="' . h($clearUrl) . '" class="btn btn-line btn-sm" style="align-self:center">ล้าง</a>';
     }
@@ -53,7 +53,7 @@ function list_search_form(array $fields, $clearUrl = '', array $hidden = []) {
 function timeline_group_by_type(array $tl) {
     $groups = [];
     foreach ($tl as $e) {
-        $key = timeline_type_group($e['type']);
+        $key = isset($e['type_key']) ? ui_timeline_group_key($e['type_key']) : timeline_type_group_legacy($e['type'] ?? '');
         if (!isset($groups[$key])) $groups[$key] = [];
         $groups[$key][] = $e;
     }
@@ -75,35 +75,58 @@ function timeline_sort_items(array $items) {
 }
 
 /**
+ * ตัดกลุ่มออกจาก timeline (เช่น ไม่แสดงเบิกอะไหล่ซ้ำเมื่อมีตารางด้านบนแล้ว)
+ *
+ * @param array<int, array<string,mixed>> $tl
+ * @param array<int, string> $groupKeys กลุ่มจาก ui_timeline_group_key เช่น 'parts'
+ * @return array<int, array<string,mixed>>
+ */
+function timeline_exclude_groups(array $tl, array $groupKeys) {
+    if ($groupKeys === []) {
+        return $tl;
+    }
+    $skip = array_flip($groupKeys);
+    return array_values(array_filter($tl, function ($e) use ($skip) {
+        $key = isset($e['type_key']) ? ui_timeline_group_key($e['type_key']) : timeline_type_group_legacy($e['type'] ?? '');
+        return !isset($skip[$key]);
+    }));
+}
+
+/**
  * ลำดับคอลัมน์กลุ่มประวัติมาตรฐาน
  *
  * @return array<int, string>
  */
 function timeline_group_order() {
-    return ['🏭 บันทึกผลิต / QC', '📲 อัปเดต FW/HW', '📅 เข้า MA', '🔩 เบิกอะไหล่ใช้กับเครื่องนี้', '🔧 งานซ่อม', '📦 สถานะคลัง', '🔁 เครื่องสำรอง'];
+    return ui_timeline_group_order();
 }
 
 /**
- * แปลงหัวข้อ timeline → ชื่อกลุ่ม
+ * แปลงหัวข้อ timeline แบบเก่า (emoji) → กลุ่ม — รองรับข้อมูล legacy
  *
  * @param string $type
  * @return string
  */
-function timeline_type_group($type) {
+function timeline_type_group_legacy($type) {
     static $map = [
-        '🏭 บันทึกผลิต / QC' => '🏭 บันทึกผลิต / QC',
-        '📲 อัปเดต Firmware' => '📲 อัปเดต FW/HW',
-        '🔩 อัปเดต Hardware' => '📲 อัปเดต FW/HW',
-        '⚙️ อัปเดต' => '📲 อัปเดต FW/HW',
-        '📅 เข้า MA' => '📅 เข้า MA',
-        '🔧 งานซ่อม' => '🔧 งานซ่อม',
-        '📥 เข้าคลัง' => '📦 สถานะคลัง',
-        '📤 ออกจากคลัง' => '📦 สถานะคลัง',
-        '🔁 ถูกยืมเป็นเครื่องสำรอง' => '🔁 เครื่องสำรอง',
-        '🔩 เบิกอะไหล่ใช้กับเครื่องนี้' => '🔩 เบิกอะไหล่ใช้กับเครื่องนี้',
-        '↩️ คืนอะไหล่' => '🔩 เบิกอะไหล่ใช้กับเครื่องนี้',
+        '🏭 บันทึกผลิต / QC' => 'production',
+        '📲 อัปเดต Firmware' => 'update',
+        '🔩 อัปเดต Hardware' => 'update',
+        '⚙️ อัปเดต' => 'update',
+        '📅 เข้า MA' => 'ma',
+        '🔧 งานซ่อม' => 'repair',
+        '📥 เข้าคลัง' => 'stock',
+        '📤 ออกจากคลัง' => 'stock',
+        '🔁 ถูกยืมเป็นเครื่องสำรอง' => 'spare',
+        '🔩 เบิกอะไหล่ใช้กับเครื่องนี้' => 'parts',
+        '↩️ คืนอะไหล่' => 'parts',
     ];
-    return isset($map[$type]) ? $map[$type] : $type;
+    return isset($map[$type]) ? $map[$type] : 'other';
+}
+
+/** @deprecated ใช้ ui_timeline_group_key แทน */
+function timeline_type_group($type) {
+    return timeline_type_group_legacy($type);
 }
 
 /**
@@ -117,7 +140,8 @@ function timeline_type_group($type) {
  */
 function timeline_board_column($title, array $items, $actionsFn = null, $assetId = 0) {
     echo '<div class="tl-col">';
-    echo '<div class="tl-col-head">' . h($title) . ' <span class="muted">(' . count($items) . ')</span></div>';
+    $headHtml = (strpos($title, '<') !== false) ? $title : ui_timeline_group_title_html($title);
+    echo '<div class="tl-col-head">' . $headHtml . ' <span class="muted">(' . count($items) . ')</span></div>';
     echo '<ul class="timeline tl-col-list">';
     foreach ($items as $e) {
         $actions = ($actionsFn && is_callable($actionsFn)) ? $actionsFn($e, $assetId) : '';
@@ -149,7 +173,7 @@ function asset_timeline_grouped_html(array $tl, $actionsFn = null, $assetId = 0)
         $seen[$g] = true;
         $items = $groups[$g];
         echo '<details class="tl-group" style="margin-bottom:10px" open>';
-        echo '<summary style="cursor:pointer; font-weight:600; padding:8px 0">' . h($g) . ' <span class="muted">(' . count($items) . ')</span></summary>';
+        echo '<summary style="cursor:pointer; font-weight:600; padding:8px 0">' . ui_timeline_group_title_html($g) . ' <span class="muted">(' . count($items) . ')</span></summary>';
         echo '<ul class="timeline" style="margin-top:6px">';
         foreach ($items as $e) {
             $actions = ($actionsFn && is_callable($actionsFn)) ? $actionsFn($e, $assetId) : '';
@@ -162,7 +186,7 @@ function asset_timeline_grouped_html(array $tl, $actionsFn = null, $assetId = 0)
     foreach ($groups as $g => $items) {
         if (isset($seen[$g])) continue;
         echo '<details class="tl-group" style="margin-bottom:10px">';
-        echo '<summary style="cursor:pointer; font-weight:600; padding:8px 0">' . h($g) . ' <span class="muted">(' . count($items) . ')</span></summary>';
+        echo '<summary style="cursor:pointer; font-weight:600; padding:8px 0">' . ui_timeline_group_title_html($g) . ' <span class="muted">(' . count($items) . ')</span></summary>';
         echo '<ul class="timeline" style="margin-top:6px">';
         foreach ($items as $e) {
             $actions = ($actionsFn && is_callable($actionsFn)) ? $actionsFn($e, $assetId) : '';

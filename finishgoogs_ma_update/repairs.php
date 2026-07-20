@@ -63,7 +63,7 @@ page_header('ประวัติการซ่อม');
     <td><?= dthai($r['opened_at']) ?></td>
     <td><a href="<?= BASE_URL ?>/asset.php?id=<?= $r['asset_id'] ?>"><?= h($r['asset_code']) ?></a></td>
     <td><?= h($r['pname']) ?></td>
-    <td><?php if ($r['customer_id']) { ?><a href="<?= BASE_URL ?>/customer.php?id=<?= $r['customer_id'] ?>"><?= h($r['cust'] . ($r['site_label'] ? ' (' . $r['site_label'] . ')' : '')) ?></a><?php } else echo '-'; ?></td>
+    <td><?php if ($r['customer_id']) { echo h($r['cust'] . ($r['site_label'] ? ' (' . $r['site_label'] . ')' : '')); } else echo '-'; ?></td>
     <td><?= h($r['security_company'] ?: '-') ?></td>
     <td style="max-width:240px"><?= h($r['reported_issue'] ?: '-') ?></td>
     <td style="max-width:300px"><?= h($r['assessment'] ?: '-') ?></td>

@@ -8,3 +8,9 @@
     Deny from all
   </IfModule>
 </FilesMatch>
+
+# ห้ามเข้าถึงโฟลเดอร์ _archive จากเว็บ (ใช้ RewriteRule — DirectoryMatch ใช้ใน .htaccess ไม่ได้)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^_archive(/|$) - [F,L]
+</IfModule>

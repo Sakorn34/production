@@ -2,7 +2,7 @@
 /**
  * updates_import.php — นำเข้าประวัติอัปเดต FW/HW จาก CSV
  *
- * ใช้ร่วมกับไฟล์ที่สร้างจาก database/tools/parse_production_history.php
+ * ใช้ร่วมกับไฟล์ที่สร้างจาก _archive/dev-tools/finishgoogs_ma_update/database/tools/parse_production_history.php
  * คอลัมน์หลัก: asset_code, updated_at, update_type, component_name, old_value, new_value, detail, made_by
  *
  * Flow:
@@ -32,7 +32,7 @@ if (isset($_GET['download']) && $_GET['download'] === 'ready') {
 if (isset($_GET['download']) && $_GET['download'] === 'missing') {
     if (!is_readable($CSV_MISSING)) {
         http_response_code(404);
-        exit('ยังไม่มีรายการ — รัน php database/tools/check_import_missing.php ก่อน');
+        exit('ยังไม่มีรายการ — รัน php _archive/dev-tools/finishgoogs_ma_update/database/tools/check_import_missing.php ก่อน');
     }
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="update_logs_missing_assets.csv"');
@@ -267,7 +267,7 @@ page_header('นำเข้าประวัติอัปเดต FW/HW');
   <a class="btn btn-sm" href="<?= BASE_URL ?>/updates_import.php?download=ready">⬇️ ดาวน์โหลด update_logs_from_history.csv</a>
 </div>
 <?php } else { ?>
-<p class="muted">ยังไม่มีไฟล์สำเร็จรูป — รัน <code>php database/tools/parse_production_history.php --url</code> ก่อน</p>
+<p class="muted">ยังไม่มีไฟล์สำเร็จรูป — รัน <code>php _archive/dev-tools/finishgoogs_ma_update/database/tools/parse_production_history.php --url</code> ก่อน</p>
 <?php } ?>
 
 <?php if ($missingInfo) { ?>
@@ -311,8 +311,5 @@ page_header('นำเข้าประวัติอัปเดต FW/HW');
   </table>
 </div>
 
-<p style="margin-top:14px">
-  <a class="btn btn-line btn-sm" href="<?= BASE_URL ?>/updates.php">← กลับหน้าอัปเดต FW/HW</a>
-</p>
 <?php
 page_footer();

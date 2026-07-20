@@ -106,7 +106,7 @@ $products = $stock->getAllProducts();
 ?>
 
 <div class="page-header">
-    <h1>📋 อะไหล่</h1>
+    <?= ui_heading('products', 'อะไหล่', 'h1') ?>
     <p>รายการอะไหล่และจำนวนคงเหลือ</p>
 </div>
 

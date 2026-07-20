@@ -1,0 +1,236 @@
+{
+    "to": "test",
+    "messages": [
+        {
+            "type": "flex",
+            "altText": "📅 สรุปยอดผลิตรายสัปดาห์",
+            "contents": {
+                "type": "bubble",
+                "size": "mega",
+                "header": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "backgroundColor": "#1a5fa8",
+                    "paddingAll": "lg",
+                    "contents": [
+                        {
+                            "type": "text",
+                            "text": "สรุปยอดผลิตรายสัปดาห์",
+                            "size": "sm",
+                            "color": "#ffffff",
+                            "weight": "bold"
+                        },
+                        {
+                            "type": "text",
+                            "text": "📆 13\/07\/2026 – 19\/07\/2026",
+                            "size": "xs",
+                            "color": "#ccddff",
+                            "margin": "sm"
+                        }
+                    ]
+                },
+                "body": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "paddingAll": "14px",
+                    "contents": [
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "backgroundColor": "#f0f7ff",
+                            "cornerRadius": "10px",
+                            "paddingAll": "12px",
+                            "contents": [
+                                {
+                                    "type": "box",
+                                    "layout": "vertical",
+                                    "flex": 1,
+                                    "contents": [
+                                        {
+                                            "type": "text",
+                                            "text": "ยอดรวม",
+                                            "size": "xs",
+                                            "color": "#888888"
+                                        },
+                                        {
+                                            "type": "text",
+                                            "text": "22",
+                                            "size": "xl",
+                                            "color": "#1a5fa8",
+                                            "weight": "bold"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "box",
+                                    "layout": "vertical",
+                                    "flex": 1,
+                                    "contents": [
+                                        {
+                                            "type": "text",
+                                            "text": "จำนวน Model",
+                                            "size": "xs",
+                                            "color": "#888888"
+                                        },
+                                        {
+                                            "type": "text",
+                                            "text": "3",
+                                            "size": "xl",
+                                            "color": "#1a5fa8",
+                                            "weight": "bold"
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "bitVisitor Plus",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "10 รายการ (45%)",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "Adapter 24V",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "10 รายการ (45%)",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "bitVisitor M",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "2 รายการ (9%)",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "footer": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "paddingAll": "12px",
+                    "contents": [
+                        {
+                            "type": "text",
+                            "text": "🏆 บันทึกมากสุด: Tom",
+                            "size": "xs",
+                            "color": "#888888",
+                            "margin": "sm"
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "Tom",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "12 รายการ",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "Kong",
+                                    "size": "xs",
+                                    "color": "#888888",
+                                    "flex": 4
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "10 รายการ",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "flex": 6,
+                                    "align": "end",
+                                    "wrap": true,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "button",
+                            "style": "primary",
+                            "height": "sm",
+                            "color": "#1a5fa8",
+                            "action": {
+                                "type": "uri",
+                                "label": "เปิดระบบ Production",
+                                "uri": "D:\/AppServ\/www\/production\/finishgoogs_ma_update\/index.php"
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

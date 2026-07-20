@@ -39,7 +39,7 @@ $history = $stock->getStockInHistory(30);
 ?>
 
 <div class="page-header">
-    <h1>📥 รับเข้า</h1>
+    <?= ui_heading('stock-in', 'รับเข้า', 'h1') ?>
     <p>บันทึกการรับอะไหล่เข้าคลัง</p>
 </div>
 

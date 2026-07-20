@@ -103,23 +103,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_update'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_part_move'])) {
     csrf_check();
     $mid = (int)$_POST['record_id'];
-    $old = qr("SELECT part_id, qty, direction, tech_stock_out_id FROM part_movements WHERE id=? AND ref_asset_id=?", 'ii', [$mid, $id])->fetch_assoc();
-    if ($old && $old['direction'] === 'out') {
-        $synced = false;
-        if (!empty($old['tech_stock_out_id']) && function_exists('production_sync_delete_stock_out_from_movement')) {
-            $synced = production_sync_delete_stock_out_from_movement($mid);
+    $old = qr("SELECT id FROM part_movements WHERE id=? AND ref_asset_id=? AND direction='out'", 'ii', [$mid, $id])->fetch_assoc();
+    if ($old) {
+        $del = production_delete_out_movement_with_stock($mid, actor_name());
+        if (!$del['ok']) {
+            flash_set($del['error'] ?? 'ลบไม่สำเร็จ', 'err');
+            header('Location: ' . BASE_URL . '/asset.php?id=' . $id);
+            exit;
         }
-        if (!$synced) {
-            $ret = tech_parts_stock_in_by_part_id((int)$old['part_id'], (float)$old['qty'], 'ลบรายการเบิก (เครื่อง)', actor_name());
-            if (!$ret['ok']) {
-                flash_set($ret['error'], 'err');
-                header('Location: ' . BASE_URL . '/asset.php?id=' . $id);
-                exit;
-            }
-            q("DELETE FROM part_movements WHERE id=? AND ref_asset_id=?", 'ii', [$mid, $id]);
-        }
-    } elseif ($old) {
-        q("DELETE FROM part_movements WHERE id=? AND ref_asset_id=?", 'ii', [$mid, $id]);
     }
     flash_set('ลบรายการเบิกอะไหล่แล้ว');
     header('Location: ' . BASE_URL . '/asset.php?id=' . $id); exit;
@@ -129,6 +120,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_part_move'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_ma_asset'])) {
     csrf_check();
     $mid = (int)$_POST['record_id'];
+    if (ma_withdrawal_count($mid) > 0) {
+        $rb = ma_rollback_withdrawals($mid, actor_name());
+        if (!$rb['ok']) {
+            flash_set($rb['error'], 'err');
+            header('Location: ' . BASE_URL . '/asset.php?id=' . $id);
+            exit;
+        }
+    }
     q("DELETE FROM ma_records WHERE id=? AND asset_id=?", 'ii', [$mid, $id]);
     flash_set('ลบรายการ MA แล้ว');
     header('Location: ' . BASE_URL . '/asset.php?id=' . $id); exit;
@@ -145,6 +144,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_asset'])) {
     }
     flash_set("ลบเครื่อง $delCode และประวัติทั้งหมดเรียบร้อยแล้ว");
     header('Location: ' . BASE_URL . '/assets.php'); exit;
+}
+
+// Sync ตามรายการเบิก — ผูก/สร้าง stock_out + ลบใบเบิกซ้ำ/เกินใน Parts
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sync_withdraw_list'])) {
+    csrf_check();
+    $sync = asset_reconcile_withdraw_list_to_stock($id, actor_name());
+    if ($sync['ok']) {
+        $msg = $sync['message'] ?? 'Sync ตามรายการเบิกสำเร็จ';
+        if (!empty($sync['errors'])) {
+            $msg .= ' (มี ' . count($sync['errors']) . ' รายการข้าม/ผิดพลาด)';
+        }
+        flash_set($msg);
+    } else {
+        $err = $sync['errors'][0] ?? ($sync['message'] ?? 'Sync รายการเบิกไม่สำเร็จ');
+        flash_set($err, 'err');
+    }
+    header('Location: ' . BASE_URL . '/asset.php?id=' . $id . '#parts-withdraw');
+    exit;
 }
 
 $components = qr("SELECT component_name, component_value FROM asset_components WHERE asset_id=? ORDER BY component_name", 'i', [$id]);
@@ -186,7 +203,12 @@ require __DIR__ . "/includes/list_search.php";
 $tlData = asset_timeline_items($id);
 $tl = $tlData["tl"];
 $partsUsed = $tlData["partsUsed"];
-$partsSummary = asset_parts_withdraw_summary($id);
+$partsSummary = asset_parts_withdraw_summary($id, true);
+$showPartsWithdraw = !empty($partsSummary['show_section']);
+// มีตารางอะไหล่ด้านบนแล้ว — ไม่แสดงคอลัมน์เบิกอะไหล่ซ้ำใน timeline
+if ($showPartsWithdraw && ($partsSummary['out_count'] > 0 || $partsUsed)) {
+    $tl = timeline_exclude_groups($tl, ['parts']);
+}
 
 /** ปุ่มแก้ไข/ลบรายการในประวัติ */
 function asset_tl_actions($e, $assetId) {
@@ -195,24 +217,24 @@ function asset_tl_actions($e, $assetId) {
     $out = '<div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap">';
     if ($e['kind'] === 'update') {
         $back = urlencode(BASE_URL . '/asset.php?id=' . $assetId);
-        $out .= '<a class="btn btn-sm btn-line" href="' . BASE_URL . '/update_edit.php?id=' . $id . '&back=' . $back . '">✏️ แก้ไข</a>';
+        $out .= '<a class="btn btn-sm btn-line btn-with-icon" href="' . BASE_URL . '/update_edit.php?id=' . $id . '&back=' . $back . '">' . ui_btn_label('edit', 'แก้ไข') . '</a>';
         $out .= '<form method="post" style="display:inline" onsubmit="return confirm(\'ลบรายการนี้?\')">' . csrf_field()
               . '<input type="hidden" name="del_update" value="1"><input type="hidden" name="record_id" value="' . $id . '">'
-              . '<button class="btn-sm btn-danger" type="submit">🗑️ ลบ</button></form>';
+              . '<button class="btn-sm btn-danger btn-with-icon" type="submit">' . ui_icon_html('trash', 16, 'btn-svg') . '<span>ลบ</span></button></form>';
     } elseif ($e['kind'] === 'ma') {
-        $out .= '<a class="btn btn-sm btn-line" href="' . BASE_URL . '/ma.php?edit=' . $id . '">✏️ แก้ไข</a>';
+        $out .= '<a class="btn btn-sm btn-line btn-with-icon" href="' . BASE_URL . '/ma.php?edit=' . $id . '">' . ui_btn_label('edit', 'แก้ไข') . '</a>';
         $out .= '<form method="post" style="display:inline" onsubmit="return confirm(\'ลบรายการ MA นี้?\')">' . csrf_field()
               . '<input type="hidden" name="del_ma_asset" value="1"><input type="hidden" name="record_id" value="' . $id . '">'
-              . '<button class="btn-sm btn-danger" type="submit">🗑️ ลบ</button></form>';
+              . '<button class="btn-sm btn-danger btn-with-icon" type="submit">' . ui_icon_html('trash', 16, 'btn-svg') . '<span>ลบ</span></button></form>';
     } elseif ($e['kind'] === 'part_move') {
-        $out .= '<button class="btn btn-sm btn-line" onclick="showListModal(' . h(json_encode('แก้ไขรายการเบิก', JSON_UNESCAPED_UNICODE)) . ',' . h(json_encode(BASE_URL . '/parts.php?ajax=edit_move_form&id=' . $id)) . ',\'\')">✏️ แก้ไข</button>';
+        $out .= '<button class="btn btn-sm btn-line btn-with-icon" onclick="showListModal(' . h(json_encode('แก้ไขรายการเบิก', JSON_UNESCAPED_UNICODE)) . ',' . h(json_encode(BASE_URL . '/parts.php?ajax=edit_move_form&id=' . $id . '&back=' . urlencode(BASE_URL . '/asset.php?id=' . $assetId))) . ',\'\')">' . ui_btn_label('edit', 'แก้ไข') . '</button>';
         $out .= '<form method="post" style="display:inline" onsubmit="return confirm(\'ลบรายการเบิกนี้?\')">' . csrf_field()
               . '<input type="hidden" name="del_part_move" value="1"><input type="hidden" name="record_id" value="' . $id . '">'
-              . '<button class="btn-sm btn-danger" type="submit">🗑️ ลบ</button></form>';
+              . '<button class="btn-sm btn-danger btn-with-icon" type="submit">' . ui_icon_html('trash', 16, 'btn-svg') . '<span>ลบ</span></button></form>';
     } elseif ($e['kind'] === 'production') {
         $out .= '<form method="post" style="display:inline" onsubmit="return confirm(\'ลบบันทึกผลิตนี้?\')">' . csrf_field()
               . '<input type="hidden" name="del_production" value="1"><input type="hidden" name="record_id" value="' . $id . '">'
-              . '<button class="btn-sm btn-danger" type="submit">🗑️ ลบ</button></form>';
+              . '<button class="btn-sm btn-danger btn-with-icon" type="submit">' . ui_icon_html('trash', 16, 'btn-svg') . '<span>ลบ</span></button></form>';
     }
     return $out . '</div>';
 }
@@ -235,7 +257,7 @@ page_header('เครื่อง ' . $a['asset_code']);
         <form method="post" class="fw-inline">
           <?= csrf_field() ?><input type="hidden" name="edit_fw" value="1">
           <input type="text" name="current_fw_version" value="<?= h($a['current_fw_version']) ?>" placeholder="เช่น 2.6.6c" list="fw-suggest" maxlength="50" autocomplete="off">
-          <button class="btn-sm" type="submit">💾 บันทึก FW</button>
+          <button class="btn-sm btn-with-icon" type="submit"><?= ui_btn_label('save', 'บันทึก FW') ?></button>
         </form>
         <datalist id="fw-suggest">
           <?php foreach ($fwSuggest as $fo) { ?><option value="<?= h($fo) ?>"><?php } ?>
@@ -244,8 +266,8 @@ page_header('เครื่อง ' . $a['asset_code']);
       <?php if ($a['note']) { ?><dt>หมายเหตุ</dt><dd><?= h($a['note']) ?></dd><?php } ?>
     </dl>
     <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap">
-      <a class="btn btn-sm" href="<?= BASE_URL ?>/update_new.php?asset=<?= $id ?>">⚙️ บันทึกอัปเดต FW/HW</a>
-      <a class="btn btn-sm" href="<?= BASE_URL ?>/ma.php?record=<?= $id ?>">📅 บันทึก MA</a>
+      <a class="btn btn-sm btn-with-icon" href="<?= BASE_URL ?>/update_new.php?asset=<?= $id ?>"><?= ui_btn_label('updates', 'บันทึกอัปเดต FW/HW') ?></a>
+      <a class="btn btn-sm btn-with-icon" href="<?= BASE_URL ?>/ma.php?record=<?= $id ?>"><?= ui_btn_label('ma', 'บันทึก MA') ?></a>
       <form method="post" style="display:inline-flex; gap:6px">
         <?= csrf_field() ?>
         <select name="set_status">
@@ -267,7 +289,7 @@ page_header('เครื่อง ' . $a['asset_code']);
           <td><?= h($c['component_value']) ?></td>
           <td style="white-space:nowrap">
             <details style="display:inline">
-              <summary class="btn btn-sm btn-line" style="list-style:none; cursor:pointer; display:inline-block">✏️</summary>
+              <summary class="btn btn-sm btn-line btn-icon-only" style="list-style:none; cursor:pointer; display:inline-flex" aria-label="แก้ไข"><?= ui_icon_html('edit', 16, 'btn-svg') ?></summary>
               <form method="post" style="margin-top:6px; display:grid; gap:4px; min-width:200px">
                 <?= csrf_field() ?><input type="hidden" name="edit_component" value="1">
                 <input type="hidden" name="old_name" value="<?= h($c['component_name']) ?>">
@@ -279,7 +301,7 @@ page_header('เครื่อง ' . $a['asset_code']);
             <form method="post" style="display:inline" onsubmit="return confirm('ลบชิ้นส่วนนี้?')">
               <?= csrf_field() ?><input type="hidden" name="del_component" value="1">
               <input type="hidden" name="component_name" value="<?= h($c['component_name']) ?>">
-              <button class="btn-sm btn-danger" type="submit">🗑️</button>
+              <button class="btn-sm btn-danger btn-icon-only" type="submit" aria-label="ลบ"><?= ui_icon_html('trash', 16, 'btn-svg') ?></button>
             </form>
           </td>
         </tr>
@@ -294,7 +316,7 @@ page_header('เครื่อง ' . $a['asset_code']);
 <?php } ?>
 
 <details style="margin-bottom:16px">
-  <summary class="btn btn-line btn-sm" style="list-style:none; cursor:pointer; display:inline-block">✏️ แก้ไข / ลบเครื่องนี้</summary>
+  <summary class="btn btn-line btn-sm btn-with-icon" style="list-style:none; cursor:pointer; display:inline-flex"><?= ui_btn_label('edit', 'แก้ไข / ลบเครื่องนี้') ?></summary>
   <form method="post" class="formgrid form-narrow" style="margin-top:10px">
     <?= csrf_field() ?><input type="hidden" name="edit_asset" value="1">
     <label>หมายเลขสินค้า</label><input type="text" name="asset_code" value="<?= h($a['asset_code']) ?>" required>
@@ -308,26 +330,28 @@ page_header('เครื่อง ' . $a['asset_code']);
     <label>Lot</label><input type="text" name="lot_label" value="<?= h($a['lot_label']) ?>">
     <label class="full">หมายเหตุ</label><textarea name="note" class="full field-note" rows="2"><?= h($a['note']) ?></textarea>
     <div class="full" style="display:flex; gap:10px; align-items:center">
-      <button type="submit">💾 บันทึกการแก้ไข</button>
-      <button type="submit" form="del-asset-form" class="btn-danger"
-        onclick="return confirm('ลบเครื่อง <?= h($a['asset_code']) ?> พร้อมประวัติทั้งหมด (<?= count($tl) ?> รายการ)?\nการลบย้อนกลับไม่ได้!')">🗑️ ลบเครื่องนี้</button>
+      <button type="submit" class="btn-with-icon"><?= ui_btn_label('save', 'บันทึกการแก้ไข') ?></button>
+      <button type="submit" form="del-asset-form" class="btn-danger btn-with-icon"
+        onclick="return confirm('ลบเครื่อง <?= h($a['asset_code']) ?> พร้อมประวัติทั้งหมด (<?= count($tl) ?> รายการ)?\nการลบย้อนกลับไม่ได้!')"><?= ui_btn_label('trash', 'ลบเครื่องนี้') ?></button>
     </div>
   </form>
   <form method="post" id="del-asset-form"><?= csrf_field() ?><input type="hidden" name="delete_asset" value="1"></form>
 </details>
 
-<?php if ($partAlertsHtml) { ?>
-<div style="margin-bottom:16px"><?= $partAlertsHtml ?></div>
-<?php } ?>
-
+<?php if ($showPartsWithdraw) { ?>
 <div id="parts-withdraw" style="margin-bottom:20px;padding:14px 16px;background:#fff;border:1px solid #dfe4ec;border-radius:8px">
-  <b style="font-size:14px">🔩 สถานะการเบิกอะไหล่</b>
+  <b class="h-with-icon" style="font-size:14px"><?= ui_icon_html('parts', 16, 'h-svg') ?><span>สถานะการเบิกอะไหล่</span></b>
   <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-start">
     <div>
       <span class="muted" style="font-size:12px">สถานะ</span><br>
       <?= asset_parts_status_badge($partsSummary) ?>
-      <?php if ($partsSummary['bom_count'] > 0) { ?>
-      <span class="muted" style="font-size:11px;margin-left:6px">BOM <?= (int)$partsSummary['bom_withdrawn'] ?>/<?= (int)$partsSummary['bom_count'] ?> ชนิด</span>
+      <?php if ($partsSummary['bom_count'] > 0 && ($partsSummary['bom_match'] ?? 'none') !== 'none') { ?>
+      <span class="muted" style="font-size:11px;margin-left:6px"><?= h(asset_bom_match_label([
+          'bom_match' => $partsSummary['bom_match'] ?? 'none',
+          'bom_count' => (int)$partsSummary['bom_count'],
+          'bom_extra_parts' => (int)($partsSummary['bom_extra_parts'] ?? 0),
+          'bom_missing_parts' => (int)($partsSummary['bom_missing_parts'] ?? 0),
+      ])) ?></span>
       <?php } ?>
     </div>
     <?php if ($partsSummary['out_count'] > 0) { ?>
@@ -349,25 +373,85 @@ page_header('เครื่อง ' . $a['asset_code']);
       ?>
     </div>
     <div>
-      <a class="btn btn-sm btn-line" href="<?= h(parts_app_base_url() . '/pages/history.php') ?>" target="_blank">📦 ดูใน Stock ช่าง</a>
-      <a class="btn btn-sm btn-line" href="<?= h(BASE_URL . '/parts.php?rs=' . urlencode($a['asset_code'])) ?>">📋 ประวัติเบิก (production)</a>
+      <a class="btn btn-sm btn-line btn-with-icon" href="<?= h($partsSummary['production_url']) ?>"><?= ui_btn_label('clipboard', 'ประวัติเบิก (production)') ?></a>
+      <?php if (!empty($partsSummary['in_parts_history'])) { ?>
+      <a class="btn btn-sm btn-line btn-with-icon" href="<?= h(parts_app_base_url() . '/pages/history.php') ?>" target="_blank"><?= ui_btn_label('box', 'Stock ช่าง (Parts app)') ?></a>
+      <?php } ?>
+      <?php
+      $needsWithdrawSync = asset_needs_withdraw_list_sync($partsSummary);
+      $withdrawN = (int)($partsSummary['out_count'] ?? 0);
+      $withdrawConfirm = "Sync ตามรายการเบิกในตาราง?\n\n";
+      $withdrawConfirm .= "• ผูก Stock ตาม {$withdrawN} รายการในตาราง\n";
+      $withdrawConfirm .= "• ลบใบเบิกซ้ำ/เกินใน Parts (คืนสต็ockเมื่อหักแล้ว)\n\n";
+      $withdrawConfirm .= "รายการในตาราง production จะไม่ถูกลบ";
+      ?>
+      <form method="post" style="display:inline" onsubmit="return confirm(<?= h(json_encode($withdrawConfirm, JSON_UNESCAPED_UNICODE)) ?>)">
+        <?= csrf_field() ?>
+        <input type="hidden" name="sync_withdraw_list" value="1">
+        <button type="submit" class="btn btn-sm btn-with-icon"><?= ui_btn_label('refresh', $needsWithdrawSync ? 'Sync ตามรายการเบิก' : 'Sync ตามรายการเบิก (ตรวจ)') ?></button>
+      </form>
+    </div>
+    <?php } elseif ($partsSummary['stock_out_count'] > 0) { ?>
+    <div>
+      <span class="muted" style="font-size:12px">มีเบิกใน Parts app แต่ยังไม่มีบันทึก production สำหรับ S/N นี้</span><br>
+      <a class="btn btn-sm btn-line btn-with-icon" href="<?= h(parts_app_base_url() . '/pages/history.php') ?>" target="_blank"><?= ui_btn_label('box', 'Stock ช่าง (Parts app)') ?></a>
     </div>
     <?php } elseif ($partsSummary['bom_count'] > 0) { ?>
-    <div><span class="muted" style="font-size:12px">รุ่นนี้มี BOM <?= (int)$partsSummary['bom_count'] ?> ชนิด — ยังไม่มีการเบิกอะไหล่สำหรับเครื่องนี้</span></div>
+    <div>
+      <span class="muted" style="font-size:12px">รุ่นนี้มี BOM <?= (int)$partsSummary['bom_count'] ?> ชนิด — ยังไม่มีการเบิกอะไหล่สำหรับเครื่องนี้</span>
+    </div>
     <?php } else { ?>
     <div><span class="muted" style="font-size:12px">ไม่มี BOM กำหนดไว้สำหรับรุ่นนี้</span></div>
     <?php } ?>
   </div>
 </div>
 
-<?php if ($partsUsed) {
+<?php
+$assetBackUrl = urlencode(BASE_URL . '/asset.php?id=' . $id . '#parts-withdraw');
+$addWithdrawModalUrl = BASE_URL . '/parts.php?ajax=add_move_form&asset_id=' . (int)$id . '&back=' . $assetBackUrl;
+?>
+
+<?php if ($partsSummary['out_count'] > 0) { ?>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px">
+  <?= ui_heading('parts', 'อะไหล่ที่เบิกใช้กับเครื่องนี้', 'h2') ?>
+  <button type="button" class="btn btn-sm btn-line btn-with-icon" style="margin-left:auto"
+    onclick="showListModal(<?= h(json_encode('เพิ่มรายการเบิก — ' . $a['asset_code'], JSON_UNESCAPED_UNICODE)) ?>,<?= h(json_encode($addWithdrawModalUrl)) ?>,'')">
+    <?= ui_btn_label('stock-out-item', 'เพิ่มรายการเบิก') ?>
+  </button>
+</div>
+<table class="list" style="max-width:920px; margin-bottom:20px">
+  <tr><th>อะไหล่</th><th style="text-align:right">จำนวน</th><th>ประเภท</th><th>วันที่</th><th>รหัส Stock</th><th></th></tr>
+  <?php foreach ($partsSummary['movements'] as $mv) {
+      $modeLabel = part_movement_mode_label($mv['mode'] ?? '');
+      $modeClass = $modeLabel === 'MA' ? 'st-spare' : ($modeLabel === 'ผลิต' ? 'st-new' : 'st-rental');
+      $editUrl = BASE_URL . '/parts.php?ajax=edit_move_form&id=' . (int)$mv['id'] . '&back=' . $assetBackUrl;
+  ?>
+  <tr>
+    <td><?= h($mv['pname']) ?><?php if (!empty($mv['part_code']) && trim((string)$mv['part_code']) !== trim((string)$mv['pname'])) { ?><br><span class="muted" style="font-size:11px"><?= h($mv['part_code']) ?></span><?php } ?></td>
+    <td style="text-align:right"><b><?= qty_fmt($mv['qty']) ?></b><?= !empty($mv['unit']) ? ' ' . h($mv['unit']) : '' ?></td>
+    <td><span class="badge <?= h($modeClass) ?>"><?= h($modeLabel) ?></span></td>
+    <td style="white-space:nowrap"><?= dthai($mv['moved_at']) ?></td>
+    <td class="muted"><?= h($mv['stock_code'] ?: '—') ?></td>
+    <td style="white-space:nowrap">
+      <button type="button" class="btn btn-sm btn-line" onclick="showListModal(<?= h(json_encode('แก้ไข: ' . $mv['pname'], JSON_UNESCAPED_UNICODE)) ?>,<?= h(json_encode($editUrl)) ?>,'')">แก้ไข</button>
+      <form method="post" style="display:inline" onsubmit="return confirm('ลบรายการเบิกนี้?')">
+        <?= csrf_field() ?>
+        <input type="hidden" name="del_part_move" value="1">
+        <input type="hidden" name="record_id" value="<?= (int)$mv['id'] ?>">
+        <button type="submit" class="btn-sm btn-danger">ลบ</button>
+      </form>
+    </td>
+  </tr>
+  <?php } ?>
+</table>
+<?php } elseif ($partsUsed) {
     $stockCodeMap = [];
     $scRes = qr('SELECT name, stock_code FROM parts WHERE stock_code IS NOT NULL AND TRIM(stock_code)<>""');
     while ($scRow = $scRes->fetch_assoc()) {
         $stockCodeMap[$scRow['name']] = $scRow['stock_code'];
     }
 ?>
-<h2>🔩 อะไหล่ที่เบิกใช้กับเครื่องนี้</h2>
+<?= ui_heading('parts', 'อะไหล่ที่เบิกใช้กับเครื่องนี้', 'h2') ?>
 <table class="list" style="max-width:640px; margin-bottom:20px">
   <tr><th>อะไหล่</th><th style="text-align:right">จำนวนที่เบิกใช้</th><th>รหัส Stock</th></tr>
   <?php foreach ($partsUsed as $pu) { ?>
@@ -378,6 +462,16 @@ page_header('เครื่อง ' . $a['asset_code']);
   </tr>
   <?php } ?>
 </table>
+<?php } else { ?>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px">
+  <?= ui_heading('parts', 'อะไหล่ที่เบิกใช้กับเครื่องนี้', 'h2') ?>
+  <button type="button" class="btn btn-sm btn-line btn-with-icon" style="margin-left:auto"
+    onclick="showListModal(<?= h(json_encode('เพิ่มรายการเบิก — ' . $a['asset_code'], JSON_UNESCAPED_UNICODE)) ?>,<?= h(json_encode($addWithdrawModalUrl)) ?>,'')">
+    <?= ui_btn_label('stock-out-item', 'เพิ่มรายการเบิก') ?>
+  </button>
+</div>
+<p class="muted" style="margin:-4px 0 16px;font-size:13px">ยังไม่มีรายการเบิกใน production — กดปุ่มด้านบนเพื่อเบิกอะไหล่ใช้กับเครื่องนี้ (หักสต็ock Parts อัตโนมัติ)</p>
+<?php } ?>
 <?php } ?>
 
 <h2>ประวัติทั้งหมด (<?= count($tl) ?> รายการ) — จัดกลุ่มตามประเภท · เรียงตามวันที่ในแต่ละกลุ่ม</h2>

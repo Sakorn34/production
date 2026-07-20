@@ -41,7 +41,7 @@ $history = $stock->getSingleItemOutHistory(30);
 ?>
 
 <div class="page-header">
-    <h1>📤 เบิกรายชิ้น</h1>
+    <?= ui_heading('stock-out-item', 'เบิกรายชิ้น', 'h1') ?>
     <p>เบิกอะไหล่ออกทีละรายการ — ระบุ S/N ได้ถ้าเบิกไปใช้กับเครื่อง</p>
 </div>
 

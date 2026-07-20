@@ -39,6 +39,93 @@ if (isset($_GET['part_used'])) {
     exit;
 }
 
+/* ─── AJAX: รายละเอียดการเบิกตาม S/N (popup) ─────────────────────── */
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'group_detail') {
+    header('Content-Type: text/html; charset=utf-8');
+    $assetId = (int)(isset($_GET['asset_id']) ? $_GET['asset_id'] : 0);
+    $soloMid = (int)(isset($_GET['movement_id']) ? $_GET['movement_id'] : 0);
+    $rs = trim(isset($_GET['rs']) ? $_GET['rs'] : '');
+    $rm = trim(isset($_GET['rm']) ? $_GET['rm'] : '');
+    $rd = trim(isset($_GET['rd']) ? $_GET['rd'] : '');
+    $rb = trim(isset($_GET['rb']) ? $_GET['rb'] : '');
+
+    $wClauses = ["pm.direction='out'"];
+    $rTypes = '';
+    $rParams = [];
+    if ($assetId > 0) {
+        $wClauses[] = 'pm.ref_asset_id=?';
+        $rTypes .= 'i';
+        $rParams[] = $assetId;
+    } elseif ($soloMid > 0) {
+        $wClauses[] = 'pm.id=?';
+        $rTypes .= 'i';
+        $rParams[] = $soloMid;
+    } else {
+        echo '<p class="muted">ไม่พบข้อมูล</p>';
+        exit;
+    }
+    if ($rs !== '') { $wClauses[] = 'a.asset_code LIKE ?'; $rTypes .= 's'; $rParams[] = "%$rs%"; }
+    if ($rm !== '') { $wClauses[] = 'pr.name LIKE ?';      $rTypes .= 's'; $rParams[] = "%$rm%"; }
+    if ($rd !== '') { $wClauses[] = 'DATE(pm.moved_at)=?'; $rTypes .= 's'; $rParams[] = $rd; }
+    if ($rb !== '') { $wClauses[] = 'pm.made_by LIKE ?';   $rTypes .= 's'; $rParams[] = "%$rb%"; }
+    $where = 'WHERE ' . implode(' AND ', $wClauses);
+
+    $res = qr("SELECT pm.id, pm.moved_at, pm.qty, pm.made_by, pm.remark, pm.mode,
+                      pt.id part_id, pt.name pname, pt.unit,
+                      a.id asset_id, a.asset_code, a.status ast_status,
+                      pr.name product_name
+               FROM part_movements pm
+               JOIN parts pt ON pt.id=pm.part_id
+               LEFT JOIN assets a ON a.id=pm.ref_asset_id
+               LEFT JOIN products pr ON pr.id=a.product_id
+               $where ORDER BY pm.moved_at DESC, pm.id DESC LIMIT 300", $rTypes, $rParams);
+
+    $rows = [];
+    while ($r = $res->fetch_assoc()) {
+        $rows[] = $r;
+    }
+    if (!$rows) {
+        echo '<p class="muted" style="padding:12px 0">ไม่พบรายการเบิก</p>';
+        exit;
+    }
+    $head = $rows[0];
+    if ($head['asset_code']) {
+        echo '<p style="margin:0 0 10px;font-size:13px">'
+            . '<a href="' . BASE_URL . '/asset.php?id=' . (int)$head['asset_id'] . '"><b>' . h($head['asset_code']) . '</b></a> '
+            . status_badge($head['ast_status'])
+            . ($head['product_name'] ? ' · ' . h($head['product_name']) : '')
+            . '</p>';
+    }
+    $baseUrl = BASE_URL;
+    echo '<table class="list"><tr><th>วันที่</th><th>อะไหล่</th><th>ประเภท</th><th style="text-align:right">จำนวน</th><th>โดย</th><th>หมายเหตุ</th>';
+    if (can('parts')) {
+        echo '<th style="width:120px">จัดการ</th>';
+    }
+    echo '</tr>';
+    foreach ($rows as $sub) {
+        $sq = rtrim(rtrim(number_format((float)$sub['qty'], 2), '0'), '.');
+        $modeLabel = function_exists('part_movement_mode_label') ? part_movement_mode_label($sub['mode'] ?? '') : h($sub['mode'] ?? '-');
+        echo '<tr>'
+            . '<td style="white-space:nowrap">' . dthai_full($sub['moved_at']) . '</td>'
+            . '<td>' . h($sub['pname']) . '</td>'
+            . '<td><span class="badge">' . h($modeLabel) . '</span></td>'
+            . '<td style="text-align:right">' . $sq . ($sub['unit'] ? ' <span class="muted">' . h($sub['unit']) . '</span>' : '') . '</td>'
+            . '<td>' . h($sub['made_by'] ?: '-') . '</td>'
+            . '<td>' . h($sub['remark'] ?: '') . '</td>';
+        if (can('parts')) {
+            echo '<td style="white-space:nowrap">'
+                . '<button type="button" class="btn btn-sm btn-line" onclick="showListModal(' . h(json_encode('แก้ไข: ' . $sub['pname'], JSON_UNESCAPED_UNICODE)) . ',' . h(json_encode($baseUrl . '/parts.php?ajax=edit_move_form&id=' . $sub['id'])) . ',\'\')">แก้ไข</button> '
+                . '<form method="post" action="' . h($baseUrl . '/parts.php') . '" style="display:inline" onsubmit="return confirm(\'ลบรายการเบิกนี้?\')">'
+                . csrf_field() . '<input type="hidden" name="del_movement" value="1"><input type="hidden" name="movement_id" value="' . (int)$sub['id'] . '">'
+                . '<button class="btn-sm btn-danger" type="submit">ลบ</button></form>'
+                . '</td>';
+        }
+        echo '</tr>';
+    }
+    echo '</table>';
+    exit;
+}
+
 /* ─── AJAX: รายการอะไหล่ทั้งหมด (popup) ─────────────────────────── */
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'parts_list') {
     header('Content-Type: text/html; charset=utf-8');
@@ -111,11 +198,25 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'parts_list') {
     exit;
 }
 
+/**
+ * ตรวจสิทธิ์แก้ไขรายการเบิก (parts หรือ ma)
+ *
+ * @return void
+ */
+function require_withdraw_edit_access() {
+    require_login();
+    if (!can('parts') && !can('ma')) {
+        http_response_code(403);
+        exit('Forbidden');
+    }
+}
+
 /* ─── AJAX: แบบฟอร์มแก้ไขรายการเบิก ─────────────────────────────── */
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'edit_move_form') {
     header('Content-Type: text/html; charset=utf-8');
-    require_can('parts');
+    require_withdraw_edit_access();
     $mid = (int)(isset($_GET['id']) ? $_GET['id'] : 0);
+    $back = trim(isset($_GET['back']) ? $_GET['back'] : '');
     $m = $mid ? qr("SELECT pm.*, pt.name pname, a.asset_code
                     FROM part_movements pm
                     JOIN parts pt ON pt.id=pm.part_id
@@ -127,6 +228,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'edit_move_form') {
       <?= csrf_field() ?>
       <input type="hidden" name="edit_movement" value="1">
       <input type="hidden" name="movement_id" value="<?= (int)$m['id'] ?>">
+      <?php if ($back !== '') { ?><input type="hidden" name="back" value="<?= h($back) ?>"><?php } ?>
       <div class="formgrid form-narrow">
         <label>อะไหล่</label><input type="text" value="<?= h($m['pname']) ?>" readonly>
         <label>จำนวน</label>
@@ -135,6 +237,16 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'edit_move_form') {
           <input type="number" name="qty" value="<?= h(rtrim(rtrim(number_format((float)$m['qty'], 2), '0'), '.')) ?>" step="0.5" min="0.5" required>
           <button type="button" class="qty-btn" onclick="qtyStepClick(this)" data-delta="0.5">+</button>
         </div>
+        <label>ประเภท</label>
+        <select name="mode_category" required>
+          <?php
+          $modeFormVal = function_exists('part_movement_mode_form_value')
+              ? part_movement_mode_form_value($m['mode'] ?? '')
+              : 'เบิกใช้';
+          foreach (part_movement_mode_form_options() as $optVal => $optLabel) { ?>
+            <option value="<?= h($optVal) ?>"<?= $modeFormVal === $optVal ? ' selected' : '' ?>><?= h($optLabel) ?></option>
+          <?php } ?>
+        </select>
         <label>หมายเลขสินค้า</label><input type="text" name="asset_code" class="asset-search" value="<?= h($m['asset_code'] ?? '') ?>" placeholder="พิมพ์แล้วเลือก">
         <label>หมายเหตุ</label><input type="text" name="remark" value="<?= h($m['remark'] ?? '') ?>">
         <div class="full" style="margin-top:10px; display:flex; gap:8px">
@@ -149,12 +261,20 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'edit_move_form') {
 /* ─── AJAX: แบบฟอร์มเพิ่มรายการเบิก ─────────────────────────────── */
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'add_move_form') {
     header('Content-Type: text/html; charset=utf-8');
-    require_can('parts');
-    $parts = qr("SELECT id, name FROM parts ORDER BY name LIMIT 500");
+    require_withdraw_edit_access();
+    $prefillCode = trim(isset($_GET['asset_code']) ? $_GET['asset_code'] : '');
+    $assetId = (int)(isset($_GET['asset_id']) ? $_GET['asset_id'] : 0);
+    $back = trim(isset($_GET['back']) ? $_GET['back'] : '');
+    if ($prefillCode === '' && $assetId > 0) {
+        $ar = qr('SELECT asset_code FROM assets WHERE id=?', 'i', [$assetId])->fetch_assoc();
+        $prefillCode = trim((string)($ar['asset_code'] ?? ''));
+    }
+    $parts = qr("SELECT id, name FROM parts WHERE is_active=1 ORDER BY name LIMIT 800");
     ?>
     <form method="post" action="<?= BASE_URL ?>/parts.php">
       <?= csrf_field() ?>
       <input type="hidden" name="move_part" value="1">
+      <?php if ($back !== '') { ?><input type="hidden" name="back" value="<?= h($back) ?>"><?php } ?>
       <div class="formgrid form-narrow">
         <label>อะไหล่</label>
         <select name="part_id" required>
@@ -169,7 +289,14 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'add_move_form') {
           <input type="number" name="qty" value="1" step="0.5" min="0.5" required>
           <button type="button" class="qty-btn" onclick="qtyStepClick(this)" data-delta="0.5">+</button>
         </div>
-        <label>หมายเลขสินค้า</label><input type="text" name="asset_code" class="asset-search" placeholder="พิมพ์แล้วเลือก">
+        <label>ประเภท</label>
+        <select name="mode_category" required>
+          <?php foreach (part_movement_mode_form_options() as $optVal => $optLabel) { ?>
+            <option value="<?= h($optVal) ?>"<?= $optVal === 'เบิกใช้' ? ' selected' : '' ?>><?= h($optLabel) ?></option>
+          <?php } ?>
+        </select>
+        <label>หมายเลขสินค้า</label>
+        <input type="text" name="asset_code" class="asset-search" value="<?= h($prefillCode) ?>" placeholder="พิมพ์แล้วเลือก"<?= $prefillCode !== '' ? ' required' : '' ?>>
         <label>หมายเหตุ</label><input type="text" name="remark" placeholder="ถ้ามี">
         <div class="full" style="margin-top:10px"><button type="submit" class="btn">บันทึกการเบิก</button></div>
       </div>
@@ -215,7 +342,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'edit_part_form') {
 
 /* ─── POST: เบิกอะไหล่ (out เท่านั้น) ──────────────────────────── */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['move_part'])) {
-    csrf_check(); require_can('parts');
+    csrf_check();
+    require_withdraw_edit_access();
+    $back = trim(isset($_POST['back']) ? $_POST['back'] : '');
     $pid  = (int)$_POST['part_id'];
     $qty  = max(0.01, (float)$_POST['qty']);
     $refId = null;
@@ -225,79 +354,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['move_part'])) {
         if ($a) $refId = (int)$a['id'];
     }
     $remark = trim(isset($_POST['remark']) ? $_POST['remark'] : '') ?: null;
-    $out = tech_parts_stock_out_by_part_id($pid, $qty, 'เบิกใช้', actor_name(), $code !== '' ? $code : null);
+    $modeCategory = trim(isset($_POST['mode_category']) ? $_POST['mode_category'] : 'เบิกใช้');
+    $mode = function_exists('part_movement_mode_from_form')
+        ? part_movement_mode_from_form($modeCategory)
+        : ($modeCategory !== '' ? $modeCategory : 'เบิกใช้');
+    $out = tech_parts_stock_out_by_part_id($pid, $qty, $mode, actor_name(), $code !== '' ? $code : null);
     if (!$out['ok']) {
         flash_set($out['error'], 'err');
-        header('Location: ' . BASE_URL . '/parts.php');
+        header('Location: ' . ($back !== '' ? $back : BASE_URL . '/parts.php'));
         exit;
     }
     q("INSERT INTO part_movements (part_id,moved_at,direction,qty,mode,ref_asset_id,made_by,remark,tech_stock_out_id)
-       VALUES (?,NOW(),'out',?,'เบิกใช้',?,?,?,?,?)", 'idissi',
-      [$pid, $qty, $refId, actor_name(), $remark, (int)($out['stock_out_id'] ?? 0)]);
+       VALUES (?,NOW(),'out',?,?,?,?,?,?)", 'idsissi',
+      [$pid, $qty, $mode, $refId, actor_name(), $remark, (int)($out['stock_out_id'] ?? 0)]);
     $mid = (int)db()->insert_id;
     if (!empty($out['stock_out_id']) && function_exists('production_link_stock_out')) {
         production_link_stock_out(dbParts(), (int)$out['stock_out_id'], $mid, $code !== '' ? $code : null);
     }
 
     flash_set('บันทึกการเบิกอะไหล่แล้ว');
-    header('Location: ' . BASE_URL . '/parts.php'); exit;
+    header('Location: ' . ($back !== '' ? $back : BASE_URL . '/parts.php'));
+    exit;
 }
 
 /* ─── POST: แก้ไขรายการเบิก ─────────────────────────────────────── */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_movement'])) {
-    csrf_check(); require_can('parts');
+    csrf_check();
+    require_withdraw_edit_access();
     $mid = (int)$_POST['movement_id'];
-    $old = qr("SELECT part_id, qty, ref_asset_id, tech_stock_out_id FROM part_movements WHERE id=? AND direction='out'", 'i', [$mid])->fetch_assoc();
-    if (!$old) { flash_set('ไม่พบรายการที่จะแก้ไข', 'err'); header('Location: ' . BASE_URL . '/parts.php'); exit; }
+    $back = trim(isset($_POST['back']) ? $_POST['back'] : '');
+    $old = qr("SELECT id FROM part_movements WHERE id=? AND direction='out'", 'i', [$mid])->fetch_assoc();
+    if (!$old) {
+        flash_set('ไม่พบรายการที่จะแก้ไข', 'err');
+        header('Location: ' . ($back !== '' ? $back : BASE_URL . '/parts.php'));
+        exit;
+    }
     $qty = max(0.01, (float)$_POST['qty']);
-    $refId = null;
     $code = trim(isset($_POST['asset_code']) ? $_POST['asset_code'] : '');
-    if ($code !== '') {
-        $a = qr("SELECT id FROM assets WHERE asset_code=? OR factory_serial=?", 'ss', [$code, $code])->fetch_assoc();
-        if ($a) $refId = (int)$a['id'];
-    }
     $remark = trim(isset($_POST['remark']) ? $_POST['remark'] : '') ?: null;
-    $diff = $qty - (float)$old['qty'];
-    if ($diff != 0 && empty($old['tech_stock_out_id'])) {
-        $adj = tech_parts_adjust_by_part_id((int)$old['part_id'], $diff, actor_name(), 'ปรับรายการเบิก');
-        if (!$adj['ok']) {
-            flash_set($adj['error'], 'err');
-            header('Location: ' . BASE_URL . '/parts.php');
-            exit;
-        }
+    $modeCategory = trim(isset($_POST['mode_category']) ? $_POST['mode_category'] : '');
+    $mode = function_exists('part_movement_mode_from_form')
+        ? part_movement_mode_from_form($modeCategory)
+        : ($modeCategory !== '' ? $modeCategory : 'เบิกใช้');
+    $edit = production_edit_out_movement($mid, $qty, $code !== '' ? $code : null, $remark, actor_name(), $mode);
+    if (!$edit['ok']) {
+        flash_set($edit['error'] ?? 'แก้ไขไม่สำเร็จ', 'err');
+        header('Location: ' . ($back !== '' ? $back : BASE_URL . '/parts.php'));
+        exit;
     }
-    q("UPDATE part_movements SET qty=?, ref_asset_id=?, remark=? WHERE id=?", 'dissi', [$qty, $refId, $remark, $mid]);
-    if (!empty($old['tech_stock_out_id']) && function_exists('production_sync_stock_out_from_movement')) {
-        production_sync_stock_out_from_movement($mid, $qty, $code !== '' ? $code : null, $remark);
-    }
-    flash_set('แก้ไขรายการเบิกอะไหล่แล้ว');
-    header('Location: ' . BASE_URL . '/parts.php'); exit;
+    flash_set('แก้ไขรายการเบิกอะไหล่แล้ว (sync Stock ช่างแล้ว)');
+    header('Location: ' . ($back !== '' ? $back : BASE_URL . '/parts.php'));
+    exit;
 }
 
 /* ─── POST: ลบรายการเบิก ───────────────────────────────────────── */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_movement'])) {
-    csrf_check(); require_can('parts');
+    csrf_check();
+    require_withdraw_edit_access();
     $mid = (int)$_POST['movement_id'];
-    $old = qr("SELECT part_id, qty, tech_stock_out_id FROM part_movements WHERE id=? AND direction='out'", 'i', [$mid])->fetch_assoc();
-    if ($old) {
-        $synced = false;
-        if (!empty($old['tech_stock_out_id']) && function_exists('production_sync_delete_stock_out_from_movement')) {
-            $synced = production_sync_delete_stock_out_from_movement($mid);
-        }
-        if (!$synced) {
-            if (empty($old['tech_stock_out_id'])) {
-                $ret = tech_parts_stock_in_by_part_id((int)$old['part_id'], (float)$old['qty'], 'ลบรายการเบิก', actor_name());
-                if (!$ret['ok']) {
-                    flash_set($ret['error'], 'err');
-                    header('Location: ' . BASE_URL . '/parts.php');
-                    exit;
-                }
-            }
-            q("DELETE FROM part_movements WHERE id=?", 'i', [$mid]);
-        }
+    $back = trim(isset($_POST['back']) ? $_POST['back'] : '');
+    $del = production_delete_out_movement_with_stock($mid, actor_name());
+    if (!$del['ok']) {
+        flash_set($del['error'] ?? 'ลบไม่สำเร็จ', 'err');
+    } else {
         flash_set('ลบรายการเบิกอะไหล่แล้ว');
     }
-    header('Location: ' . BASE_URL . '/parts.php'); exit;
+    header('Location: ' . ($back !== '' ? $back : BASE_URL . '/parts.php'));
+    exit;
 }
 
 /* ─── POST: เพิ่มอะไหล่ใหม่ ────────────────────────────────────── */
@@ -359,7 +482,7 @@ if ($rd !== '') { $wClauses[] = 'DATE(pm.moved_at)=?'; $rTypes .= 's'; $rParams[
 if ($rb !== '') { $wClauses[] = 'pm.made_by LIKE ?';   $rTypes .= 's'; $rParams[] = "%$rb%"; }
 $where = 'WHERE ' . implode(' AND ', $wClauses);
 
-$recent = qr("SELECT pm.id, pm.moved_at, pm.qty, pm.made_by, pm.remark,
+$recent = qr("SELECT pm.id, pm.moved_at, pm.qty, pm.made_by, pm.remark, pm.mode,
                      pt.id part_id, pt.name pname, pt.unit,
                      a.id asset_id, a.asset_code,
                      pr.name product_name
@@ -370,17 +493,82 @@ $recent = qr("SELECT pm.id, pm.moved_at, pm.qty, pm.made_by, pm.remark,
               $where ORDER BY $orderBy LIMIT 200", $rTypes, $rParams);
 
 $groups = [];
-$groupOrder = [];
 while ($m = $recent->fetch_assoc()) {
-    // จัดกลุ่มเฉพาะรายการที่เบิกพร้อมกัน (timestamp เดียวกัน) — ไม่รวมประวัติเก่าของเครื่องเดียวกัน
+    // รวมรายการที่ S/N เดียวกัน — แถวเดียว คลิกเปิด popup ดูรายละเอียด
     $key = ($m['asset_id'] !== null)
-        ? 'a' . $m['asset_id'] . '@' . $m['moved_at']
+        ? 'a' . $m['asset_id']
         : 'x' . $m['id'];
     if (!isset($groups[$key])) {
         $groups[$key] = [];
-        $groupOrder[] = $key;
     }
     $groups[$key][] = $m;
+}
+
+$groupOrder = array_keys($groups);
+usort($groupOrder, function ($ka, $kb) use ($groups) {
+    $ta = $groups[$ka][0]['moved_at'];
+    $tb = $groups[$kb][0]['moved_at'];
+    foreach ($groups[$ka] as $row) {
+        if ($row['moved_at'] > $ta) {
+            $ta = $row['moved_at'];
+        }
+    }
+    foreach ($groups[$kb] as $row) {
+        if ($row['moved_at'] > $tb) {
+            $tb = $row['moved_at'];
+        }
+    }
+    return strcmp($tb, $ta);
+});
+
+/**
+ * วันที่ล่าสุดในกลุ่มรายการเบิก
+ *
+ * @param array<int,array<string,mixed>> $items
+ * @return string
+ */
+function parts_group_latest_at(array $items): string
+{
+    $latest = $items[0]['moved_at'];
+    foreach ($items as $item) {
+        if ($item['moved_at'] > $latest) {
+            $latest = $item['moved_at'];
+        }
+    }
+    return $latest;
+}
+
+/**
+ * URL เปิด popup รายละเอียดกลุ่มเบิก
+ *
+ * @param array<string,mixed> $first
+ * @param string              $rs
+ * @param string              $rm
+ * @param string              $rd
+ * @param string              $rb
+ * @return string
+ */
+function parts_group_detail_url(array $first, $rs, $rm, $rd, $rb): string
+{
+    $q = ['ajax' => 'group_detail'];
+    if (!empty($first['asset_id'])) {
+        $q['asset_id'] = (int)$first['asset_id'];
+    } else {
+        $q['movement_id'] = (int)$first['id'];
+    }
+    if ($rs !== '') {
+        $q['rs'] = $rs;
+    }
+    if ($rm !== '') {
+        $q['rm'] = $rm;
+    }
+    if ($rd !== '') {
+        $q['rd'] = $rd;
+    }
+    if ($rb !== '') {
+        $q['rb'] = $rb;
+    }
+    return BASE_URL . '/parts.php?' . http_build_query($q);
 }
 
 /**
@@ -412,8 +600,8 @@ require __DIR__ . '/includes/list_search.php';
 
 <!-- ─── ปุ่มหลัก ──────────────────────────────────────────────── -->
 <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center">
-  <button class="btn" onclick="showListModal('รายการอะไหล่','<?= h(BASE_URL) ?>/parts.php?ajax=parts_list','')">
-    📦 ดูรายการอะไหล่
+  <button class="btn btn-with-icon" onclick="showListModal('รายการอะไหล่','<?= h(BASE_URL) ?>/parts.php?ajax=parts_list','')">
+    <?= ui_btn_label('box', 'ดูรายการอะไหล่') ?>
   </button>
   <?php if (can('parts')) { ?>
   <button class="btn btn-line" onclick="showListModal('เพิ่มรายการเบิกอะไหล่','<?= h(BASE_URL) ?>/parts.php?ajax=add_move_form','')">
@@ -466,6 +654,7 @@ list_search_form([
     } ?>
   </select>
 </form>
+<p class="muted ma-table-hint">คลิกแถวเพื่อดูรายละเอียดอะไหล่ที่เบิก</p>
 
 <table class="list">
   <tr>
@@ -484,73 +673,46 @@ list_search_form([
   foreach ($groupOrder as $key) {
       $items = $groups[$key];
       $first = $items[0];
-      $extra = count($items) - 1;
-      $totalQty = 0.0;
-      foreach ($items as $gi) {
-          $totalQty += (float)$gi['qty'];
-      }
-      $qty = rtrim(rtrim(number_format($extra > 0 ? $totalQty : (float)$first['qty'], 2), '0'), '.');
+      $itemCount = count($items);
+      $latestAt = parts_group_latest_at($items);
+      $detailUrl = parts_group_detail_url($first, $rs, $rm, $rd, $rb);
+      $modalTitle = $first['asset_code']
+          ? ('อะไหล่ที่เบิก — ' . $first['asset_code'])
+          : ('รายละเอียดการเบิก — ' . $first['pname']);
       $assetCell = $first['asset_code']
-          ? '<a href="' . BASE_URL . '/asset.php?id=' . $first['asset_id'] . '"><b>' . h($first['asset_code']) . '</b></a>'
+          ? '<a href="' . BASE_URL . '/asset.php?id=' . $first['asset_id'] . '" onclick="event.stopPropagation()"><b>' . h($first['asset_code']) . '</b></a>'
           : '<span class="muted">ไม่ระบุ</span>';
       ?>
-  <tr>
-    <td style="white-space:nowrap"><?= dthai_full($first['moved_at']) ?></td>
+  <tr class="parts-group-row clickable"
+      onclick="showListModal(<?= h(json_encode($modalTitle, JSON_UNESCAPED_UNICODE)) ?>, <?= h(json_encode($detailUrl)) ?>, '')"
+      title="คลิกเพื่อดูรายละเอียดอะไหล่ที่เบิก">
+    <td style="white-space:nowrap"><?= dthai_full($latestAt) ?></td>
     <td>
       <?= parts_group_part_label($items) ?>
-      <?php if ($extra > 0) { ?>
-        <br><span class="muted" style="font-size:11px">รวม <?= count($items) ?> ชิ้นในรอบนี้</span>
+      <?php if ($itemCount > 1) { ?>
+        <br><span class="muted" style="font-size:11px"><?= $itemCount ?> รายการ · คลิกเพื่อดูทั้งหมด</span>
       <?php } ?>
       <?php if ($first['remark']) { ?><br><span class="muted"><?= h($first['remark']) ?></span><?php } ?>
     </td>
-    <td style="text-align:right"><?= $qty ?><?= $extra > 0 ? ' <span class="muted">รวม</span>' : ($first['unit'] ? ' <span class="muted">' . h($first['unit']) . '</span>' : '') ?></td>
+    <td style="text-align:right"><?= $itemCount > 1 ? '<span class="muted">' . $itemCount . ' รายการ</span>' : (rtrim(rtrim(number_format((float)$first['qty'], 2), '0'), '.') . ($first['unit'] ? ' <span class="muted">' . h($first['unit']) . '</span>' : '')) ?></td>
     <td><?= h($first['product_name'] ?: '-') ?></td>
-    <td>
-      <?= $assetCell ?>
-      <?php if ($extra > 0) { ?>
-        <br><button type="button" class="btn btn-sm btn-line" style="margin-top:3px;font-size:11px"
-                    onclick="var r=document.getElementById('exp-<?= h($key) ?>');var b=this;if(r.style.display==='none'){r.style.display='';b.textContent='▲ ซ่อน'}else{r.style.display='none';b.textContent='▼ ดูรายละเอียด <?= count($items) ?> รายการ'}">▼ ดูรายละเอียด <?= count($items) ?> รายการ</button>
-      <?php } ?>
-    </td>
+    <td><?= $assetCell ?></td>
     <td><?= h($first['made_by'] ?: '-') ?></td>
     <?php if (can('parts')) { ?>
-    <td style="white-space:nowrap">
-      <button class="btn btn-sm btn-line" onclick="showListModal(<?= h(json_encode('แก้ไข: ' . $first['pname'], JSON_UNESCAPED_UNICODE)) ?>,<?= h(json_encode(BASE_URL . '/parts.php?ajax=edit_move_form&id=' . $first['id'])) ?>,'')">แก้ไข</button>
+    <td style="white-space:nowrap" onclick="event.stopPropagation()">
+      <?php if ($itemCount === 1) { ?>
+      <button type="button" class="btn btn-sm btn-line" onclick="showListModal(<?= h(json_encode('แก้ไข: ' . $first['pname'], JSON_UNESCAPED_UNICODE)) ?>,<?= h(json_encode(BASE_URL . '/parts.php?ajax=edit_move_form&id=' . $first['id'])) ?>,'')">แก้ไข</button>
       <form method="post" style="display:inline" onsubmit="return confirm('ลบรายการเบิกนี้?')">
         <?= csrf_field() ?><input type="hidden" name="del_movement" value="1"><input type="hidden" name="movement_id" value="<?= (int)$first['id'] ?>">
         <button class="btn-sm btn-danger" type="submit">ลบ</button>
       </form>
+      <?php } else { ?>
+      <span class="muted" style="font-size:12px">ดูใน popup</span>
+      <?php } ?>
     </td>
     <?php } ?>
   </tr>
-  <?php if ($extra > 0) { ?>
-  <tr id="exp-<?= h($key) ?>" style="display:none">
-    <td colspan="<?= can('parts') ? 7 : 6 ?>" style="padding:0 0 6px 24px;background:var(--hover,#f7f9fc)">
-      <table class="list" style="margin:0">
-        <tr><th>วันที่</th><th>อะไหล่</th><th style="text-align:right">จำนวน</th><th>โดย</th><th>หมายเหตุ</th><?= can('parts') ? '<th></th>' : '' ?></tr>
-        <?php foreach ($items as $sub) {
-            $sq = rtrim(rtrim(number_format((float)$sub['qty'], 2), '0'), '.'); ?>
-        <tr>
-          <td style="white-space:nowrap"><?= dthai_full($sub['moved_at']) ?></td>
-          <td><?= h($sub['pname']) ?></td>
-          <td style="text-align:right"><?= $sq ?><?= $sub['unit'] ? ' <span class="muted">' . h($sub['unit']) . '</span>' : '' ?></td>
-          <td><?= h($sub['made_by'] ?: '-') ?></td>
-          <td><?= h($sub['remark'] ?: '') ?></td>
-          <?php if (can('parts')) { ?>
-          <td style="white-space:nowrap">
-            <button class="btn btn-sm btn-line" onclick="showListModal(<?= h(json_encode('แก้ไข: ' . $sub['pname'], JSON_UNESCAPED_UNICODE)) ?>,<?= h(json_encode(BASE_URL . '/parts.php?ajax=edit_move_form&id=' . $sub['id'])) ?>,'')">แก้ไข</button>
-            <form method="post" style="display:inline" onsubmit="return confirm('ลบรายการเบิกนี้?')">
-              <?= csrf_field() ?><input type="hidden" name="del_movement" value="1"><input type="hidden" name="movement_id" value="<?= (int)$sub['id'] ?>">
-              <button class="btn-sm btn-danger" type="submit">ลบ</button>
-            </form>
-          </td>
-          <?php } ?>
-        </tr>
-        <?php } ?>
-      </table>
-    </td>
-  </tr>
-  <?php }
+  <?php
   } ?>
 </table>
 

@@ -1,6 +1,7 @@
 <?php
  
 $pageTitle = 'รายละเอียดอะไหล่';
+$partsShowBack = false;
 require_once __DIR__ . '/../includes/header.php';
 
 $productId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
@@ -9,7 +10,7 @@ $history = $product ? $stock->getProductStockOutHistory($productId, 50) : [];
 ?>
 
 <div class="page-header">
-    <h1>🧩 รายละเอียดอะไหล่</h1>
+    <?= ui_heading('products', 'รายละเอียดอะไหล่', 'h1') ?>
     <p>ข้อมูลสินค้า ราคา ลิงก์สั่งซื้อ และประวัติการเบิกของชิ้นนี้</p>
 </div>
 

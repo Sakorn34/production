@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>สรุปการเปลี่ยนแปลงระบบ — ฉบับเข้าใจง่าย</title>
+<style>
+  :root {
+    --primary: #4e2985;
+    --accent: #e11d74;
+    --bg: #f4f1fb;
+    --card: #fff;
+    --text: #1e1b2e;
+    --muted: #6b6580;
+    --border: #e8e4f0;
+    --green: #16a34a;
+    --green-bg: #dcfce7;
+    --yellow: #a16207;
+    --yellow-bg: #fef9c3;
+    --red: #b91c1c;
+    --red-bg: #fee2e2;
+    --blue: #1d4ed8;
+    --blue-bg: #dbeafe;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', 'Noto Sans Thai', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.75;
+    font-size: 16px;
+  }
+  .hero {
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    color: #fff;
+    padding: 2rem 1.5rem;
+  }
+  .hero h1 { font-size: 1.6rem; margin-bottom: .5rem; }
+  .hero p { opacity: .92; max-width: 640px; }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 1.25rem 1rem 2.5rem; }
+  .box {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 1.35rem 1.4rem;
+    margin-bottom: 1.1rem;
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 10px rgba(78,41,133,.06);
+  }
+  .box h2 {
+    color: var(--primary);
+    font-size: 1.12rem;
+    margin-bottom: .85rem;
+    padding-bottom: .45rem;
+    border-bottom: 2px solid var(--bg);
+  }
+  .box h3 { font-size: 1rem; margin: 1rem 0 .4rem; }
+  p { margin-bottom: .6rem; }
+  ul, ol { padding-left: 1.3rem; margin-bottom: .6rem; }
+  li { margin-bottom: .35rem; }
+  .lead {
+    font-size: 1.05rem;
+    background: var(--blue-bg);
+    border-left: 4px solid var(--blue);
+    padding: .9rem 1rem;
+    border-radius: 0 8px 8px 0;
+    margin-bottom: 1rem;
+  }
+  .two-sys {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .75rem;
+    margin: .75rem 0;
+  }
+  @media (max-width: 600px) { .two-sys { grid-template-columns: 1fr; } }
+  .sys-card {
+    background: var(--bg);
+    border-radius: 10px;
+    padding: 1rem;
+  }
+  .sys-card strong { color: var(--primary); display: block; margin-bottom: .3rem; }
+  .sys-card span { font-size: .9rem; color: var(--muted); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .95rem;
+    margin: .75rem 0;
+  }
+  th, td {
+    padding: .65rem .7rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    text-align: left;
+  }
+  th { background: var(--bg); color: var(--primary); font-weight: 600; }
+  .old { color: #666; }
+  .new { color: var(--green); font-weight: 600; }
+  .scene {
+    background: #faf8ff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.1rem;
+    margin: .75rem 0;
+  }
+  .scene-title {
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: .5rem;
+  }
+  .arrow { color: var(--accent); font-weight: bold; margin: .3rem 0; }
+  .good {
+    background: var(--green-bg);
+    border-left: 4px solid var(--green);
+    padding: .75rem 1rem;
+    border-radius: 0 8px 8px 0;
+    margin: .6rem 0;
+  }
+  .warn {
+    background: var(--yellow-bg);
+    border-left: 4px solid var(--yellow);
+    padding: .75rem 1rem;
+    border-radius: 0 8px 8px 0;
+    margin: .6rem 0;
+  }
+  .bad {
+    background: var(--red-bg);
+    border-left: 4px solid var(--red);
+    padding: .75rem 1rem;
+    border-radius: 0 8px 8px 0;
+    margin: .6rem 0;
+  }
+  .tag {
+    display: inline-block;
+    font-size: .78rem;
+    font-weight: 600;
+    padding: .12rem .5rem;
+    border-radius: 999px;
+    margin-right: .25rem;
+  }
+  .tag-ok { background: var(--green-bg); color: var(--green); }
+  .tag-wait { background: var(--yellow-bg); color: var(--yellow); }
+  footer { text-align: center; color: var(--muted); font-size: .85rem; padding: 1rem; }
+  .summary-box {
+    background: linear-gradient(135deg, #f0ebf8, #fce4ef);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.2rem 1.3rem;
+  }
+  .summary-box dt { font-weight: 700; color: var(--primary); margin-top: .5rem; }
+  .summary-box dd { margin-left: 0; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap" style="padding-top:0;padding-bottom:0">
+    <h1>ระบบใหม่ ต่างจากเดิมอย่างไร?</h1>
+    <p>สรุปแบบอ่านง่าย เน้นสิ่งที่คุณจะเห็นและใช้งานต่างจากเดิม ไม่ลงรายละเอียดเทคนิค</p>
+    <p style="font-size:.88rem;margin-top:.5rem;opacity:.85">จัดทำ 19 กรกฎาคม 2569 · เปรียบเทียบระบบเก่า vs ระบบใหม่</p>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- เปิดด้วยสรุปสั้น -->
+  <div class="box">
+    <h2>พูดง่ายๆ คืออะไร?</h2>
+    <p class="lead">
+      เรามี <strong>2 ระบบ</strong> ที่ทำงานคู่กัน — ระบบบันทึกเครื่อง/ผลิต/ซ่อม (MA) กับ ระบบคลังอะไหล่ (Stock ช่าง)
+      ระบบใหม่ทำให้ <strong>ทั้งสองหน้าตาเหมือนกัน</strong> และ <strong>จำนวนอะไหล่ตรงกันทั้งสองฝั่ง</strong> มากขึ้น
+    </p>
+    <div class="two-sys">
+      <div class="sys-card">
+        <strong>ระบบทะเบียนเครื่อง (MA)</strong>
+        ใช้บันทึกผลิตเครื่อง อัปเดต FW/HW ซ่อม ลูกค้า เบิกอะไหล่ตอนผลิต
+        <br><span>ทีม MA / Production</span>
+      </div>
+      <div class="sys-card">
+        <strong>ระบบสต็อกอะไหล่ (Stock ช่าง)</strong>
+        ใช้รับอะไหล่เข้า เบิกออก ดูคงเหลือ จัดชุดเบิก (Set)
+        <br><span>ทีมคลัง / ช่าง</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- สิ่งที่ user เห็นทันที -->
+  <div class="box">
+    <h2>1. สิ่งที่เห็นทันทีเมื่อเปิดใช้</h2>
+    <table>
+      <tr>
+        <th>เรื่อง</th>
+        <th>ของเดิม</th>
+        <th>ของใหม่</th>
+      </tr>
+      <tr>
+        <td><strong>สีและธีม</strong></td>
+        <td class="old">MA สีน้ำเงิน / Stock หน้าตาแยก ไม่เหมือนกัน</td>
+        <td class="new">สีม่วง-ชมพูชุดเดียว ปรับที่ MA แล้ว Stock ตามอัตโนมัติ</td>
+      </tr>
+      <tr>
+        <td><strong>ไอคอนเมนู</strong></td>
+        <td class="old">ใช้ emoji 📦📊📤</td>
+        <td class="new">ใช้ไอคอนรูปเส้นแบบเดียวกันทั้ง 2 ระบบ ดูเป็นมืออาชีพขึ้น</td>
+      </tr>
+      <tr>
+        <td><strong>สลับระหว่าง 2 ระบบ</strong></td>
+        <td class="old">ต้องจำ URL หรือ bookmark แยก</td>
+        <td class="new">มีลิงก์ในแถบเมนูซ้าย — กดไปอีกระบบได้เลย</td>
+      </tr>
+      <tr>
+        <td><strong>ฟอนต์ตัวหนังสือ</strong></td>
+        <td class="old">อาจไม่เหมือนกัน</td>
+        <td class="new">ใช้ฟอนต์ไทยชุดเดียว (Noto Sans Thai) อ่านสบายขึ้น</td>
+      </tr>
+      <tr>
+        <td><strong>มือถือ / จอเล็ก</strong></td>
+        <td class="old">เมนูอาจบังหน้าจอ</td>
+        <td class="new">เมนูซ่อนได้ เอาเมาส์ไปขอบซ้ายหรือแตะเพื่อเปิด</td>
+      </tr>
+      <tr>
+        <td><strong>ป้ายสถานะ</strong> (เช่น สำเร็จ/รอซ่อม)</td>
+        <td class="old">รูปแบบไม่เหมือนกัน</td>
+        <td class="new">ทรง pill สีชุดเดียวกัน มองแล้วเข้าใจเร็วขึ้น</td>
+      </tr>
+      <tr>
+        <td><strong>การ์ดตัวเลขหน้าแรก</strong> (Dashboard)</td>
+        <td class="old">การ์ดสีเต็มใบ</td>
+        <td class="new"><span class="tag tag-wait">ยังเป็นสีเต็มเหมือนเดิม</span> รอปรับในรอบถัดไป</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- การใช้งานจริง -->
+  <div class="box">
+    <h2>2. การใช้งานจริง เปลี่ยนอย่างไร?</h2>
+
+    <div class="scene">
+      <div class="scene-title">กรณีที่ 1 — บันทึกผลิตเครื่องใหม่ แล้วเบิกอะไหล่</div>
+      <p><strong>เดิม:</strong> บันทึกใน MA แล้วระบบส่งคำสั่งไปตัดสต็อกอะไหล่ทางอินเทอร์เน็ต (webhook) บางครั้งส่งไม่ถึง หรือจำนวนไม่ตรง</p>
+      <p class="arrow">↓ ตอนนี้</p>
+      <p><strong>ใหม่:</strong> บันทึกใน MA แล้วระบบตัดสต็อกอะไหล่ <em>โดยตรงในฐานข้อมูลเดียวกัน</em> ที่ Stock ช่างใช้ดูคงเหลือ — จำนวนควรตรงกันทันที</p>
+      <p style="font-size:.92rem;color:var(--muted)">สิ่งที่คุณทำเหมือนเดิม แค่ระบบหลังบ้านทำงานแม่นขึ้น</p>
+    </div>
+
+    <div class="scene">
+      <div class="scene-title">กรณีที่ 2 — ช่างเบิกอะไหล่จาก Stock ช่าง</div>
+      <p><strong>เดิม:</strong> เบิกใน Stock ช่าง ข้อมูลอาจไม่ไปโผล่ในประวัติ MA</p>
+      <p class="arrow">↓ ตอนนี้</p>
+      <p><strong>ใหม่:</strong> เบิกใน Stock ช่าง ระบบบันทึกประวัติไปที่ MA ด้วย (ถ้าระบุรหัสเครื่อง) ทีม MA ตามย้อนหลังได้</p>
+    </div>
+
+    <div class="scene">
+      <div class="scene-title">กรณีที่ 3 — ดูประวัติเบิกตาม Serial Number</div>
+      <p><strong>เดิม:</strong> ดูรายการในตารางอย่างเดียว</p>
+      <p class="arrow">↓ ตอนนี้</p>
+      <p><strong>ใหม่:</strong> คลิก S/N แล้วเปิดหน้าต่างย่อ ดูว่าเครื่องนี้เบิกอะไหล่อะไรไปบ้าง โดยไม่ต้องออกจากหน้าเดิม</p>
+    </div>
+
+    <div class="scene">
+      <div class="scene-title">กรณีที่ 4 — Admin ปรับสี/โลโก้</div>
+      <p><strong>เดิม:</strong> ปรับใน MA อย่างเดียว Stock ช่างยังหน้าตาเดิม</p>
+      <p class="arrow">↓ ตอนนี้</p>
+      <p><strong>ใหม่:</strong> ปรับครั้งเดียวใน MA (หน้า ปรับแต่งหน้าตา) Stock ช่างเปลี่ยนตาม — ไม่ต้องตั้งสองที่</p>
+    </div>
+
+    <div class="scene">
+      <div class="scene-title">กรณีที่ 5 — เข้าใช้งาน</div>
+      <p><strong>เดิม:</strong> ต้อง login ผ่าน bit-online ทุกครั้ง (รวมตอนทดสอบในเครื่อง)</p>
+      <p class="arrow">↓ ตอนนี้</p>
+      <p><strong>ใหม่:</strong> บน server จริงยัง login เหมือนเดิม · บนเครื่อง dev (localhost) เข้าได้เลยไม่ต้อง login เพื่อให้ทีมพัฒนาทดสอบเร็วขึ้น</p>
+    </div>
+  </div>
+
+  <!-- แยกตามกลุ่ม user -->
+  <div class="box">
+    <h2>3. แต่ละทีมได้อะไร / ต้องรู้อะไร?</h2>
+
+    <h3>ทีม MA / Production</h3>
+    <ul>
+      <li>หน้าตาใหม่ สีม่วง-ชมพู มีลิงก์ไป Stock ช่างในเมนู</li>
+      <li>เบิกอะไหล่ตอนผลิต — จำนวนคงเหลือใน Stock ช่างควรลดทันที</li>
+      <li>ไม่ต้องตั้ง webhook รายรุ่นสินค้าอีกแล้ว (ระบบเก่าถูกถอดออก)</li>
+      <li><strong>สำคัญ:</strong> รหัสอะไหล่ใน MA ต้องตรงกับรหัสใน Stock ช่าง ไม่งั้นจำนวนจะไม่ sync</li>
+    </ul>
+
+    <h3>ทีมคลัง / ช่าง (Stock ช่าง)</h3>
+    <ul>
+      <li>หน้าตาใหม่ตาม MA โดยอัตโนมัติ มีลิงก์กลับไประบบ MA</li>
+      <li>รับเข้า-เบิกออก ทำเหมือนเดิม แต่ประวัติส่งไป MA ได้ด้วย</li>
+      <li>หน้าประวัติเบิก — คลิก S/N ดูรายละเอียดได้ใน popup</li>
+      <li>ไฟล์เก่าที่ไม่ใช้แล้ว (add.php, delete.php ฯลฯ) ถูกเอาออก — ใช้เมนูในระบบแทน</li>
+    </ul>
+
+    <h3>Admin / หัวหน้างาน</h3>
+    <ul>
+      <li>ปรับสี โลโก้ ฟอนต์ ที่ MA ครั้งเดียว ทั้ง 2 ระบบเปลี่ยน</li>
+      <li>มีหน้าตรวจความคมชัดของสี (contrast) ช่วยให้อ่านง่าย</li>
+      <li>ระบบมีหน้าตรวจสุขภาพ (health check) ให้ IT ดูว่าเชื่อมฐานข้อมูลได้หรือไม่</li>
+    </ul>
+  </div>
+
+  <!-- ข้อดีข้อเสียแบบเข้าใจง่าย -->
+  <div class="box">
+    <h2>4. ดีขึ้นตรงไหน / ยังระวังอะไร?</h2>
+
+    <div class="good">
+      <strong>ดีขึ้น — จำนวนอะไหล่ตรงกันมากขึ้น</strong><br>
+      ไม่พึ่งการส่งข้อมูลทางอินเทอร์เน็ตแบบเดิม ลดปัญหา "เบิกแล้วแต่ตัวเลขไม่ลด"
+    </div>
+    <div class="good">
+      <strong>ดีขึ้น — ใช้ 2 ระบบสบายขึ้น</strong><br>
+      หน้าตาเหมือนกัน สลับระหว่าง MA กับ Stock ได้จากเมนู ไม่ต้องจำลิงก์
+    </div>
+    <div class="good">
+      <strong>ดีขึ้น — ตั้งค่าครั้งเดียว</strong><br>
+      สี โลโก้ ฟอนต์ ตั้งที่ MA แล้ว Stock ตาม
+    </div>
+    <div class="good">
+      <strong>ดีขึ้น — ตามประวัติ S/N ง่ายขึ้น</strong><br>
+      คลิก serial number ดูว่าเบิกอะไรไปบ้าง
+    </div>
+
+    <div class="warn">
+      <strong>ยังไม่สมบูรณ์ — การ์ดตัวเลขหน้าแรก</strong><br>
+      ส่วนอื่นเปลี่ยนหน้าใหม่แล้ว แต่การ์ดสรุปตัวเลข (Dashboard) ยังเป็นสไตล์เก่า รอปรับในรอบถัดไป
+    </div>
+    <div class="warn">
+      <strong>ต้องระวัง — รหัสอะไหล่ต้องตรงกัน</strong><br>
+      ถ้ารหัสใน MA กับ Stock ช่างไม่ตรงกัน ระบบจะไม่ sync จำนวน แต่ไม่แจ้งเตือนชัดเจน ต้องตรวจให้ครบก่อนใช้จริง
+    </div>
+    <div class="warn">
+      <strong>ต้องระวัง — ทดสอบก่อนใช้จริงทั้งองค์กร</strong><br>
+      ลอง flow จริง: ผลิตเครื่อง → เบิกอะไหล่ → ดูคงเหลือ Stock → ดูประวัติ MA ว่าตรงกันไหม
+    </div>
+  </div>
+
+  <!-- อะไรเหมือนเดิม -->
+  <div class="box">
+    <h2>5. อะไรยังเหมือนเดิม?</h2>
+    <ul>
+      <li>เมนูหลักและขั้นตอนงานยังเหมือนเดิม — รับเข้า เบิกออก จัด Set บันทึกเครื่อง ซ่อม ลูกค้า</li>
+      <li>ยัง login ผ่าน bit-online เหมือนเดิม (บน server จริง)</li>
+      <li>ข้อมูลเดิมในฐานข้อมูลไม่หาย — แค่ระบบเชื่อมข้อมูลดีขึ้น</li>
+      <li>หน้าที่ทำได้ยังครบ ไม่มีฟีเจอร์หลักถูกตัดออก</li>
+    </ul>
+  </div>
+
+  <!-- แนะนำต่อ -->
+  <div class="box">
+    <h2>6. ควรทำอะไรต่อ?</h2>
+
+    <h3>ทำก่อนเปิดใช้ทั้งบริษัท</h3>
+    <ol>
+      <li><strong>ตรวจรหัสอะไหล่</strong> — ให้รหัสใน MA ตรงกับ Stock ช่างทุกตัว</li>
+      <li><strong>ทดสอบจริง 1 รอบ</strong> — ผลิต → เบิก → ดูตัวเลขทั้ง 2 ระบบว่าตรงกัน</li>
+      <li><strong>สอนทีมสั้นๆ</strong> — บอกว่าหน้าตาเปลี่ยน มีลิงก์สลับระบบ และ S/N คลิกดูได้</li>
+    </ol>
+
+    <h3>ทำใน 1–2 เดือนถัดไป</h3>
+    <ol>
+      <li>ปรับการ์ดตัวเลขหน้าแรกให้เข้าชุดหน้าใหม่</li>
+      <li>ทดสอบบนมือถือ/แท็บเล็ตของช่างจริง</li>
+      <li>ทำคู่มือใช้งานสั้นๆ ให้ทีมใหม่</li>
+      <li>แจ้งเตือนเมื่ออะไหล่ใกล้หมด (ยังไม่มี — เป็นแผนอนาคต)</li>
+    </ol>
+  </div>
+
+  <!-- สรุปท้าย -->
+  <div class="summary-box">
+    <h2 style="color:var(--primary);margin-bottom:.75rem;border:none;padding:0">สรุปสั้นๆ</h2>
+    <dl>
+      <dt>เป้าหมายของระบบใหม่</dt>
+      <dd>ให้ทีม MA กับทีมคลังใช้งานสะดวกขึ้น และตัวเลขอะไหล่ตรงกัน ไม่หลุด</dd>
+
+      <dt>ผู้ใช้จะรู้สึกต่างตรงไหน</dt>
+      <dd>หน้าตาใหม่ สลับระบบง่าย ตั้งสีครั้งเดียว ดูประวัติ S/N ได้ และจำนวนอะไหล่น่าเชื่อถือขึ้น</dd>
+
+      <dt>งานเสร็จเมื่อไหร่ (สำหรับ go-live)</dt>
+      <dd>รหัสอะไหล่ตรงครบ · ทดสอบ flow จริงผ่าน · ทีมรู้ว่าอะไรเปลี่ยน · ไม่มีตัวเลขคลาดเคลื่อนระหว่าง MA กับ Stock</dd>
+    </dl>
+  </div>
+
+</div>
+
+<footer>
+  รายงานฉบับเข้าใจง่าย · โปรเจกต์ Production · 19 กรกฎาคม 2569
+</footer>
+
+</body>
+</html>

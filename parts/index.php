@@ -39,11 +39,15 @@ $recent = $stock->getRecentMovements(8);
         <div class="label">เบิกออกวันนี้</div>
         <div class="value"><?= formatNumber($stats['today_out']) ?></div>
     </div>
+    <a href="<?= url('/pages/year-end-summary.php') ?>" class="stat-card" style="text-decoration:none; color:inherit; border-left:4px solid var(--primary, #6366f1)">
+        <div class="label">สรุปยอดสิ้นปี</div>
+        <div class="value" style="font-size:1rem; font-weight:600">เปิดรายงาน →</div>
+    </a>
 </div>
 
 <div class="grid-2">
     <div class="card">
-        <h2>📋 อะไหล่คงเหลือ</h2>
+        <?= ui_heading('clipboard', 'อะไหล่คงเหลือ', 'h2') ?>
         <div class="table-wrap">
         <table>
             <thead>
@@ -81,7 +85,7 @@ $recent = $stock->getRecentMovements(8);
     <div>
         <?php if (!empty($lowStock)): ?>
         <div class="card">
-            <h2>⚠️ แจ้งเตือนอะไหล่ใกล้หมด</h2>
+            <?= ui_heading('alert', 'แจ้งเตือนอะไหล่ใกล้หมด', 'h2') ?>
             <div class="table-wrap">
             <table>
                 <thead>
@@ -106,7 +110,7 @@ $recent = $stock->getRecentMovements(8);
         <?php endif; ?>
 
         <div class="card">
-            <h2>🔄 ความเคลื่อนไหวล่าสุด</h2>
+            <?= ui_heading('refresh', 'ความเคลื่อนไหวล่าสุด', 'h2') ?>
             <?php if (empty($recent)): ?>
                 <p class="empty-state">ยังไม่มีข้อมูล</p>
             <?php else: ?>

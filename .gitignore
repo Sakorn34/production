@@ -1,9 +1,11 @@
 # secrets — ไม่มีไฟล์เหล่านี้ในโค้ดแล้ว (ย้ายไป D:\AppServ\secrets\production\) แต่กันไว้อีกชั้น
 **/config.local.php
+**/config.paths.php
 **/*.secrets.php
 **/sftp.json
 **/.vscode/
 .env
+Appscript*.txt
 
 # ไฟล์ที่ generate/runtime ไม่ควร commit
 **/uploads/*
@@ -12,9 +14,11 @@
 *.log
 
 # ฐานข้อมูล local/backup ที่ไม่ควรอยู่ใน repo
+/_db_import_temp/
 *.sql
 *.sql.zip
 **/db.db
 
-# vendor (ยังไม่มี composer แต่กันไว้)
-/vendor/
+# _archive — ไม่ track ใน git (เก็บ local)
+/_archive/backups/
+/_archive/.claude/
