@@ -1,27 +1,22 @@
 /**
- * app.js — sidebar overlay (เมาส์ชิดขอบซ้ายค้าง 2 วิ แล้วเมนูเลื่อนเข้า) + modal S/N basket
+ * app.js — sidebar overlay (เมาส์ชิดขอบซ้ายเปิดทันที) + modal S/N basket
  */
 (function () {
     'use strict';
-
-    var SIDEBAR_HOVER_DELAY_MS = 500; // เมาส์ต้องค้างที่ขอบครบก่อน เมนูถึงเลื่อนเข้ามา
 
     var body = document.body;
     var sidebar = document.getElementById('app-sidebar');
     var edge = document.querySelector('.sidebar-edge');
     var toggle = document.getElementById('sidebar-toggle');
     var backdrop = document.getElementById('sidebar-backdrop');
-    var openTimer = null;
     var hideTimer = null;
 
     function showSidebar() {
-        clearTimeout(openTimer);
         clearTimeout(hideTimer);
         body.classList.add('sidebar-hover');
     }
 
     function hideSidebar() {
-        clearTimeout(openTimer);
         clearTimeout(hideTimer);
         body.classList.remove('sidebar-hover');
     }
@@ -32,16 +27,12 @@
     }
 
     if (edge) {
-        edge.addEventListener('mouseenter', function () {
-            clearTimeout(openTimer);
-            openTimer = setTimeout(showSidebar, SIDEBAR_HOVER_DELAY_MS);
-        });
+        edge.addEventListener('mouseenter', showSidebar);
         edge.addEventListener('mouseleave', function (e) {
-            clearTimeout(openTimer);
             if (sidebar && sidebar.contains(e.relatedTarget)) return;
             scheduleHide();
         });
-        edge.addEventListener('click', showSidebar); // คลิกขอบ = เปิดทันที ไม่ต้องรอ
+        edge.addEventListener('click', showSidebar);
     }
 
     if (sidebar) {
@@ -51,7 +42,6 @@
         });
         sidebar.addEventListener('mouseleave', scheduleHide);
     }
-
     if (toggle) {
         toggle.addEventListener('click', function () {
             if (body.classList.contains('sidebar-hover')) hideSidebar();

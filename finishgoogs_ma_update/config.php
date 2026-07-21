@@ -286,6 +286,8 @@ function nav_effective() {
     $out = [];
     foreach (nav_default() as $i => $n) {
         if (!$n[3]) continue;
+        // ระบบหลังบ้าน — แสดงเป็นไอคónข้างชื่อผู้ใช้ใน userbox ไม่ใส่ในรายการเมนู
+        if ($n[0] === 'settings.php') continue;
         $o = isset($byFile[$n[0]]) ? $byFile[$n[0]] : [];
         if (!empty($o['hidden'])) continue;
         $out[] = [
@@ -297,6 +299,32 @@ function nav_effective() {
     }
     usort($out, function ($a, $b) { return $a['order'] - $b['order']; });
     return $out;
+}
+
+/**
+ * เปอร์เซ็นต์ขยายขนาดตัวอักษร (90–140) จาก appearance.php
+ *
+ * @return int
+ */
+function theme_font_scale_percent(): int {
+    $p = (int) setting('font_scale_percent', 100);
+    return max(90, min(140, $p));
+}
+
+/**
+ * CSS variables ขนาดตัวอักษรตาม font_scale_percent
+ *
+ * @return string
+ */
+function theme_font_css_sizes(): string {
+    $s = theme_font_scale_percent() / 100;
+    return sprintf(
+        '--fs-body:%spx; --fs-h1:%spx; --fs-table:%spx; --fs-badge:%spx;',
+        round(15 * $s, 1),
+        round(22 * $s, 1),
+        round(13.5 * $s, 1),
+        round(12 * $s, 1)
+    );
 }
 
 /** ชื่อเดือนย่อภาษาไทย จาก Y-m */

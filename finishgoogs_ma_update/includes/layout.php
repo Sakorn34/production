@@ -144,7 +144,7 @@ function page_header($title, $showBack = true, $subtitle = '', $backUrl = '') {
   --shadow-sm:0 1px 2px rgba(15,23,42,.06);
   --shadow-md:0 4px 16px rgba(15,23,42,.08);
   --input-h:40px; --transition:.18s ease;
-  --fs-body:15px; --fs-h1:22px; --fs-table:13.5px; --fs-badge:12px;
+  <?= theme_font_css_sizes() ?>
 }</style>
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/theme-v2.css?v=<?= @filemtime(__DIR__ . '/../assets/theme-v2.css') ?: time() ?>">
 </head>
@@ -179,6 +179,7 @@ $sideClass = $side === 'right' ? ' sidebar-right' : ($side === 'top' ? ' sidebar
           <div class="ub-name"><?= h($showName) ?></div>
           <div class="muted"><?= h($u && $u['display_name'] !== '' && $u['display_name'] !== $showName ? $u['display_name'] : 'SSO') ?></div>
         </div>
+        <?= ui_userbox_settings_link(in_array($cur, ['settings.php', 'appearance.php', 'server_config.php', 'line_notify_settings.php', 'activity_logs.php', 'share_admin.php', 'system_doc.php'], true) ? 'is-active' : '') ?>
       </div>
       <div class="ub-links">
         <a href="<?= BASE_URL ?>/profile.php">โปรไฟล์</a> ·
@@ -236,22 +237,21 @@ function page_footer() {
 <script>
 function closeOverlay(id){ document.getElementById(id).hidden = true; }
 (function(){
-  var SIDEBAR_HOVER_DELAY_MS = 500; // เมาส์ต้องค้างที่ขอบครบก่อน เมนูถึงเลื่อนเข้ามา
   var app = document.querySelector('.app');
   var edge = document.getElementById('fg-sidebar-edge');
   var sidebar = app && app.querySelector('.sidebar');
   var toggle = document.getElementById('fg-sidebar-toggle');
   var backdrop = document.getElementById('fg-nav-backdrop');
-  var openTimer = null, hideTimer = null;
+  var hideTimer = null;
   if (!app || !sidebar) return;
   if (app.classList.contains('sidebar-top')) return;
 
   function showNav(){
-    clearTimeout(openTimer); clearTimeout(hideTimer);
+    clearTimeout(hideTimer);
     app.classList.add('nav-hover');
   }
   function hideNav(){
-    clearTimeout(openTimer); clearTimeout(hideTimer);
+    clearTimeout(hideTimer);
     app.classList.remove('nav-hover', 'nav-open');
   }
   function scheduleHide(){
@@ -260,16 +260,12 @@ function closeOverlay(id){ document.getElementById(id).hidden = true; }
   }
 
   if (edge) {
-    edge.addEventListener('mouseenter', function(){
-      clearTimeout(openTimer);
-      openTimer = setTimeout(showNav, SIDEBAR_HOVER_DELAY_MS);
-    });
+    edge.addEventListener('mouseenter', showNav);
     edge.addEventListener('mouseleave', function(e){
-      clearTimeout(openTimer);
       if (sidebar.contains(e.relatedTarget)) return;
       scheduleHide();
     });
-    edge.addEventListener('click', showNav); // คลิกขอบ = เปิดทันที ไม่ต้องรอ
+    edge.addEventListener('click', showNav);
   }
   sidebar.addEventListener('mouseenter', function(){ clearTimeout(hideTimer); showNav(); });
   sidebar.addEventListener('mouseleave', scheduleHide);

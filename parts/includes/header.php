@@ -102,6 +102,21 @@ $partsNav = array_map(function ($it) {
             </li>
             <?php endforeach; ?>
         </ul>
+        <div class="userbox">
+            <div class="ub-row">
+                <div class="ub-avatar"><?= e(mb_substr(trim($line_name), 0, 1)) ?></div>
+                <div class="ub-info">
+                    <div class="ub-name"><?= e($line_name) ?></div>
+                    <div class="muted">SSO</div>
+                </div>
+                <?= ui_userbox_settings_link() ?>
+            </div>
+            <div class="ub-links">
+                <a href="<?= e(ui_finishgoogs_base_url() . '/profile.php') ?>">โปรไฟล์</a>
+                ·
+                <a href="<?= e(ui_finishgoogs_base_url() . '/logout.php') ?>">ออกจากระบบ</a>
+            </div>
+        </div>
     </nav>
 
     <main class="content">

@@ -227,6 +227,32 @@ function ui_finishgoogs_base_url(): string
 }
 
 /**
+ * URL หน้าระบบหลังบ้าน (settings.php)
+ *
+ * @return string
+ */
+function ui_settings_admin_url(): string
+{
+    return ui_finishgoogs_base_url() . '/settings.php';
+}
+
+/**
+ * ไอคónระบบหลังบ้าน (ข้างชื่อผู้ใช้ใน userbox)
+ *
+ * @param string $extraClass
+ * @return string
+ */
+function ui_userbox_settings_link(string $extraClass = ''): string
+{
+    $cls = 'ub-settings-btn' . ($extraClass !== '' ? ' ' . $extraClass : '');
+    return '<a href="' . htmlspecialchars(ui_settings_admin_url(), ENT_QUOTES, 'UTF-8') . '"'
+        . ' class="' . htmlspecialchars($cls, ENT_QUOTES, 'UTF-8') . '"'
+        . ' title="ระบบหลังบ้าน" aria-label="ระบบหลังบ้าน">'
+        . ui_icon_html('settings', 20, 'ub-settings-svg')
+        . '</a>';
+}
+
+/**
  * รายการเมนูระบบสต็อกอะไหล่ (source เดียว ใช้ render ทั้งใน parts เองและกลุ่มข้ามระบบใน finishgoogs)
  *
  * @return array<int, array{file:string,icon:string,label:string}>

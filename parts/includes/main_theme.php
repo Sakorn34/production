@@ -120,6 +120,34 @@ function parts_sidebar_active_color(): string
 }
 
 /**
+ * เปอร์เซ็นต์ขยายขนาดตัวอักษรจาก appearance.php
+ *
+ * @return int
+ */
+function main_font_scale_percent(): int
+{
+    $p = (int) main_setting('font_scale_percent', 100);
+    return max(90, min(140, $p));
+}
+
+/**
+ * CSS variables ขนาดตัวอักษรตาม font_scale_percent
+ *
+ * @return string
+ */
+function main_font_css_sizes(): string
+{
+    $s = main_font_scale_percent() / 100;
+    return sprintf(
+        '--fs-body:%spx; --fs-h1:%spx; --fs-table:%spx; --fs-badge:%spx;',
+        round(15 * $s, 1),
+        round(22 * $s, 1),
+        round(13.5 * $s, 1),
+        round(12 * $s, 1)
+    );
+}
+
+/**
  * สร้าง CSS variables สำหรับ inject ใน header
  *
  * @return string
@@ -147,6 +175,6 @@ function parts_theme_css_block(): string
   --shadow-sm:0 1px 2px rgba(46,26,90,.07);
   --shadow-md:0 4px 16px rgba(46,26,90,.12);
   --input-h:40px; --transition:.18s ease;
-  --fs-body:15px; --fs-h1:22px; --fs-table:13.5px; --fs-badge:12px;
+  ' . main_font_css_sizes() . '
 }';
 }

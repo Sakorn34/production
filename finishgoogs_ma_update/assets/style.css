@@ -55,6 +55,16 @@ a:hover { text-decoration: underline; }
 .userbox { padding: 12px 12px 14px; border-top: 1px solid #26344f; font-size: 13px; }
 .userbox a { color: #9db8dd; }
 .ub-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.ub-settings-btn {
+  margin-left: auto; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.28); background: rgba(255,255,255,.1);
+  color: #fff; text-decoration: none; transition: background .15s, border-color .15s;
+}
+.ub-settings-btn:hover { background: rgba(255,255,255,.2); border-color: rgba(255,255,255,.45); color: #fff; text-decoration: none; }
+.ub-settings-btn.is-active { background: var(--sidebar-active, var(--primary)); border-color: transparent; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+.ub-settings-btn .ub-settings-svg { opacity: .95; }
 .ub-avatar { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
   background: linear-gradient(135deg, #3a5c93, var(--primary)); color: #fff; font-weight: 600; font-size: 14px; text-transform: uppercase; }
 .ub-info { min-width: 0; }
@@ -444,7 +454,7 @@ span.thumb-sm { display: inline-flex; align-items: center; justify-content: cent
 .dyn-field-row label { font-size: 13px; }
 @media (max-width: 900px) { .produce-cols { grid-template-columns: 1fr; } .note-grid { grid-template-columns: 1fr; } }
 
-/* เมนูหลัก overlay — เมาส์ชิดขอบซ้ายค้าง ~2 วิ แล้วเมนูเลื่อนเข้ามา (delay อยู่ใน JS ของ layout.php) */
+/* เมนูหลัก overlay — เมาส์ชิดขอบซ้ายเปิดทันที (logic อยู่ใน JS ของ layout.php) */
 .sidebar-edge {
   position: fixed; left: 0; top: 0; width: 14px; height: 100vh; z-index: 72;
   cursor: pointer;
@@ -490,6 +500,11 @@ html:has(.app.sidebar-right) .sidebar-edge {
 
 @media (max-width: 800px) {
   .sidebar-toggle { display: flex; }
+  /* ซ่อนปุ่ม ☰ เมื่อเมนูเปิด — ไม่ให้ทับโลโก้/ชื่อบน sidebar */
+  .app.nav-hover:not(.sidebar-top) .sidebar-toggle,
+  .app.nav-open:not(.sidebar-top) .sidebar-toggle {
+    display: none;
+  }
   html:has(.app.sidebar-top) .sidebar-toggle { display: none; }
   .app:not(.sidebar-top) .content { padding-top: 64px; }
 }

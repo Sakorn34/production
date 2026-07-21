@@ -28,6 +28,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // ความสูงโลโก้ (px)
     $lh = (int)($_POST['brand_logo_h'] ?? 0);
     if ($lh >= 20 && $lh <= 160) set_setting('brand_logo_h', $lh);
+    // ขนาดตัวอักษร (เปอร์เซ็นต์)
+    $fontScale = (int)($_POST['font_scale_percent'] ?? 100);
+    if ($fontScale >= 90 && $fontScale <= 140) set_setting('font_scale_percent', $fontScale);
     // โลโก้ + ไอคอนแท็บเบราว์เซอร์ (favicon) — แจ้ง error ถ้าเลือกไฟล์แล้วอัปโหลดไม่ผ่าน
     $upErrors = [];
     $brandUpload = function ($field, $label) use (&$upErrors) {
@@ -94,6 +97,7 @@ $ovrByFile = [];
 foreach ($ovr as $o) if (isset($o['file'])) $ovrByFile[$o['file']] = $o;
 $navRows = [];
 foreach (nav_default() as $i => $n) {
+    if ($n[0] === 'settings.php') continue;
     $o = isset($ovrByFile[$n[0]]) ? $ovrByFile[$n[0]] : [];
     $navRows[] = [
         'file'   => $n[0],
@@ -137,7 +141,21 @@ page_header('ปรับแต่งหน้าตาระบบ');
           </div>
         <?php } ?>
         <input type="file" name="favicon" accept="image/*,.ico,.svg">
-        <div class="muted" style="font-size:12px; margin-top:3px">แนะนำรูปสี่เหลี่ยมจัตุรัส PNG ขนาด 64×64 ขึ้นไป · รองรับ PNG / JPG / GIF / WebP / ICO / SVG · ขนาดไม่เกิน <?= h(ini_get('upload_max_filesize')) ?></div></div>
+        <div class="muted" style="font-size:12px; margin-top:3px">แนะนำรูปสี่เหลี่ยมจัตุรัส PNG ขนาด 64×64 ขึ้นไป · รองรับ PNG / JPG / GIF / WebP / ICO / SVG · ขนาดไม่เกิน <?= h(ini_get('upload_max_filesize')) ?></div>      </div>
+
+      <h3 class="h-with-icon" style="margin:18px 0 10px"><?= ui_icon_html('clipboard', 18, 'h-svg') ?><span>ขนาดตัวอักษร</span></h3>
+      <?php $fontScaleCur = theme_font_scale_percent(); ?>
+      <div class="field">
+        <label>ขยายขนาดข้อความทั้งระบบ</label>
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
+          <input type="range" name="font_scale_percent" min="90" max="140" step="5"
+            value="<?= (int) $fontScaleCur ?>"
+            oninput="document.getElementById('font-scale-val').textContent=this.value + '%'"
+            style="flex:1; min-width:160px">
+          <span style="font-size:13px; min-width:52px"><b id="font-scale-val"><?= (int) $fontScaleCur ?>%</b></span>
+        </div>
+        <div class="muted" style="font-size:12px; margin-top:4px">100% = ค่าเริ่มต้น · มีผลกับเนื้อหา หัวข้อ ตาราง และป้ายสถานะ</div>
+      </div>
 
       <?= ui_heading('font', 'ฟอนต์ภาษาไทย', 'h3') ?>
       <?php
@@ -185,7 +203,7 @@ page_header('ปรับแต่งหน้าตาระบบ');
     <!-- ขวา: เมนู + ตำแหน่ง -->
     <div class="panel">
       <?= ui_heading('clipboard', 'เมนู (ไอคอน · ชื่อ · ลำดับ · แสดง)', 'h3') ?>
-      <p class="muted" style="margin-bottom:8px">ลาก ≡ จัดลำดับ · ใส่ icon key (เช่น dashboard, parts, scan) หรือ emoji · ติ๊กออกเพื่อซ่อนเมนู</p>
+      <p class="muted" style="margin-bottom:8px">ลาก ≡ จัดลำดับ · ใส่ icon key (เช่น dashboard, parts, scan) หรือ emoji · ติ๊กออกเพื่อซ่อนเมนู · <b>ระบบหลังบ้าน</b> แสดงเป็นไอคón ⚙️ ข้างชื่อผู้ใช้เสมอ</p>
       <table class="list" id="tbl-nav">
         <tr><th style="width:26px"></th><th style="width:56px">ไอคอน</th><th>ชื่อเมนู</th><th style="width:44px; text-align:center">แสดง</th></tr>
         <?php foreach ($navRows as $r) { ?>

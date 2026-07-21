@@ -96,13 +96,46 @@ body {
 
 /* ─ Layout ──────────────────────────────────────────────────────────────── */
 
-/* ─ Sidebar overlay — เมาส์ชิดขอบซ้ายค้าง ~2 วิ แล้วเมนูเลื่อนเข้ามา (delay อยู่ใน app.js) ─ */
+/* ─ Sidebar overlay — เมาส์ชิดขอบซ้ายเปิดทันที (delay อยู่ใน app.js) ─ */
+
+.nav-links { flex: 1; }
+.nav-links-cross-top { flex-shrink: 0; }
+
+.userbox {
+    margin-top: auto;
+    padding: 12px 1.25rem 14px;
+    border-top: 1px solid rgba(255, 255, 255, .15);
+    font-size: 13px;
+    flex-shrink: 0;
+}
+.userbox a { color: rgba(255, 255, 255, .75); text-decoration: none; }
+.userbox a:hover { color: #fff; }
+.ub-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.ub-avatar {
+    width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--primary); color: #fff; font-weight: 600; font-size: 14px;
+    text-transform: uppercase;
+}
+.ub-info { min-width: 0; flex: 1; }
+.ub-name { font-weight: 600; color: #fff; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ub-info .muted { color: rgba(255, 255, 255, .55); font-size: 12px; }
+.ub-links { padding-left: 2px; font-size: 12px; }
+.ub-settings-btn {
+    margin-left: auto; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,.28); background: rgba(255,255,255,.1);
+    color: #fff; text-decoration: none; transition: background .15s, border-color .15s;
+}
+.ub-settings-btn:hover { background: rgba(255,255,255,.2); border-color: rgba(255,255,255,.45); color: #fff; }
+.ub-settings-btn.is-active { background: var(--sidebar-active, var(--primary)); border-color: transparent; }
 
 .sidebar {
     width: 248px;
     background: var(--sidebar-bg, var(--sidebar));
     color: #fff;
-    padding: 1.5rem 0;
+    padding: 1.5rem 0 0;
     position: fixed;
     left: 0;
     top: 0;
@@ -115,6 +148,8 @@ body {
     opacity: 0;
     pointer-events: none;
     transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease, box-shadow 0.28s ease;
+    display: flex;
+    flex-direction: column;
 }
 
 body.sidebar-hover .sidebar {
@@ -207,6 +242,10 @@ body.sidebar-hover .sidebar-backdrop {
 
 @media (max-width: 800px) {
     .sidebar-toggle { display: flex; }
+    /* ซ่อนปุ่ม ☰ เมื่อเมนูเปิด — ไม่ให้ทับโลโก้/ชื่อบน sidebar */
+    body.sidebar-hover .sidebar-toggle {
+        display: none;
+    }
     .content { padding: 1.25rem 1rem 2rem; padding-top: 64px; }
 }
 
