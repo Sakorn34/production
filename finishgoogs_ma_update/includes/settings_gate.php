@@ -69,7 +69,9 @@ function settings_gate_render($wrong = false) {
 .pin-pad button {
   font-size: 22px; padding: 16px 0; border-radius: 10px; border: 1px solid var(--border,#dde3ec);
   background: var(--card,#fff); cursor: pointer; font-weight: 600;
+  color: #1f2430; /* ต้อง override — global button เป็นตัวอักษรขาว จะกลืนกับพื้นขาวจนมองไม่เห็นเลข */
 }
+.pin-pad button:hover { background: #f4f1fb; }
 .pin-pad button:active { transform: scale(0.97); }
 .pin-pad .pin-wide { grid-column: span 2; }
 .pin-err { color: #b91c1c; margin-bottom: 10px; font-weight: 600; }
