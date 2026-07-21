@@ -113,6 +113,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         flash_set($deleted > 0 ? "ลบ $deleted รายการที่เลือกแล้ว" : 'ไม่มีรายการถูกลบ', $deleted > 0 ? 'ok' : 'err');
+    } elseif ($act === 'bulk_update') {
+        // ตั้งค่า active และ/หรือ timestamp ให้หลายรายการที่ติ๊กเลือกพร้อมกัน
+        $sns = array_values(array_filter(array_map(function ($sn) {
+            $sn = trim((string)$sn);
+            return ($sn !== '' && mb_strlen($sn) <= 80) ? $sn : null;
+        }, (array)($_POST['serial_numbers'] ?? []))));
+
+        $set = []; $types2 = ''; $params2 = []; $desc = [];
+        $setActive = $_POST['set_active'] ?? '';
+        if ($setActive === '0' || $setActive === '1') {
+            $set[] = 'active = ?';
+            $types2 .= 'i';
+            $params2[] = (int)$setActive;
+            $desc[] = 'active = ' . $setActive;
+        }
+        $tsMode = $_POST['set_ts_mode'] ?? '';
+        if ($tsMode === 'now') {
+            $set[] = '`timestamp` = NOW()';
+            $desc[] = 'เวลา = ตอนนี้';
+        } elseif ($tsMode === 'custom') {
+            $tsVal = trim((string)($_POST['ts_value'] ?? ''));
+            $tsVal = $tsVal !== '' ? str_replace('T', ' ', $tsVal) . (strlen($tsVal) === 16 ? ':00' : '') : '';
+            $dt = $tsVal !== '' ? date_create($tsVal) : false;
+            if (!$dt) {
+                flash_set('รูปแบบวันเวลาไม่ถูกต้อง — เลือกวันเวลาก่อนกดตั้งเวลา', 'err');
+                header('Location: ' . BASE_URL . '/share.php' . (isset($_POST['back']) && $_POST['back'] !== '' ? '?' . $_POST['back'] : ''));
+                exit;
+            }
+            $set[] = '`timestamp` = ?';
+            $types2 .= 's';
+            $params2[] = $dt->format('Y-m-d H:i:s');
+            $desc[] = 'เวลา = ' . $dt->format('d/m/Y H:i');
+        }
+
+        $updated = 0;
+        if ($sns && $set) {
+            $placeholders = implode(',', array_fill(0, count($sns), '?'));
+            $st = $DB->prepare('UPDATE stock SET ' . implode(', ', $set) . " WHERE serial_number IN ($placeholders)");
+            if ($st) {
+                $types2 .= str_repeat('s', count($sns));
+                $params2 = array_merge($params2, $sns);
+                $st->bind_param($types2, ...$params2);
+                $st->execute();
+                $updated = $st->affected_rows;
+            }
+        }
+        if (!$set) {
+            flash_set('ไม่ได้เลือกว่าจะตั้งค่าอะไร', 'err');
+        } else {
+            flash_set('ตั้ง ' . implode(' · ', $desc) . ' ให้ ' . count($sns) . ' รายการที่เลือกแล้ว (เปลี่ยนจริง ' . $updated . ')');
+        }
     } elseif ($act === 'sync') {
         // ดึงเครื่องในระบบที่ยังไม่มีในตาราง stock — เครื่องจากระบบผลิต = active 1
         $max = stock_next_id() - 1;
@@ -358,14 +409,30 @@ page_header('ทะเบียนสินค้า (stock)');
 
 <div class="stock-bulk-bar" id="stock-bulk-bar" hidden>
   <span>เลือกแล้ว <b id="stock-bulk-count">0</b> รายการ</span>
-  <button type="button" class="btn btn-sm btn-danger" id="stock-bulk-delete" disabled>🗑 ลบที่เลือก</button>
-  <button type="button" class="btn btn-sm btn-line" id="stock-bulk-clear">ยกเลิกการเลือก</button>
+  <span class="stock-bulk-group">
+    <span class="stock-bulk-glbl">Active:</span>
+    <button type="button" class="btn btn-sm btn-line" id="stock-bulk-active1" disabled>ตั้งเป็น 1</button>
+    <button type="button" class="btn btn-sm btn-line" id="stock-bulk-active0" disabled>ตั้งเป็น 0</button>
+  </span>
+  <span class="stock-bulk-group">
+    <span class="stock-bulk-glbl">เวลา:</span>
+    <button type="button" class="btn btn-sm btn-line" id="stock-bulk-tsnow" disabled>= ตอนนี้</button>
+    <input type="datetime-local" id="stock-bulk-tsval" class="stock-bulk-ts">
+    <button type="button" class="btn btn-sm btn-line" id="stock-bulk-tsset" disabled>ตั้งตามที่เลือก</button>
+  </span>
+  <span class="stock-bulk-group">
+    <button type="button" class="btn btn-sm btn-danger" id="stock-bulk-delete" disabled>🗑 ลบที่เลือก</button>
+    <button type="button" class="btn btn-sm btn-line" id="stock-bulk-clear">ยกเลิกการเลือก</button>
+  </span>
 </div>
 
 <form method="post" id="stock-bulk-form" style="display:none">
   <?= csrf_field() ?>
-  <input type="hidden" name="act" value="delete_bulk">
+  <input type="hidden" name="act" value="delete_bulk" id="stock-bulk-act">
   <input type="hidden" name="back" value="<?= h($qs) ?>">
+  <input type="hidden" name="set_active" value="" id="stock-bulk-set-active">
+  <input type="hidden" name="set_ts_mode" value="" id="stock-bulk-set-tsmode">
+  <input type="hidden" name="ts_value" value="" id="stock-bulk-set-tsval">
   <div id="stock-bulk-hidden"></div>
 </form>
 
@@ -427,9 +494,13 @@ page_header('ทะเบียนสินค้า (stock)');
 .stock-search-form { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 .stock-chips { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 10px; }
 .stock-list-meta { font-size:13px; margin:0 0 10px; }
-.stock-bulk-bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+.stock-bulk-bar { display:flex; align-items:center; gap:14px; flex-wrap:wrap;
   margin:0 0 10px; padding:10px 14px; background:#fff5f5; border:1px solid #e8b4b4; border-radius:8px; }
 .stock-bulk-bar[hidden] { display:none !important; }
+.stock-bulk-group { display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;
+  padding-left:14px; border-left:1px solid #e8c9c9; }
+.stock-bulk-glbl { font-size:12.5px; color:#8a5f5f; font-weight:600; }
+.stock-bulk-ts { padding:4px 6px; border:1px solid var(--border,#dde3ec); border-radius:6px; font-family:inherit; font-size:13px; }
 #stock-table .stock-pick { width:16px; height:16px; cursor:pointer; accent-color:var(--primary); }
 #stock-table tr.stock-picked td { background:#f0f6ff !important; }
 </style>
@@ -450,6 +521,8 @@ page_header('ทะเบียนสินค้า (stock)');
       if (cb) tr.classList.toggle('stock-picked', cb.checked);
     });
   }
+  var actionBtns = ['stock-bulk-active1', 'stock-bulk-active0', 'stock-bulk-tsnow', 'stock-bulk-tsset']
+    .map(function(id){ return document.getElementById(id); });
   function refresh(){
     var picksArr = picks();
     var n = picksArr.length;
@@ -457,6 +530,7 @@ page_header('ทะเบียนสินค้า (stock)');
     if (bar) bar.hidden = n === 0;
     if (cntEl) cntEl.textContent = String(n);
     if (delBtn) delBtn.disabled = n === 0;
+    actionBtns.forEach(function(b){ if (b) b.disabled = n === 0; });
     if (allCb) allCb.indeterminate = n > 0 && n < total;
     if (allCb) allCb.checked = total > 0 && n === total;
     syncRowHighlight();
@@ -473,20 +547,51 @@ page_header('ทะเบียนสินค้า (stock)');
     if (allCb) { allCb.checked = false; allCb.indeterminate = false; }
     refresh();
   });
-  if (delBtn && form && hidden) delBtn.addEventListener('click', function(){
-    var sel = picks();
-    if (!sel.length) return;
-    if (!confirm('ลบ ' + sel.length + ' รายการที่เลือกออกจากตาราง stock ?')) return;
+  function fillSelected(){
     hidden.innerHTML = '';
-    sel.forEach(function(cb){
+    picks().forEach(function(cb){
       var inp = document.createElement('input');
       inp.type = 'hidden';
       inp.name = 'serial_numbers[]';
       inp.value = cb.value;
       hidden.appendChild(inp);
     });
+  }
+  /** ส่งฟอร์ม bulk: act = delete_bulk | bulk_update พร้อมค่าที่จะตั้ง */
+  function submitBulk(act, setActive, tsMode, tsValue){
+    if (!form || !hidden) return;
+    fillSelected();
+    document.getElementById('stock-bulk-act').value = act;
+    document.getElementById('stock-bulk-set-active').value = setActive || '';
+    document.getElementById('stock-bulk-set-tsmode').value = tsMode || '';
+    document.getElementById('stock-bulk-set-tsval').value = tsValue || '';
     form.submit();
+  }
+  if (delBtn) delBtn.addEventListener('click', function(){
+    var n = picks().length;
+    if (!n) return;
+    if (!confirm('ลบ ' + n + ' รายการที่เลือกออกจากตาราง stock ?')) return;
+    submitBulk('delete_bulk');
   });
+  function bindSet(id, msg, setActive, tsMode, needTs){
+    var b = document.getElementById(id);
+    if (!b) return;
+    b.addEventListener('click', function(){
+      var n = picks().length;
+      if (!n) return;
+      var tsValue = '';
+      if (needTs) {
+        tsValue = document.getElementById('stock-bulk-tsval').value;
+        if (!tsValue) { alert('เลือกวันเวลาในช่องก่อน แล้วค่อยกด "ตั้งตามที่เลือก"'); return; }
+      }
+      if (!confirm('ตั้ง ' + msg + (needTs ? ' (' + tsValue.replace('T', ' ') + ')' : '') + ' ให้ ' + n + ' รายการที่เลือก ?')) return;
+      submitBulk('bulk_update', setActive, tsMode, tsValue);
+    });
+  }
+  bindSet('stock-bulk-active1', 'Active = 1', '1', '', false);
+  bindSet('stock-bulk-active0', 'Active = 0', '0', '', false);
+  bindSet('stock-bulk-tsnow',   'เวลา = ตอนนี้', '', 'now', false);
+  bindSet('stock-bulk-tsset',   'เวลา', '', 'custom', true);
   refresh();
 })();
 </script>
