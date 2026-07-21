@@ -4,7 +4,7 @@
 (function () {
     'use strict';
 
-    var SIDEBAR_HOVER_DELAY_MS = 1000; // เมาส์ต้องค้างที่ขอบครบก่อน เมนูถึงเลื่อนเข้ามา
+    var SIDEBAR_HOVER_DELAY_MS = 500; // เมาส์ต้องค้างที่ขอบครบก่อน เมนูถึงเลื่อนเข้ามา
 
     var body = document.body;
     var sidebar = document.getElementById('app-sidebar');

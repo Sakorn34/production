@@ -236,7 +236,7 @@ function page_footer() {
 <script>
 function closeOverlay(id){ document.getElementById(id).hidden = true; }
 (function(){
-  var SIDEBAR_HOVER_DELAY_MS = 1000; // เมาส์ต้องค้างที่ขอบครบก่อน เมนูถึงเลื่อนเข้ามา
+  var SIDEBAR_HOVER_DELAY_MS = 500; // เมาส์ต้องค้างที่ขอบครบก่อน เมนูถึงเลื่อนเข้ามา
   var app = document.querySelector('.app');
   var edge = document.getElementById('fg-sidebar-edge');
   var sidebar = app && app.querySelector('.sidebar');

@@ -61,10 +61,14 @@ function settings_gate_render($wrong = false) {
 <style>
 .pin-gate { max-width: 360px; margin: 24px auto; text-align: center; }
 .pin-display {
-  font-size: 28px; letter-spacing: 12px; font-weight: 700;
+  font-size: 28px; letter-spacing: 8px; font-weight: 700;
   padding: 14px 16px; border: 2px solid var(--border,#dde3ec); border-radius: 10px;
   background: var(--card,#fff); min-height: 52px; margin-bottom: 16px;
+  color: #1f2430;
+  font-variant-numeric: tabular-nums;
 }
+.pin-display .pin-slot { display: inline-block; min-width: 1.1em; text-align: center; }
+.pin-display .pin-slot.is-empty { color: #c4cad4; font-weight: 500; }
 .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .pin-pad button {
   font-size: 22px; padding: 16px 0; border-radius: 10px; border: 1px solid var(--border,#dde3ec);
@@ -85,7 +89,7 @@ function settings_gate_render($wrong = false) {
     <?= csrf_field() ?>
     <input type="hidden" name="settings_pin_unlock" value="1">
     <input type="hidden" name="pin" id="pin-input" value="" maxlength="4" autocomplete="off">
-    <div class="pin-display" id="pin-display" aria-live="polite">••••</div>
+    <div class="pin-display" id="pin-display" aria-live="polite" aria-label="รหัสที่กรอก"></div>
     <div class="pin-pad">
       <?php for ($d = 1; $d <= 9; $d++) { ?>
         <button type="button" data-digit="<?= $d ?>"><?= $d ?></button>
@@ -103,8 +107,13 @@ function settings_gate_render($wrong = false) {
   var input = document.getElementById('pin-input');
   var display = document.getElementById('pin-display');
   function render(){
-    if (!pin.length) { display.textContent = '••••'; return; }
-    display.textContent = '•'.repeat(pin.length) + '•'.repeat(max - pin.length);
+    var html = '';
+    for (var i = 0; i < max; i++) {
+      var filled = i < pin.length;
+      html += '<span class="pin-slot' + (filled ? '' : ' is-empty') + '">'
+        + (filled ? pin.charAt(i) : '–') + '</span>';
+    }
+    display.innerHTML = html;
   }
   function addDigit(d){
     if (pin.length >= max) return;
