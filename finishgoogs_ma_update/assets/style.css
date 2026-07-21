@@ -444,7 +444,7 @@ span.thumb-sm { display: inline-flex; align-items: center; justify-content: cent
 .dyn-field-row label { font-size: 13px; }
 @media (max-width: 900px) { .produce-cols { grid-template-columns: 1fr; } .note-grid { grid-template-columns: 1fr; } }
 
-/* เมนูหลัก overlay — เปิดทับเนื้อหาแบบพลิกหนังสือ */
+/* เมนูหลัก overlay — เมาส์ชิดขอบซ้ายค้าง ~2 วิ แล้วเมนูเลื่อนเข้ามา (delay อยู่ใน JS ของ layout.php) */
 .sidebar-edge {
   position: fixed; left: 0; top: 0; width: 14px; height: 100vh; z-index: 72;
   cursor: pointer;
@@ -462,6 +462,8 @@ html:has(.app.sidebar-right) .sidebar-edge {
   transition: transform .28s cubic-bezier(.4, 0, .2, 1), opacity .22s ease, box-shadow .28s ease;
 }
 .app.sidebar-right:not(.sidebar-top) .sidebar {
+  left: auto; right: 0; transform-origin: right center;
+  transform: perspective(1400px) rotateY(88deg);
   box-shadow: -4px 0 28px rgba(10, 15, 30, 0.32);
 }
 .app.nav-hover:not(.sidebar-top) .sidebar,
@@ -475,6 +477,22 @@ html:has(.app.sidebar-right) .sidebar-edge {
   box-shadow: -8px 0 32px rgba(10, 15, 30, 0.38);
 }
 .app:not(.sidebar-top) .content { width: 100%; flex: 1; }
+
+/* ปุ่ม ☰ เปิดเมนูบนมือถือ (จอสัมผัสไม่มี hover) */
+.sidebar-toggle {
+  display: none;
+  position: fixed; top: 12px; left: 12px; z-index: 74;
+  width: 40px; height: 40px; border-radius: 10px;
+  border: 1px solid #d7dcea; background: #fff; color: #1f2430;
+  cursor: pointer; align-items: center; justify-content: center;
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(15,23,42,.08));
+}
+
+@media (max-width: 800px) {
+  .sidebar-toggle { display: flex; }
+  html:has(.app.sidebar-top) .sidebar-toggle { display: none; }
+  .app:not(.sidebar-top) .content { padding-top: 64px; }
+}
 
 /* people picker (ฟิลด์ชนิด "ผู้ผลิต" — เลือกได้หลายคน) */
 .ppl { display: block; position: relative; }

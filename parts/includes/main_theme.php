@@ -109,6 +109,17 @@ function main_brand_logo_url(): ?string
 }
 
 /**
+ * สีเมนู active — กันค่าขาวล้วน (legacy default) ที่จะกลืนกับตัวอักษรเมนูสีขาว
+ *
+ * @return string
+ */
+function parts_sidebar_active_color(): string
+{
+    $v = main_theme_color('color_sidebar_active', '#e11d74');
+    return in_array(strtolower($v), ['#fff', '#ffffff'], true) ? 'rgba(255,255,255,.16)' : $v;
+}
+
+/**
  * สร้าง CSS variables สำหรับ inject ใน header
  *
  * @return string
@@ -123,7 +134,7 @@ function parts_theme_css_block(): string
   --primary-dark:' . main_theme_color('color_primary_dark', '#c01862') . ';
   --sidebar-bg:' . main_theme_color('color_sidebar', '#4e2985') . ';
   --sidebar:' . main_theme_color('color_sidebar', '#4e2985') . ';
-  --sidebar-active:' . main_theme_color('color_sidebar_active', '#ffffff') . ';
+  --sidebar-active:' . parts_sidebar_active_color() . ';
   --bg:' . main_theme_color('color_page_bg', '#f4f1fb') . ';
   --page-bg:' . main_theme_color('color_page_bg', '#f4f1fb') . ';
   --logo-h:' . $logoH . 'px;

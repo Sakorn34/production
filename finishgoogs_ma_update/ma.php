@@ -46,13 +46,14 @@ function ma_items_cell(array $rec, $col, $jsonKey, $max = 6) {
 function ma_items_html($rec) {
     $out = [];
     $groups = [
-        ['ok_items', 'OK', '✅ ปกติ', '#1d6b2a'],
-        ['replace_items', 'Replace', '🔄 เปลี่ยนอะไหล่', '#8a5f0b'],
-        ['repair_items', 'Repair', '🔧 ซ่อม', '#90312c'],
+        ['ok_items', 'OK', 'status-ok', 'ปกติ', 'var(--success)'],
+        ['replace_items', 'Replace', 'status-replace', 'เปลี่ยนอะไหล่', 'var(--warning)'],
+        ['repair_items', 'Repair', 'status-repair', 'ซ่อม', 'var(--danger)'],
     ];
     foreach ($groups as $g) {
         $items = ma_record_items($rec, $g[0], $g[1]);
-        if ($items) $out[] = '<div style="margin:2px 0"><b style="color:' . $g[3] . '">' . $g[2] . ' (' . count($items) . '):</b> '
+        if ($items) $out[] = '<div style="margin:2px 0"><b class="ma-item-head" style="color:' . $g[4] . '">'
+                           . ui_icon_html($g[2], 13, 'ma-item-svg') . ' ' . h($g[3]) . ' (' . count($items) . '):</b> '
                            . h(implode(' · ', $items)) . '</div>';
     }
     // ข้อมูลอื่นจาก JSON เดิม (Pin IO, เวอร์ชันบอร์ด ฯลฯ)
@@ -64,7 +65,7 @@ function ma_items_html($rec) {
         }
         if ($others) $out[] = '<div class="muted" style="font-size:12.5px">' . h(implode(' | ', $others)) . '</div>';
     }
-    if (!empty($rec['remark'])) $out[] = '<div style="font-size:13px">📝 ' . h($rec['remark']) . '</div>';
+    if (!empty($rec['remark'])) $out[] = '<div style="font-size:13px">' . ui_icon_html('edit', 12, 'ma-item-svg') . ' ' . h($rec['remark']) . '</div>';
     return $out ? implode('', $out) : '<span class="muted">-</span>';
 }
 
@@ -255,7 +256,7 @@ function ma_snippets_inner_html($pfx, array $opts = []) {
     $showLead = !isset($opts['lead']) || $opts['lead'];
     ob_start();
     if ($showTitle) { ?>
-    <h3 class="ma-snippets-title">📋 ข้อความประจำสินค้า</h3>
+    <h3 class="ma-snippets-title h-with-icon"><?= ui_icon_html('clipboard', 15, 'h-svg') ?><span>ข้อความประจำสินค้า</span></h3>
     <?php }
     if ($showLead) { ?>
     <p class="muted ma-snippets-lead">อัปเดตตามหมายเลขสินค้าและฟอร์ม · กดคัดลอกทีละข้อ</p>
@@ -263,21 +264,21 @@ function ma_snippets_inner_html($pfx, array $opts = []) {
     <div class="ma-snippet">
       <div class="ma-snippet-hd">
         <span>1. ตั้งค่า Serial (MobaXterm)</span>
-        <button type="button" class="btn-sm btn-line ma-copy-btn" data-target="<?= h($pfx) ?>-serial">📋 คัดลอก</button>
+        <button type="button" class="btn-sm btn-line ma-copy-btn" data-target="<?= h($pfx) ?>-serial"><?= ui_btn_label('copy', 'คัดลอก', 13) ?></button>
       </div>
       <textarea class="ma-snippet-txt" id="<?= h($pfx) ?>-serial" readonly rows="3" aria-label="คำสั่งตั้งค่า Serial"></textarea>
     </div>
     <div class="ma-snippet">
       <div class="ma-snippet-hd">
         <span>2. ตั้งค่า MAC — เปิดไฟล์ (MobaXterm)</span>
-        <button type="button" class="btn-sm btn-line ma-copy-btn" data-target="<?= h($pfx) ?>-mac">📋 คัดลอก</button>
+        <button type="button" class="btn-sm btn-line ma-copy-btn" data-target="<?= h($pfx) ?>-mac"><?= ui_btn_label('copy', 'คัดลอก', 13) ?></button>
       </div>
       <textarea class="ma-snippet-txt" id="<?= h($pfx) ?>-mac" readonly rows="3" aria-label="คำสั่งเปิด cmdline.txt">sudo nano /boot/cmdline.txt</textarea>
     </div>
     <div class="ma-snippet">
       <div class="ma-snippet-hd">
         <span>3. MAC Address จากหมายเลขสินค้า</span>
-        <button type="button" class="btn-sm btn-line ma-copy-btn" data-target="<?= h($pfx) ?>-macaddr">📋 คัดลอก</button>
+        <button type="button" class="btn-sm btn-line ma-copy-btn" data-target="<?= h($pfx) ?>-macaddr"><?= ui_btn_label('copy', 'คัดลอก', 13) ?></button>
       </div>
       <textarea class="ma-snippet-txt" id="<?= h($pfx) ?>-macaddr" readonly rows="3" aria-label="MAC Address ที่คำนวณจากหมายเลขสินค้า" placeholder="(กรอกหมายเลขสินค้าก่อน)"></textarea>
       <p class="muted ma-snippet-note">เช่น BS22120047 → be:99:22:12:00:47</p>
@@ -285,7 +286,7 @@ function ma_snippets_inner_html($pfx, array $opts = []) {
     <div class="ma-snippet">
       <div class="ma-snippet-hd">
         <span>4. สรุปส่งงานเช่า Office</span>
-        <button type="button" class="btn-sm btn-line ma-copy-btn" data-target="<?= h($pfx) ?>-rental">📋 คัดลอก</button>
+        <button type="button" class="btn-sm btn-line ma-copy-btn" data-target="<?= h($pfx) ?>-rental"><?= ui_btn_label('copy', 'คัดลอก', 13) ?></button>
       </div>
       <textarea class="ma-snippet-txt ma-snippet-txt-tall" id="<?= h($pfx) ?>-rental" readonly rows="8" aria-label="ข้อความสรุป MA งานเช่า"></textarea>
     </div>
@@ -807,7 +808,7 @@ require __DIR__ . '/includes/list_search.php';
 <p class="muted" style="margin-bottom:10px">การบันทึก MA จะเปลี่ยนสถานะเครื่องเป็น "เครื่องเช่า" หรือ "เครื่องสำรอง" ตามที่เลือก</p>
 <button type="button" class="btn" id="ma-add-btn" onclick="document.getElementById('ma-form-wrap').hidden=false; this.hidden=true;" <?= $formOpen ? 'hidden' : '' ?>>➕ เพิ่มรายการ MA</button>
 <div id="ma-form-wrap" <?= $formOpen ? '' : 'hidden' ?>>
-<h3 style="margin:4px 0 10px"><?= $ea ? '✏️ แก้ไขรายการ MA' : '📝 เพิ่มรายการ MA ใหม่' ?></h3>
+<h3 style="margin:4px 0 10px" class="h-with-icon"><?= ui_icon_html('edit', 15, 'h-svg') ?><span><?= $ea ? 'แก้ไขรายการ MA' : 'เพิ่มรายการ MA ใหม่' ?></span></h3>
 <?php $maFwOpts = effective_ma_fw_options($productId); ?>
 <div class="ma-page-grid">
   <div class="ma-form-col">
@@ -1384,11 +1385,11 @@ list_search_form([
       <button type="button" class="btn-sm btn-line" onclick="closeOverlay('ma-detail-overlay')">✕ ปิด</button>
     </div>
     <section class="ma-detail-section">
-      <h3 class="ma-detail-sub">📋 ข้อมูลการ MA</h3>
+      <h3 class="ma-detail-sub h-with-icon"><?= ui_icon_html('clipboard', 14, 'h-svg') ?>ข้อมูลการ MA</h3>
       <dl class="ma-detail-dl" id="ma-detail-dl"></dl>
     </section>
     <section class="ma-detail-section">
-      <h3 class="ma-detail-sub">📋 ข้อความประจำสินค้า</h3>
+      <h3 class="ma-detail-sub h-with-icon"><?= ui_icon_html('clipboard', 14, 'h-svg') ?>ข้อความประจำสินค้า</h3>
       <p class="muted ma-snippets-lead">อัปเดตตามหมายเลขสินค้าและฟอร์ม · กดคัดลอกทีละข้อ</p>
       <?= ma_snippets_inner_html('ma-modal-sn', ['title' => false, 'lead' => false]) ?>
     </section>

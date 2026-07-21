@@ -241,7 +241,7 @@ function history_row_actions(array $h): string
         <?php if (!empty($detail['part_movement_id'])): ?>
         <div>
             <dt>Production</dt>
-            <dd><span class="sync-badge">🔗 movement #<?= (int) $detail['part_movement_id'] ?></span></dd>
+            <dd><span class="sync-badge"><?= ui_icon_html('switch', 12, 'sync-svg') ?> movement #<?= (int) $detail['part_movement_id'] ?></span></dd>
         </div>
         <?php endif; ?>
     </dl>

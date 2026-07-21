@@ -41,16 +41,15 @@ $fontCfg = main_font_config();
 $brandLogo = main_brand_logo_url();
 $partsAppName = trim((string) main_setting('app_name', '')) ?: 'Stock ช่าง';
 
-$partsNav = [
-    ['file' => 'index',           'icon' => 'dashboard',      'label' => 'Dashboard',           'href' => url('/index.php')],
-    ['file' => 'products',        'icon' => 'products',       'label' => 'อะไหล่',              'href' => url('/pages/products.php')],
-    ['file' => 'stock-in',        'icon' => 'stock-in',       'label' => 'รับเข้า',             'href' => url('/pages/stock-in.php')],
-    ['file' => 'stock-out',       'icon' => 'stock-out-set',  'label' => 'เบิกออก (Set)',       'href' => url('/pages/stock-out.php')],
-    ['file' => 'stock-out-item',  'icon' => 'stock-out-item', 'label' => 'เบิกรายชิ้น',         'href' => url('/pages/stock-out-item.php')],
-    ['file' => 'sets',            'icon' => 'sets',           'label' => 'จัดการ Set',          'href' => url('/pages/sets.php')],
-    ['file' => 'history',         'icon' => 'history',        'label' => 'ประวัติเบิก',         'href' => url('/pages/history.php')],
-    ['file' => 'year-end-summary', 'icon' => 'chart',          'label' => 'สรุปยอดสิ้นปี',       'href' => url('/pages/year-end-summary.php')],
-];
+// เมนูของ parts มาจาก source กลางเดียวกับกลุ่มข้ามระบบใน finishgoogs (shared/ui_icons.php)
+$partsNav = array_map(function ($it) {
+    return [
+        'file'  => basename($it['file'], '.php'),
+        'icon'  => $it['icon'],
+        'label' => $it['label'],
+        'href'  => url('/' . $it['file']),
+    ];
+}, ui_nav_items_parts());
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -76,6 +75,9 @@ $partsNav = [
 <body>
     <div class="sidebar-edge" aria-hidden="true"></div>
     <div class="sidebar-backdrop" id="sidebar-backdrop" aria-hidden="true"></div>
+    <button type="button" class="sidebar-toggle" id="sidebar-toggle" aria-label="เปิด/ปิดเมนู" aria-controls="app-sidebar">
+        <?= ui_icon_html('menu', 18, 'toggle-svg') ?>
+    </button>
     <nav class="sidebar" id="app-sidebar">
         <div class="sidebar-brand">
             <?php if ($brandLogo): ?>
@@ -85,7 +87,12 @@ $partsNav = [
                 <span><?= e($partsAppName) ?></span>
             <?php endif; ?>
         </div>
+        <?php /* กลุ่ม "ทะเบียนเครื่อง" อยู่ลำดับแรกเสมอทั้ง 2 แอป — ผู้ใช้จำตำแหน่งเมนูที่เดิมได้ */ ?>
+        <div class="nav-links-cross nav-links-cross-top">
+            <?= ui_sidebar_cross_group('ทะเบียนเครื่อง', ui_nav_items_finishgoogs(), ui_finishgoogs_base_url()) ?>
+        </div>
         <ul class="nav-links">
+            <li><?= ui_nav_group_label('สต็อกอะไหล่') ?></li>
             <?php foreach ($partsNav as $item): ?>
             <li>
                 <a href="<?= e($item['href']) ?>" class="<?= $currentPage === $item['file'] ? 'active' : '' ?>">
@@ -95,7 +102,6 @@ $partsNav = [
             </li>
             <?php endforeach; ?>
         </ul>
-        <?= ui_sidebar_cross_link(ui_finishgoogs_app_url(), 'ไปที่ระบบทะเบียนเครื่อง') ?>
     </nav>
 
     <main class="content">

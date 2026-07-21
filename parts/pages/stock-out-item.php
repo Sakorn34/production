@@ -79,7 +79,7 @@ $history = $stock->getSingleItemOutHistory(30);
                 </select>
             </div>
             <?php if (!empty($editRow['part_movement_id'])): ?>
-            <p class="sync-badge">🔗 เชื่อมกับ production (movement #<?= (int) $editRow['part_movement_id'] ?>)</p>
+            <p class="sync-badge"><?= ui_icon_html('switch', 12, 'sync-svg') ?> เชื่อมกับ production (movement #<?= (int) $editRow['part_movement_id'] ?>)</p>
             <?php endif; ?>
             <div class="form-actions">
                 <button type="submit" class="btn btn-danger">บันทึกการแก้ไข</button>

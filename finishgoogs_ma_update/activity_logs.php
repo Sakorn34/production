@@ -41,7 +41,7 @@ $filterQs = http_build_query($queryBase);
 page_header('Activity Log — ระบบหลังบ้าน');
 ?>
 <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px">
-  <a class="btn btn-sm btn-line" href="<?= BASE_URL ?>/activity_logs.php?<?= h($filterQs) ?>&export=csv">⬇ Export CSV</a>
+  <a class="btn btn-sm btn-line btn-with-icon" href="<?= BASE_URL ?>/activity_logs.php?<?= h($filterQs) ?>&export=csv"><?= ui_btn_label('download', 'Export CSV', 14) ?></a>
 </div>
 
 <p class="muted" style="margin-bottom:12px">
@@ -87,7 +87,7 @@ page_header('Activity Log — ระบบหลังบ้าน');
   ?>
   <tr>
     <td style="white-space:nowrap"><?= h(date('d/m/Y H:i', strtotime($r['created_at']))) ?></td>
-    <td><span class="badge st-new" style="font-size:10px"><?= h($sysLbl) ?></span></td>
+    <td><span class="badge-pill <?= $r['system_key'] === 'parts' ? 'bp-info' : 'bp-success' ?>" style="font-size:10.5px"><?= h($sysLbl) ?></span></td>
     <td><?= h($r['actor_name'] ?: '-') ?></td>
     <td class="muted" style="font-size:11px"><?= h($r['action_key']) ?></td>
     <td><b><?= h($r['summary']) ?></b></td>

@@ -121,7 +121,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     </div>
     <div style="display:flex; flex-wrap:wrap; gap:8px">
         <a href="<?= url('/pages/year-end-summary.php?export=csv') ?>" class="btn btn-outline"><?= ui_icon_html('download', 16, 'btn-svg') ?> Export CSV</a>
-        <a href="<?= url('/index.php') ?>" class="btn btn-outline">← Dashboard</a>
+        <a href="<?= e(ui_finishgoogs_app_url()) ?>" class="btn btn-outline">← Dashboard รวม</a>
     </div>
 </div>
 
@@ -134,7 +134,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
         <div class="label">จำนวนชิ้นรวม</div>
         <div class="value"><?= formatNumber($summary['total_qty']) ?></div>
     </div>
-    <div class="stat-card" style="border-left:4px solid var(--primary, #6366f1)">
+    <div class="stat-card">
         <div class="label">มูลค่ารวม (มีราคาแล้ว)</div>
         <div class="value"><?= formatCurrency($summary['total_value']) ?></div>
     </div>
@@ -145,8 +145,8 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 </div>
 
 <?php if ($summary['missing_price'] > 0): ?>
-<div class="card" style="margin-bottom:16px; border-left:4px solid #f59e0b">
-    <p style="margin:0; font-size:13px; color:#92400e">
+<div class="card" style="margin-bottom:16px; border-left:4px solid var(--warning)">
+    <p style="margin:0; font-size:13px; color:var(--warning)">
         มี <?= formatNumber($summary['missing_price']) ?> รายการที่ยังไม่มีราคา — กรอกในตารางด้านล่างแล้วกด <b>บันทึกราคา</b> มูลค่ารวมจะอัปเดตทันที
     </p>
 </div>
@@ -206,7 +206,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
                 <?php endforeach; ?>
             </tbody>
             <tfoot>
-                <tr style="background:#f8fafc; font-weight:600">
+                <tr style="background:var(--bg); font-weight:600">
                     <td colspan="2">รวม (เฉพาะรายการที่มีราคา)</td>
                     <td class="text-right"><?= formatNumber($summary['total_qty']) ?></td>
                     <td></td>
@@ -219,14 +219,16 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 </form>
 
 <style>
-.row-missing-price { background: #fffbeb; }
-.row-missing-price .price-input { border-color: #f59e0b; }
+.row-missing-price { background: var(--warning-soft); }
+.row-missing-price .price-input { border-color: var(--warning); }
 .price-input {
-    padding: 6px 8px;
-    border: 1px solid var(--border, #dde3ec);
-    border-radius: 6px;
-    font-size: 13px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-family: inherit;
 }
+.price-input:focus { outline: none; border-color: var(--border-focus); }
 </style>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

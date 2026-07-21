@@ -191,8 +191,9 @@ function parts_is_menu_page(?string $cur = null): bool
     if ($cur === 'history' && isset($_GET['id'])) {
         return false;
     }
+    // ไม่มี 'index' แล้ว — Dashboard ของ parts ถูกแทนด้วย Dashboard รวม (index.php เป็น redirect)
     static $menus = [
-        'index', 'products', 'stock-in', 'stock-out', 'stock-out-item', 'sets', 'history', 'year-end-summary',
+        'products', 'stock-in', 'stock-out', 'stock-out-item', 'sets', 'history', 'year-end-summary',
     ];
     return in_array($cur, $menus, true);
 }
@@ -211,7 +212,8 @@ function parts_page_back_url_default(): string
         case 'history':
             return url('/pages/history.php');
         default:
-            return url('/index.php');
+            // index.php เป็น redirect ไป Dashboard รวมแล้ว — หน้าแรกในแอปนี้คือรายการอะไหล่
+            return url('/pages/products.php');
     }
 }
 

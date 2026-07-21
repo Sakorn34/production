@@ -96,7 +96,7 @@ body {
 
 /* ─ Layout ──────────────────────────────────────────────────────────────── */
 
-/* ─ Sidebar overlay (เปิดทับเนื้อหา แบบพลิกหนังสือ) ─────────────────────────── */
+/* ─ Sidebar overlay — เมาส์ชิดขอบซ้ายค้าง ~2 วิ แล้วเมนูเลื่อนเข้ามา (delay อยู่ใน app.js) ─ */
 
 .sidebar {
     width: 248px;
@@ -135,6 +135,51 @@ body.sidebar-hover .sidebar {
     cursor: pointer;
 }
 
+/* ป้ายหัวข้อกลุ่มเมนู */
+.nav-group-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, .45);
+    padding: 14px 1.25rem 6px;
+}
+
+/* กลุ่มลิงก์ข้ามระบบ (ทะเบียนเครื่อง) */
+.nav-links-cross { margin-top: 4px; border-top: 1px solid rgba(255, 255, 255, .12); }
+.nav-links-cross-top { margin-top: 0; border-top: 0; border-bottom: 1px solid rgba(255, 255, 255, .12); padding-bottom: 6px; }
+.nav-links-cross .nav-cross {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 1.25rem;
+    color: rgba(255, 255, 255, .72);
+    text-decoration: none;
+    font-size: 13.5px;
+    transition: background .12s, color .12s;
+}
+.nav-links-cross .nav-cross:hover { background: rgba(255, 255, 255, .1); color: #fff; }
+.nav-links-cross .nav-cross .nav-ico { display: inline-flex; width: 1.3em; justify-content: center; flex-shrink: 0; }
+
+/* ปุ่ม ☰ สำหรับมือถือ */
+.sidebar-toggle {
+    display: none;
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 1004;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid var(--border, #e2e8f0);
+    background: #fff;
+    color: var(--text, #1e293b);
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-sm);
+}
+
 .sidebar-backdrop {
     position: fixed;
     inset: 0;
@@ -158,6 +203,11 @@ body.sidebar-hover .sidebar-backdrop {
     flex: 1;
     width: 100%;
     max-width: none;
+}
+
+@media (max-width: 800px) {
+    .sidebar-toggle { display: flex; }
+    .content { padding: 1.25rem 1rem 2rem; padding-top: 64px; }
 }
 
 body.modal-open {

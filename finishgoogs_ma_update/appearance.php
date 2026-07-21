@@ -8,7 +8,7 @@ $COLORS = [
     'color_primary'        => ['สีหลัก (ปุ่ม/ลิงก์)', '#e11d74'],
     'color_primary_dark'   => ['สีหลักเข้ม (hover)', '#c01862'],
     'color_sidebar'        => ['พื้นแถบเมนู', '#4e2985'],
-    'color_sidebar_active' => ['เมนูที่เลือกอยู่', '#ffffff'],
+    'color_sidebar_active' => ['เมนูที่เลือกอยู่', '#e11d74'],
     'color_page_bg'        => ['พื้นหลังหน้า', '#f4f1fb'],
 ];
 
@@ -216,10 +216,10 @@ page_header('ปรับแต่งหน้าตาระบบ');
 
 <script>
 var PRESETS = {
-  v2: { color_primary:'#e11d74', color_primary_dark:'#c01862', color_sidebar:'#4e2985', color_sidebar_active:'#ffffff', color_page_bg:'#f4f1fb' },
+  v2: { color_primary:'#e11d74', color_primary_dark:'#c01862', color_sidebar:'#4e2985', color_sidebar_active:'#e11d74', color_page_bg:'#f4f1fb' },
   navy: { color_primary:'#2c4a7c', color_primary_dark:'#1d3a68', color_sidebar:'#17233a', color_sidebar_active:'#2c4a7c', color_page_bg:'#f2f4f8' },
   teal: { color_primary:'#0f766e', color_primary_dark:'#115e59', color_sidebar:'#12312e', color_sidebar_active:'#0f766e', color_page_bg:'#f1f5f4' },
-  vibrant: { color_primary:'#e11d74', color_primary_dark:'#c01862', color_sidebar:'#4e2985', color_sidebar_active:'#ffffff', color_page_bg:'#f4f1fb' }
+  vibrant: { color_primary:'#e11d74', color_primary_dark:'#c01862', color_sidebar:'#4e2985', color_sidebar_active:'#e11d74', color_page_bg:'#f4f1fb' }
 };
 function applyPreset(name){
   var p = PRESETS[name]; if (!p) return;

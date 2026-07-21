@@ -251,7 +251,7 @@ page_header('ระบบหลังบ้าน — ตั้งค่าร�
 <?php } ?>
 </div>
 
-<h2>➕ เพิ่มรุ่นสินค้าใหม่</h2>
+<?= ui_heading('box', 'เพิ่มรุ่นสินค้าใหม่') ?>
 <form method="post" class="formgrid" enctype="multipart/form-data" id="form-new-product">
   <?= csrf_field() ?><input type="hidden" name="new_product" value="1">
   <label>รหัสสินค้า (PRD)</label><input type="text" name="product_code" required placeholder="เช่น PRD004" maxlength="20">
@@ -285,7 +285,7 @@ productCodeToggle('new');
   </div>
 </div>
 
-<h2>⓪ ข้อมูลรุ่นและการออกรหัส</h2>
+<?= ui_heading('tag', 'ข้อมูลรุ่นและการออกรหัส') ?>
 <form method="post" class="formgrid" enctype="multipart/form-data" id="form-edit-product">
   <?= csrf_field() ?>
   <input type="hidden" name="edit_product" value="1">

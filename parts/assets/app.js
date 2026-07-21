@@ -1,45 +1,61 @@
 /**
- * app.js — sidebar overlay (hover ขอบซ้าย) + modal S/N basket
+ * app.js — sidebar overlay (เมาส์ชิดขอบซ้ายค้าง 2 วิ แล้วเมนูเลื่อนเข้า) + modal S/N basket
  */
 (function () {
     'use strict';
 
+    var SIDEBAR_HOVER_DELAY_MS = 2000; // เมาส์ต้องค้างที่ขอบครบก่อน เมนูถึงเลื่อนเข้ามา
+
     var body = document.body;
     var sidebar = document.getElementById('app-sidebar');
     var edge = document.querySelector('.sidebar-edge');
+    var toggle = document.getElementById('sidebar-toggle');
     var backdrop = document.getElementById('sidebar-backdrop');
-    var hoverTimer = null;
+    var openTimer = null;
+    var hideTimer = null;
 
     function showSidebar() {
+        clearTimeout(openTimer);
+        clearTimeout(hideTimer);
         body.classList.add('sidebar-hover');
     }
 
     function hideSidebar() {
+        clearTimeout(openTimer);
+        clearTimeout(hideTimer);
         body.classList.remove('sidebar-hover');
     }
 
     function scheduleHide() {
-        hoverTimer = setTimeout(hideSidebar, 280);
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(hideSidebar, 280);
     }
 
     if (edge) {
         edge.addEventListener('mouseenter', function () {
-            clearTimeout(hoverTimer);
-            showSidebar();
+            clearTimeout(openTimer);
+            openTimer = setTimeout(showSidebar, SIDEBAR_HOVER_DELAY_MS);
         });
-        edge.addEventListener('click', function () {
-            clearTimeout(hoverTimer);
-            showSidebar();
+        edge.addEventListener('mouseleave', function (e) {
+            clearTimeout(openTimer);
+            if (sidebar && sidebar.contains(e.relatedTarget)) return;
+            scheduleHide();
         });
+        edge.addEventListener('click', showSidebar); // คลิกขอบ = เปิดทันที ไม่ต้องรอ
     }
 
     if (sidebar) {
         sidebar.addEventListener('mouseenter', function () {
-            clearTimeout(hoverTimer);
+            clearTimeout(hideTimer);
             showSidebar();
         });
-        sidebar.addEventListener('mouseleave', function () {
-            scheduleHide();
+        sidebar.addEventListener('mouseleave', scheduleHide);
+    }
+
+    if (toggle) {
+        toggle.addEventListener('click', function () {
+            if (body.classList.contains('sidebar-hover')) hideSidebar();
+            else showSidebar();
         });
     }
 
@@ -47,7 +63,7 @@
         backdrop.addEventListener('click', hideSidebar);
     }
 
-    document.querySelectorAll('.sidebar .nav-links a, .sidebar .sidebar-cross-link').forEach(function (a) {
+    document.querySelectorAll('.sidebar .nav-links a, .sidebar .nav-cross').forEach(function (a) {
         a.addEventListener('click', hideSidebar);
     });
 

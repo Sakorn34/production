@@ -61,6 +61,7 @@ function ui_icon_paths(string $name): ?string
         'test'           => '<path d="M10 2v7.31M14 9.3V2M8.5 2h7M7 16h10l1.5 6H5.5L7 16z"/>',
         'book'           => '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
         'basket'         => '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0"/>',
+        'menu'           => '<path d="M3 6h18M3 12h18M3 18h18"/>',
     ];
     return $icons[$name] ?? null;
 }
@@ -203,6 +204,96 @@ function ui_finishgoogs_app_url(): string
         return str_replace('/parts', '/finishgoogs_ma_update', BASE_PATH) . '/index.php';
     }
     return '/production/finishgoogs_ma_update/index.php';
+}
+
+/**
+ * base URL ระบบสต็อกอะไหล่ (ไม่มี /index.php ท้าย)
+ *
+ * @return string
+ */
+function ui_parts_base_url(): string
+{
+    return preg_replace('~/index\.php$~', '', ui_parts_app_url());
+}
+
+/**
+ * base URL ระบบทะเบียนเครื่อง (ไม่มี /index.php ท้าย)
+ *
+ * @return string
+ */
+function ui_finishgoogs_base_url(): string
+{
+    return preg_replace('~/index\.php$~', '', ui_finishgoogs_app_url());
+}
+
+/**
+ * รายการเมนูระบบสต็อกอะไหล่ (source เดียว ใช้ render ทั้งใน parts เองและกลุ่มข้ามระบบใน finishgoogs)
+ *
+ * @return array<int, array{file:string,icon:string,label:string}>
+ */
+function ui_nav_items_parts(): array
+{
+    // ไม่มีเมนู Dashboard ของ parts แล้ว — ใช้ Dashboard รวมของระบบทะเบียนเครื่องแทน
+    // (parts/index.php redirect ไปที่นั่น)
+    return [
+        ['file' => 'pages/products.php',        'icon' => 'products',       'label' => 'อะไหล่'],
+        ['file' => 'pages/stock-in.php',        'icon' => 'stock-in',       'label' => 'รับเข้า'],
+        ['file' => 'pages/stock-out.php',       'icon' => 'stock-out-set',  'label' => 'เบิกออกเป็นชุด (Set)'],
+        ['file' => 'pages/stock-out-item.php',  'icon' => 'stock-out-item', 'label' => 'เบิกรายชิ้น'],
+        ['file' => 'pages/sets.php',            'icon' => 'sets',           'label' => 'จัดการ Set'],
+        ['file' => 'pages/history.php',         'icon' => 'history',        'label' => 'ประวัติเบิก'],
+        ['file' => 'pages/year-end-summary.php', 'icon' => 'chart',          'label' => 'สรุปยอดสิ้นปี'],
+    ];
+}
+
+/**
+ * รายการเมนูระบบทะเบียนเครื่อง (สำหรับกลุ่มข้ามระบบใน parts)
+ *
+ * @return array<int, array{file:string,icon:string,label:string}>
+ */
+function ui_nav_items_finishgoogs(): array
+{
+    return [
+        ['file' => 'index.php',   'icon' => 'dashboard', 'label' => 'Dashboard'],
+        ['file' => 'assets.php',  'icon' => 'assets',    'label' => 'ทะเบียนเครื่องผลิตใหม่'],
+        ['file' => 'updates.php', 'icon' => 'updates',   'label' => 'อัปเดต FW/HW'],
+        ['file' => 'ma.php',      'icon' => 'ma',        'label' => 'บันทึก MA'],
+        ['file' => 'parts.php',   'icon' => 'parts',     'label' => 'อะไหล่ใช้ผลิต'],
+        ['file' => 'repairs.php', 'icon' => 'repairs',   'label' => 'ประวัติซ่อม'],
+        ['file' => 'scan.php',    'icon' => 'scan',      'label' => 'สแกน QR'],
+    ];
+}
+
+/**
+ * ป้ายหัวข้อกลุ่มเมนูใน sidebar
+ *
+ * @param string $text
+ * @return string
+ */
+function ui_nav_group_label(string $text): string
+{
+    return '<div class="nav-group-label">' . htmlspecialchars($text, ENT_QUOTES, 'UTF-8') . '</div>';
+}
+
+/**
+ * กลุ่มเมนูข้ามระบบใน sidebar (ป้ายหัวข้อ + ลิงก์รายเมนู)
+ *
+ * @param string $label   หัวข้อกลุ่ม
+ * @param array  $items   รายการจาก ui_nav_items_*()
+ * @param string $baseUrl base URL ของระบบปลายทาง
+ * @return string
+ */
+function ui_sidebar_cross_group(string $label, array $items, string $baseUrl): string
+{
+    $html = ui_nav_group_label($label);
+    foreach ($items as $it) {
+        $href = rtrim($baseUrl, '/') . '/' . $it['file'];
+        $html .= '<a class="nav-cross" href="' . htmlspecialchars($href, ENT_QUOTES, 'UTF-8') . '">'
+            . '<span class="nav-ico">' . ui_nav_icon_html($it['icon']) . '</span> '
+            . htmlspecialchars($it['label'], ENT_QUOTES, 'UTF-8')
+            . '</a>';
+    }
+    return $html;
 }
 
 /**

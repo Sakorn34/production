@@ -128,7 +128,11 @@ function page_header($title, $showBack = true, $subtitle = '', $backUrl = '') {
   --primary: <?= theme_color('color_primary', '#e11d74') ?>;
   --primary-dark: <?= theme_color('color_primary_dark', '#c01862') ?>;
   --sidebar-bg: <?= theme_color('color_sidebar', '#4e2985') ?>;
-  --sidebar-active: <?= theme_color('color_sidebar_active', '#ffffff') ?>;
+  --sidebar-active: <?php
+    // สีเมนู active — ค่าขาวล้วน (legacy default) จะมองไม่เห็นเพราะตัวอักษรเมนูเป็นสีขาว
+    $sbAct = theme_color('color_sidebar_active', '#e11d74');
+    echo in_array(strtolower($sbAct), ['#fff', '#ffffff'], true) ? 'rgba(255,255,255,.16)' : $sbAct;
+  ?>;
   --page-bg: <?= theme_color('color_page_bg', '#f4f1fb') ?>;
   --logo-h: <?= max(20, min(160, (int)setting('brand_logo_h', 56))) ?>px;
   --app-font: <?= $fontCfg['font'] ?>;
@@ -146,22 +150,24 @@ function page_header($title, $showBack = true, $subtitle = '', $backUrl = '') {
 </head>
 <body>
 <div class="sidebar-edge" id="fg-sidebar-edge" aria-hidden="true"></div>
+<button type="button" class="sidebar-toggle" id="fg-sidebar-toggle" aria-label="เปิด/ปิดเมนู"><?= ui_icon_html('menu', 18, 'toggle-svg') ?></button>
 <?php
 $brandLogo = setting('brand_logo');
 $side = setting('sidebar_side', 'left');
 $sideClass = $side === 'right' ? ' sidebar-right' : ($side === 'top' ? ' sidebar-top' : '');
 ?>
-<div class="app nav-hidden<?= $sideClass ?>">
+<div class="app<?= $sideClass ?>">
   <aside class="sidebar">
     <div class="brand">
       <?php if ($brandLogo) { ?><img src="<?= h(img_url($brandLogo)) ?>" alt="โลโก้" class="brand-logo"><?php } else { ?><?= ui_nav_icon_html('assets', 20, 'brand-icon') ?><span class="brand-text"><?= h(setting('app_name', APP_NAME)) ?></span><?php } ?>
     </div>
     <nav>
+      <?= ui_nav_group_label('ทะเบียนเครื่อง') ?>
       <?php foreach ($nav as $n) { ?>
         <a href="<?= BASE_URL . '/' . $n['file'] ?>" class="<?= $cur === $n['file'] ? 'active' : '' ?>"><span class="nav-ico"><?= ui_nav_icon_html($n['icon']) ?></span> <?= h($n['label']) ?></a>
       <?php } ?>
+      <?= ui_sidebar_cross_group('สต็อกอะไหล่', ui_nav_items_parts(), ui_parts_base_url()) ?>
     </nav>
-    <?= ui_sidebar_cross_link(ui_parts_app_url(), 'ไปที่ระบบสต็อกอะไหล่') ?>
     <div class="userbox">
       <?php
         $actor = $u ? actor_name() : '';
@@ -230,43 +236,56 @@ function page_footer() {
 <script>
 function closeOverlay(id){ document.getElementById(id).hidden = true; }
 (function(){
+  var SIDEBAR_HOVER_DELAY_MS = 2000; // เมาส์ต้องค้างที่ขอบครบก่อน เมนูถึงเลื่อนเข้ามา
   var app = document.querySelector('.app');
   var edge = document.getElementById('fg-sidebar-edge');
   var sidebar = app && app.querySelector('.sidebar');
+  var toggle = document.getElementById('fg-sidebar-toggle');
   var backdrop = document.getElementById('fg-nav-backdrop');
-  var timer = null;
-  if (!app || !edge || !sidebar) return;
+  var openTimer = null, hideTimer = null;
+  if (!app || !sidebar) return;
   if (app.classList.contains('sidebar-top')) return;
 
   function showNav(){
-    clearTimeout(timer);
+    clearTimeout(openTimer); clearTimeout(hideTimer);
     app.classList.add('nav-hover');
-    app.classList.remove('nav-hidden');
   }
   function hideNav(){
+    clearTimeout(openTimer); clearTimeout(hideTimer);
     app.classList.remove('nav-hover', 'nav-open');
-    app.classList.add('nav-hidden');
   }
   function scheduleHide(){
-    timer = setTimeout(hideNav, 280);
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(hideNav, 280);
   }
 
-  edge.addEventListener('mouseenter', showNav);
-  edge.addEventListener('click', showNav);
-  sidebar.addEventListener('mouseenter', function(){ clearTimeout(timer); showNav(); });
+  if (edge) {
+    edge.addEventListener('mouseenter', function(){
+      clearTimeout(openTimer);
+      openTimer = setTimeout(showNav, SIDEBAR_HOVER_DELAY_MS);
+    });
+    edge.addEventListener('mouseleave', function(e){
+      clearTimeout(openTimer);
+      if (sidebar.contains(e.relatedTarget)) return;
+      scheduleHide();
+    });
+    edge.addEventListener('click', showNav); // คลิกขอบ = เปิดทันที ไม่ต้องรอ
+  }
+  sidebar.addEventListener('mouseenter', function(){ clearTimeout(hideTimer); showNav(); });
   sidebar.addEventListener('mouseleave', scheduleHide);
-  edge.addEventListener('mouseleave', function(e){
-    if (sidebar.contains(e.relatedTarget)) return;
-    scheduleHide();
+
+  if (toggle) toggle.addEventListener('click', function(){
+    if (app.classList.contains('nav-open') || app.classList.contains('nav-hover')) hideNav();
+    else app.classList.add('nav-open');
   });
   if (backdrop) backdrop.addEventListener('click', hideNav);
 
-  document.querySelectorAll('.sidebar nav a, .sidebar .sidebar-cross-link').forEach(function(a){
+  document.querySelectorAll('.sidebar nav a').forEach(function(a){
     a.addEventListener('click', hideNav);
   });
 
   document.addEventListener('keydown', function(e){
-    if (e.key === 'Escape' && app.classList.contains('nav-hover')) hideNav();
+    if (e.key === 'Escape' && (app.classList.contains('nav-open') || app.classList.contains('nav-hover'))) hideNav();
   });
 })();
 
