@@ -22,3 +22,6 @@ Appscript*.txt
 # _archive — ไม่ track ใน git (เก็บ local)
 /_archive/backups/
 /_archive/.claude/
+
+# ชุด deploy server (มีรหัส DB — อย่า commit)
+/deploy/hostatom/

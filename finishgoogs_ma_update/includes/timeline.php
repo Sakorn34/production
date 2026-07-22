@@ -11,6 +11,8 @@ function qty_fmt($v) { return rtrim(rtrim(number_format((float)$v, 2), '0'), '.'
 function asset_timeline_items($id) {
     $id = (int)$id;
     $tl = [];
+    $acRow = qr('SELECT asset_code FROM assets WHERE id=?', 'i', [$id])->fetch_assoc();
+    $assetCode = $acRow ? (string)$acRow['asset_code'] : '';
     $res = qr("SELECT id, recorded_at d, made_by, assembly_by, fw_version, problems_found, fix, checklist, lot_label, extra_json
                FROM production_records WHERE asset_id=?", 'i', [$id]);
     while ($r = $res->fetch_assoc()) {
@@ -39,7 +41,18 @@ function asset_timeline_items($id) {
         }
         if ($imgs) $body[] = '<span class="tl-imgs">' . $imgs . '</span>';
         $typeKey = $r['update_type'] === 'firmware' ? 'update_fw' : ($r['update_type'] === 'hardware' ? 'update_hw' : 'update');
-        $tl[] = ['d' => $r['d'], 'type_key' => $typeKey, 'type' => ui_timeline_type_html($typeKey), 'html' => implode('<br>', $body), 'kind' => 'update', 'rid' => (int)$r['id']];
+        $fw = ($r['update_type'] === 'firmware') ? trim((string)($r['new_value'] ?? '')) : '';
+        $tl[] = [
+            'd' => $r['d'], 'type_key' => $typeKey, 'type' => ui_timeline_type_html($typeKey),
+            'html' => implode('<br>', $body), 'kind' => 'update', 'rid' => (int)$r['id'],
+            'snippet' => [
+                'code' => $assetCode,
+                'replace' => '',
+                'repair' => '',
+                'fw' => $fw,
+                'remark' => trim((string)($r['detail'] ?? '')),
+            ],
+        ];
     }
     $res = qr("SELECT id, visited_at d, ma_round, result, fw_version, ok_items, replace_items, repair_items, versions_json, remark, done_by
                FROM ma_records WHERE asset_id=?", 'i', [$id]);
@@ -70,7 +83,17 @@ function asset_timeline_items($id) {
         if ($others) $body[] = '<span class="muted" style="font-size:12.5px">' . h(implode('  |  ', $others)) . '</span>';
         if ($r['remark']) $body[] = h($r['remark']);
         if ($r['done_by']) $body[] = 'โดย: ' . h($r['done_by']);
-        $tl[] = ['d' => $r['d'] . ' 00:00:00', 'type_key' => 'ma', 'type' => ui_timeline_type_html('ma'), 'html' => implode('<br>', $body), 'kind' => 'ma', 'rid' => (int)$r['id']];
+        $tl[] = [
+            'd' => $r['d'] . ' 00:00:00', 'type_key' => 'ma', 'type' => ui_timeline_type_html('ma'),
+            'html' => implode('<br>', $body), 'kind' => 'ma', 'rid' => (int)$r['id'],
+            'snippet' => [
+                'code' => $assetCode,
+                'replace' => implode(' , ', $grab('replace_items', 'Replace')),
+                'repair' => implode(' , ', $grab('repair_items', 'Repair')),
+                'fw' => (string)($r['fw_version'] ?? ''),
+                'remark' => (string)($r['remark'] ?? ''),
+            ],
+        ];
     }
     $res = qr("SELECT r.opened_at d, r.reported_issue, r.assessment, r.action_taken, r.status, r.closed_at, c.name cust
                FROM repairs r LEFT JOIN customers c ON c.id=r.customer_id WHERE r.asset_id=?", 'i', [$id]);

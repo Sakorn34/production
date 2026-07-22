@@ -3,10 +3,13 @@
  * pages/year-end-summary.php — สรุปมูลค่าสต็อกสิ้นปี (จำนวนคงเหลือ × ราคา)
  *
  * แสดงอะไหล่ที่ quantity > 0 · ช่องราคาว่างถ้ายังไม่ตั้ง · บันทึกราคา · Export CSV
+ *
+ * Flow:
+ *   bootstrap → POST/CSV (exit ก่อน HTML) → header + ตารางรายการ
  */
 
 $pageTitle = 'สรุปยอดสิ้นปี';
-require_once __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/parts_bootstrap.php';
 
 ensureProductColumns($db);
 
@@ -49,6 +52,43 @@ function year_end_compute_summary(array $rows): array
     return $summary;
 }
 
+/**
+ * ส่งไฟล์ CSV สรุปมูลค่าสต็อก (UTF-8 BOM) แล้วจบ request
+ *
+ * @param array<int,array<string,mixed>> $rows
+ * @param array{total_items:int,total_qty:int,total_value:float,missing_price:int,valued_items:int} $summary
+ * @return void
+ */
+function year_end_export_csv(array $rows, array $summary): void
+{
+    header('Content-Type: text/csv; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="year-end-stock-' . date('Y-m-d') . '.csv"');
+    echo "\xEF\xBB\xBF";
+    $out = fopen('php://output', 'w');
+    fputcsv($out, ['รหัส', 'ชื่ออะไหล่', 'จำนวนคงเหลือ', 'หน่วย', 'ราคาต่อหน่วย', 'มูลค่ารวม', 'หมายเหตุ']);
+    foreach ($rows as $row) {
+        $qty = (int) $row['quantity'];
+        $hasPrice = year_end_has_price($row['price'] ?? null);
+        $price = $hasPrice ? (float) $row['price'] : null;
+        $lineValue = $hasPrice ? $qty * $price : null;
+        fputcsv($out, [
+            $row['code'],
+            parts_display_name($row),
+            $qty,
+            $row['unit'],
+            $hasPrice ? number_format($price, 2, '.', '') : '',
+            $lineValue !== null ? number_format($lineValue, 2, '.', '') : '',
+            $hasPrice ? '' : 'ยังไม่มีราคา',
+        ]);
+    }
+    fputcsv($out, []);
+    fputcsv($out, ['สรุป', '', $summary['total_qty'], '', '', number_format($summary['total_value'], 2, '.', ''), '']);
+    fputcsv($out, ['รายการในคลัง', $summary['total_items'], '', '', '', '', '']);
+    fputcsv($out, ['ยังไม่มีราคา', $summary['missing_price'], '', '', '', '', '']);
+    fclose($out);
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_prices') {
     $prices = (array) ($_POST['price'] ?? []);
     $saved = 0;
@@ -80,38 +120,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
     redirect(url('/pages/year-end-summary.php'));
 }
 
-$rows = $stock->getStockValuationRows();
+$rows = parts_enrich_products($stock->getStockValuationRows());
 $summary = year_end_compute_summary($rows);
 $reportYear = (int) date('Y') + 543;
 
 if (isset($_GET['export']) && $_GET['export'] === 'csv') {
-    header('Content-Type: text/csv; charset=UTF-8');
-    header('Content-Disposition: attachment; filename="year-end-stock-' . date('Y-m-d') . '.csv"');
-    echo "\xEF\xBB\xBF";
-    $out = fopen('php://output', 'w');
-    fputcsv($out, ['รหัส', 'ชื่ออะไหล่', 'จำนวนคงเหลือ', 'หน่วย', 'ราคาต่อหน่วย', 'มูลค่ารวม', 'หมายเหตุ']);
-    foreach ($rows as $row) {
-        $qty = (int) $row['quantity'];
-        $hasPrice = year_end_has_price($row['price'] ?? null);
-        $price = $hasPrice ? (float) $row['price'] : null;
-        $lineValue = $hasPrice ? $qty * $price : null;
-        fputcsv($out, [
-            $row['code'],
-            $row['name'],
-            $qty,
-            $row['unit'],
-            $hasPrice ? number_format($price, 2, '.', '') : '',
-            $lineValue !== null ? number_format($lineValue, 2, '.', '') : '',
-            $hasPrice ? '' : 'ยังไม่มีราคา',
-        ]);
-    }
-    fputcsv($out, []);
-    fputcsv($out, ['สรุป', '', $summary['total_qty'], '', '', number_format($summary['total_value'], 2, '.', ''), '']);
-    fputcsv($out, ['รายการในคลัง', $summary['total_items'], '', '', '', '', '']);
-    fputcsv($out, ['ยังไม่มีราคา', $summary['missing_price'], '', '', '', '', '']);
-    fclose($out);
-    exit;
+    year_end_export_csv($rows, $summary);
 }
+
+require_once __DIR__ . '/../includes/header.php';
 ?>
 
 <div class="page-header" style="display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:12px">
@@ -182,7 +199,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
                 <tr class="<?= $hasPrice ? '' : 'row-missing-price' ?>">
                     <td><?= e($row['code']) ?></td>
                     <td>
-                        <a href="<?= url('/pages/product-detail.php?id=' . (int) $row['id']) ?>"><?= e($row['name']) ?></a>
+                        <a href="<?= url('/pages/product-detail.php?id=' . (int) $row['id']) ?>"><?= e(parts_display_name($row)) ?></a>
                     </td>
                     <td class="text-right"><?= formatNumber($qty) ?> <?= e($row['unit']) ?></td>
                     <td class="text-right" style="min-width:120px">

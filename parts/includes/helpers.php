@@ -87,7 +87,9 @@ function ensureProductColumns(PDO $db): void
 {
     $columns = [
         'purchase_link' => 'VARCHAR(500) DEFAULT NULL',
+        'supplier' => 'VARCHAR(200) DEFAULT NULL',
         'price' => 'DECIMAL(10,2) DEFAULT 0.00',
+        'is_active' => 'TINYINT(1) NOT NULL DEFAULT 1',
     ];
 
     foreach ($columns as $column => $definition) {
@@ -96,6 +98,449 @@ function ensureProductColumns(PDO $db): void
             $db->exec("ALTER TABLE products ADD COLUMN {$column} {$definition}");
         }
     }
+}
+
+/**
+ * อ่านสถานะการใช้งานจากแถว products (ค่าเก่าที่ไม่มีคอลัมน์ถือว่าใช้งานอยู่)
+ *
+ * @param array<string,mixed> $row
+ * @return bool
+ */
+function product_is_active(array $row): bool
+{
+    if (!array_key_exists('is_active', $row)) {
+        return true;
+    }
+    return (int) $row['is_active'] === 1;
+}
+
+/**
+ * ป้ายข้อความสถานะการใช้งานอะไหล่
+ *
+ * @param bool $active
+ * @return string
+ */
+function product_usage_label(bool $active): string
+{
+    return $active ? 'ใช้งานอยู่' : 'ยกเลิกใช้งาน';
+}
+
+/**
+ * HTML badge สถานะการใช้งานอะไหล่
+ *
+ * @param bool $active
+ * @return string
+ */
+function product_usage_badge(bool $active): string
+{
+    $cls = $active ? 'badge badge-success badge-active' : 'badge badge-warning badge-inactive';
+    return '<span class="' . $cls . '">' . e(product_usage_label($active)) . '</span>';
+}
+
+/**
+ * cache รายการ metadata อะไหล่จาก production (key = stock_code)
+ *
+ * @return array<string,array{name:string,part_code:string,icon_path:string}>
+ */
+function &parts_prod_label_cache(): array
+{
+    static $cache = [];
+    return $cache;
+}
+
+/**
+ * โหลด name / part_code / icon จาก production.parts ตาม stock_code (products.code)
+ *
+ * @param array<int,string> $stockCodes รหัส Pxxxxx จาก biton_tech_parts
+ * @return array<string,array{name:string,part_code:string,icon_path:string}>
+ */
+function production_part_labels_by_stock_codes(array $stockCodes): array
+{
+    $cache = &parts_prod_label_cache();
+    $stockCodes = array_values(array_unique(array_filter(array_map(function ($c) {
+        return trim((string) $c);
+    }, $stockCodes))));
+    if ($stockCodes === []) {
+        return [];
+    }
+
+    $missing = [];
+    foreach ($stockCodes as $code) {
+        if (!isset($cache[$code])) {
+            $missing[] = $code;
+        }
+    }
+
+    if ($missing !== []) {
+        require_once __DIR__ . '/production_sync.php';
+        try {
+            $prod = production_db();
+            $ph = implode(',', array_fill(0, count($missing), '?'));
+            $st = $prod->prepare(
+                "SELECT stock_code, name, part_code, icon_path FROM parts WHERE stock_code IN ($ph)"
+            );
+            $st->execute($missing);
+            while ($r = $st->fetch(PDO::FETCH_ASSOC)) {
+                $sc = trim((string) ($r['stock_code'] ?? ''));
+                if ($sc === '') {
+                    continue;
+                }
+                $cache[$sc] = [
+                    'name' => trim((string) ($r['name'] ?? '')),
+                    'part_code' => trim((string) ($r['part_code'] ?? '')),
+                    'icon_path' => trim((string) ($r['icon_path'] ?? '')),
+                ];
+            }
+            foreach ($missing as $code) {
+                if (!isset($cache[$code])) {
+                    $cache[$code] = ['name' => '', 'part_code' => '', 'icon_path' => ''];
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('[production_part_labels_by_stock_codes] ' . $e->getMessage());
+        }
+    }
+
+    $out = [];
+    foreach ($stockCodes as $code) {
+        if (isset($cache[$code])) {
+            $out[$code] = $cache[$code];
+        }
+    }
+    return $out;
+}
+
+/**
+ * ชื่อแสดงผลหลักของอะไหล่ — ใช้ production.name ก่อน แล้ว fallback ชื่อใน tech_parts
+ *
+ * @param array<string,mixed> $productRow แถว products (code, name)
+ * @param array<string,array{name:string,part_code:string,icon_path?:string}> $prodLabels
+ * @return string
+ */
+function part_product_display_name(array $productRow, array $prodLabels): string
+{
+    $code = trim((string) ($productRow['code'] ?? ''));
+    $fallback = trim((string) ($productRow['name'] ?? ''));
+    if ($code !== '' && isset($prodLabels[$code])) {
+        $name = trim((string) ($prodLabels[$code]['name'] ?? ''));
+        if ($name !== '') {
+            return $name;
+        }
+    }
+    return $fallback;
+}
+
+/**
+ * บรรทัดรองใต้ชื่อ — ใช้ production.part_code ก่อน แล้ว fallback รหัสสต็อก Pxxxxx
+ *
+ * @param array<string,mixed> $productRow
+ * @param array<string,array{name:string,part_code:string,icon_path?:string}> $prodLabels
+ * @return string
+ */
+function part_product_display_sub(array $productRow, array $prodLabels): string
+{
+    $code = trim((string) ($productRow['code'] ?? ''));
+    if ($code !== '' && isset($prodLabels[$code])) {
+        $partCode = trim((string) ($prodLabels[$code]['part_code'] ?? ''));
+        if ($partCode !== '') {
+            return $partCode;
+        }
+    }
+    return $code;
+}
+
+/**
+ * ชื่อแสดงผลจากรหัส + ชื่อ fallback
+ *
+ * @param string $code
+ * @param string $fallbackName
+ * @param array<string,array{name:string,part_code:string,icon_path?:string}>|null $prodLabels
+ * @return string
+ */
+function parts_label_for_code(string $code, string $fallbackName, ?array $prodLabels = null): string
+{
+    if ($prodLabels === null) {
+        $prodLabels = production_part_labels_by_stock_codes([$code]);
+    }
+    return part_product_display_name(['code' => $code, 'name' => $fallbackName], $prodLabels);
+}
+
+/**
+ * เติม display_name / display_sub ให้แถว product เดียว
+ *
+ * @param array<string,mixed> $product
+ * @return array<string,mixed>
+ */
+function parts_enrich_product(array $product): array
+{
+    $labels = production_part_labels_by_stock_codes([(string) ($product['code'] ?? '')]);
+    $product['display_name'] = part_product_display_name($product, $labels);
+    $product['display_sub'] = part_product_display_sub($product, $labels);
+    return $product;
+}
+
+/**
+ * เติม display_name / display_sub ให้ทุกแถวในรายการ products
+ *
+ * @param array<int,array<string,mixed>> $products
+ * @return array<int,array<string,mixed>>
+ */
+function parts_enrich_products(array $products): array
+{
+    if ($products === []) {
+        return $products;
+    }
+    $labels = production_part_labels_by_stock_codes(array_column($products, 'code'));
+    foreach ($products as &$p) {
+        $p['display_name'] = part_product_display_name($p, $labels);
+        $p['display_sub'] = part_product_display_sub($p, $labels);
+    }
+    unset($p);
+    return $products;
+}
+
+/**
+ * คืนชื่อแสดงผลของ product (ต้อง enrich มาก่อนหรือโหลดจาก production อัตโนมัติ)
+ *
+ * @param array<string,mixed> $product
+ * @return string
+ */
+function parts_display_name(array $product): string
+{
+    if (!empty($product['display_name'])) {
+        return (string) $product['display_name'];
+    }
+    return part_product_display_name($product, production_part_labels_by_stock_codes([(string) ($product['code'] ?? '')]));
+}
+
+/**
+ * HTML ชื่ออะไหล่ + part_code รอง (ถ้ามี)
+ *
+ * @param array<string,mixed> $product
+ * @param bool $withSub แสดงบรรทัด part_code ใต้ชื่อ
+ * @return string
+ */
+function parts_product_name_html(array $product, bool $withSub = true): string
+{
+    $name = parts_display_name($product);
+    $html = e($name);
+    if (!$withSub) {
+        return $html;
+    }
+    $sub = (string) ($product['display_sub'] ?? '');
+    if ($sub === '') {
+        $sub = part_product_display_sub($product, production_part_labels_by_stock_codes([(string) ($product['code'] ?? '')]));
+    }
+    $stockCode = trim((string) ($product['code'] ?? ''));
+    if ($sub !== '' && $sub !== $stockCode) {
+        $html .= '<div class="muted" style="font-size:11px;margin-top:2px">' . e($sub) . '</div>';
+    }
+    return $html;
+}
+
+/**
+ * ข้อความสำหรับ option / รายการย่อ: [P001] ชื่อ
+ *
+ * @param array<string,mixed> $product
+ * @return string
+ */
+function parts_format_product_option(array $product): string
+{
+    $code = trim((string) ($product['code'] ?? ''));
+    return '[' . $code . '] ' . parts_display_name($product);
+}
+
+/**
+ * ข้อความ [รหัส] ชื่อ จาก code + fallback (ไม่มีแถว product เต็ม)
+ *
+ * @param string $code
+ * @param string $fallbackName
+ * @param array<string,array{name:string,part_code:string,icon_path?:string}>|null $prodLabels
+ * @return string
+ */
+function parts_format_product_line(string $code, string $fallbackName, ?array $prodLabels = null): string
+{
+    return '[' . $code . '] ' . parts_label_for_code($code, $fallbackName, $prodLabels);
+}
+
+/**
+ * โหลด map รหัสอะไหล่ → icon_path จากตาราง parts ฝั่ง production
+ *
+ * @param array<int,array<string,mixed>> $products แถว products (ต้องมี key code)
+ * @return array<string,string>
+ */
+function parts_product_icon_map(array $products): array
+{
+    if (!$products) {
+        return [];
+    }
+    $codes = array_values(array_unique(array_filter(array_map(function ($r) {
+        return trim((string) ($r['code'] ?? ''));
+    }, $products))));
+    if (!$codes) {
+        return [];
+    }
+    $labels = production_part_labels_by_stock_codes($codes);
+    $icons = [];
+    foreach ($labels as $code => $meta) {
+        if (!empty($meta['icon_path'])) {
+            $icons[$code] = $meta['icon_path'];
+        }
+    }
+    return $icons;
+}
+
+/**
+ * สร้าง URL รูปจาก icon_path ของ production (รองรับ legacy + encode ชื่อไฟล์)
+ *
+ * @param string|null $path relative path เช่น Parts_Images/foo bar.png หรือ parts/2026/x.png
+ * @return string|null
+ */
+function parts_upload_img_url(?string $path): ?string
+{
+    $path = trim((string) $path);
+    if ($path === '') {
+        return null;
+    }
+    if (preg_match('#^https?://#i', $path)) {
+        return $path;
+    }
+    if (!function_exists('ui_finishgoogs_base_url')) {
+        require_once dirname(__DIR__, 2) . '/shared/ui_icons.php';
+    }
+    $base = rtrim(str_replace('\\', '/', ui_finishgoogs_base_url()), '/');
+    $normalized = str_replace('\\', '/', $path);
+    $legacyFolders = [
+        'Update_Images/', 'Parts_Images/', 'Menu Product_Images/', 'model appsheet_Images/',
+        'model_Images/', 'NamePart_Images/', 'Sub Menu_Images/', 'Sub Product_Images/', 'Thumbnail_Images/',
+    ];
+    foreach ($legacyFolders as $lf) {
+        if (strpos($normalized, $lf) === 0) {
+            return $base . '/uploads/legacy/' . implode('/', array_map('rawurlencode', explode('/', $normalized)));
+        }
+    }
+    return $base . '/uploads/' . implode('/', array_map('rawurlencode', explode('/', ltrim($normalized, '/'))));
+}
+
+/**
+ * แสดงรูปอะไหล่จาก path ใต้ uploads ของ production (ไม่มีรูปคืนค่าว่าง)
+ *
+ * @param string|null $path  relative path เช่น parts/2026/01/x.png
+ * @param string      $alt
+ * @param string      $class
+ * @return string HTML
+ */
+function parts_img_tag(?string $path, string $alt = '', string $class = 'parts-thumb'): string
+{
+    $url = parts_upload_img_url($path);
+    if ($url === null) {
+        return '';
+    }
+    return '<img src="' . e($url) . '" alt="' . e($alt) . '" class="' . e($class) . '" loading="lazy"'
+        . ' onerror="this.hidden=true">';
+}
+
+/**
+ * ตรวจว่าอะไหล่มีราคาที่แสดงได้ (มากกว่า 0)
+ *
+ * @param array<string,mixed> $product
+ * @return bool
+ */
+function product_has_price(array $product): bool
+{
+    if (!isset($product['price']) || $product['price'] === '' || $product['price'] === null) {
+        return false;
+    }
+    return (float) $product['price'] > 0;
+}
+
+/**
+ * บันทึกรูปอะไหล่ลง uploads/parts ของ finishgoogs (validate MIME + ขนาด)
+ *
+ * @param string $field ชื่อ field ใน $_FILES
+ * @return string|null relative path เช่น parts/2026/07/xxx.png
+ */
+function parts_save_product_image(string $field): ?string
+{
+    if (empty($_FILES[$field]['tmp_name']) || (int) ($_FILES[$field]['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        return null;
+    }
+    if ((int) ($_FILES[$field]['size'] ?? 0) > 5 * 1024 * 1024) {
+        return null;
+    }
+    $exts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    $ext = strtolower(pathinfo((string) $_FILES[$field]['name'], PATHINFO_EXTENSION));
+    if (!in_array($ext, $exts, true)) {
+        return null;
+    }
+    if (!@getimagesize($_FILES[$field]['tmp_name'])) {
+        return null;
+    }
+    $subdir = 'parts/' . date('Y/m');
+    $dir = dirname(__DIR__, 2) . '/finishgoogs_ma_update/uploads/' . $subdir;
+    if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
+        return null;
+    }
+    $name = date('His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+    if (!move_uploaded_file($_FILES[$field]['tmp_name'], $dir . '/' . $name)) {
+        return null;
+    }
+    return $subdir . '/' . $name;
+}
+
+/**
+ * คอลัมน์รูปในตาราง — แสดง thumbnail หรือปุ่มเพิ่มรูป
+ *
+ * @param string|null       $iconPath
+ * @param array<string,mixed> $product
+ * @return string HTML
+ */
+function parts_product_img_cell(?string $iconPath, array $product): string
+{
+    $name = parts_display_name($product);
+    if ($iconPath !== '') {
+        $html = parts_img_tag($iconPath, $name);
+        $html .= '<button type="button" class="btn-cell-mini btn-cell-img" title="เปลี่ยนรูป"'
+            . ' data-open-modal="product-icon-modal"'
+            . ' data-fill-modal="product-icon-modal"'
+            . ' data-product-id="' . (int) ($product['id'] ?? 0) . '"'
+            . ' data-product-name="' . e($name) . '">'
+            . ui_icon_html('edit', 12, 'btn-svg') . '</button>';
+        return '<div class="col-img-wrap">' . $html . '</div>';
+    }
+    return '<button type="button" class="btn btn-sm btn-outline btn-cell-action"'
+        . ' data-open-modal="product-icon-modal"'
+        . ' data-fill-modal="product-icon-modal"'
+        . ' data-product-id="' . (int) ($product['id'] ?? 0) . '"'
+        . ' data-product-name="' . e($name) . '">'
+        . ui_icon_html('plus', 14, 'btn-svg') . ' รูป</button>';
+}
+
+/**
+ * คอลัมน์ราคา — แสดงราคาหรือปุ่มกรอกราคา
+ *
+ * @param array<string,mixed> $product
+ * @return string HTML
+ */
+function parts_product_price_cell(array $product): string
+{
+    if (product_has_price($product)) {
+        return '<span class="price-value">' . formatCurrency($product['price']) . '</span>'
+            . ' <button type="button" class="btn-cell-mini" title="แก้ไขราคา"'
+            . ' data-open-modal="product-price-modal"'
+            . ' data-fill-modal="product-price-modal"'
+            . ' data-product-id="' . (int) ($product['id'] ?? 0) . '"'
+            . ' data-product-name="' . e(parts_display_name($product)) . '"'
+            . ' data-product-price="' . e(number_format((float) $product['price'], 2, '.', '')) . '">'
+            . ui_icon_html('edit', 12, 'btn-svg') . '</button>';
+    }
+    return '<button type="button" class="btn btn-sm btn-outline btn-cell-action"'
+        . ' data-open-modal="product-price-modal"'
+        . ' data-fill-modal="product-price-modal"'
+        . ' data-product-id="' . (int) ($product['id'] ?? 0) . '"'
+        . ' data-product-name="' . e(parts_display_name($product)) . '"'
+        . ' data-product-price="">'
+        . ui_icon_html('plus', 14, 'btn-svg') . ' ราคา</button>';
 }
 
 function ensureStockInColumns(PDO $db): void

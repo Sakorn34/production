@@ -1228,15 +1228,15 @@ function ma_sync_withdrawals_on_edit(int $maRecordId, int $assetId, string $asse
 }
 
 /**
- * HTML สรุปอะไหล่ที่เบิกในรอบ MA (สำหรับตารางประวัติ)
+ * รายการอะไหล่ที่เบิกในรอบ MA
  *
  * @param int $maRecordId
- * @return string
+ * @return array<int, array{name:string,qty:float,unit:string}>
  */
-function ma_parts_withdrawn_html($maRecordId) {
+function ma_parts_withdrawn_items($maRecordId) {
     $maRecordId = (int)$maRecordId;
     if ($maRecordId <= 0) {
-        return '';
+        return [];
     }
     $res = qr(
         "SELECT pm.qty, pt.name, pt.unit
@@ -1247,15 +1247,53 @@ function ma_parts_withdrawn_html($maRecordId) {
         'i',
         [$maRecordId]
     );
-    if (!$res->num_rows) {
-        return '';
-    }
     $items = [];
     while ($r = $res->fetch_assoc()) {
-        $q = rtrim(rtrim(number_format((float)$r['qty'], 2), '0'), '.');
-        $items[] = h($r['name']) . ' × ' . $q . ($r['unit'] ? ' ' . h($r['unit']) : '');
+        $items[] = [
+            'name' => (string)$r['name'],
+            'qty'  => (float)$r['qty'],
+            'unit' => (string)($r['unit'] ?? ''),
+        ];
     }
-    return '<div class="muted" style="font-size:12px;margin-top:4px">🔩 เบิก: ' . implode(' · ', $items) . '</div>';
+    return $items;
+}
+
+/**
+ * ข้อความรายการอะไหล่ที่เบิกในรอบ MA (plain text)
+ *
+ * @param int $maRecordId
+ * @return string
+ */
+function ma_parts_withdrawn_text($maRecordId) {
+    $items = ma_parts_withdrawn_items($maRecordId);
+    if (!$items) {
+        return '-';
+    }
+    $parts = [];
+    foreach ($items as $r) {
+        $q = rtrim(rtrim(number_format((float)$r['qty'], 2), '0'), '.');
+        $parts[] = $r['name'] . ' × ' . $q . ($r['unit'] !== '' ? ' ' . $r['unit'] : '');
+    }
+    return implode("\n", $parts);
+}
+
+/**
+ * HTML สรุปอะไหล่ที่เบิกในรอบ MA (สำหรับตารางประวัติ)
+ *
+ * @param int $maRecordId
+ * @return string
+ */
+function ma_parts_withdrawn_html($maRecordId) {
+    $items = ma_parts_withdrawn_items($maRecordId);
+    if (!$items) {
+        return '';
+    }
+    $parts = [];
+    foreach ($items as $r) {
+        $q = rtrim(rtrim(number_format((float)$r['qty'], 2), '0'), '.');
+        $parts[] = h($r['name']) . ' × ' . $q . ($r['unit'] !== '' ? ' ' . h($r['unit']) : '');
+    }
+    return '<div class="muted" style="font-size:12px;margin-top:4px">🔩 เบิก: ' . implode(' · ', $parts) . '</div>';
 }
 
 /**

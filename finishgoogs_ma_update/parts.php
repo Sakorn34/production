@@ -9,14 +9,13 @@ if (isset($_GET['part_used'])) {
     $part = qr("SELECT name, unit FROM parts WHERE id=?", 'i', [$pid])->fetch_assoc();
     $unit = ($part && $part['unit']) ? $part['unit'] : '';
     $res  = qr("SELECT pm.moved_at, pm.qty, pm.made_by, pm.remark,
-                       a.id asset_id, a.asset_code, a.status, p.name pname, c.name cust
+                       a.id asset_id, a.asset_code, a.status, p.name pname
                 FROM   part_movements pm
                 LEFT JOIN assets a   ON a.id  = pm.ref_asset_id
                 LEFT JOIN products p ON p.id  = a.product_id
-                LEFT JOIN customers c ON c.id = a.current_customer_id
                 WHERE  pm.part_id = ? AND pm.direction = 'out'
                 ORDER  BY pm.moved_at DESC, pm.id DESC LIMIT 300", 'i', [$pid]);
-    echo '<table class="list"><tr><th>วันที่</th><th>เครื่อง</th><th>รุ่น</th><th>ลูกค้า</th><th style="text-align:right">จำนวน</th><th>ผู้เบิก</th></tr>';
+    echo '<table class="list"><tr><th>วันที่</th><th>เครื่อง</th><th>รุ่น</th><th style="text-align:right">จำนวน</th><th>ผู้เบิก</th></tr>';
     $n = 0;
     while ($r = $res->fetch_assoc()) {
         $n++;
@@ -29,12 +28,11 @@ if (isset($_GET['part_used'])) {
            . '<td style="white-space:nowrap">' . dthai_full($r['moved_at']) . '</td>'
            . '<td>' . $code . ($rem !== '' ? '<br><span class="muted">' . h($rem) . '</span>' : '') . '</td>'
            . '<td>' . h($r['pname'] ?: '-') . '</td>'
-           . '<td>' . h($r['cust'] ?: '-') . '</td>'
            . '<td style="text-align:right">' . $qty . ($unit ? ' <span class="muted">' . h($unit) . '</span>' : '') . '</td>'
            . '<td>' . h($r['made_by'] ?: '-') . '</td>'
            . '</tr>';
     }
-    if (!$n) echo '<tr><td colspan="6" class="muted" style="text-align:center;padding:14px">ยังไม่มีการเบิกอะไหล่ชิ้นนี้</td></tr>';
+    if (!$n) echo '<tr><td colspan="5" class="muted" style="text-align:center;padding:14px">ยังไม่มีการเบิกอะไหล่ชิ้นนี้</td></tr>';
     echo '</table>';
     exit;
 }

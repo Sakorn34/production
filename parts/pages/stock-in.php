@@ -1,4 +1,7 @@
 <?php
+/**
+ * pages/stock-in.php — รับเข้าอะไหล่ (modal) + ประวัติเต็มจอพร้อมรูป
+ */
 
 $pageTitle = 'รับเข้า';
 require_once __DIR__ . '/../includes/header.php';
@@ -34,80 +37,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect(url('/pages/stock-in.php'));
 }
 
-$products = $stock->getAllProducts();
-$history = $stock->getStockInHistory(30);
+$products = parts_enrich_products($stock->getAllProducts());
+$partIcons = parts_product_icon_map($products);
+$history = $stock->getStockInHistory(50);
+$partProdLabels = production_part_labels_by_stock_codes(array_column($products, 'code'));
+
+$actions = parts_btn_open_modal('stock-in-add-modal', 'บันทึกรับเข้า', 'stock-in', 'btn-success');
+parts_page_header('stock-in', 'รับเข้า', 'บันทึกการรับอะไหล่เข้าคลัง · ' . number_format(count($history)) . ' รายการล่าสุด', $actions);
 ?>
 
-<div class="page-header">
-    <?= ui_heading('stock-in', 'รับเข้า', 'h1') ?>
-    <p>บันทึกการรับอะไหล่เข้าคลัง</p>
-</div>
-
-<div class="grid-2">
-    <div class="card">
-        <h2><?= $editRow ? 'แก้ไขรายการรับเข้า' : 'บันทึกรับเข้า' ?></h2>
-        <?php if ($editRow): ?>
-        <form method="POST">
-            <input type="hidden" name="update_stock_in" value="1">
-            <input type="hidden" name="id" value="<?= (int) $editRow['id'] ?>">
-            <div class="form-group">
-                <label>อะไหล่</label>
-                <input type="text" value="<?= e($editRow['name']) ?>" readonly>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>จำนวนรับเข้า</label>
-                    <input type="number" name="quantity" min="1" value="<?= (int) $editRow['quantity'] ?>" required>
-                </div>
-                <div class="form-group">
-                    <label>หมายเหตุ</label>
-                    <textarea name="note" rows="2"><?= e($editRow['note'] ?? '') ?></textarea>
-                </div>
-            </div>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-success">บันทึกการแก้ไข</button>
-                <a href="<?= url('/pages/stock-in.php') ?>" class="btn btn-outline">ยกเลิก</a>
-            </div>
-        </form>
-        <?php else: ?>
-        <form method="POST">
-            <div class="form-group">
-                <label>เลือกอะไหล่</label>
-                <select name="product_id" required>
-                    <option value="">-- เลือกอะไหล่ --</option>
-                    <?php foreach ($products as $p): ?>
-                    <option value="<?= $p['id'] ?>">
-                       <?= e($p['name']) ?> (คงเหลือ: <?= formatNumber($p['quantity']) ?>)
-                    </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>จำนวนรับเข้า</label>
-                    <input type="number" name="quantity" min="1" required>
-                </div>
-                <div class="form-group">
-                    <label>หมายเหตุ</label>
-                    <textarea name="note" rows="2" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea>
-                </div>
-            </div>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-success">บันทึกรับเข้า</button>
-            </div>
-        </form>
-        <?php endif; ?>
-    </div>
-
-    <div class="card">
-        <h2>ประวัติรับเข้าล่าสุด</h2>
-        <?php if (empty($history)): ?>
-            <p class="empty-state">ยังไม่มีประวัติ</p>
-        <?php else: ?>
-        <div class="table-wrap">
-        <table>
+<div class="card parts-list-card">
+    <?php if (empty($history)): ?>
+        <p class="empty-state">ยังไม่มีประวัติรับเข้า — กดปุ่ม <strong>บันทึกรับเข้า</strong> เพื่อเพิ่มรายการ</p>
+    <?php else: ?>
+    <div class="table-wrap">
+        <table class="parts-table">
             <thead>
                 <tr>
+                    <th class="col-img">รูป</th>
+                    <th>รหัส</th>
                     <th>อะไหล่</th>
                     <th>ผู้รับ</th>
                     <th class="text-right">จำนวน</th>
@@ -117,9 +65,13 @@ $history = $stock->getStockInHistory(30);
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($history as $h): ?>
+                <?php foreach ($history as $h):
+                    $icon = $partIcons[$h['code']] ?? '';
+                ?>
                 <tr>
-                    <td><?= e($h['name']) ?></td>
+                    <td class="col-img"><?= parts_img_tag($icon, parts_label_for_code((string) $h['code'], (string) $h['name'], $partProdLabels)) ?></td>
+                    <td><?= e($h['code']) ?></td>
+                    <td><?= e(parts_label_for_code((string) $h['code'], (string) $h['name'], $partProdLabels)) ?></td>
                     <td><?= e($h['received_by'] ?: '-') ?></td>
                     <td class="text-right text-success">+<?= formatNumber($h['quantity']) ?> <?= e($h['unit']) ?></td>
                     <td class="text-muted"><?= e($h['note'] ?: '-') ?></td>
@@ -138,9 +90,69 @@ $history = $stock->getStockInHistory(30);
                 <?php endforeach; ?>
             </tbody>
         </table>
-        </div>
-        <?php endif; ?>
     </div>
+    <?php endif; ?>
 </div>
+
+<?php parts_modal_begin('stock-in-add-modal', 'บันทึกรับเข้า'); ?>
+<form method="POST">
+    <div class="form-group">
+        <label>ค้นหาอะไหล่</label>
+        <input type="text" data-product-search="stock-in-product" placeholder="พิมพ์ชื่อหรือรหัสอะไหล่" autocomplete="off" data-autofocus>
+    </div>
+    <div class="form-group">
+        <label>เลือกอะไหล่</label>
+        <select name="product_id" id="stock-in-product" required>
+            <option value="">-- เลือกอะไหล่ --</option>
+            <?php foreach ($products as $p): ?>
+            <option value="<?= (int) $p['id'] ?>">
+                <?= e(parts_format_product_option($p)) ?> (คงเหลือ: <?= formatNumber($p['quantity']) ?>)
+            </option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>จำนวนรับเข้า</label>
+            <input type="number" name="quantity" min="1" required>
+        </div>
+        <div class="form-group">
+            <label>หมายเหตุ</label>
+            <textarea name="note" rows="2" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea>
+        </div>
+    </div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-outline modal-close-btn">ยกเลิก</button>
+        <button type="submit" class="btn btn-success"><?= ui_icon_html('stock-in', 16, 'btn-svg') ?> บันทึกรับเข้า</button>
+    </div>
+</form>
+<?php parts_modal_end(); ?>
+
+<?php if ($editRow): ?>
+<?php parts_modal_begin('stock-in-edit-modal', 'แก้ไขรายการรับเข้า', true, true); ?>
+<form method="POST">
+    <input type="hidden" name="update_stock_in" value="1">
+    <input type="hidden" name="id" value="<?= (int) $editRow['id'] ?>">
+    <div class="form-group">
+        <label>อะไหล่</label>
+        <input type="text" value="<?= e(parts_label_for_code((string) ($editRow['code'] ?? ''), (string) ($editRow['name'] ?? ''), $partProdLabels)) ?>" readonly>
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>จำนวนรับเข้า</label>
+            <input type="number" name="quantity" min="1" value="<?= (int) $editRow['quantity'] ?>" required data-autofocus>
+        </div>
+        <div class="form-group">
+            <label>หมายเหตุ</label>
+            <textarea name="note" rows="2"><?= e($editRow['note'] ?? '') ?></textarea>
+        </div>
+    </div>
+    <div class="form-actions">
+        <a href="<?= url('/pages/stock-in.php') ?>" class="btn btn-outline">ยกเลิก</a>
+        <button type="submit" class="btn btn-success">บันทึกการแก้ไข</button>
+    </div>
+</form>
+<?php parts_modal_end(); ?>
+<?php endif; ?>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

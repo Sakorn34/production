@@ -743,11 +743,6 @@ function setBomPart(dd, partId){
     filt.placeholder = partId ? '' : 'ค้นหาอะไหล่…';
   }
   dd.querySelector('.chip-dd-opts').innerHTML = bomPartOptsHtml(partId, '');
-  var row = dd.closest('.bom-row');
-  if (row) {
-    var slot = row.querySelector('.bom-thumb-wrap');
-    if (slot) slot.innerHTML = bomThumbHtml(partId);
-  }
 }
 document.addEventListener('focusin', function(e){
   if (!e.target.classList || !e.target.classList.contains('bom-part-filter')) return;
@@ -796,7 +791,6 @@ document.addEventListener('input', function(e){
 });
 function bomRowHtml(partId, qty){
   return '<div class="bom-row">'
-    + '<span class="bom-thumb-wrap">' + bomThumbHtml(partId) + '</span>'
     + bomPartChipHtml(partId)
     + qtyStepHtml('bom_qty[]', qty || 1, 0.5, 0.5)
     + '<button type="button" class="btn-sm btn-line" onclick="this.closest(\'.bom-row\').remove()">ลบ</button>'

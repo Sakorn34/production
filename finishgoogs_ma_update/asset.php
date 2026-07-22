@@ -11,9 +11,8 @@ if (isset($_GET['code'])) {
     header('Location: ' . BASE_URL . '/assets.php'); exit;
 }
 $id = (int)(isset($_GET['id']) ? $_GET['id'] : 0);
-$a = qr("SELECT a.*, p.name pname, p.icon_path, c.name cust
-         FROM assets a JOIN products p ON p.id=a.product_id
-         LEFT JOIN customers c ON c.id=a.current_customer_id WHERE a.id=?", 'i', [$id])->fetch_assoc();
+$a = qr("SELECT a.*, p.name pname, p.icon_path
+         FROM assets a JOIN products p ON p.id=a.product_id WHERE a.id=?", 'i', [$id])->fetch_assoc();
 if (!$a) { http_response_code(404); exit('ไม่พบเครื่องนี้'); }
 
 // เปลี่ยนสถานะเครื่อง
@@ -165,6 +164,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sync_withdraw_list'])
 }
 
 $components = qr("SELECT component_name, component_value FROM asset_components WHERE asset_id=? ORDER BY component_name", 'i', [$id]);
+$componentRows = [];
+while ($row = $components->fetch_assoc()) {
+    $componentRows[] = $row;
+}
 $productOptions = qr("SELECT id, name FROM products WHERE is_active=1 ORDER BY name");
 
 /** ตัวเลือก FW ที่เคยใช้กับรุ่นนี้ (สำหรับ datalist) */
@@ -200,6 +203,8 @@ $partAlertsHtml = part_alerts_html($id, $a['produced_at']);
 // รวม timeline ทุกประเภท (ฟังก์ชันกลาง includes/timeline.php — ใช้ร่วมกับ popup เจาะลึกจาก dashboard)
 require __DIR__ . "/includes/timeline.php";
 require __DIR__ . "/includes/list_search.php";
+require __DIR__ . '/includes/stockparts_withdraw.php';
+require __DIR__ . '/includes/ma_snippets.php';
 $tlData = asset_timeline_items($id);
 $tl = $tlData["tl"];
 $partsUsed = $tlData["partsUsed"];
@@ -210,11 +215,15 @@ if ($showPartsWithdraw && ($partsSummary['out_count'] > 0 || $partsUsed)) {
     $tl = timeline_exclude_groups($tl, ['parts']);
 }
 
-/** ปุ่มแก้ไข/ลบรายการในประวัติ */
+$stockWithdraw = asset_stockparts_withdraw_info((string) $a['asset_code']);
+$assetBackHref = page_back_url('');
+
+/** ปุ่มแก้ไข/ลบ/ข้อความประจำสินค้า ในประวัติ timeline */
 function asset_tl_actions($e, $assetId) {
     if (empty($e['kind']) || empty($e['rid'])) return '';
     $id = (int)$e['rid'];
-    $out = '<div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap">';
+    $out = '<div class="tl-actions" style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap">';
+    $snippetBtn = (!empty($e['snippet']) && is_array($e['snippet'])) ? ma_snippet_open_button($e['snippet']) : '';
     if ($e['kind'] === 'update') {
         $back = urlencode(BASE_URL . '/asset.php?id=' . $assetId);
         $out .= '<a class="btn btn-sm btn-line btn-with-icon" href="' . BASE_URL . '/update_edit.php?id=' . $id . '&back=' . $back . '">' . ui_btn_label('edit', 'แก้ไข') . '</a>';
@@ -236,61 +245,68 @@ function asset_tl_actions($e, $assetId) {
               . '<input type="hidden" name="del_production" value="1"><input type="hidden" name="record_id" value="' . $id . '">'
               . '<button class="btn-sm btn-danger btn-with-icon" type="submit">' . ui_icon_html('trash', 16, 'btn-svg') . '<span>ลบ</span></button></form>';
     }
-    return $out . '</div>';
+    return $out . $snippetBtn . '</div>';
 }
 
-page_header('เครื่อง ' . $a['asset_code']);
+page_header('เครื่อง ' . $a['asset_code'], false);
 ?>
+<div class="asset-toolbar">
+  <a href="<?= h($assetBackHref) ?>" class="btn btn-line btn-sm backbtn">← ย้อนกลับ</a>
+  <h1 class="asset-toolbar-title">เครื่อง <?= h($a['asset_code']) ?></h1>
+  <div class="asset-toolbar-actions">
+    <a class="btn btn-sm btn-with-icon" href="<?= BASE_URL ?>/update_new.php?asset=<?= $id ?>"><?= ui_btn_label('updates', 'บันทึกอัปเดต FW/HW') ?></a>
+    <a class="btn btn-sm btn-with-icon" href="<?= BASE_URL ?>/ma.php?record=<?= $id ?>"><?= ui_btn_label('ma', 'บันทึก MA') ?></a>
+  </div>
+</div>
+
 <div class="asset-head">
-  <div><?= img_tag($a['icon_path'], $a['pname'], 'thumb-lg') ?></div>
-  <div class="info">
+  <div class="asset-head-photo"><?= img_tag($a['icon_path'], $a['pname'], 'thumb-lg') ?></div>
+  <div class="info asset-head-main">
     <dl>
-      <dt>หมายเลขสินค้า</dt><dd><b><?= h($a['asset_code']) ?></b>
+      <dt>หมายเลขสินค้า</dt><dd class="asset-dd-span"><b><?= h($a['asset_code']) ?></b>
         <?php if ($a['running_no']) { ?><span class="muted" style="font-size:12px"> (running <?= (int)$a['running_no'] ?>)</span><?php } ?>
       </dd>
-      <dt>รุ่น</dt><dd><?= h($a['pname']) ?></dd>
-      <dt>สถานะ</dt><dd><?= status_badge($a['status']) ?></dd>
-      <dt>ลูกค้าปัจจุบัน</dt><dd><?= h($a['cust'] ?: '-') ?></dd>
-      <dt>ผลิตเมื่อ</dt><dd><?= dthai($a['produced_at']) ?><?= $a['lot_label'] ? ' (Lot ' . h($a['lot_label']) . ')' : '' ?></dd>
+      <dt>รุ่น</dt><dd class="asset-dd-span"><?= h($a['pname']) ?></dd>
+      <dt>สถานะ</dt><dd class="asset-dd-span"><?= status_badge($a['status']) ?></dd>
+      <dt>ผลิตเมื่อ</dt><dd class="asset-dd-span"><?= dthai($a['produced_at']) ?><?= $a['lot_label'] ? ' (Lot ' . h($a['lot_label']) . ')' : '' ?></dd>
       <dt>FW ปัจจุบัน</dt>
-      <dd>
-        <form method="post" class="fw-inline">
+      <dd class="asset-dd-val">
+        <form method="post" id="asset-fw-form" class="asset-field-form">
           <?= csrf_field() ?><input type="hidden" name="edit_fw" value="1">
           <input type="text" name="current_fw_version" value="<?= h($a['current_fw_version']) ?>" placeholder="เช่น 2.6.6c" list="fw-suggest" maxlength="50" autocomplete="off">
-          <button class="btn-sm btn-with-icon" type="submit"><?= ui_btn_label('save', 'บันทึก FW') ?></button>
         </form>
         <datalist id="fw-suggest">
           <?php foreach ($fwSuggest as $fo) { ?><option value="<?= h($fo) ?>"><?php } ?>
         </datalist>
       </dd>
-      <?php if ($a['note']) { ?><dt>หมายเหตุ</dt><dd><?= h($a['note']) ?></dd><?php } ?>
-    </dl>
-    <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap">
-      <a class="btn btn-sm btn-with-icon" href="<?= BASE_URL ?>/update_new.php?asset=<?= $id ?>"><?= ui_btn_label('updates', 'บันทึกอัปเดต FW/HW') ?></a>
-      <a class="btn btn-sm btn-with-icon" href="<?= BASE_URL ?>/ma.php?record=<?= $id ?>"><?= ui_btn_label('ma', 'บันทึก MA') ?></a>
-      <form method="post" style="display:inline-flex; gap:6px">
-        <?= csrf_field() ?>
-        <select name="set_status">
-          <?php foreach (status_list() as $s) { ?>
-            <option value="<?= $s ?>" <?= $a['status'] === $s ? 'selected' : '' ?>><?= h(status_th($s)) ?></option>
-          <?php } ?>
-        </select>
-        <button class="btn-sm" type="submit">เปลี่ยนสถานะ</button>
-      </form>
-    </div>
-  </div>
-  <?php if ($components->num_rows) { ?>
-  <div>
-    <b style="font-size:14px">ชิ้นส่วนฮาร์ดแวร์</b>
-    <table class="list" style="margin-top:6px">
-      <?php while ($c = $components->fetch_assoc()) { ?>
-        <tr>
-          <td class="muted"><?= h($c['component_name']) ?></td>
-          <td><?= h($c['component_value']) ?></td>
-          <td style="white-space:nowrap">
-            <details style="display:inline">
-              <summary class="btn btn-sm btn-line btn-icon-only" style="list-style:none; cursor:pointer; display:inline-flex" aria-label="แก้ไข"><?= ui_icon_html('edit', 16, 'btn-svg') ?></summary>
-              <form method="post" style="margin-top:6px; display:grid; gap:4px; min-width:200px">
+      <dd class="asset-dd-act">
+        <button class="btn-sm btn-with-icon" type="submit" form="asset-fw-form"><?= ui_btn_label('save', 'บันทึก FW') ?></button>
+      </dd>
+      <dt>ประเภท</dt>
+      <dd class="asset-dd-val">
+        <form method="post" id="asset-status-form" class="asset-field-form asset-status-form">
+          <?= csrf_field() ?>
+          <select name="set_status">
+            <?php foreach (status_list() as $s) { ?>
+              <option value="<?= $s ?>" <?= $a['status'] === $s ? 'selected' : '' ?>><?= h(status_th($s)) ?></option>
+            <?php } ?>
+          </select>
+        </form>
+      </dd>
+      <dd class="asset-dd-act">
+        <button class="btn-sm btn-with-icon" type="submit" form="asset-status-form"><?= ui_btn_label('save', 'เปลี่ยนสถานะ') ?></button>
+      </dd>
+      <?php if ($a['note']) { ?><dt>หมายเหตุ</dt><dd class="asset-dd-span"><?= h($a['note']) ?></dd><?php } ?>
+      <?php if ($componentRows) { ?>
+      <dt class="asset-dl-section">ชิ้นส่วนฮาร์ดแวร์</dt>
+      <?php foreach ($componentRows as $c) { ?>
+      <dt><?= h($c['component_name']) ?></dt>
+      <dd class="asset-dd-val"><?= h($c['component_value']) ?></dd>
+      <dd class="asset-dd-act">
+        <span class="asset-comp-actions">
+            <details class="asset-comp-edit">
+              <summary class="btn btn-sm btn-line btn-icon-only" aria-label="แก้ไข"><?= ui_icon_html('edit', 16, 'btn-svg') ?></summary>
+              <form method="post" class="asset-comp-edit-form">
                 <?= csrf_field() ?><input type="hidden" name="edit_component" value="1">
                 <input type="hidden" name="old_name" value="<?= h($c['component_name']) ?>">
                 <input type="text" name="component_name" value="<?= h($c['component_name']) ?>" required>
@@ -298,17 +314,18 @@ page_header('เครื่อง ' . $a['asset_code']);
                 <button class="btn-sm" type="submit">บันทึก</button>
               </form>
             </details>
-            <form method="post" style="display:inline" onsubmit="return confirm('ลบชิ้นส่วนนี้?')">
+            <form method="post" class="asset-comp-del-form" onsubmit="return confirm('ลบชิ้นส่วนนี้?')">
               <?= csrf_field() ?><input type="hidden" name="del_component" value="1">
               <input type="hidden" name="component_name" value="<?= h($c['component_name']) ?>">
               <button class="btn-sm btn-danger btn-icon-only" type="submit" aria-label="ลบ"><?= ui_icon_html('trash', 16, 'btn-svg') ?></button>
             </form>
-          </td>
-        </tr>
+        </span>
+      </dd>
       <?php } ?>
-    </table>
+      <?php } ?>
+    </dl>
   </div>
-  <?php } ?>
+  <?= asset_stockparts_withdraw_card_html($stockWithdraw) ?>
 </div>
 
 <?php if ($partAlertsHtml) { ?>
@@ -477,4 +494,18 @@ $addWithdrawModalUrl = BASE_URL . '/parts.php?ajax=add_move_form&asset_id=' . (i
 <h2>ประวัติทั้งหมด (<?= count($tl) ?> รายการ) — จัดกลุ่มตามประเภท · เรียงตามวันที่ในแต่ละกลุ่ม</h2>
 <p class="muted" style="margin:-6px 0 12px; font-size:13px">เลื่อนแนวนอนเพื่อดูแต่ละประเภทงาน · รายการในแต่ละคอลัมน์เรียงจากใหม่ → เก่า</p>
 <?php asset_timeline_board_html($tl, 'asset_tl_actions', $id); ?>
+
+<div id="asset-snippet-overlay" class="notif-overlay ma-sn-overlay" hidden>
+  <div class="notif-box ma-sn-modal" role="dialog" aria-modal="true" aria-labelledby="asset-snippet-title">
+    <div class="ma-sn-modal-hd">
+      <div>
+        <h2 id="asset-snippet-title" class="ma-snippets-title h-with-icon"><?= ui_icon_html('clipboard', 16, 'h-svg') ?><span>ข้อความประจำสินค้า</span></h2>
+        <p class="muted ma-snippets-lead">อัปเดตตามหมายเลขสินค้าและฟอร์ม · กดคัดลอกทีละข้อ</p>
+      </div>
+      <button type="button" class="btn-sm btn-line" onclick="closeOverlay('asset-snippet-overlay')">✕ ปิด</button>
+    </div>
+    <?= ma_snippets_inner_html('asset-tl-sn', ['title' => false, 'lead' => false]) ?>
+  </div>
+</div>
+<script src="<?= BASE_URL ?>/assets/ma-snippets.js?v=<?= @filemtime(__DIR__ . '/assets/ma-snippets.js') ?: time() ?>"></script>
 <?php page_footer();

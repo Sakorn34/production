@@ -41,6 +41,28 @@ class StockService
         return $stmt->fetch() ?: null;
     }
 
+    /**
+     * ตั้งสถานะการใช้งานอะไหล่ (ใช้งานอยู่ / ยกเลิกใช้งาน)
+     *
+     * @param int  $productId รหัส products.id
+     * @param bool $active    true = ใช้งานอยู่, false = ยกเลิกใช้งาน
+     * @return void
+     */
+    public function setProductActive(int $productId, bool $active): void
+    {
+        if ($productId <= 0) {
+            throw new InvalidArgumentException('รหัสอะไหล่ไม่ถูกต้อง');
+        }
+        $stmt = $this->db->prepare('UPDATE products SET is_active = ? WHERE id = ?');
+        $stmt->execute([$active ? 1 : 0, $productId]);
+        if ($stmt->rowCount() === 0) {
+            $check = $this->getProduct($productId);
+            if (!$check) {
+                throw new InvalidArgumentException('ไม่พบอะไหล่ที่จะอัปเดต');
+            }
+        }
+    }
+
     public function getProductStockOutHistory(int $productId, ?int $limit = 20): array
     {
         $sql = "
@@ -57,6 +79,46 @@ class StockService
         }
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$productId]);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * ประวัติรับเข้า/เบิกออกของอะไหล่หนึ่งรายการ เรียงจากล่าสุด
+     *
+     * @param int      $productId รหัส products.id
+     * @param int|null $limit     จำกัดจำนวนแถว (null = ไม่จำกัด)
+     * @return array<int,array<string,mixed>>
+     */
+    public function getProductMovementHistory(int $productId, ?int $limit = 80): array
+    {
+        if ($productId <= 0) {
+            return [];
+        }
+
+        $sql = "
+            (SELECT 'in' AS move_type, si.id AS ref_id, si.quantity, si.note,
+                    si.received_by AS actor, si.created_at,
+                    NULL AS doc_no, NULL AS asset_code, NULL AS stock_out_id,
+                    NULL AS set_id, NULL AS set_code, NULL AS set_name
+             FROM stock_in si
+             WHERE si.product_id = ?)
+            UNION ALL
+            (SELECT 'out' AS move_type, soi.id AS ref_id, soi.quantity, so.note,
+                    so.issued_by AS actor, so.created_at,
+                    so.doc_no, so.asset_code, so.id AS stock_out_id,
+                    so.set_id, s.code AS set_code, s.name AS set_name
+             FROM stock_out_items soi
+             JOIN stock_out so ON so.id = soi.stock_out_id
+             LEFT JOIN sets s ON s.id = so.set_id
+             WHERE soi.product_id = ?)
+            ORDER BY created_at DESC
+        ";
+        if ($limit) {
+            $sql .= ' LIMIT ' . (int) $limit;
+        }
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$productId, $productId]);
         return $stmt->fetchAll();
     }
 

@@ -5,112 +5,110 @@ $partsShowBack = false;
 require_once __DIR__ . '/../includes/header.php';
 
 $productId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
-$product = $productId ? $stock->getProduct($productId) : null;
+$rawProduct = $productId ? $stock->getProduct($productId) : null;
+$product = $rawProduct ? parts_enrich_product($rawProduct) : null;
 $history = $product ? $stock->getProductStockOutHistory($productId, 50) : [];
+$icon = '';
+if ($product) {
+    $icons = parts_product_icon_map([$product]);
+    $icon = $icons[$product['code']] ?? '';
+}
+
+parts_page_header('products', 'รายละเอียดอะไหล่', 'ข้อมูลสินค้า ราคา ลิงก์สั่งซื้อ และประวัติการเบิกของชิ้นนี้');
 ?>
 
-<div class="page-header">
-    <?= ui_heading('products', 'รายละเอียดอะไหล่', 'h1') ?>
-    <p>ข้อมูลสินค้า ราคา ลิงก์สั่งซื้อ และประวัติการเบิกของชิ้นนี้</p>
-</div>
-
-<div class="card">
+<div class="card parts-list-card">
     <?php if (!$product): ?>
         <p class="text-muted">ไม่พบอะไหล่ หรือไม่มีรหัสสินค้าใน URL</p>
         <p><a href="<?= url('/pages/products.php') ?>" class="btn btn-outline">← กลับไปหน้าอะไหล่</a></p>
     <?php else: ?>
-        <div class="grid-2">
+        <div class="product-detail-hero">
+            <?php if ($icon): ?>
+                <?= parts_img_tag($icon, parts_display_name($product), 'parts-thumb-lg') ?>
+            <?php else: ?>
+                <div class="parts-thumb-lg-placeholder" aria-hidden="true"></div>
+            <?php endif; ?>
             <div>
-                <h2>ข้อมูลพื้นฐาน</h2>
-                <table>
-                    <tbody>
-                        <tr>
-                            <th>รหัส</th>
-                            <td><?= e($product['code']) ?></td>
-                        </tr>
-                        <tr>
-                            <th>ชื่ออะไหล่</th>
-                            <td><?= e($product['name']) ?></td>
-                        </tr>
-                        <tr>
-                            <th>จำนวนคงเหลือ</th>
-                            <td><?= formatNumber($product['quantity']) ?> <?= e($product['unit']) ?></td>
-                        </tr>
-                        <tr>
-                            <th>สต็อกขั้นต่ำ</th>
-                            <td><?= formatNumber($product['min_stock']) ?> <?= e($product['unit']) ?></td>
-                        </tr>
-                        <tr>
-                            <th>ราคา</th>
-                            <td><?= formatCurrency($product['price'] ?? null) ?></td>
-                        </tr>
-                        <tr>
-                            <th>ลิงก์สั่งซื้อ</th>
-                            <td>
-                                <?php if (!empty($product['purchase_link'])): ?>
-                                    <a href="<?= e($product['purchase_link']) ?>" target="_blank">สั่งซื้อทันที</a>
-                                <?php else: ?>
-                                    -
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div>
-                <h2>สรุป</h2>
-                <p><strong>ชื่อ:</strong> <?= e($product['name']) ?></p>
-                <p><strong>หน่วย:</strong> <?= e($product['unit']) ?></p>
-                <p><strong>สถานะสต็อก:</strong>
+                <h2 style="margin:0 0 0.35rem;font-size:1.2rem"><?= e(parts_display_name($product)) ?></h2>
+                <?php if (!empty($product['display_sub']) && $product['display_sub'] !== $product['code']): ?>
+                <p class="text-muted" style="margin:0;font-size:12px">Code Part : <?= e($product['display_sub']) ?></p>
+                <?php endif; ?>
+                <p class="text-muted" style="margin:0.15rem 0 0;font-size:12px">ID Part : <?= e($product['code']) ?></p>
+                <p style="margin:0.5rem 0 0">
+                    <strong><?= formatNumber($product['quantity']) ?></strong> <?= e($product['unit']) ?> คงเหลือ
                     <?php if ($product['quantity'] <= $product['min_stock']): ?>
                         <span class="badge badge-danger">ใกล้หมด</span>
                     <?php else: ?>
                         <span class="badge badge-success">ปกติ</span>
                     <?php endif; ?>
                 </p>
-                <p><strong>อัพเดตล่าสุด:</strong> <?= formatDate($product['updated_at'] ?? $product['created_at']) ?></p>
             </div>
         </div>
 
-        <div style="margin-top: 1.5rem;">
-            <h2>ประวัติการเบิกของอะไหล่ชิ้นนี้</h2>
-            <?php if (empty($history)): ?>
-                <p class="text-muted">ยังไม่มีการเบิกออกสำหรับอะไหล่ชิ้นนี้</p>
-            <?php else: ?>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>เลขที่</th>
-                            <th>ประเภท</th>
-                            <th class="text-right">จำนวน</th>
-                            <th>ผู้เบิก</th>
-                            <th>หมายเหตุ</th>
-                            <th>วันที่</th>
-                        </tr>
-                    </thead>
+        <div class="grid-2" style="margin-bottom:1.25rem">
+            <div>
+                <h3 style="margin-bottom:0.75rem;font-size:1rem">ข้อมูลพื้นฐาน</h3>
+                <table class="parts-table">
                     <tbody>
-                        <?php foreach ($history as $row): ?>
+                        <tr><th>สต็อกขั้นต่ำ</th><td><?= formatNumber($product['min_stock']) ?> <?= e($product['unit']) ?></td></tr>
+                        <tr><th>ผู้จำหน่าย</th><td><?= !empty($product['supplier']) ? e($product['supplier']) : '-' ?></td></tr>
+                        <tr><th>ราคา</th><td><?= formatCurrency($product['price'] ?? null) ?></td></tr>
                         <tr>
-                            <td><a href="<?= url('/pages/history.php?id=' . (int) $row['id']) ?>"><?= e($row['doc_no']) ?></a></td>
+                            <th>ลิงก์สั่งซื้อ</th>
                             <td>
-                                <?php if ($row['set_id']): ?>
-                                    <span class="badge badge-info">ชุดเบิก</span>
-                                    [<?= e($row['set_code']) ?>] <?= e($row['set_name']) ?>
+                                <?php if (!empty($product['purchase_link'])): ?>
+                                    <a href="<?= e($product['purchase_link']) ?>" target="_blank" rel="noopener noreferrer" class="detail-link">สั่งซื้อทันที</a>
                                 <?php else: ?>
-                                    <span class="badge badge-secondary">เบิกรายชิ้น</span>
+                                    -
                                 <?php endif; ?>
                             </td>
-                            <td class="text-right">-<?= formatNumber($row['quantity']) ?></td>
-                            <td><?= e($row['issued_by'] ?: '-') ?></td>
-                            <td class="text-muted"><?= e($row['note'] ?: '-') ?></td>
-                            <td class="text-muted"><?= formatDate($row['created_at']) ?></td>
                         </tr>
-                        <?php endforeach; ?>
+                        <tr><th>อัปเดตล่าสุด</th><td><?= formatDate($product['updated_at'] ?? $product['created_at']) ?></td></tr>
                     </tbody>
                 </table>
-            <?php endif; ?>
+            </div>
         </div>
+
+        <h3 style="margin-bottom:0.75rem;font-size:1rem">ประวัติการเบิกของอะไหล่ชิ้นนี้</h3>
+        <?php if (empty($history)): ?>
+            <p class="text-muted">ยังไม่มีการเบิกออกสำหรับอะไหล่ชิ้นนี้</p>
+        <?php else: ?>
+        <div class="table-wrap">
+            <table class="parts-table">
+                <thead>
+                    <tr>
+                        <th class="col-img">รูป</th>
+                        <th>เลขที่</th>
+                        <th>ประเภท</th>
+                        <th class="text-right">จำนวน</th>
+                        <th>ผู้เบิก</th>
+                        <th>หมายเหตุ</th>
+                        <th>วันที่</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($history as $row): ?>
+                    <tr>
+                        <td class="col-img"><?= parts_img_tag($icon, parts_display_name($product)) ?></td>
+                        <td><a href="<?= url('/pages/history.php?id=' . (int) $row['id']) ?>" class="detail-link"><?= e($row['doc_no']) ?></a></td>
+                        <td>
+                            <?php if ($row['set_id']): ?>
+                                <span class="badge badge-info">ชุดเบิก</span>
+                                [<?= e($row['set_code']) ?>] <?= e($row['set_name']) ?>
+                            <?php else: ?>
+                                <span class="badge badge-info">เบิกรายชิ้น</span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="text-right text-danger">-<?= formatNumber($row['quantity']) ?></td>
+                        <td><?= e($row['issued_by'] ?: '-') ?></td>
+                        <td class="text-muted"><?= e($row['note'] ?: '-') ?></td>
+                        <td class="text-muted"><?= formatDate($row['created_at']) ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php endif; ?>
 
         <p style="margin-top: 1rem;"><a href="<?= url('/pages/products.php') ?>" class="btn btn-outline">← กลับไปหน้าอะไหล่</a></p>
     <?php endif; ?>

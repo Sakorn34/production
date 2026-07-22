@@ -119,7 +119,84 @@ function production_part_id_by_product_code(string $productCode): ?int
 }
 
 /**
- * หา asset_id จากหมายเลขสินค้า (S/N)
+ * สร้างแถว parts ใน biton_production จาก products ใน biton_tech_parts
+ *
+ * @param array<string,mixed> $product แถว products (code, name, unit, quantity, min_stock, purchase_link, is_active)
+ * @return int|null part id ใน production หรือ null ถ้า sync ไม่ได้
+ */
+function production_sync_create_part_from_product(array $product): ?int
+{
+    $code = trim((string) ($product['code'] ?? ''));
+    $name = trim((string) ($product['name'] ?? ''));
+    if ($code === '' || $name === '') {
+        return null;
+    }
+    $existing = production_part_id_by_product_code($code);
+    if ($existing) {
+        return $existing;
+    }
+    $active = !isset($product['is_active']) || (int) $product['is_active'] === 1;
+    $prod = production_db();
+    $stmt = $prod->prepare(
+        'INSERT INTO parts (part_code, stock_code, name, category, unit, stock_qty, stock_min, dealer, link, icon_path, is_active)
+         VALUES (?, ?, ?, NULL, ?, ?, ?, NULL, ?, NULL, ?)'
+    );
+    $stmt->execute([
+        $code,
+        $code,
+        $name,
+        trim((string) ($product['unit'] ?? '')) ?: 'ชิ้น',
+        (float) ($product['quantity'] ?? 0),
+        (float) ($product['min_stock'] ?? 0),
+        trim((string) ($product['purchase_link'] ?? '')) ?: null,
+        $active ? 1 : 0,
+    ]);
+    return (int) $prod->lastInsertId();
+}
+
+/**
+ * sync สถานะการใช้งานไป production.parts ตาม stock_code
+ *
+ * @param string $stockCode รหัส products.code
+ * @param bool   $active
+ * @return void
+ */
+function production_sync_product_active_by_code(string $stockCode, bool $active): void
+{
+    $stockCode = trim($stockCode);
+    if ($stockCode === '') {
+        return;
+    }
+    $prod = production_db();
+    $st = $prod->prepare('UPDATE parts SET is_active = ? WHERE stock_code = ?');
+    $st->execute([$active ? 1 : 0, $stockCode]);
+}
+
+/**
+ * อัปเดต icon_path ใน production.parts ตาม stock_code
+ *
+ * @param string      $stockCode รหัส products.code
+ * @param string|null $iconPath  relative path ใต้ uploads
+ * @return bool true ถ้ามีแถว parts ที่อัปเดต
+ */
+function production_sync_part_icon_by_code(string $stockCode, ?string $iconPath): bool
+{
+    $stockCode = trim($stockCode);
+    if ($stockCode === '') {
+        return false;
+    }
+    $partId = production_part_id_by_product_code($stockCode);
+    if (!$partId) {
+        return false;
+    }
+    $path = trim((string) $iconPath);
+    $prod = production_db();
+    $st = $prod->prepare('UPDATE parts SET icon_path = ? WHERE stock_code = ?');
+    $st->execute([$path !== '' ? $path : null, $stockCode]);
+    return $st->rowCount() > 0;
+}
+
+/**
  *
  * @param string|null $assetCode
  * @return int|null

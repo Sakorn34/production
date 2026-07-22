@@ -31,15 +31,29 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'sn_basket') {
         echo '<p class="text-muted">ไม่พบรายการเบิกสำหรับ S/N นี้</p>';
         exit;
     }
+    $codes = [];
+    foreach ($basket as $doc) {
+        foreach ($doc['items'] as $item) {
+            if (!empty($item['code'])) {
+                $codes[] = $item['code'];
+            }
+        }
+    }
+    $partProdLabels = production_part_labels_by_stock_codes(array_unique($codes));
+    $iconProducts = array_map(function ($c) {
+        return ['code' => $c];
+    }, array_unique($codes));
+    $partIcons = parts_product_icon_map($iconProducts);
     ?>
     <p class="text-muted" style="margin-bottom:0.75rem">S/N: <strong><?= e($sn) ?></strong> — <?= count($basket) ?> ใบเบิก</p>
     <div class="table-wrap">
-    <table>
+    <table class="parts-table">
         <thead>
             <tr>
-                <th>เลขที่</th>
+                <th class="col-img">รูป</th>
                 <th>อะไหล่</th>
                 <th class="text-right">จำนวน</th>
+                <th>เลขที่</th>
                 <th>ผู้เบิก</th>
                 <th>วันที่</th>
                 <th class="col-actions">จัดการ</th>
@@ -49,21 +63,20 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'sn_basket') {
             <?php foreach ($basket as $doc): ?>
                 <?php foreach ($doc['items'] as $idx => $item): ?>
                 <tr>
+                    <td class="col-img"><?= parts_img_tag($partIcons[$item['code']] ?? '', parts_label_for_code((string) $item['code'], (string) $item['name'], $partProdLabels)) ?></td>
+                    <td>
+                        <?php if ($doc['set_id'] && $idx === 0): ?>
+                        <span class="text-muted">[<?= e($doc['set_code']) ?>] </span>
+                        <?php endif; ?>
+                        <?= e(parts_format_product_line((string) $item['code'], (string) $item['name'], $partProdLabels)) ?>
+                    </td>
+                    <td class="text-right text-danger">-<?= formatNumber($item['quantity']) ?> <?= e($item['unit']) ?></td>
                     <?php if ($idx === 0): ?>
                     <td rowspan="<?= count($doc['items']) ?>"><strong><?= e($doc['doc_no']) ?></strong>
                         <?php if ($doc['set_id']): ?>
                         <br><span class="badge badge-info">Set</span>
                         <?php endif; ?>
                     </td>
-                    <?php endif; ?>
-                    <td>
-                        <?php if ($doc['set_id'] && $idx === 0): ?>
-                        <span class="text-muted">[<?= e($doc['set_code']) ?>] </span>
-                        <?php endif; ?>
-                        [<?= e($item['code']) ?>] <?= e($item['name']) ?>
-                    </td>
-                    <td class="text-right text-danger">-<?= formatNumber($item['quantity']) ?> <?= e($item['unit']) ?></td>
-                    <?php if ($idx === 0): ?>
                     <td rowspan="<?= count($doc['items']) ?>"><?= e($doc['issued_by'] ?: '-') ?></td>
                     <td rowspan="<?= count($doc['items']) ?>" class="text-muted"><?= formatDate($doc['created_at']) ?></td>
                     <td rowspan="<?= count($doc['items']) ?>" class="col-actions">
@@ -102,6 +115,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_stock_out'])) 
 $detailId = isset($_GET['id']) ? (int) $_GET['id'] : null;
 $detail = $detailId ? $stock->getStockOutDetail($detailId) : null;
 $grouped = $stock->getStockOutHistoryGroupedBySn();
+$allProducts = parts_enrich_products($stock->getAllProducts());
+$partProdLabels = production_part_labels_by_stock_codes(array_column($allProducts, 'code'));
+$partIcons = parts_product_icon_map($allProducts);
 
 /**
  * สรุปรายการเบิกของ S/N (แถวยุบ)
@@ -174,10 +190,13 @@ function history_sn_latest(array $g): array
  */
 function history_row_label(array $h): string
 {
+    global $partProdLabels;
     if (!empty($h['set_id'])) {
         return '[Set] [' . e($h['set_code']) . '] ' . e($h['set_name']);
     }
-    return '<span class="badge badge-info">รายชิ้น</span> [' . e($h['single_product_code']) . '] ' . e($h['single_product_name']);
+    $code = (string) ($h['single_product_code'] ?? '');
+    $name = parts_label_for_code($code, (string) ($h['single_product_name'] ?? ''), $partProdLabels ?? []);
+    return '<span class="badge badge-info">รายชิ้น</span> [' . e($code) . '] ' . e($name);
 }
 
 /**
@@ -201,15 +220,30 @@ function history_row_actions(array $h): string
         . '</form>';
     return '<div class="table-actions">' . $view . $edit . $delete . '</div>';
 }
+
+/**
+ * รูปอะไหล่สำหรับแถวประวัติเบิก
+ *
+ * @param array<string,mixed> $h
+ * @param array<string,string> $partIcons
+ * @return string
+ */
+function history_row_thumb(array $h, array $partIcons): string
+{
+    global $partProdLabels;
+    if (!empty($h['set_id'])) {
+        return '';
+    }
+    $code = (string) ($h['single_product_code'] ?? '');
+    $name = parts_label_for_code($code, (string) ($h['single_product_name'] ?? ''), $partProdLabels ?? []);
+    return parts_img_tag($partIcons[$code] ?? '', $name);
+}
 ?>
 
-<div class="page-header">
-    <?= ui_heading('history', 'ประวัติการเบิก', 'h1') ?>
-    <p>รายการเบิกออกทั้งหมด — 1 แถวต่อ S/N (คลิกแถวเพื่อดูรายละเอียด)</p>
-</div>
+<?php parts_page_header('history', 'ประวัติการเบิก', 'รายการเบิกออกทั้งหมด — 1 แถวต่อ S/N (คลิกแถวเพื่อดูรายละเอียด)'); ?>
 
 <?php if ($detail): ?>
-<div class="card">
+<div class="card parts-list-card">
     <h2>รายละเอียด <?= e($detail['doc_no']) ?></h2>
     <dl class="detail-meta">
         <div>
@@ -246,9 +280,10 @@ function history_row_actions(array $h): string
         <?php endif; ?>
     </dl>
     <div class="table-wrap">
-    <table>
+    <table class="parts-table">
         <thead>
             <tr>
+                <th class="col-img">รูป</th>
                 <th>รหัส</th>
                 <th>อะไหล่</th>
                 <th class="text-right">จำนวนเบิก</th>
@@ -258,8 +293,9 @@ function history_row_actions(array $h): string
         <tbody>
             <?php foreach ($detail['items'] as $item): ?>
             <tr>
+                <td class="col-img"><?= parts_img_tag($partIcons[$item['code']] ?? '', parts_label_for_code((string) $item['code'], (string) $item['name'], $partProdLabels)) ?></td>
                 <td><?= e($item['code']) ?></td>
-                <td><?= e($item['name']) ?></td>
+                <td><?= e(parts_label_for_code((string) $item['code'], (string) $item['name'], $partProdLabels)) ?></td>
                 <td class="text-right text-danger">-<?= formatNumber($item['quantity']) ?></td>
                 <td><?= e($item['unit']) ?></td>
             </tr>
@@ -283,11 +319,12 @@ function history_row_actions(array $h): string
 </div>
 <?php else: ?>
 
-<div class="card">
+<div class="card parts-list-card">
     <div class="table-wrap">
-    <table>
+    <table class="parts-table">
         <thead>
             <tr>
+                <th class="col-img">รูป</th>
                 <th>เลขที่</th>
                 <th>รายการเบิก</th>
                 <th>S/N</th>
@@ -300,12 +337,13 @@ function history_row_actions(array $h): string
         </thead>
         <tbody>
             <?php if (empty($grouped)): ?>
-            <tr><td colspan="8" class="text-center text-muted">ยังไม่มีประวัติการเบิก</td></tr>
+            <tr><td colspan="9" class="text-center text-muted">ยังไม่มีประวัติการเบิก</td></tr>
             <?php else: ?>
             <?php foreach ($grouped as $g): ?>
             <?php if ($g['type'] === 'sn'): ?>
             <?php $latest = history_sn_latest($g); ?>
             <tr class="history-sn-row" data-sn-basket-row="<?= e($g['sn']) ?>" title="คลิกดูรายการเบิกทั้งหมดของ S/N นี้">
+                <td class="col-img"></td>
                 <td>
                     <?php if (($g['doc_count'] ?? $g['count']) > 1): ?>
                     <span class="text-muted"><?= (int) ($g['doc_count'] ?? $g['count']) ?> ใบเบิก</span>
@@ -326,6 +364,7 @@ function history_row_actions(array $h): string
             <?php else: ?>
             <?php foreach ($g['items'] as $h): ?>
             <tr>
+                <td class="col-img"><?= history_row_thumb($h, $partIcons) ?></td>
                 <td><strong><?= e($h['doc_no']) ?></strong></td>
                 <td><?= history_row_label($h) ?></td>
                 <td>-</td>

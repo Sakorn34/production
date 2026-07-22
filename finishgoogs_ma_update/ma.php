@@ -7,6 +7,7 @@
  */
 require __DIR__ . '/config.php';
 require_login();
+require __DIR__ . '/includes/ma_snippets.php';
 
 /** แปลงข้อความรายการ (คั่นด้วย ,) เป็น array */
 function ma_items($s) {
@@ -30,6 +31,30 @@ function ma_record_items(array $rec, $col, $jsonKey) {
         if (!empty($vj[$jsonKey])) return ma_items($vj[$jsonKey]);
     }
     return [];
+}
+
+/**
+ * ดึง FW และหมายเหตุจาก MA ครั้งล่าสุดของรุ่น (product)
+ *
+ * @param int $productId
+ * @return array{fw_version:string,remark:string}
+ */
+function ma_last_product_prefill(int $productId): array {
+    if ($productId <= 0) {
+        return ['fw_version' => '', 'remark' => ''];
+    }
+    $row = qr(
+        "SELECT m.fw_version, m.remark FROM ma_records m
+         INNER JOIN assets a ON a.id = m.asset_id
+         WHERE a.product_id = ?
+         ORDER BY m.visited_at DESC, m.id DESC LIMIT 1",
+        'i',
+        [$productId]
+    )->fetch_assoc();
+    return [
+        'fw_version' => trim((string)($row['fw_version'] ?? '')),
+        'remark'     => trim((string)($row['remark'] ?? '')),
+    ];
 }
 
 /** แสดงรายการในคอลัมน์ตาราง (ย่อถ้ายาว) */
@@ -151,27 +176,6 @@ function ma_asset_code_to_mac($assetCode) {
 }
 
 /**
- * สร้าง data-* attributes สำหรับปุ่มเปิด popup ข้อความประจำสินค้าจากแถว MA
- *
- * @param array<string,mixed> $rec แถว ma_records + asset_code
- * @return string HTML attributes
- */
-function ma_snippet_data_attrs(array $rec) {
-    $attrs = [
-        'data-code' => $rec['asset_code'],
-        'data-replace' => implode(' , ', ma_record_items($rec, 'replace_items', 'Replace')),
-        'data-repair' => implode(' , ', ma_record_items($rec, 'repair_items', 'Repair')),
-        'data-fw' => (string)($rec['fw_version'] ?? ''),
-        'data-remark' => (string)($rec['remark'] ?? ''),
-    ];
-    $out = '';
-    foreach ($attrs as $k => $v) {
-        $out .= ' ' . $k . '="' . h($v) . '"';
-    }
-    return $out;
-}
-
-/**
  * data-* สำหรับแถวตาราง MA (เปิด popup รายละเอียด)
  *
  * @param array<string,mixed> $rec
@@ -185,12 +189,19 @@ function ma_row_data_attrs(array $rec) {
         'data-date' => dthai($rec['visited_at']),
         'data-round' => $rec['ma_round'] ? (string)(int)$rec['ma_round'] : '-',
         'data-asset' => (string)$rec['asset_code'],
-        'data-ok' => $ok ? implode(' · ', $ok) : '-',
-        'data-replace-disp' => $rep ? implode(' · ', $rep) : '-',
-        'data-repair-disp' => $fix ? implode(' · ', $fix) : '-',
+        'data-ok' => $ok ? implode("\n", $ok) : '-',
+        'data-replace-disp' => $rep ? implode("\n", $rep) : '-',
+        'data-repair-disp' => $fix ? implode("\n", $fix) : '-',
+        'data-parts-withdraw' => ma_parts_withdrawn_text((int)$rec['id']),
         'data-by' => (string)($rec['done_by'] ?: '-'),
     ];
-    $out = ma_snippet_data_attrs($rec);
+    $out = ma_snippet_data_attrs([
+        'code' => (string)$rec['asset_code'],
+        'replace' => implode(' , ', ma_record_items($rec, 'replace_items', 'Replace')),
+        'repair' => implode(' , ', ma_record_items($rec, 'repair_items', 'Repair')),
+        'fw' => (string)($rec['fw_version'] ?? ''),
+        'remark' => (string)($rec['remark'] ?? ''),
+    ]);
     foreach ($extra as $k => $v) {
         $out .= ' ' . $k . '="' . h($v) . '"';
     }
@@ -243,65 +254,13 @@ function ma_sort_th($label, $ascKey, $descKey, $msort, $productId) {
     return '<a href="' . h(ma_list_qs($productId, ['msort' => $next, 'page' => 1])) . '" class="ma-sort-link">' . $label . $arrow . '</a>';
 }
 
-/**
- * HTML บล็อกข้อความประจำสินค้า (4 รายการคัดลอกได้)
- *
- * @param string $pfx คำนำหน้า id ของ element (เช่น ma-sn, ma-modal-sn)
- * @param array{title?:bool,lead?:bool} $opts แสดงหัวข้อ/คำอธิบายหรือไม่
- * @return string
- */
-function ma_snippets_inner_html($pfx, array $opts = []) {
-    $pfx = preg_replace('/[^a-z0-9_-]/', '', $pfx);
-    $showTitle = !isset($opts['title']) || $opts['title'];
-    $showLead = !isset($opts['lead']) || $opts['lead'];
-    ob_start();
-    if ($showTitle) { ?>
-    <h3 class="ma-snippets-title h-with-icon"><?= ui_icon_html('clipboard', 15, 'h-svg') ?><span>ข้อความประจำสินค้า</span></h3>
-    <?php }
-    if ($showLead) { ?>
-    <p class="muted ma-snippets-lead">อัปเดตตามหมายเลขสินค้าและฟอร์ม · กดคัดลอกทีละข้อ</p>
-    <?php } ?>
-    <div class="ma-snippet">
-      <div class="ma-snippet-hd">
-        <span>1. ตั้งค่า Serial (MobaXterm)</span>
-        <button type="button" class="btn-sm btn-line ma-copy-btn" data-target="<?= h($pfx) ?>-serial"><?= ui_btn_label('copy', 'คัดลอก', 13) ?></button>
-      </div>
-      <textarea class="ma-snippet-txt" id="<?= h($pfx) ?>-serial" readonly rows="3" aria-label="คำสั่งตั้งค่า Serial"></textarea>
-    </div>
-    <div class="ma-snippet">
-      <div class="ma-snippet-hd">
-        <span>2. ตั้งค่า MAC — เปิดไฟล์ (MobaXterm)</span>
-        <button type="button" class="btn-sm btn-line ma-copy-btn" data-target="<?= h($pfx) ?>-mac"><?= ui_btn_label('copy', 'คัดลอก', 13) ?></button>
-      </div>
-      <textarea class="ma-snippet-txt" id="<?= h($pfx) ?>-mac" readonly rows="3" aria-label="คำสั่งเปิด cmdline.txt">sudo nano /boot/cmdline.txt</textarea>
-    </div>
-    <div class="ma-snippet">
-      <div class="ma-snippet-hd">
-        <span>3. MAC Address จากหมายเลขสินค้า</span>
-        <button type="button" class="btn-sm btn-line ma-copy-btn" data-target="<?= h($pfx) ?>-macaddr"><?= ui_btn_label('copy', 'คัดลอก', 13) ?></button>
-      </div>
-      <textarea class="ma-snippet-txt" id="<?= h($pfx) ?>-macaddr" readonly rows="3" aria-label="MAC Address ที่คำนวณจากหมายเลขสินค้า" placeholder="(กรอกหมายเลขสินค้าก่อน)"></textarea>
-      <p class="muted ma-snippet-note">เช่น BS22120047 → be:99:22:12:00:47</p>
-    </div>
-    <div class="ma-snippet">
-      <div class="ma-snippet-hd">
-        <span>4. สรุปส่งงานเช่า Office</span>
-        <button type="button" class="btn-sm btn-line ma-copy-btn" data-target="<?= h($pfx) ?>-rental"><?= ui_btn_label('copy', 'คัดลอก', 13) ?></button>
-      </div>
-      <textarea class="ma-snippet-txt ma-snippet-txt-tall" id="<?= h($pfx) ?>-rental" readonly rows="8" aria-label="ข้อความสรุป MA งานเช่า"></textarea>
-    </div>
-    <?php
-    return ob_get_clean();
-}
-
 // ---------------------------------------------------------------
 // AJAX: ประวัติ MA ของเครื่อง (HTML)
 // ---------------------------------------------------------------
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'history') {
     header('Content-Type: text/html; charset=utf-8');
     $code = trim(isset($_GET['code']) ? $_GET['code'] : '');
-    $a = qr("SELECT a.*, p.name pname, c.name cust FROM assets a JOIN products p ON p.id=a.product_id
-             LEFT JOIN customers c ON c.id=a.current_customer_id
+    $a = qr("SELECT a.*, p.name pname FROM assets a JOIN products p ON p.id=a.product_id
              WHERE a.asset_code=? OR a.factory_serial=?", 'ss', [$code, $code])->fetch_assoc();
     if (!$a) { echo '<p class="muted">❌ ไม่พบเครื่องรหัส "' . h($code) . '" ในระบบ</p>'; exit; }
 
@@ -688,7 +647,7 @@ $maClearUrl = $maListUrl;
 page_header('บันทึก MA — ' . $product['name'] . ' (' . number_format($total) . ')');
 require __DIR__ . '/includes/list_search.php';
 ?>
-<?php if (can('ma')) { $ea = $editRec; ?>
+<?php if (can('ma')) { $ea = $editRec; $maProductPrefill = $ea ? ['fw_version' => '', 'remark' => ''] : ma_last_product_prefill($productId); ?>
 <div class="ma-section-head">
   <?= img_tag($product['icon_path'], $product['name'], 'thumb') ?>
   <div class="ma-section-head-info">
@@ -704,48 +663,9 @@ require __DIR__ . '/includes/list_search.php';
 </p>
 <?php } ?>
 
+<script src="<?= BASE_URL ?>/assets/ma-snippets.js?v=<?= @filemtime(__DIR__ . '/assets/ma-snippets.js') ?: time() ?>"></script>
 <script>
 (function(){
-  function normItem(s){ return (s == null ? '' : String(s)).trim(); }
-  function assetCodeToMac(code){
-    code = normItem(code);
-    if (!code) return '';
-    var digits = code.replace(/\D/g, '');
-    if (!digits) return '';
-    if (digits.length > 8) digits = digits.slice(-8);
-    while (digits.length < 8) digits = '0' + digits;
-    return 'be:99:' + digits.slice(0, 2) + ':' + digits.slice(2, 4) + ':' + digits.slice(4, 6) + ':' + digits.slice(6, 8);
-  }
-  function buildRentalSummaryFromData(rep, fix, fw, remark){
-    rep = normItem(rep);
-    fix = normItem(fix);
-    fw = normItem(fw);
-    remark = normItem(remark);
-    var lines = ['✅ ใช้งานได้ปกติ เช็ดทำความสะอาด'];
-    if (rep) lines.push('✨ เปลี่ยน : ' + rep);
-    if (fix) lines.push('🛠️ แก้ไข : ' + fix);
-    lines.push('🛜 FW : ' + fw);
-    lines.push('📝 Note : ' + remark);
-    return lines.join('\n');
-  }
-  window.maFillSnippets = function(prefix, data){
-    data = data || {};
-    var code = normItem(data.code);
-    var serialEl = document.getElementById(prefix + '-serial');
-    var macAddrEl = document.getElementById(prefix + '-macaddr');
-    var rentalEl = document.getElementById(prefix + '-rental');
-    if (serialEl) {
-      serialEl.value = code
-        ? 'sudo /opt/RTC_SDL_DS3231/srwSerial.py w ' + code
-        : '(กรอกหมายเลขสินค้าก่อน)';
-    }
-    if (macAddrEl) {
-      macAddrEl.value = code ? assetCodeToMac(code) : '(กรอกหมายเลขสินค้าก่อน)';
-    }
-    if (rentalEl) {
-      rentalEl.value = buildRentalSummaryFromData(data.replace, data.repair, data.fw, data.remark);
-    }
-  };
   window.maOpenRowModal = function(tr){
     if (!tr || !tr.dataset) return;
     var d = tr.dataset;
@@ -757,20 +677,26 @@ require __DIR__ . '/includes/list_search.php';
     var dl = document.getElementById('ma-detail-dl');
     if (dl) {
       var rows = [
-        ['วันที่เข้า MA', d.date || '-'],
-        ['รอบ MA', d.round || '-'],
-        ['หมายเลขสินค้า', d.asset || d.code || '-'],
-        ['✅ ใช้งานได้ปกติ', d.ok || '-'],
-        ['🔄 เปลี่ยนอะไหล่', d.replaceDisp || '-'],
-        ['🔧 ซ่อม', d.repairDisp || '-'],
-        ['Firmware หลังตรวจ', d.fw || '-'],
-        ['ผู้บันทึก', d.by || '-'],
-        ['หมายเหตุ', d.remark || '-']
+        ['วันที่เข้า MA', d.date || '-', false],
+        ['รอบ MA', d.round || '-', false],
+        ['หมายเลขสินค้า', d.asset || d.code || '-', false],
+        ['✅ ใช้งานได้ปกติ', d.ok || '-', true],
+        ['🔄 เปลี่ยนอะไหล่', d.replaceDisp || '-', true],
+        ['🔩 อะไหล่ที่เบิก (MA)', d.partsWithdraw || '-', true],
+        ['🔧 ซ่อม', d.repairDisp || '-', true],
+        ['Firmware หลังตรวจ', d.fw || '-', false],
+        ['ผู้บันทึก', d.by || '-', false],
+        ['หมายเหตุ', d.remark || '-', false]
       ];
       dl.innerHTML = rows.map(function(r){
-        return '<div class="ma-detail-row"><dt>' + escHtml(r[0]) + '</dt><dd>' + escHtml(r[1]) + '</dd></div>';
+        var val = r[1];
+        var dd = r[2] && val && val !== '-' && val.indexOf('\n') >= 0
+          ? val.split('\n').map(escHtml).join('<br>')
+          : escHtml(val);
+        return '<div class="ma-detail-row"><dt>' + escHtml(r[0]) + '</dt><dd>' + dd + '</dd></div>';
       }).join('');
     }
+    window.resetMaCopyButtonsInScope('ma-modal-sn');
     window.maFillSnippets('ma-modal-sn', {
       code: d.code || '',
       replace: d.replace || '',
@@ -783,23 +709,6 @@ require __DIR__ . '/includes/list_search.php';
       titleEl.textContent = 'รายละเอียด MA — ' + (d.asset || d.code || '');
     }
     document.getElementById('ma-detail-overlay').hidden = false;
-  };
-  window.copyMaText = function(btn){
-    var el = document.getElementById(btn.dataset.target);
-    if (!el) return;
-    var text = el.value != null ? el.value : el.textContent;
-    function done(ok){
-      if (!ok) { alert('คัดลอกไม่สำเร็จ'); return; }
-      var orig = btn.textContent;
-      btn.textContent = '✓ คัดลอกแล้ว';
-      setTimeout(function(){ btn.textContent = orig; }, 1400);
-    }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(function(){ done(true); }).catch(function(){ done(false); });
-    } else {
-      el.focus(); el.select();
-      try { done(document.execCommand('copy')); } catch (e) { done(false); }
-    }
   };
 })();
 </script>
@@ -861,7 +770,7 @@ require __DIR__ . '/includes/list_search.php';
 
       <label>Firmware หลังตรวจ</label>
       <div id="ma-fw-slot" class="ma-fw-wrap">
-        <?php $maFwVal = $ea ? (string)$ea['fw_version'] : ''; ?>
+        <?php $maFwVal = $ea ? (string)$ea['fw_version'] : (string)($maProductPrefill['fw_version'] ?? ''); ?>
         <input type="text" name="fw_version" id="ma_fw_input" class="ma-fw-fallback"
           value="<?= h($maFwVal) ?>"
           placeholder="พิมพ์หรือเลือกเวอร์ชัน Firmware"
@@ -874,7 +783,7 @@ require __DIR__ . '/includes/list_search.php';
       </div>
 
       <label class="full">หมายเหตุ</label>
-      <textarea name="remark" id="ma_remark" class="full field-note ma-remark" rows="2" placeholder="บันทึกเพิ่มเติม…"><?= h($ea ? $ea['remark'] : '') ?></textarea>
+      <textarea name="remark" id="ma_remark" class="full field-note ma-remark" rows="2" placeholder="บันทึกเพิ่มเติม…"><?= h($ea ? $ea['remark'] : ($maProductPrefill['remark'] ?? '')) ?></textarea>
 
       <div class="full ma-form-actions">
         <button type="submit"><?= $ea ? '💾 บันทึกการแก้ไข' : '💾 บันทึก MA' ?></button>
@@ -938,8 +847,11 @@ function maDupMsg(val, where){
 }
 
 function maFwValue(){
-  var hid = document.querySelector('#ma-fw-slot input[data-chip-val]');
-  if (hid) return hid.value.trim();
+  var slot = document.getElementById('ma-fw-slot');
+  var hid = slot ? slot.querySelector('input[data-chip-val]') : null;
+  if (hid && hid.value.trim()) return hid.value.trim();
+  var filt = slot ? slot.querySelector('.chip-dd-filter') : null;
+  if (filt && filt.value.trim()) return filt.value.trim();
   var inp = document.getElementById('ma_fw_input');
   return inp ? inp.value.trim() : '';
 }
@@ -1078,8 +990,11 @@ function setMaPart(dd, partId){
   var chips = dd.querySelector('.chip-dd-chips');
   chips.innerHTML = partId ? maPartSelectedChipHtml(partId) : '';
   var filt = dd.querySelector('.ma-part-filter');
-  if (filt) filt.placeholder = partId ? '' : 'ค้นหาอะไหล่…';
-  dd.querySelector('.chip-dd-opts').innerHTML = maPartOptsHtml(partId, filt ? filt.value.trim() : '');
+  if (filt) {
+    filt.value = '';
+    filt.placeholder = partId ? '' : 'ค้นหาอะไหล่…';
+  }
+  dd.querySelector('.chip-dd-opts').innerHTML = maPartOptsHtml(partId, '');
 }
 function maPartRowHtml(partId, qty, movementId){
   var mid = movementId ? parseInt(movementId, 10) : 0;
@@ -1268,6 +1183,8 @@ function showList(wrap, filter, focusSearch){
 }
 
 document.getElementById('ma-form').addEventListener('submit', function(e){
+  var fwDd = document.querySelector('#ma-fw-slot .chip-dd');
+  if (fwDd && typeof chipDdFlushFreeText === 'function') chipDdFlushFreeText(fwDd);
   var seen = {};
   for (var i = 0; i < FIELDS.length; i++) {
     var key = FIELDS[i];
@@ -1397,7 +1314,6 @@ list_search_form([
 </div>
 <script>
 document.addEventListener('click', function(e){
-  if (e.target.closest('.ma-copy-btn')) { copyMaText(e.target.closest('.ma-copy-btn')); return; }
   if (e.target.closest('.ma-row-actions a, .ma-row-actions button, .ma-row-actions form')) return;
   if (e.target.closest('a')) return;
   var row = e.target.closest('tr.ma-row-click');

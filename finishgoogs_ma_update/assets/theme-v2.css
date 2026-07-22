@@ -152,19 +152,48 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .kpi-warning .kpi-ic { background: var(--warning-soft); color: var(--warning); }
 .kpi-warning .kpi-num { color: var(--warning); }
 
-/* ── Dashboard รวม: อะไหล่ใกล้หมด + activity ── */
-.dash-lists-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-@media (max-width: 900px) { .dash-lists-2col { grid-template-columns: 1fr; } }
-.low-stock-list .ls-img { width: 42px; }
+/* ── Dashboard รวม: อะไหล่ใกล้หมด (modal / popup) ── */
+.dash-low-stock-empty { margin: 0; padding: 4px 0; }
+.low-stock-cards { display: flex; flex-direction: column; gap: 10px; }
+.low-stock-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid #e7e0f5;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+.low-stock-card .ls-img { width: auto; }
+.low-stock-card .ls-info { min-width: 0; }
+.low-stock-card .ls-qty { text-align: right; white-space: nowrap; font-size: 13px; }
+.low-stock-card .ls-badge { white-space: nowrap; }
+.low-stock-list { margin: 0; }
+.low-stock-list .ls-img { width: 46px; padding: 10px 8px 10px 4px; vertical-align: middle; }
+.low-stock-list .ls-info { padding: 10px 8px; vertical-align: middle; min-width: 0; }
+.low-stock-list .ls-qty { padding: 10px 8px; vertical-align: middle; text-align: right; white-space: nowrap; }
+.low-stock-list .ls-badge { padding: 10px 8px 10px 4px; vertical-align: middle; white-space: nowrap; }
+.low-stock-list .ls-name {
+  font-weight: 600; font-size: 13px; line-height: 1.35;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; max-width: 240px;
+}
+.low-stock-list .ls-code { font-size: 12px; margin-top: 2px; }
+.low-stock-list .ls-bar { height: 5px; border-radius: 999px; background: #f1edfa; overflow: hidden; margin-top: 6px; max-width: 200px; }
+.low-stock-list .ls-bar i { display: block; height: 100%; border-radius: 999px; }
 .ls-thumb { width: 34px; height: 34px; border-radius: 8px; object-fit: contain; background: #f7f4fd; border: 1px solid #e7e0f5; }
-.ls-thumb-ph { display: inline-flex; align-items: center; justify-content: center; color: #8b5fb8; }
-.ls-bar { height: 5px; border-radius: 999px; background: #f1edfa; overflow: hidden; margin-top: 5px; max-width: 180px; }
-.ls-bar i { display: block; height: 100%; border-radius: 999px; }
+.ls-thumb-ph { display: inline-flex; align-items: center; justify-content: center; color: #8b5fb8; width: 34px; height: 34px; }
 .badge-pill { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 2.5px 11px; border-radius: 999px; white-space: nowrap; }
 .bp-success { background: var(--success-soft); color: var(--success); }
 .bp-info { background: var(--info-soft); color: var(--info); }
 .bp-warning { background: var(--warning-soft); color: var(--warning); }
 .bp-danger { background: var(--danger-soft); color: var(--danger); }
+
+/* legacy dash-lists-2col — คงไว้ถ้ามีหน้าอื่นอ้าง */
+.dash-lists-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+@media (max-width: 900px) { .dash-lists-2col { grid-template-columns: 1fr; } }
 .dash-feed { display: flex; flex-direction: column; }
 .dash-ev { display: flex; align-items: baseline; gap: 10px; padding: 8px 2px; border-bottom: 1px solid #f1edfa; font-size: 13.5px; }
 .dash-ev:last-child { border-bottom: none; }
@@ -174,6 +203,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 
 /* ── Dashboard รวม: ทางลัด ── */
 .quick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.dash-quick-panel { margin-bottom: 20px; }
+.dash-quick-panel h3 { margin-bottom: 10px; }
+.dash-quick-panel .quick-item { padding: 10px 12px; }
 @media (max-width: 900px) { .quick-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 560px) { .quick-grid { grid-template-columns: 1fr; } }
 .quick-item {
@@ -191,8 +223,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .q-warning { background: var(--warning-soft); color: var(--warning); }
 
 /* ── Dashboard v2 layout ── */
+.content > .panel,
+.content > .dash-charts-2col,
+.content > .kpi-grid { margin-bottom: 20px; }
+.content > .panel:last-child { margin-bottom: 0; }
 .dash-charts-2col {
-  display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; margin-bottom: 16px;
+  display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px;
 }
 @media (max-width: 900px) { .dash-charts-2col { grid-template-columns: 1fr; } }
 .dash-barchart { border: 0; padding: 8px 4px 0; height: 160px; background: transparent; }
@@ -207,7 +243,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .year-hbar-val { text-align: right; font-weight: 600; color: #2a2440; }
 
 .model-card-grid {
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px;
 }
 @media (max-width: 1100px) { .model-card-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 640px) { .model-card-grid { grid-template-columns: 1fr; } }
@@ -216,6 +252,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   background: #fff; border: 1px solid #e7e0f5; border-radius: var(--radius-sm);
   padding: 10px 12px; cursor: pointer; transition: box-shadow .15s, border-color .15s;
 }
+.model-card[hidden] { display: none !important; }
+.dash-view-pane[hidden] { display: none !important; }
 .model-card:hover { box-shadow: var(--shadow-md); border-color: #d9c9f2; }
 .model-card-img { flex-shrink: 0; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: #f7f4fd; border-radius: 8px; overflow: hidden; }
 .model-thumb { width: 40px; height: 40px; object-fit: contain; }
@@ -224,6 +262,213 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .model-card-bar { height: 6px; background: #f1edfa; border-radius: 999px; overflow: hidden; margin-bottom: 4px; }
 .model-card-fill { height: 100%; border-radius: 999px; }
 .model-card-num { font-size: 12px; color: #6b6480; font-weight: 600; }
+.model-card-num .text-warn { color: var(--warning, #a16207); font-weight: 600; }
+.model-card-sub { font-size: 11px; margin: -4px 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.model-card-link { text-decoration: none; color: inherit; }
+.model-card-link:hover { text-decoration: none; }
+.model-card.clickable { cursor: pointer; }
+
+/* โปรไฟล์อะไหล่ใน modal dashboard */
+.part-profile-head {
+  display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap;
+  margin-bottom: 12px; background: #f7f9fc; border: 1px solid #eceff4;
+  border-radius: 8px; padding: 12px 14px;
+}
+.part-profile-ph {
+  width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+  background: #f7f4fd; border-radius: 8px; color: #8b5cf6;
+}
+.part-profile-meta { flex: 1; min-width: 180px; }
+.part-profile-stats { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.part-profile-stat {
+  font-size: 12px; background: #fff; border: 1px solid #eceff4;
+  border-radius: 6px; padding: 4px 10px; color: #6b6480;
+}
+.part-move-table td { font-size: 13px; }
+.part-move-in { color: #059669; font-weight: 600; white-space: nowrap; }
+.part-move-out { color: #dc2626; font-weight: 600; white-space: nowrap; }
+.part-move-badge {
+  display: inline-block; font-size: 11px; font-weight: 600;
+  padding: 2px 8px; border-radius: 999px;
+}
+.part-move-badge-in { background: #ecfdf5; color: #059669; }
+.part-move-badge-out { background: #fef2f2; color: #dc2626; }
+
+/* โปรไฟล์เครื่อง — ใช้ asset-toolbar แทน pagehead ป้องกันชื่อซ้ำ */
+.pagehead:has(+ .asset-toolbar) { display: none; }
+
+/* โปรไฟล์เครื่อง — toolbar + card เบิกขาย */
+.asset-toolbar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.asset-toolbar-title {
+  margin: 0; font-size: 20px; font-weight: 700; flex: 1; min-width: 160px;
+}
+.asset-toolbar-actions {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto;
+}
+.asset-head {
+  display: grid;
+  grid-template-columns: auto 1fr minmax(240px, 300px);
+  grid-template-areas: "photo main sales";
+  gap: 18px; align-items: stretch;
+}
+.asset-head-photo { grid-area: photo; align-self: start; }
+.asset-head-main { grid-area: main; min-width: 0; }
+.asset-head-main dl { width: 100%; }
+.asset-status-form select {
+  font-size: 13px; padding: 4px 8px; min-width: 140px; max-width: 100%;
+  height: 29px; border: 1px solid #d9c9f2; border-radius: 6px; background: #fff;
+}
+.asset-sales-card {
+  grid-area: sales;
+  display: flex; flex-direction: column;
+  background: #f7f9fc; border: 1px solid #dce3ef; border-radius: 10px;
+  padding: 12px 14px; font-size: 13px; min-height: 100%;
+}
+.asset-sales-empty { flex: 1; margin: 0; font-size: 12px; }
+.asset-sales-card-head {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+  font-size: 14px; color: #4b5563;
+}
+.asset-sales-ref {
+  margin: 0 0 10px; font-size: 12px; color: #6b6480;
+  padding: 6px 10px; background: #eef4ff; border-radius: 6px;
+  border-left: 3px solid var(--primary, #e11d74);
+}
+.asset-sales-dl {
+  display: grid; grid-template-columns: 110px 1fr; gap: 4px 10px; margin: 0;
+}
+.asset-sales-dl dt { color: #6b6480; font-size: 12px; }
+.asset-sales-dl dd { margin: 0; }
+.asset-sales-setup-id { font-size: 15px; color: var(--primary, #e11d74); }
+.asset-sales-badge {
+  display: inline-block; font-size: 11px; font-weight: 600;
+  padding: 2px 8px; border-radius: 999px; background: #ede9fe; color: #6d28d9;
+}
+.asset-sales-others { margin-top: 10px; font-size: 12px; }
+.asset-sales-others ul { margin: 4px 0 0; padding-left: 18px; color: #4b5563; }
+.asset-sales-foot { margin: 10px 0 0; font-size: 12px; }
+@media (max-width: 960px) {
+  .asset-head {
+    grid-template-columns: 1fr;
+    grid-template-areas: "photo" "main" "sales";
+  }
+  .asset-toolbar-actions { width: 100%; margin-left: 0; }
+}
+.model-thumb-ph { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; color: var(--primary); opacity: .85; }
+
+.panel-head-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap; margin-bottom: 14px;
+}
+.panel-head-row h3 { margin: 0; }
+.panel-head-actions {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  margin-left: auto;
+}
+.panel-meta { font-weight: 400; font-size: 13px; margin-left: 6px; }
+.dash-parts-filter[hidden] { display: none !important; }
+.dash-parts-filters[hidden] { display: none !important; }
+.dash-parts-filters {
+  width: 100%;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, #faf8ff 0%, #fff 100%);
+  border: 1px solid #ece6f8;
+  border-radius: 12px;
+  box-sizing: border-box;
+}
+.dash-parts-filters-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dash-parts-filter-group {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px 12px;
+}
+.dash-parts-filter-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #8b839c;
+  padding-top: 9px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.dash-parts-filter:not([hidden]) {
+  display: inline-flex; gap: 0; padding: 3px; border-radius: 999px;
+  background: #fff7ed; border: 1px solid #fed7aa;
+  width: fit-content;
+}
+.dash-parts-supplier-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+.dash-parts-filter-group--suppliers .dash-parts-supplier-filter {
+  padding-top: 2px;
+}
+.dash-parts-supplier-btn {
+  border: 1px solid #e7e0f5; background: #fff; color: #6b6480; font-family: inherit;
+  font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 999px;
+  cursor: pointer; transition: background .15s, color .15s, border-color .15s, box-shadow .15s;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-parts-supplier-btn:hover:not(.active) { color: var(--primary-dark); border-color: #d9c9f2; }
+.dash-parts-supplier-btn.active {
+  background: #f6f3fd; color: var(--primary-dark); border-color: #d9c9f2;
+  box-shadow: 0 1px 4px rgba(46, 26, 90, .08);
+}
+.model-card-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px;
+}
+.dash-part-order-btn { flex-shrink: 0; padding: 3px 8px !important; font-size: 11px !important; white-space: nowrap; }
+.dash-part-order-btn .btn-svg { width: 13px; height: 13px; }
+.dash-parts-filter-btn {
+  border: 0; background: transparent; color: #9a3412; font-family: inherit;
+  font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 999px;
+  cursor: pointer; transition: background .15s, color .15s, box-shadow .15s;
+}
+.dash-parts-filter-btn:hover:not(.active) { color: #c2410c; }
+.dash-parts-filter-btn.active {
+  background: #fff; color: #c2410c;
+  box-shadow: 0 1px 4px rgba(154, 52, 18, .12);
+}
+.dash-parts-filter-btn:disabled { opacity: .45; cursor: not-allowed; }
+.dash-parts-filter-empty { margin: 8px 0 0; padding: 4px 0; }
+@media (max-width: 640px) {
+  .dash-parts-filter-group {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .dash-parts-filter-label { padding-top: 0; }
+}
+.dash-view-toggle {
+  display: inline-flex; gap: 0; padding: 3px; border-radius: 999px;
+  background: #f1edfa; border: 1px solid #e7e0f5;
+}
+.dash-view-btn {
+  border: 0; background: transparent; color: #6b6480; font-family: inherit;
+  font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 999px;
+  cursor: pointer; transition: background .15s, color .15s, box-shadow .15s;
+}
+.dash-view-btn:hover:not(:disabled) { color: var(--primary-dark); }
+.dash-view-btn.active {
+  background: #fff; color: var(--primary-dark);
+  box-shadow: 0 1px 4px rgba(46, 26, 90, .12);
+}
+.dash-view-btn:disabled { opacity: .45; cursor: not-allowed; }
 
 .dash-extra { margin-bottom: 16px; }
 .dash-extra summary { cursor: pointer; font-weight: 600; color: #6b6480; padding: 4px 0 10px; }

@@ -3,7 +3,6 @@
 require __DIR__ . '/config.php';
 require __DIR__ . '/includes/layout.php';
 require_once __DIR__ . '/includes/part_stock_bridge.php';
-require_once dirname(__DIR__) . '/shared/activity_log_core.php';
 require_login();
 
 // ---- สรุปสถานะ ----
@@ -13,7 +12,7 @@ while ($r = $res->fetch_assoc()) $byStatus[$r['status']] = (int)$r['c'];
 $total = array_sum($byStatus);
 
 // ---- สต็อกอะไหล่ (biton_tech_parts) — พังแล้วหน้าอื่นต้องยังแสดงได้ ----
-$stock = ['ok' => false, 'items' => 0, 'qty' => 0, 'low' => 0, 'in_today' => 0, 'out_today' => 0, 'low_list' => []];
+$stock = ['ok' => false, 'items' => 0, 'qty' => 0, 'low' => 0, 'in_today' => 0, 'out_today' => 0];
 try {
     $pdo = dbParts();
     $row = $pdo->query('SELECT COUNT(*) c, COALESCE(SUM(quantity),0) q FROM products')->fetch();
@@ -22,28 +21,9 @@ try {
     $stock['low']   = (int)$pdo->query('SELECT COUNT(*) FROM products WHERE quantity <= min_stock')->fetchColumn();
     $stock['in_today']  = (int)$pdo->query('SELECT COALESCE(SUM(quantity),0) FROM stock_in WHERE DATE(created_at) = CURDATE()')->fetchColumn();
     $stock['out_today'] = (int)$pdo->query("SELECT COALESCE(SUM(soi.quantity),0) FROM stock_out_items soi JOIN stock_out so ON so.id = soi.stock_out_id WHERE DATE(so.created_at) = CURDATE()")->fetchColumn();
-    $stock['low_list'] = $pdo->query('SELECT code, name, unit, quantity, min_stock FROM products WHERE quantity <= min_stock ORDER BY quantity ASC LIMIT 5')->fetchAll();
     $stock['ok'] = true;
 } catch (Throwable $e) {
     // แสดง dashboard ฝั่งเครื่องต่อได้แม้ต่อ DB สต็อกไม่ได้
-}
-
-// รูปอะไหล่: map code → icon_path จากตาราง parts ฝั่ง production
-$lowIcons = [];
-if ($stock['low_list']) {
-    $codes = array_map(function ($r) { return $r['code']; }, $stock['low_list']);
-    $ph = implode(',', array_fill(0, count($codes), '?'));
-    $st = qr("SELECT stock_code, icon_path FROM parts WHERE stock_code IN ($ph) AND icon_path IS NOT NULL AND icon_path <> ''",
-             str_repeat('s', count($codes)), $codes);
-    while ($r = $st->fetch_assoc()) $lowIcons[$r['stock_code']] = $r['icon_path'];
-}
-
-// ---- ความเคลื่อนไหวล่าสุดรวม 2 ระบบ ----
-$feed = [];
-try {
-    $fr = activity_log_search([], 6, 0);
-    $feed = $fr['rows'] ?? [];
-} catch (Throwable $e) {
 }
 
 // ---- ผลิตราย 12 เดือน ----
@@ -69,12 +49,51 @@ $res = qr("SELECT p.id pid, p.name, p.icon_path, COUNT(*) c FROM assets a JOIN p
 while ($r = $res->fetch_assoc()) $perModel[] = $r;
 $maxPM = 1; foreach ($perModel as $m) $maxPM = max($maxPM, (int)$m['c']);
 
-// ---- ตามหมวดสินค้า (ส่วนเสริม) ----
-$perCat = [];
-$res = qr("SELECT COALESCE(NULLIF(p.category,''),'อื่นๆ') cat, COUNT(*) c FROM assets a JOIN products p ON p.id=a.product_id
-           GROUP BY cat ORDER BY c DESC");
-while ($r = $res->fetch_assoc()) $perCat[$r['cat']] = (int)$r['c'];
-$maxCat = max(1, $perCat ? max($perCat) : 1);
+// ---- รายการอะไหล่ (สต็อก) สำหรับสลับมุมมองบน Dashboard ----
+$perPart = [];
+$maxPart = 1;
+$partIcons = [];
+$partProdLabels = [];
+if ($stock['ok']) {
+    try {
+        require_once dirname(__DIR__) . '/parts/includes/helpers.php';
+        ensureProductColumns($pdo);
+        $perPart = $pdo->query(
+            'SELECT id, code, name, quantity, unit, min_stock, purchase_link, supplier FROM products ORDER BY quantity DESC'
+        )->fetchAll();
+        foreach ($perPart as $p) {
+            $maxPart = max($maxPart, (int) $p['quantity']);
+        }
+        if ($perPart) {
+            $partCodes = array_map(function ($r) { return $r['code']; }, $perPart);
+            $partProdLabels = production_part_labels_by_stock_codes($partCodes);
+            foreach ($partProdLabels as $sc => $meta) {
+                if (!empty($meta['icon_path'])) {
+                    $partIcons[$sc] = $meta['icon_path'];
+                }
+            }
+        }
+    } catch (Throwable $e) {
+        $perPart = [];
+        $partProdLabels = [];
+    }
+}
+
+$perPartLowCount = 0;
+$partSuppliers = [];
+$partSupplierNoneCount = 0;
+foreach ($perPart as $p) {
+    if ((int) $p['quantity'] <= (int) $p['min_stock']) {
+        $perPartLowCount++;
+    }
+    $sup = trim((string) ($p['supplier'] ?? ''));
+    if ($sup === '') {
+        $partSupplierNoneCount++;
+    } else {
+        $partSuppliers[$sup] = ($partSuppliers[$sup] ?? 0) + 1;
+    }
+}
+ksort($partSuppliers, SORT_NATURAL | SORT_FLAG_CASE);
 
 $PALETTE = ['#ec4899','#8b5cf6','#3b82f6','#f59e0b','#10b981','#06b6d4','#f43f5e','#a855f7','#14b8a6','#eab308','#6366f1','#ef4444'];
 function pct($v, $t) { return $t > 0 ? round($v / $t * 100) : 0; }
@@ -102,9 +121,12 @@ function kpi($num, $label, $icon, $tone, $sub = '', $onclick = '', $sys = '', $n
     if ($sub !== '') echo '<div class="kpi-sub">' . $sub . '</div>';
     echo '</div>';
 }
-/** สร้างโค้ด JS ดิบสำหรับ onclick — ตัว kpi() จะ h() ให้ตอนใส่ attribute (ห้าม escape ซ้ำ) */
+/** สร้างโค้ด JS ดิบสำหรับ onclick — ต้องครอบด้วย h() เมื่อใส่ใน attribute */
 function modal_js($title, $dataUrl, $moreUrl = '') {
-    return 'showListModal(' . json_encode($title, JSON_UNESCAPED_UNICODE) . ", '" . $dataUrl . "', '" . $moreUrl . "')";
+    return 'showListModal('
+        . json_encode($title, JSON_UNESCAPED_UNICODE) . ', '
+        . json_encode($dataUrl, JSON_UNESCAPED_UNICODE) . ', '
+        . json_encode($moreUrl, JSON_UNESCAPED_UNICODE) . ')';
 }
 $B = BASE_URL;
 $partsBase = ui_parts_base_url();
@@ -112,20 +134,23 @@ $partsBase = ui_parts_base_url();
 <div class="kpi-grid">
   <?php
   kpi($total, 'เครื่องทั้งหมด', 'assets', 'primary', pct($byStatus['new'], $total) . '% อยู่ในคลัง',
-      modal_js('เครื่องทั้งหมด (แสดง 150 รายการล่าสุด)', "$B/dashboard_data.php?type=all", "$B/assets.php"), 'เครื่อง');
+      modal_js('เครื่องทั้งหมด — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=all", "$B/assets.php"), 'เครื่อง');
   kpi($byStatus['new'], 'ใหม่ (คลัง)', 'box', 'success', pct($byStatus['new'], $total) . '% ของทั้งหมด',
-      modal_js('เครื่องใหม่', "$B/dashboard_data.php?type=status&v=new", "$B/assets.php?status=new"), 'เครื่อง');
+      modal_js('เครื่องใหม่ — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=new", "$B/assets.php?status=new"), 'เครื่อง');
   kpi($byStatus['rental'], 'เครื่องเช่า', 'updates', 'info', pct($byStatus['rental'], $total) . '% ของทั้งหมด',
-      modal_js('เครื่องเช่า', "$B/dashboard_data.php?type=status&v=rental", "$B/assets.php?status=rental"), 'เครื่อง');
+      modal_js('เครื่องเช่า — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=rental", "$B/assets.php?status=rental"), 'เครื่อง');
   kpi($byStatus['spare'], 'เครื่องสำรอง', 'box', 'warning', 'พร้อมสลับเปลี่ยนหน้างาน',
-      modal_js('เครื่องสำรอง', "$B/dashboard_data.php?type=status&v=spare", "$B/assets.php?status=spare"), 'เครื่อง');
+      modal_js('เครื่องสำรอง — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=spare", "$B/assets.php?status=spare"), 'เครื่อง');
   if ($stock['ok']) {
       kpi($stock['qty'], 'สต็อกคงเหลือรวม', 'parts', 'primary', number_format($stock['items']) . ' รายการ',
           "location.href='" . h($partsBase) . "/pages/products.php'", 'อะไหล่');
       kpi($stock['low'], 'อะไหล่ใกล้หมด', 'alert', $stock['low'] > 0 ? 'warning' : 'success', $stock['low'] > 0 ? '<span class="kpi-down">ต้องตรวจสอบ/สั่งซื้อ</span>' : 'ทุกรายการเพียงพอ',
-          "location.href='" . h($partsBase) . "/pages/products.php'", 'อะไหล่');
+          $stock['low'] > 0
+              ? modal_js('อะไหล่ใกล้หมด (' . number_format($stock['low']) . ' รายการ)', "$B/dashboard_data.php?type=low_stock", "$partsBase/pages/products.php")
+              : "location.href='" . h($partsBase) . "/pages/products.php'",
+          'อะไหล่');
       kpi(0, 'รับเข้า / เบิกออก', 'history', 'info', 'ความเคลื่อนไหววันนี้',
-          "location.href='" . h($partsBase) . "/pages/history.php'", 'วันนี้',
+          modal_js('รับเข้า / เบิกออกวันนี้', "$B/dashboard_data.php?type=stock_today", "$partsBase/pages/history.php"), 'วันนี้',
           number_format($stock['in_today']) . ' / ' . number_format($stock['out_today']));
   } else {
       echo '<div class="kpi kpi-warning"><div class="kpi-top"><span class="kpi-ic">' . ui_icon_html('alert', 14) . '</span> สต็อกอะไหล่</div><b class="kpi-num">—</b><div class="kpi-sub">เชื่อมต่อระบบสต็อกไม่ได้</div></div>';
@@ -161,8 +186,60 @@ $partsBase = ui_parts_base_url();
   </div>
 </div>
 
-<div class="panel">
-  <h3>จำนวนเครื่องรายรุ่น <span class="muted panel-meta"><?= count($perModel) ?> รุ่น</span></h3>
+<div class="panel dash-quick-panel">
+  <?= ui_heading('check', 'ทางลัดที่ใช้บ่อย', 'h3') ?>
+  <div class="quick-grid">
+    <a href="<?= $B ?>/asset_new.php" class="quick-item"><span class="q-ic q-primary"><?= ui_icon_html('assets', 17) ?></span><span>บันทึกเครื่องใหม่<small>ทะเบียนเครื่อง</small></span></a>
+    <a href="<?= $B ?>/ma.php" class="quick-item"><span class="q-ic q-warning"><?= ui_icon_html('ma', 17) ?></span><span>บันทึก MA<small>บำรุงรักษา</small></span></a>
+    <a href="<?= $B ?>/update_new.php" class="quick-item"><span class="q-ic q-info"><?= ui_icon_html('updates', 17) ?></span><span>อัปเดต FW/HW<small>บันทึกเวอร์ชัน</small></span></a>
+    <a href="<?= h($partsBase) ?>/pages/stock-out.php" class="quick-item"><span class="q-ic q-info"><?= ui_icon_html('stock-out-set', 17) ?></span><span>เบิกอะไหล่<small>Set / รายชิ้น</small></span></a>
+    <a href="<?= h($partsBase) ?>/pages/stock-in.php" class="quick-item"><span class="q-ic q-success"><?= ui_icon_html('stock-in', 17) ?></span><span>รับอะไหล่เข้า<small>สต็อกอะไหล่</small></span></a>
+    <a href="<?= $B ?>/scan.php" class="quick-item"><span class="q-ic q-primary"><?= ui_icon_html('scan', 17) ?></span><span>สแกน QR<small>ค้นเครื่องเร็ว</small></span></a>
+  </div>
+</div>
+
+<div class="panel" id="dash-inventory-panel">
+  <div class="panel-head-row">
+    <h3 id="dash-inventory-title">
+      <span id="dash-inventory-title-text">จำนวนเครื่องรายรุ่น</span>
+      <span class="muted panel-meta" id="dash-inventory-meta"><?= count($perModel) ?> รุ่น</span>
+    </h3>
+    <div class="panel-head-actions">
+      <div class="dash-view-toggle" role="tablist" aria-label="โหมดรายการ">
+        <button type="button" class="dash-view-btn active" data-view="models" role="tab" aria-selected="true">รุ่นสินค้า</button>
+        <button type="button" class="dash-view-btn" data-view="parts" role="tab" aria-selected="false"
+          <?= ($stock['ok'] && $perPart) ? '' : 'disabled title="เชื่อมต่อสต็อกอะไหล่ไม่ได้"' ?>>รายการอะไหล่</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-parts-filters" id="dash-parts-filters" hidden>
+    <div class="dash-parts-filters-inner">
+      <div class="dash-parts-filter-group">
+        <span class="dash-parts-filter-label">สถานะ</span>
+        <div class="dash-parts-filter" id="dash-parts-filter" role="tablist" aria-label="ตัวกรองสต็อกอะไหล่">
+          <button type="button" class="dash-parts-filter-btn active" data-filter="all" role="tab" aria-selected="true">อะไหล่ทั้งหมด</button>
+          <button type="button" class="dash-parts-filter-btn" data-filter="low" role="tab" aria-selected="false"<?= $perPartLowCount <= 0 ? ' disabled title="ไม่มีอะไหล่ใกล้หมด"' : '' ?>>ใกล้หมด<?= $perPartLowCount > 0 ? ' (' . number_format($perPartLowCount) . ')' : '' ?></button>
+        </div>
+      </div>
+      <?php if ($partSuppliers || $partSupplierNoneCount) { ?>
+      <div class="dash-parts-filter-group dash-parts-filter-group--suppliers">
+        <span class="dash-parts-filter-label">ผู้จำหน่าย</span>
+        <div class="dash-parts-supplier-filter" id="dash-parts-supplier-filter" role="tablist" aria-label="ตัวกรองผู้จำหน่าย">
+          <button type="button" class="dash-parts-supplier-btn active" data-supplier="" role="tab" aria-selected="true">ทั้งหมด</button>
+          <?php foreach ($partSuppliers as $supName => $supCnt) { ?>
+          <button type="button" class="dash-parts-supplier-btn" data-supplier="<?= h($supName) ?>" role="tab" aria-selected="false"><?= h($supName) ?> (<?= number_format($supCnt) ?>)</button>
+          <?php } ?>
+          <?php if ($partSupplierNoneCount > 0) { ?>
+          <button type="button" class="dash-parts-supplier-btn" data-supplier="__none__" role="tab" aria-selected="false">ไม่ระบุ (<?= number_format($partSupplierNoneCount) ?>)</button>
+          <?php } ?>
+        </div>
+      </div>
+      <?php } ?>
+    </div>
+  </div>
+
+  <div class="dash-view-pane" id="dash-view-models" role="tabpanel">
   <div class="model-card-grid">
     <?php $mi = 0; foreach ($perModel as $m) { $col = $PALETTE[$mi++ % count($PALETTE)]; ?>
     <div class="model-card clickable"
@@ -178,108 +255,201 @@ $partsBase = ui_parts_base_url();
     </div>
     <?php } ?>
   </div>
-</div>
+  </div>
 
-<details class="panel dash-extra">
-  <summary>สัดส่วนสถานะ · หมวดสินค้า</summary>
-  <div class="dash-extra-body">
-    <?php
-      $donut = [['เครื่องใหม่ (คลัง)', $byStatus['new'], '#3b82f6', 'new'], ['เครื่องเช่า', $byStatus['rental'], '#8b5cf6', 'rental'], ['เครื่องสำรอง', $byStatus['spare'], '#f59e0b', 'spare']];
-      $acc = 0; $stops = [];
-      foreach ($donut as $d) { $p = pct($d[1], $total); $stops[] = $d[2] . ' ' . $acc . '% ' . ($acc + $p) . '%'; $acc += $p; }
-      if ($acc < 100 && $stops) $stops[] = '#e7e0f5 ' . $acc . '% 100%';
+  <div class="dash-view-pane" id="dash-view-parts" role="tabpanel" hidden>
+  <?php if (!$stock['ok'] || !$perPart) { ?>
+    <p class="muted" style="padding:12px 0">ไม่มีข้อมูลสต็อกอะไหล่</p>
+  <?php } else { ?>
+  <div class="model-card-grid" id="dash-parts-grid">
+    <?php $pi = 0; foreach ($perPart as $p) {
+        $col = $PALETTE[$pi++ % count($PALETTE)];
+        $qty = (int) $p['quantity'];
+        $low = $qty <= (int) $p['min_stock'];
+        $icon = isset($partIcons[$p['code']]) ? $partIcons[$p['code']] : '';
+        $supplier = trim((string) ($p['supplier'] ?? ''));
+        $purchaseLink = trim((string) ($p['purchase_link'] ?? ''));
+        $displayName = part_product_display_name($p, $partProdLabels);
+        $displaySub = part_product_display_sub($p, $partProdLabels);
+        $stockCode = trim((string) ($p['code'] ?? ''));
+        $cardTitle = $stockCode;
+        if ($displaySub !== '' && $displaySub !== $stockCode) {
+            $cardTitle .= ' · ' . $displaySub;
+        }
     ?>
-    <div class="dash-extra-cols">
-      <div>
-        <h3>สัดส่วนตามประเภท</h3>
-        <div class="donut-wrap">
-          <div class="donut" style="background:conic-gradient(<?= implode(',', $stops) ?>)"><div class="donut-hole"><b><?= number_format($total) ?></b><span>เครื่อง</span></div></div>
-          <div class="donut-legend">
-            <?php foreach ($donut as $d) { ?>
-            <div class="lg-row clickable" onclick="showListModal(<?= h(json_encode($d[0], JSON_UNESCAPED_UNICODE)) ?>, '<?= $B ?>/dashboard_data.php?type=status&v=<?= $d[3] ?>', '<?= $B ?>/assets.php?status=<?= $d[3] ?>')">
-              <span class="lg-dot" style="background:<?= $d[2] ?>"></span><?= h($d[0]) ?> <b><?= number_format($d[1]) ?></b>
-            </div>
-            <?php } ?>
-          </div>
-        </div>
+    <div class="model-card clickable dash-part-card" data-low-stock="<?= $low ? '1' : '0' ?>" data-supplier="<?= h($supplier) ?>"
+         onclick="showListModal(<?= h(json_encode('โปรไฟล์: ' . $displayName, JSON_UNESCAPED_UNICODE)) ?>, '<?= h("$B/dashboard_data.php?type=part_profile&v=" . (int) $p['id']) ?>', '<?= h("$partsBase/pages/product-detail.php?id=" . (int) $p['id']) ?>')"
+         title="<?= h($cardTitle) ?>">
+      <div class="model-card-img">
+        <?php if ($icon) {
+            echo img_tag($icon, $displayName, 'model-thumb');
+        } else {
+            echo '<span class="model-thumb model-thumb-ph">' . ui_icon_html('parts', 18) . '</span>';
+        } ?>
       </div>
-      <div>
-        <h3>ตามหมวดสินค้า</h3>
-        <?php $ci = 0; foreach ($perCat as $cat => $c) { $col = $PALETTE[$ci++ % count($PALETTE)]; ?>
-        <div class="hbar-row clickable" onclick="showListModal(<?= h(json_encode("หมวด: $cat", JSON_UNESCAPED_UNICODE)) ?>, '<?= h("$B/dashboard_data.php?type=category&v=" . rawurlencode($cat)) ?>', '')">
-          <div class="hbar-label"><?= h($cat) ?></div>
-          <div class="hbar-track"><div class="hbar-fill" style="width:<?= pct($c, $maxCat) ?>%; background:<?= $col ?>"></div></div>
-          <div class="hbar-val"><?= number_format($c) ?></div>
+      <div class="model-card-body">
+        <div class="model-card-name" title="<?= h($displayName) ?>"><?= h($displayName) ?></div>
+        <div class="model-card-sub muted"><?= h($displaySub) ?></div>
+        <div class="model-card-bar"><div class="model-card-fill" style="width:<?= pct($qty, $maxPart) ?>%; background:<?= $low ? 'var(--warning,#f59e0b)' : h($col) ?>"></div></div>
+        <div class="model-card-foot">
+          <div class="model-card-num"><?= number_format($qty) ?> <?= h($p['unit'] ?: 'ชิ้น') ?><?php if ($low) { ?> · <span class="text-warn">ใกล้หมด</span><?php } ?></div>
+          <?php if ($purchaseLink !== '') { ?>
+          <a href="<?= h($purchaseLink) ?>" class="btn btn-sm btn-line dash-part-order-btn" target="_blank" rel="noopener noreferrer"
+             onclick="event.stopPropagation();" title="เปิดลิงก์สั่งซื้อ"><?= ui_btn_label('external-link', 'สั่งซื้อ', 13) ?></a>
+          <?php } ?>
         </div>
-        <?php } ?>
       </div>
     </div>
-  </div>
-</details>
-
-<?php if ($stock['ok'] || $feed) { ?>
-<div class="dash-lists-2col">
-  <?php if ($stock['ok']) { ?>
-  <div class="panel">
-    <?= ui_heading('alert', 'อะไหล่ใกล้หมด', 'h3') ?>
-    <?php if (!$stock['low_list']) { ?>
-      <p class="muted" style="padding:8px 0">ไม่มีรายการใกล้หมด — สต็อกทุกตัวเพียงพอ</p>
-    <?php } else { ?>
-    <table class="list low-stock-list">
-      <?php foreach ($stock['low_list'] as $p) {
-          $pctLeft = $p['min_stock'] > 0 ? min(100, round($p['quantity'] / max(1, $p['min_stock'] * 2) * 100)) : 50;
-          $crit = (int)$p['quantity'] <= max(1, (int)$p['min_stock'] / 2);
-          $icon = isset($lowIcons[$p['code']]) ? $lowIcons[$p['code']] : '';
-      ?>
-      <tr>
-        <td class="ls-img"><?php if ($icon) { echo img_tag($icon, $p['name'], 'ls-thumb'); } else { echo '<span class="ls-thumb ls-thumb-ph">' . ui_icon_html('parts', 15) . '</span>'; } ?></td>
-        <td>
-          <b><?= h($p['name']) ?></b>
-          <span class="muted" style="font-size:12px"> <?= h($p['code']) ?></span>
-          <div class="ls-bar"><i style="width:<?= $pctLeft ?>%;background:<?= $crit ? 'var(--danger)' : 'var(--warning)' ?>"></i></div>
-        </td>
-        <td style="text-align:right;white-space:nowrap"><b><?= number_format($p['quantity']) ?></b> <span class="muted"><?= h($p['unit'] ?: 'ชิ้น') ?></span></td>
-        <td><span class="badge-pill <?= $crit ? 'bp-danger' : 'bp-warning' ?>"><?= $crit ? 'วิกฤต' : 'ใกล้หมด' ?></span></td>
-      </tr>
-      <?php } ?>
-    </table>
-    <p style="margin-top:8px"><a href="<?= h($partsBase) ?>/pages/products.php">ดูทั้งหมด (<?= number_format($stock['low']) ?> รายการ) ›</a></p>
     <?php } ?>
   </div>
+  <p class="muted dash-parts-filter-empty" id="dash-parts-filter-empty" hidden>ไม่มีอะไหล่ใกล้หมดในรายการนี้</p>
+  <p style="margin-top:10px"><a href="<?= h($partsBase) ?>/pages/products.php">ดูรายการอะไหล่ทั้งหมด ›</a></p>
   <?php } ?>
-
-  <?php if ($feed) { ?>
-  <div class="panel">
-    <?= ui_heading('history', 'ความเคลื่อนไหวล่าสุด (2 ระบบ)', 'h3') ?>
-    <div class="dash-feed">
-      <?php foreach ($feed as $ev) {
-          $sysKey = (string)($ev['system_key'] ?? '');
-          $sysLabel = defined('ACTIVITY_LOG_SYSTEM_LABELS') && isset(ACTIVITY_LOG_SYSTEM_LABELS[$sysKey])
-              ? ACTIVITY_LOG_SYSTEM_LABELS[$sysKey] : $sysKey;
-          $t = strtotime((string)($ev['created_at'] ?? ''));
-      ?>
-      <div class="dash-ev">
-        <span class="dash-ev-sys"><?= h($sysLabel) ?></span>
-        <p><b><?= h((string)($ev['actor_name'] ?? '')) ?></b> · <?= h((string)($ev['summary'] ?? '')) ?></p>
-        <span class="dash-ev-t"><?= $t ? h(date('d/m H:i', $t)) : '' ?></span>
-      </div>
-      <?php } ?>
-    </div>
-    <p style="margin-top:8px"><a href="<?= $B ?>/activity_logs.php">ดู Activity Log ทั้งหมด ›</a></p>
-  </div>
-  <?php } ?>
-</div>
-<?php } ?>
-
-<div class="panel">
-  <?= ui_heading('check', 'ทางลัดที่ใช้บ่อย', 'h3') ?>
-  <div class="quick-grid">
-    <a href="<?= $B ?>/asset_new.php" class="quick-item"><span class="q-ic q-primary"><?= ui_icon_html('assets', 17) ?></span><span>บันทึกเครื่องใหม่<small>ทะเบียนเครื่อง</small></span></a>
-    <a href="<?= $B ?>/ma.php" class="quick-item"><span class="q-ic q-warning"><?= ui_icon_html('ma', 17) ?></span><span>บันทึก MA<small>บำรุงรักษา</small></span></a>
-    <a href="<?= $B ?>/update_new.php" class="quick-item"><span class="q-ic q-info"><?= ui_icon_html('updates', 17) ?></span><span>อัปเดต FW/HW<small>บันทึกเวอร์ชัน</small></span></a>
-    <a href="<?= h($partsBase) ?>/pages/stock-out.php" class="quick-item"><span class="q-ic q-info"><?= ui_icon_html('stock-out-set', 17) ?></span><span>เบิกอะไหล่<small>Set / รายชิ้น</small></span></a>
-    <a href="<?= h($partsBase) ?>/pages/stock-in.php" class="quick-item"><span class="q-ic q-success"><?= ui_icon_html('stock-in', 17) ?></span><span>รับอะไหล่เข้า<small>สต็อกอะไหล่</small></span></a>
-    <a href="<?= $B ?>/scan.php" class="quick-item"><span class="q-ic q-primary"><?= ui_icon_html('scan', 17) ?></span><span>สแกน QR<small>ค้นเครื่องเร็ว</small></span></a>
   </div>
 </div>
+
+<script>
+(function(){
+  var panel = document.getElementById('dash-inventory-panel');
+  if (!panel) return;
+  var titleText = document.getElementById('dash-inventory-title-text');
+  var metaEl = document.getElementById('dash-inventory-meta');
+  var paneModels = document.getElementById('dash-view-models');
+  var paneParts = document.getElementById('dash-view-parts');
+  var partsFilter = document.getElementById('dash-parts-filter');
+  var partsFiltersWrap = document.getElementById('dash-parts-filters');
+  var partsSupplierFilter = document.getElementById('dash-parts-supplier-filter');
+  var partsGrid = document.getElementById('dash-parts-grid');
+  var partsEmpty = document.getElementById('dash-parts-filter-empty');
+  var viewBtns = panel.querySelectorAll('.dash-view-btn');
+  var filterBtns = partsFilter ? partsFilter.querySelectorAll('.dash-parts-filter-btn') : [];
+  var supplierBtns = partsSupplierFilter ? partsSupplierFilter.querySelectorAll('.dash-parts-supplier-btn') : [];
+  var partCards = partsGrid ? partsGrid.querySelectorAll('.dash-part-card[data-low-stock]') : [];
+  var currentView = 'models';
+  var currentPartsFilter = 'all';
+  var currentSupplierFilter = '';
+  var labels = {
+    models: { title: 'จำนวนเครื่องรายรุ่น', meta: '<?= count($perModel) ?> รุ่น' },
+    parts:  { title: 'สต็อกอะไหล่รายการ' }
+  };
+
+  function setFilterButtons(mode) {
+    filterBtns.forEach(function(b) {
+      var on = (b.getAttribute('data-filter') || 'all') === mode;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+  }
+
+  function setSupplierButtons(mode) {
+    supplierBtns.forEach(function(b) {
+      var key = b.getAttribute('data-supplier') || '';
+      var on = key === mode;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+  }
+
+  function applyPartsFilter(stockMode, supplierMode, updateMeta) {
+    if (!partCards.length) return;
+    if (typeof stockMode === 'string') currentPartsFilter = stockMode;
+    if (typeof supplierMode === 'string') currentSupplierFilter = supplierMode;
+    setFilterButtons(currentPartsFilter);
+    setSupplierButtons(currentSupplierFilter);
+    var shown = 0;
+    partCards.forEach(function(card) {
+      var isLow = card.getAttribute('data-low-stock') === '1';
+      var supplier = card.getAttribute('data-supplier') || '';
+      var stockOk = currentPartsFilter === 'all' || (currentPartsFilter === 'low' && isLow);
+      var supplierOk = currentSupplierFilter === '' || (currentSupplierFilter === '__none__' ? supplier === '' : supplier === currentSupplierFilter);
+      var show = stockOk && supplierOk;
+      card.hidden = !show;
+      if (show) shown++;
+    });
+    if (partsEmpty) {
+      var noMatch = shown === 0;
+      partsEmpty.hidden = !noMatch;
+      if (noMatch) {
+        partsEmpty.textContent = currentPartsFilter === 'low'
+          ? 'ไม่มีอะไหล่ใกล้หมดตามตัวกรองที่เลือก'
+          : 'ไม่มีอะไหล่ตามตัวกรองที่เลือก';
+      }
+    }
+    if (updateMeta !== false && metaEl && currentView === 'parts') {
+      metaEl.textContent = shown.toLocaleString('th-TH') + ' รายการ';
+    }
+  }
+
+  function resetPartsFilter() {
+    currentPartsFilter = 'all';
+    currentSupplierFilter = '';
+    setFilterButtons('all');
+    setSupplierButtons('');
+    partCards.forEach(function(card) { card.hidden = false; });
+    if (partsEmpty) partsEmpty.hidden = true;
+  }
+
+  function setPartsFilterVisible(on) {
+    if (partsFiltersWrap) {
+      partsFiltersWrap.hidden = !on;
+      partsFiltersWrap.setAttribute('aria-hidden', on ? 'false' : 'true');
+    }
+  }
+
+  function switchView(view) {
+    if (view === 'parts') {
+      var partsBtn = panel.querySelector('.dash-view-btn[data-view="parts"]');
+      if (partsBtn && partsBtn.disabled) return;
+    }
+    currentView = view;
+    viewBtns.forEach(function(b) {
+      var on = b.getAttribute('data-view') === view;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    if (paneModels) paneModels.hidden = view !== 'models';
+    if (paneParts) paneParts.hidden = view !== 'parts';
+    setPartsFilterVisible(view === 'parts');
+    var lb = labels[view] || labels.models;
+    if (titleText) titleText.textContent = lb.title;
+    if (view === 'parts') {
+      applyPartsFilter(currentPartsFilter, currentSupplierFilter, true);
+    } else {
+      resetPartsFilter();
+      if (metaEl) metaEl.textContent = lb.meta;
+    }
+  }
+
+  setPartsFilterVisible(false);
+
+  filterBtns.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (btn.disabled) return;
+      var mode = btn.getAttribute('data-filter') || 'all';
+      if (currentView !== 'parts') {
+        switchView('parts');
+      }
+      applyPartsFilter(mode, currentSupplierFilter, true);
+    });
+  });
+
+  supplierBtns.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var key = btn.getAttribute('data-supplier') || '';
+      if (currentView !== 'parts') {
+        switchView('parts');
+      }
+      applyPartsFilter(currentPartsFilter, key, true);
+    });
+  });
+
+  viewBtns.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      if (btn.disabled) return;
+      switchView(btn.getAttribute('data-view') || 'models');
+    });
+  });
+})();
+</script>
+
 <?php page_footer();

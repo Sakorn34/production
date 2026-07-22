@@ -462,6 +462,17 @@ function modalBack(){
     }
     chipDdSync(dd, chipDdGetSelected(dd).filter(function(v){ return v !== val; }));
   }
+  /** ย้ายข้อควที่พิมพ์ใน filter ไป hidden input ก่อน submit (chip_*_free) */
+  function chipDdFlushFreeText(dd){
+    if (!dd) return;
+    if (!chipDdAllowFree(chipDdMode(dd))) return;
+    var filt = dd.querySelector('.chip-dd-filter');
+    if (!filt) return;
+    var pending = filt.value.trim();
+    if (!pending) return;
+    chipDdAdd(dd, pending);
+  }
+  window.chipDdFlushFreeText = chipDdFlushFreeText;
   function showChipList(dd, filter, focusSearch){
     var opts = JSON.parse(dd.dataset.opts || '[]');
     var sel = chipDdGetSelected(dd);
@@ -546,6 +557,13 @@ function modalBack(){
           }
         }
       });
+      filt.addEventListener('blur', function(){
+        setTimeout(function(){
+          var list = dd.querySelector('.chip-dd-list');
+          if (list && !list.hidden) return;
+          chipDdFlushFreeText(dd);
+        }, 120);
+      });
       dd.querySelector('.chip-dd-box').addEventListener('click', function(e){
         if (!e.target.closest('.chip-dd-btn')) filt.focus();
       });
@@ -590,6 +608,11 @@ function modalBack(){
     });
   });
   document.addEventListener('DOMContentLoaded', function(){ initChipDd(); });
+  document.addEventListener('submit', function(e){
+    var form = e.target;
+    if (!form || form.tagName !== 'FORM') return;
+    form.querySelectorAll('.chip-dd').forEach(function(dd){ chipDdFlushFreeText(dd); });
+  }, true);
 })();
 
 // ── stepper จำนวน (+/- ทีละ step) ─────────────────────────────────────
