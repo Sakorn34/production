@@ -449,7 +449,7 @@ function line_notify_run_job(string $job, array $opts = []): array
             break;
 
         case 'monthly':
-            if (empty($opts['ignore_last_day_check']) && date('Y-m-d') !== date('Y-m-t')) {
+            if (empty($opts['ignore_last_day_check']) && !line_notify_is_last_day_of_month()) {
                 $result['skipped'] = 'not last day of month';
                 break;
             }
@@ -755,7 +755,20 @@ function line_notify_plesk_run_hint(string $eventKey): string
         return 'Cron — เลือกวัน+เวลาใน Plesk (เช่น ศ 17:30)';
     }
     if ($type === 'monthly_last_day') {
-        return 'Cron — วันสุดท้ายเดือน หรือ Daily วันที่ 28–31';
+        return 'Cron 28–31 * * (เช่น 10 20 28-31 * *) — ส่งเฉพาะวันสุดท้ายเดือน';
     }
     return 'Daily — ตั้งเวลาใน Plesk';
+}
+
+/**
+ * ตรวจว่าวันนี้เป็นวันสุดท้ายของเดือน (Asia/Bangkok)
+ *
+ * ใช้กับ job monthly จาก Plesk — ตั้ง cron รัน 28–31 แล้วข้ามวันที่ไม่ใช่วันสุดท้าย
+ *
+ * @return bool
+ */
+function line_notify_is_last_day_of_month(): bool
+{
+    $now = new DateTime('now', new DateTimeZone('Asia/Bangkok'));
+    return $now->format('Y-m-d') === $now->format('Y-m-t');
 }

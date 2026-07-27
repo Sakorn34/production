@@ -4,6 +4,8 @@
  *
  * ใช้ผ่านไฟล์ wrapper `plesk_line_job_*.php` ใน Plesk Scheduled Task (Run a PHP script)
  * ตั้ง **Daily/Cron** ใน Plesk — เวลาไม่ได้ตั้งในหลังบ้านอีก
+ *
+ * monthly: ตั้ง Cron รัน 28–31 (เช่น `10 20 28-31 * *`) — โค้ดส่งเฉพาะวันสุดท้ายเดือน
  */
 if (!defined('LINE_PLESK_JOB')) {
     echo json_encode(['ok' => false, 'error' => 'ใช้ plesk_line_job_*.php'], JSON_UNESCAPED_UNICODE) . "\n";
@@ -14,12 +16,7 @@ require __DIR__ . '/_bootstrap.php';
 require_once dirname(__DIR__, 2) . '/shared/line_notify_jobs.php';
 
 $job = (string)LINE_PLESK_JOB;
-$jobOpts = [];
-if ($job === 'monthly') {
-    $jobOpts['ignore_last_day_check'] = true;
-}
-
-$result = line_notify_run_job($job, $jobOpts);
+$result = line_notify_run_job($job, []);
 $worker = line_notify_is_enabled() ? line_notify_process_outbox(15) : ['skipped' => 'disabled'];
 line_notify_snapshot_cleanup();
 

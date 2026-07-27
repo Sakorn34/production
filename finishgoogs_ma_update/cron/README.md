@@ -24,7 +24,7 @@
 | อัปเดตหลังเลิกงาน | `plesk_line_job_daily_update.php` | Daily |
 | อะไหล่ใกล้หมด | `plesk_line_job_low_stock.php` | Daily |
 | สรุปรายสัปดาห์ | `plesk_line_job_weekly.php` | Cron วัน+เวลา |
-| สรุปรายเดือน | `plesk_line_job_monthly.php` | Cron วันสุดท้ายเดือน |
+| สรุปรายเดือน | `plesk_line_job_monthly.php` | Cron `10 20 28-31 * *` (ส่งเฉพาะวันสุดท้ายเดือน) |
 
 ดู path และคำแนะนำได้ที่ **หลังบ้าน → ตั้งค่า LINE** (คอลัมน์ Plesk script)
 
