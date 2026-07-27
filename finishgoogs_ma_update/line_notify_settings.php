@@ -142,13 +142,11 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
 .ln-note { background:#eff6ff; border-left:3px solid #3b82f6; padding:10px 12px; border-radius:0 8px 8px 0; font-size:12.5px; color:#1e40af; margin-bottom:14px; }
 
-.ln-types .tbl { font-size:13px; }
+.ln-types select { padding:6px 8px; font-size:calc(13px * var(--font-scale, 1)); min-width:100px; min-height:34px; }
 
-.ln-types select { padding:4px 6px; font-size:13px; min-width:100px; }
+.ln-instant { color:#6b7280; font-size:calc(12.5px * var(--font-scale, 1)); }
 
-.ln-instant { color:#6b7280; font-size:12px; }
-
-.ln-delivery-select { padding:4px 6px; font-size:13px; min-width:148px; }
+.ln-delivery-select { padding:6px 8px; font-size:calc(13px * var(--font-scale, 1)); min-width:148px; min-height:34px; }
 
 .ln-send-form { display:inline; margin:0; }
 
@@ -225,6 +223,46 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 .ln-plesk-check .tbl { font-size:12.5px; }
 
 .ln-plesk-check .tbl td { vertical-align:top; }
+
+.ln-form { font-size: calc(13.5px * var(--font-scale, 1)); }
+
+.ln-form h3 { margin: 0 0 12px; font-size: calc(14px * var(--font-scale, 1)); color: var(--primary); font-weight: 700; }
+
+.ln-form h3.ln-form-section { margin-top: 20px; }
+
+.ln-form-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; max-width: 640px; }
+
+.ln-form-field > label,
+.ln-form-grid label { display: flex; flex-direction: column; gap: 4px; font-size: calc(13px * var(--font-scale, 1)); color: #45506a; font-weight: 500; line-height: 1.4; }
+
+.ln-form-grid { display: grid; grid-template-columns: 1fr; gap: 12px; max-width: 640px; margin-bottom: 20px; }
+
+.ln-form-grid input[type=text],
+.ln-form-grid input[type=password],
+.ln-form-grid input[type=url],
+.ln-form-field input[type=text] {
+  width: 100%; box-sizing: border-box;
+  padding: 7px 10px; border: 1px solid #c9d2e0; border-radius: 6px;
+  font-family: inherit; font-size: calc(14px * var(--font-scale, 1));
+  min-height: 36px; background: #fff;
+}
+
+.ln-form-grid input:focus,
+.ln-form-field input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(225,29,116,.13); }
+
+.ln-form-check { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; font-size: calc(13.5px * var(--font-scale, 1)); color: #374151; }
+
+.ln-form-check input[type=checkbox] { width: 16px; height: 16px; flex-shrink: 0; }
+
+.ln-form-help { font-size: calc(12.5px * var(--font-scale, 1)); margin: 0 0 10px; line-height: 1.5; }
+
+.ln-types .tbl { width: 100%; border-collapse: collapse; font-size: calc(13px * var(--font-scale, 1)); }
+
+.ln-types .tbl th { background: #eef1f6; text-align: left; padding: 8px 10px; font-size: calc(13px * var(--font-scale, 1)); color: #45506a; font-weight: 600; white-space: nowrap; border-bottom: 1px solid #dfe4ec; }
+
+.ln-types .tbl td { padding: 9px 10px; border-top: 1px solid #eceff4; vertical-align: middle; line-height: 1.45; }
+
+.ln-types .tbl tbody tr:first-child td { border-top: 0; }
 
 </style>
 
@@ -564,7 +602,7 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
 
 
-<form method="post" class="panel" style="margin-bottom:16px">
+<form method="post" class="panel ln-form" style="margin-bottom:16px">
 
   <?= csrf_field() ?>
 
@@ -572,29 +610,31 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
 
 
-  <h3 style="margin:0 0 12px; font-size:15px; color:var(--primary)">การเชื่อมต่อ LINE</h3>
+  <h3>การเชื่อมต่อ LINE</h3>
 
 
 
-  <label style="display:block; margin-bottom:10px">Path ไฟล์ line.secrets.php
+  <div class="ln-form-field">
 
-    <input type="text" name="line_secrets_path" value="<?= h($form['line_secrets_path']) ?>" style="width:100%; max-width:640px" required>
+    <label for="line_secrets_path">Path ไฟล์ line.secrets.php</label>
 
-  </label>
+    <input type="text" id="line_secrets_path" name="line_secrets_path" value="<?= h($form['line_secrets_path']) ?>" required>
+
+  </div>
 
 
 
-  <label style="display:flex; align-items:center; gap:8px; margin-bottom:12px">
+  <label class="ln-form-check">
 
     <input type="checkbox" name="line_enabled" value="1" <?= !empty($form['enabled']) ? 'checked' : '' ?>>
 
-    <b>เปิดใช้งานแจ้งเตือน LINE</b>
+    <span>เปิดใช้งานแจ้งเตือน LINE</span>
 
   </label>
 
 
 
-  <div class="form-grid" style="display:grid; grid-template-columns:1fr; gap:10px; max-width:640px; margin-bottom:20px">
+  <div class="ln-form-grid">
 
     <label>Channel Access Token
 
@@ -630,9 +670,9 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
 
 
-  <h3 style="margin:0 0 10px; font-size:15px; color:var(--primary)">ประเภทแจ้งเตือน · วิธีส่ง · Plesk</h3>
+  <h3 class="ln-form-section">ประเภทแจ้งเตือน · วิธีส่ง · Plesk</h3>
 
-  <p class="muted" style="font-size:12px; margin-bottom:10px">
+  <p class="muted ln-form-help">
 
     <b>ทันที</b> = ส่งเมื่อเกิดเหตุการณ์ · <b>ตามเวลา</b> = Plesk trigger ตาม script · <b>ทั้งสอง</b> = ใช้ได้ทั้งสองแบบ (เช่น อะไหล่ใกล้หมด)
 
