@@ -19,56 +19,139 @@ function line_notify_type_catalog(): array
 {
     return [
         'production.problem_found' => [
-            'label'  => 'พบปัญหาตอนผลิต',
-            'mode'   => 'instant',
-            'job'    => null,
+            'label'         => 'พบปัญหาตอนผลิต',
+            'can_instant'   => true,
+            'can_scheduled' => false,
+            'job'           => null,
         ],
         'stock.low_threshold' => [
-            'label'  => 'อะไหล่ใกล้หมด',
-            'mode'   => 'scheduled',
-            'job'    => 'low_stock_scan',
-            'default_time' => '08:00',
+            'label'           => 'อะไหล่ใกล้หมด',
+            'can_instant'     => true,
+            'can_scheduled'   => true,
+            'job'             => 'low_stock_scan',
+            'schedule_type'   => 'daily',
+            'default_delivery'=> 'both',
         ],
         'ma.repair_required' => [
-            'label'  => 'MA ต้องซ่อม',
-            'mode'   => 'instant',
-            'job'    => null,
+            'label'         => 'MA ต้องซ่อม',
+            'can_instant'   => true,
+            'can_scheduled' => false,
+            'job'           => null,
         ],
         'stock.manual_withdraw' => [
-            'label'  => 'เบิกอะไหล่ (manual)',
-            'mode'   => 'instant',
-            'job'    => null,
+            'label'         => 'เบิกอะไหล่ (manual)',
+            'can_instant'   => true,
+            'can_scheduled' => false,
+            'job'           => null,
         ],
         'production.summary.daily' => [
-            'label'  => 'สรุปผลิตรายวัน',
-            'mode'   => 'scheduled',
-            'job'    => 'daily',
-            'default_time' => '17:30',
-            'schedule_type' => 'daily',
+            'label'           => 'สรุปผลิตรายวัน',
+            'can_instant'     => false,
+            'can_scheduled'   => true,
+            'job'             => 'daily',
+            'schedule_type'   => 'daily',
+            'default_delivery'=> 'scheduled',
         ],
         'production.summary.daily_update' => [
-            'label'  => 'อัปเดตผลิตหลังเลิกงาน',
-            'mode'   => 'scheduled',
-            'job'    => 'daily_update',
-            'default_time' => '18:00',
-            'schedule_type' => 'daily',
+            'label'           => 'อัปเดตผลิตหลังเลิกงาน',
+            'can_instant'     => false,
+            'can_scheduled'   => true,
+            'job'             => 'daily_update',
+            'schedule_type'   => 'daily',
+            'default_delivery'=> 'scheduled',
         ],
         'production.summary.weekly' => [
-            'label'  => 'สรุปผลิตรายสัปดาห์',
-            'mode'   => 'scheduled',
-            'job'    => 'weekly',
-            'default_time' => '17:30',
-            'schedule_type' => 'weekly',
-            'default_weekday' => 0,
+            'label'           => 'สรุปผลิตรายสัปดาห์',
+            'can_instant'     => false,
+            'can_scheduled'   => true,
+            'job'             => 'weekly',
+            'schedule_type'   => 'weekly',
+            'default_delivery'=> 'scheduled',
         ],
         'production.summary.monthly' => [
-            'label'  => 'สรุปผลิตรายเดือน',
-            'mode'   => 'scheduled',
-            'job'    => 'monthly',
-            'default_time' => '17:35',
-            'schedule_type' => 'monthly_last_day',
+            'label'           => 'สรุปผลิตรายเดือน',
+            'can_instant'     => false,
+            'can_scheduled'   => true,
+            'job'             => 'monthly',
+            'schedule_type'   => 'monthly_last_day',
+            'default_delivery'=> 'scheduled',
         ],
     ];
+}
+
+/**
+ *  normalize โหมดส่งต่อ event (instant / scheduled / both)
+ *
+ * @param string $eventKey
+ * @param string $delivery
+ * @return string
+ */
+function line_notify_normalize_delivery(string $eventKey, string $delivery): string
+{
+    $meta = line_notify_type_catalog()[$eventKey] ?? [];
+    $canInstant = !empty($meta['can_instant']);
+    $canScheduled = !empty($meta['can_scheduled']);
+    $delivery = in_array($delivery, ['instant', 'scheduled', 'both'], true) ? $delivery : 'instant';
+
+    if ($canInstant && $canScheduled) {
+        return $delivery;
+    }
+    if ($canScheduled) {
+        return 'scheduled';
+    }
+    return 'instant';
+}
+
+/**
+ * เปิดส่งทันทีเมื่อเกิดเหตุการณ์หรือไม่
+ *
+ * @param string $eventKey
+ * @return bool
+ */
+function line_notify_instant_enabled(string $eventKey): bool
+{
+    if (!line_notify_is_enabled($eventKey)) {
+        return false;
+    }
+    $delivery = line_notify_event_delivery($eventKey);
+    return $delivery === 'instant' || $delivery === 'both';
+}
+
+/**
+ * เปิดส่งตามเวลา (cron) หรือไม่
+ *
+ * @param string $eventKey
+ * @return bool
+ */
+function line_notify_scheduled_enabled(string $eventKey): bool
+{
+    if (!line_notify_is_enabled($eventKey)) {
+        return false;
+    }
+    $delivery = line_notify_event_delivery($eventKey);
+    return $delivery === 'scheduled' || $delivery === 'both';
+}
+
+/**
+ * อ่านโหมดส่งจาก config
+ *
+ * @param string $eventKey
+ * @return string instant|scheduled|both
+ */
+function line_notify_event_delivery(string $eventKey): string
+{
+    $schedules = line_notify_schedules();
+    if (isset($schedules[$eventKey]['delivery'])) {
+        return line_notify_normalize_delivery($eventKey, (string)$schedules[$eventKey]['delivery']);
+    }
+    $meta = line_notify_type_catalog()[$eventKey] ?? [];
+    if (!empty($meta['default_delivery'])) {
+        return line_notify_normalize_delivery($eventKey, (string)$meta['default_delivery']);
+    }
+    if (!empty($meta['can_scheduled']) && empty($meta['can_instant'])) {
+        return 'scheduled';
+    }
+    return 'instant';
 }
 
 /**
@@ -80,20 +163,21 @@ function line_notify_schedule_defaults(): array
 {
     $out = [];
     foreach (line_notify_type_catalog() as $eventKey => $meta) {
-        if (($meta['mode'] ?? '') !== 'scheduled') {
-            continue;
+        $delivery = line_notify_normalize_delivery(
+            $eventKey,
+            (string)($meta['default_delivery'] ?? 'instant')
+        );
+        $row = ['delivery' => $delivery];
+        if (!empty($meta['can_scheduled'])) {
+            $row['type'] = (string)($meta['schedule_type'] ?? 'daily');
         }
-        $out[$eventKey] = [
-            'time'    => (string)($meta['default_time'] ?? '08:00'),
-            'weekday' => (int)($meta['default_weekday'] ?? 0),
-            'type'    => (string)($meta['schedule_type'] ?? 'daily'),
-        ];
+        $out[$eventKey] = $row;
     }
     return $out;
 }
 
 /**
- * อ่านตารางเวลาจาก config (merge default)
+ * อ่าน schedule จาก config (merge default) — เก็บแค่ delivery + type
  *
  * @return array<string,array<string,mixed>>
  */
@@ -106,27 +190,17 @@ function line_notify_schedules(): array
         $row = isset($saved[$eventKey]) && is_array($saved[$eventKey])
             ? array_merge($def, $saved[$eventKey])
             : $def;
-        $row['time'] = line_notify_normalize_time((string)($row['time'] ?? $def['time']));
-        $row['weekday'] = (int)($row['weekday'] ?? $def['weekday']);
-        $row['type'] = (string)($row['type'] ?? $def['type']);
+        if (isset($def['type'])) {
+            $row['type'] = (string)($row['type'] ?? $def['type']);
+        }
+        $row['delivery'] = line_notify_normalize_delivery(
+            $eventKey,
+            (string)($row['delivery'] ?? $def['delivery'] ?? 'instant')
+        );
+        unset($row['time'], $row['weekday']);
         $defaults[$eventKey] = $row;
     }
     return $defaults;
-}
-
-/**
- *  normalize เวลา HH:MM
- *
- * @param string $time
- * @return string
- */
-function line_notify_normalize_time(string $time): string
-{
-    $time = trim($time);
-    if (preg_match('/^(\d{1,2}):(\d{2})$/', $time, $m)) {
-        return sprintf('%02d:%02d', (int)$m[1], (int)$m[2]);
-    }
-    return '08:00';
 }
 
 // ─ Production queries ────────────────────────────────────────────────────────
@@ -285,19 +359,10 @@ function line_notify_run_job(string $job, array $opts = []): array
             $dr = line_job_date_range('daily');
             $records = line_job_production_records($dr['from'], $dr['to']);
             if ($records === []) {
-                $withdraws = line_job_today_withdraw_records($dr['from']);
-                if ($withdraws === []) {
-                    line_notify_dispatch('production.summary.daily', [
-                        'no_data'   => true,
-                        'timestamp' => date('d/m/Y H:i'),
-                    ], array_merge($dispatchOpts, ['dedup_key' => 'production.summary:' . $dr['dedup_suffix'] . ':nodata']));
-                } else {
-                    line_notify_dispatch('production.summary.daily', [
-                        'grouped'        => [],
-                        'records'        => [],
-                        'withdraw_items' => $withdraws,
-                    ], array_merge($dispatchOpts, ['dedup_key' => 'production.summary:' . $dr['dedup_suffix'] . ':withdraw_only']));
-                }
+                line_notify_dispatch('production.summary.daily', [
+                    'no_data'   => true,
+                    'timestamp' => date('d/m/Y H:i'),
+                ], array_merge($dispatchOpts, ['dedup_key' => 'production.summary:' . $dr['dedup_suffix'] . ':nodata']));
                 $result['dispatched'] = 1;
                 $result['event_key'] = 'production.summary.daily';
                 break;
@@ -305,9 +370,8 @@ function line_notify_run_job(string $job, array $opts = []): array
             $grouped = line_job_group_records($records);
             line_notify_snapshot_save('daily_round1:' . date('Y-m-d'), $grouped, 86400 * 2);
             line_notify_dispatch('production.summary.daily', [
-                'grouped'         => $grouped,
-                'records'         => $records,
-                'withdraw_items'  => line_job_today_withdraw_records($dr['from']),
+                'grouped' => $grouped,
+                'records' => $records,
             ], array_merge($dispatchOpts, ['dedup_key' => 'production.summary:' . $dr['dedup_suffix']]));
             $result['dispatched'] = 1;
             $result['event_key'] = 'production.summary.daily';
@@ -324,9 +388,8 @@ function line_notify_run_job(string $job, array $opts = []): array
             $round1 = line_notify_snapshot_get('daily_round1:' . $today);
             if (!$round1) {
                 line_notify_dispatch('production.summary.daily', [
-                    'grouped'        => $newGrouped,
-                    'records'        => $records,
-                    'withdraw_items' => line_job_today_withdraw_records($today),
+                    'grouped' => $newGrouped,
+                    'records' => $records,
                 ], array_merge($dispatchOpts, ['dedup_key' => 'production.summary:daily_update_fallback:' . $today]));
                 $result['dispatched'] = 1;
                 $result['event_key'] = 'production.summary.daily';
@@ -463,59 +526,6 @@ function line_job_count_problems(array $records): int
 }
 
 /**
- * รันงานที่ถึงเวลาตาม config (cron --job=tick)
- *
- * @return array<int,array<string,mixed>>
- */
-function line_notify_run_due_schedules(): array
-{
-    $now = new DateTime('now', new DateTimeZone('Asia/Bangkok'));
-    $hhmm = $now->format('H:i');
-    $dow = (int)$now->format('w');
-    $isLastDay = $now->format('Y-m-d') === $now->format('Y-m-t');
-    $catalog = line_notify_type_catalog();
-    $schedules = line_notify_schedules();
-    $ran = [];
-
-    foreach ($schedules as $eventKey => $sched) {
-        if (!line_notify_is_enabled($eventKey)) {
-            continue;
-        }
-        $meta = $catalog[$eventKey] ?? null;
-        if (!$meta || ($meta['mode'] ?? '') !== 'scheduled') {
-            continue;
-        }
-        $time = line_notify_normalize_time((string)($sched['time'] ?? ''));
-        if ($time !== $hhmm) {
-            continue;
-        }
-        $type = (string)($sched['type'] ?? 'daily');
-        if ($type === 'weekly' && (int)($sched['weekday'] ?? 0) !== $dow) {
-            continue;
-        }
-        if ($type === 'monthly_last_day' && !$isLastDay) {
-            continue;
-        }
-
-        $dedupKey = 'schedule_tick:' . $eventKey . ':' . date('Y-m-d') . ':' . $time;
-        if (!line_notify_dedup_take($dedupKey, 900)) {
-            continue;
-        }
-
-        $job = (string)($meta['job'] ?? '');
-        if ($job === '') {
-            continue;
-        }
-        $jobOpts = [];
-        if ($job === 'monthly') {
-            $jobOpts['ignore_last_day_check'] = true;
-        }
-        $ran[] = line_notify_run_job($job, $jobOpts);
-    }
-    return $ran;
-}
-
-/**
  * ส่งทันทีตามประเภท (จากหลังบ้าน)
  *
  * @param string $eventKey
@@ -531,13 +541,18 @@ function line_notify_send_now(string $eventKey): array
         return ['ok' => false, 'message' => 'ไม่รู้จักประเภท: ' . $eventKey];
     }
     $meta = $catalog[$eventKey];
+    $preview = null;
+    $canInstant = !empty($meta['can_instant']) && line_notify_instant_enabled($eventKey);
+    $canScheduled = !empty($meta['can_scheduled']);
 
-    if (($meta['mode'] ?? '') === 'instant') {
-        $preview = line_notify_send_now_instant($eventKey);
-        if (!$preview['ok']) {
-            return $preview;
+    if ($canInstant) {
+        $instantPreview = line_notify_send_now_instant($eventKey);
+        if ($instantPreview['ok']) {
+            $preview = $instantPreview;
         }
-    } else {
+    }
+
+    if ($preview === null && $canScheduled) {
         $job = (string)($meta['job'] ?? '');
         $jobOpts = ['skip_dedup' => true];
         if ($job === 'monthly') {
@@ -545,15 +560,12 @@ function line_notify_send_now(string $eventKey): array
         }
         $preview = line_notify_run_job($job, $jobOpts);
         if ($job === 'daily' && (int)($preview['dispatched'] ?? 0) === 0) {
-            // สำหรับทดสอบส่งทันที — ใส่ withdraw ในชุด daily ด้วย
             $dr = line_job_date_range('daily');
             $records = line_job_production_records($dr['from'], $dr['to']);
-            $withdraws = line_job_today_withdraw_records($dr['from']);
-            if ($records !== [] || $withdraws !== []) {
+            if ($records !== []) {
                 line_notify_dispatch('production.summary.daily', [
-                    'grouped'        => line_job_group_records($records),
-                    'records'        => $records,
-                    'withdraw_items' => $withdraws,
+                    'grouped' => line_job_group_records($records),
+                    'records' => $records,
                 ], ['skip_dedup' => true, 'dedup_key' => 'manual:daily:' . microtime(true)]);
                 $preview = ['dispatched' => 1, 'job' => 'daily'];
             }
@@ -566,6 +578,10 @@ function line_notify_send_now(string $eventKey): array
                 'result'  => $preview,
             ];
         }
+    }
+
+    if ($preview === null) {
+        return ['ok' => false, 'message' => 'ไม่รองรับการส่งทันทีสำหรับโหมดที่ตั้งไว้'];
     }
 
     $stats = line_notify_process_outbox(15);
@@ -666,37 +682,80 @@ function line_notify_send_now_instant(string $eventKey): array
             if ($withdraws === []) {
                 return ['ok' => false, 'message' => 'ไม่พบรายการเบิกอะไหล่วันนี้'];
             }
-            $records = line_job_production_records(date('Y-m-d'), date('Y-m-d'));
-            if ($records === []) {
-                line_notify_dispatch('production.summary.daily', [
-                    'no_data'        => true,
-                    'timestamp'      => date('d/m/Y H:i'),
-                    'withdraw_items' => $withdraws,
-                ], ['skip_dedup' => true, 'dedup_key' => 'manual:withdraw_bundle:' . microtime(true)]);
-            } else {
-                line_notify_dispatch('production.summary.daily', [
-                    'grouped'        => line_job_group_records($records),
-                    'records'        => $records,
-                    'withdraw_items' => $withdraws,
-                ], ['skip_dedup' => true, 'dedup_key' => 'manual:withdraw_bundle:' . microtime(true)]);
-            }
-            return ['ok' => true, 'dispatched' => 1, 'message' => 'รวมเบิกอะไหล่ + สรุปผลิตในชุดเดียว'];
+            line_notify_dispatch('stock.manual_withdraw', [
+                'withdraw_items' => $withdraws,
+            ], ['skip_dedup' => true, 'dedup_key' => 'manual:withdraw:' . microtime(true)]);
+            return ['ok' => true, 'dispatched' => 1, 'message' => 'สรุปการเบิกอะไหล่วันนี้'];
 
         default:
             return ['ok' => false, 'message' => 'ประเภทนี้ไม่รองรับส่งทันที'];
     }
 }
 
-/** @return array<int,string> วันในสัปดาห์สำหรับ select */
-function line_notify_weekday_options(): array
+/**
+ * เขียน log cron LINE ลง private/logs/line-cron.log
+ *
+ * @param array<string,mixed> $payload
+ * @return void
+ */
+function line_notify_append_cron_log(array $payload): void
 {
-    return [
-        0 => 'อาทิตย์',
-        1 => 'จันทร์',
-        2 => 'อังคาร',
-        3 => 'พุธ',
-        4 => 'พฤหัส',
-        5 => 'ศุกร์',
-        6 => 'เสาร์',
+    if (!function_exists('app_error_log_path')) {
+        return;
+    }
+    $logFile = dirname(app_error_log_path()) . '/line-cron.log';
+    $line = date('Y-m-d H:i:s') . ' ' . json_encode($payload, JSON_UNESCAPED_UNICODE) . "\n";
+    @file_put_contents($logFile, $line, FILE_APPEND | LOCK_EX);
+}
+
+/**
+ * ชื่อไฟล์ Plesk script ต่อ event (trigger รายการละ 1 task)
+ *
+ * @param string $eventKey
+ * @return string|null
+ */
+function line_notify_plesk_script_name(string $eventKey): ?string
+{
+    $map = [
+        'stock.low_threshold'           => 'plesk_line_job_low_stock.php',
+        'production.summary.daily'      => 'plesk_line_job_daily.php',
+        'production.summary.daily_update'=> 'plesk_line_job_daily_update.php',
+        'production.summary.weekly'     => 'plesk_line_job_weekly.php',
+        'production.summary.monthly'    => 'plesk_line_job_monthly.php',
     ];
+    return $map[$eventKey] ?? null;
+}
+
+/**
+ * path สcript สำหรับแสดงใน Plesk (relative จาก httpdocs)
+ *
+ * @param string $eventKey
+ * @return string
+ */
+function line_notify_plesk_script_path(string $eventKey): string
+{
+    $name = line_notify_plesk_script_name($eventKey);
+    if ($name === null) {
+        return '';
+    }
+    return 'production/finishgoogs_ma_update/cron/' . $name;
+}
+
+/**
+ * คำแนะนำการตั้ง Plesk Scheduled Task ต่อ event (เวลาตั้งใน Plesk เท่านั้น)
+ *
+ * @param string $eventKey
+ * @return string
+ */
+function line_notify_plesk_run_hint(string $eventKey): string
+{
+    $meta = line_notify_type_catalog()[$eventKey] ?? [];
+    $type = (string)($meta['schedule_type'] ?? 'daily');
+    if ($type === 'weekly') {
+        return 'Cron — เลือกวัน+เวลาใน Plesk (เช่น ศ 17:30)';
+    }
+    if ($type === 'monthly_last_day') {
+        return 'Cron — วันสุดท้ายเดือน หรือ Daily วันที่ 28–31';
+    }
+    return 'Daily — ตั้งเวลาใน Plesk';
 }

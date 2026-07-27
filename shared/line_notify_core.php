@@ -77,6 +77,9 @@ function line_notify_config(bool $reload = false): array
         $cfg = $defaults;
         return $cfg;
     }
+    if ($reload && function_exists('opcache_invalidate')) {
+        @opcache_invalidate($path, true);
+    }
     $loaded = require $path;
     if (!is_array($loaded)) {
         $cfg = $defaults;
@@ -342,15 +345,16 @@ function line_notify_dedup_take(string $dedupKey, int $ttlSeconds): bool
     $db->query("DELETE FROM notification_dedup WHERE expires_at < NOW()");
     $expires = date('Y-m-d H:i:s', time() + max(1, $ttlSeconds));
     $stmt = $db->prepare(
-        'INSERT INTO notification_dedup (dedup_key, expires_at) VALUES (?, ?)'
+        'INSERT IGNORE INTO notification_dedup (dedup_key, expires_at) VALUES (?, ?)'
     );
     if (!$stmt) {
         return true;
     }
     $stmt->bind_param('ss', $dedupKey, $expires);
-    $ok = $stmt->execute();
+    $stmt->execute();
+    $inserted = $stmt->affected_rows > 0;
     $stmt->close();
-    return (bool)$ok;
+    return $inserted;
 }
 
 /**
@@ -971,7 +975,13 @@ function line_notify_enrich_low_stock_items(array $items): array
  */
 function line_notify_check_low_stock_product(int $productId): void
 {
-    if ($productId <= 0 || !line_notify_is_enabled('stock.low_threshold')) {
+    if ($productId <= 0) {
+        return;
+    }
+    if (!function_exists('line_notify_instant_enabled')) {
+        require_once __DIR__ . '/line_notify_jobs.php';
+    }
+    if (!line_notify_instant_enabled('stock.low_threshold')) {
         return;
     }
     if (!isset($GLOBALS['line_notify_stock_db']) || !($GLOBALS['line_notify_stock_db'] instanceof PDO)) {

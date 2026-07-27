@@ -1,9 +1,8 @@
 <?php
 /**
- * cron/line_notify_scheduled.php — งานตามเวลา / tick / ส่งทดสอบ
+ * cron/line_notify_scheduled.php — รันงาน LINE ตาม job (CLI / manual)
  *
  * Usage:
- *   php line_notify_scheduled.php --job=tick
  *   php line_notify_scheduled.php --job=daily|daily_update|weekly|monthly|low_stock_scan|test
  */
 require __DIR__ . '/_bootstrap.php';
@@ -16,7 +15,7 @@ foreach ($argv ?? [] as $arg) {
     }
 }
 
-if (!line_notify_is_enabled() && !in_array($job, ['test', 'tick'], true)) {
+if (!line_notify_is_enabled() && $job !== 'test') {
     echo "LINE notify disabled\n";
     exit(0);
 }
@@ -24,12 +23,6 @@ if (!line_notify_is_enabled() && !in_array($job, ['test', 'tick'], true)) {
 $result = ['job' => $job, 'dispatched' => 0, 'skipped' => ''];
 
 switch ($job) {
-    case 'tick':
-        $ran = line_notify_run_due_schedules();
-        line_notify_snapshot_cleanup();
-        echo json_encode(['job' => 'tick', 'ran' => $ran], JSON_UNESCAPED_UNICODE) . "\n";
-        exit(0);
-
     case 'test':
         line_notify_dispatch('line.test', [
             'message' => 'Cron test — ' . date('d/m/Y H:i:s'),
