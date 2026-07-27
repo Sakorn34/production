@@ -2271,4 +2271,5 @@ activity_log_ensure_schema();
 line_notify_ensure_schema();
 if (PHP_SAPI !== 'cli' && session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION['profile'])) {
     activity_log_register_post_shutdown('production', actor_name());
+    activity_log_register_page_view_shutdown('production', actor_name());
 }

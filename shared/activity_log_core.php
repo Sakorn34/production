@@ -139,6 +139,130 @@ function activity_log_write(array $row, $db = null) {
 }
 
 /**
+ * ตรวจว่าควรข้ามการบันทึก page view หรือไม่
+ *
+ * @param string $script basename ของสคริปต์
+ * @return bool
+ */
+function activity_log_should_skip_page_view(string $script): bool {
+    static $skipExact = [
+        'healthz.php',
+        'login.php',
+        'logout.php',
+        'dashboard_data.php',
+        'sync_data.php',
+        'notifications.php',
+    ];
+    if (in_array($script, $skipExact, true)) {
+        return true;
+    }
+    if (!empty($_GET['ajax'])) {
+        return true;
+    }
+    $scriptPath = (string)($_SERVER['SCRIPT_NAME'] ?? '');
+    if (strpos($scriptPath, '/cron/') !== false
+        || strpos($scriptPath, '/database/tools/') !== false
+        || strpos($scriptPath, '/api/') !== false) {
+        return true;
+    }
+    return false;
+}
+
+/**
+ * สรุป query string GET ที่ปลอดภัยสำหรับ detail page view
+ *
+ * @return string
+ */
+function activity_log_sanitize_get_detail(): string {
+    if (!is_array($_GET) || $_GET === []) {
+        return '';
+    }
+    $skipKeys = ['csrf', 'csrf_token', 'export'];
+    $parts = [];
+    foreach ($_GET as $k => $v) {
+        $k = (string)$k;
+        if (in_array($k, $skipKeys, true)) {
+            continue;
+        }
+        if (is_array($v)) {
+            continue;
+        }
+        $v = mb_substr(trim((string)$v), 0, 80);
+        if ($v === '') {
+            continue;
+        }
+        $parts[] = $k . '=' . $v;
+        if (count($parts) >= 8) {
+            break;
+        }
+    }
+    return implode('; ', $parts);
+}
+
+/**
+ * ลงทะเบียนบันทึก page view เมื่อเปิดหน้า (GET) — ทุกหน้าที่ login แล้ว
+ *
+ * @param string $systemKey production|parts
+ * @param string $actorName ชื่อผู้ใช้
+ * @return void
+ */
+function activity_log_register_page_view_shutdown(string $systemKey, string $actorName): void {
+    if (PHP_SAPI === 'cli') {
+        return;
+    }
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
+        return;
+    }
+    $script = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    if ($script === '' || activity_log_should_skip_page_view($script)) {
+        return;
+    }
+    register_shutdown_function(function () use ($systemKey, $actorName, $script) {
+        if (!empty($GLOBALS['activity_log_skip_auto']) || !empty($GLOBALS['activity_log_skip_page_view'])) {
+            return;
+        }
+        $action = 'page_view:' . $script;
+        $summary = 'เปิดดู — ' . activity_log_script_label($script);
+        if ($script === 'activity_logs.php' && (string)($_GET['export'] ?? '') === 'csv') {
+            $action = 'page_export:' . $script;
+            $summary = 'Export CSV — Activity Log';
+        }
+        activity_log_write([
+            'system_key'  => $systemKey,
+            'actor_name'  => $actorName,
+            'action_key'  => $action,
+            'summary'     => $summary,
+            'detail'      => activity_log_sanitize_get_detail(),
+            'entity_type' => 'page',
+            'entity_id'   => $script,
+        ]);
+    });
+}
+
+/**
+ * ดึงประวัติการเปิดดูหน้าเว็บล่าสุด (ทุกหน้า)
+ *
+ * @param int $limit
+ * @return array<int,array<string,mixed>>
+ */
+function activity_log_recent_page_views($limit = 15) {
+    $db = activity_log_db_connect();
+    if (!$db) {
+        return [];
+    }
+    activity_log_ensure_schema($db);
+    $limit = max(1, min(50, (int)$limit));
+    $sql = "SELECT * FROM activity_logs
+            WHERE action_key LIKE 'page_view:%' OR action_key LIKE 'page_export:%'
+            ORDER BY id DESC LIMIT $limit";
+    $res = $db->query($sql);
+    if (!$res) {
+        return [];
+    }
+    return $res->fetch_all(MYSQLI_ASSOC);
+}
+
+/**
  * สรุป POST ที่ปลอดภัยสำหรับ detail (ไม่เก็บ PIN/รหัสผ่าน)
  *
  * @return string
@@ -180,22 +304,37 @@ function activity_log_sanitize_post_detail() {
  */
 function activity_log_script_label($script) {
     static $map = [
-        'asset_new.php'    => 'บันทึกผลิตใหม่',
-        'asset.php'        => 'แก้ไข/ลบเครื่อง',
-        'ma.php'           => 'บันทึก MA',
-        'settings.php'     => 'ตั้งค่ารุ่น/ฟิลด์',
-        'appearance.php'   => 'ปรับแต่งหน้าตา',
-        'parts.php'        => 'เบิก/คืนอะไหล่ (Production)',
-        'update_new.php'   => 'อัปเดต FW/HW',
-        'update_edit.php'  => 'แก้ไขอัปเดต',
-        'share_admin.php'  => 'จัดการ sync stock',
-        'share.php'        => 'ทะเบียน stock',
-        'stock-in.php'     => 'รับเข้าอะไหล่',
-        'stock-out.php'    => 'เบิกออก (Set)',
+        'index.php'          => 'หน้าแรก / Dashboard',
+        'assets.php'         => 'รายการเครื่อง',
+        'asset.php'          => 'รายละเอียดเครื่อง',
+        'asset_new.php'      => 'บันทึกผลิตใหม่',
+        'ma.php'             => 'บันทึก MA',
+        'updates.php'        => 'อัปเดต FW/HW',
+        'repairs.php'        => 'งานซ่อม',
+        'scan.php'           => 'สแกน QR',
+        'parts.php'          => 'เบิก/คืนอะไหล่ (Production)',
+        'report.php'         => 'รายงาน',
+        'settings.php'       => 'ตั้งค่ารุ่น/ฟิลด์',
+        'appearance.php'     => 'ปรับแต่งหน้าตา',
+        'server_config.php'  => 'ตั้งค่า server',
+        'line_notify_settings.php' => 'ตั้งค่า LINE',
+        'activity_logs.php'  => 'Activity Log',
+        'system_doc.php'     => 'เอกสารระบบ',
+        'share_admin.php'    => 'จัดการ sync stock',
+        'share.php'          => 'ทะเบียน stock',
+        'profile.php'        => 'โปรไฟล์ผู้ใช้',
+        'users.php'          => 'จัดการผู้ใช้',
+        'update_new.php'     => 'อัปเดต FW/HW',
+        'update_edit.php'    => 'แก้ไขอัปเดต',
+        'stock-in.php'       => 'รับเข้าอะไหล่',
+        'stock-out.php'      => 'เบิกออก (Set)',
         'stock-out-item.php' => 'เบิกรายชิ้น',
-        'products.php'     => 'จัดการอะไหล่',
-        'sets.php'         => 'จัดการ Set',
+        'products.php'       => 'จัดการอะไหล่',
+        'sets.php'           => 'จัดการ Set',
         'product-detail.php' => 'รายละเอียดอะไหล่',
+        'history.php'        => 'ประวัติสต็อก',
+        'vendor-import.php'  => 'นำเข้าจาก vendor',
+        'year-end-summary.php' => 'สรุปปลายปี',
         'webhook-stockout.php' => 'Webhook เบิกอะไหล่',
     ];
     $script = basename((string)$script);

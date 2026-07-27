@@ -1,6 +1,8 @@
 <?php
 /**
  * activity_logs.php — ดู Activity Log ทั้งระบบ Production และ Parts + export CSV
+ *
+ * บันทึก page view ทุกหน้าผ่าน activity_log_register_page_view_shutdown() ใน config / parts bootstrap
  */
 require __DIR__ . '/config.php';
 require __DIR__ . '/includes/settings_gate.php';
@@ -29,6 +31,8 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     exit;
 }
 
+$recentPageViews = activity_log_recent_page_views(15);
+
 $result = activity_log_search($filters, $perPage, $offset);
 $rows = $result['rows'];
 $total = $result['total'];
@@ -45,8 +49,45 @@ page_header('Activity Log — ระบบหลังบ้าน');
 </div>
 
 <p class="muted" style="margin-bottom:12px">
-  บันทึกความเคลื่อนไหวจาก <b>ทะเบียนเครื่อง/MA</b> และ <b>สต็อกอะไหล่ (Parts)</b> — การบันทึก/แก้ไข/ลบ (POST) และรายละเอียดที่ระบบเก็บได้
+  บันทึกความเคลื่อนไหวจาก <b>ทะเบียนเครื่อง/MA</b> และ <b>สต็อกอะไหล่ (Parts)</b> — POST (บันทึก/แก้ไข/ลบ) และ <b>การเปิดดูทุกหน้า</b> (GET หลัง login)
 </p>
+
+<div class="panel" style="margin-bottom:14px; padding:12px 14px">
+  <h3 style="margin:0 0 8px; font-size:14px; color:var(--primary)">เปิดดูหน้าเว็บล่าสุด</h3>
+  <?php if (!$recentPageViews) { ?>
+    <p class="muted" style="margin:0; font-size:12.5px">ยังไม่มีประวัติ page view (เริ่มบันทึกหลังอัป patch นี้)</p>
+  <?php } else { ?>
+  <table class="list" style="font-size:12.5px; margin:0">
+    <tr>
+      <th style="white-space:nowrap">เวลา</th>
+      <th>ระบบ</th>
+      <th>ผู้ใช้</th>
+      <th>หน้า</th>
+      <th>IP</th>
+      <th>หมายเหตุ</th>
+    </tr>
+    <?php foreach ($recentPageViews as $pv) {
+        $sysLbl = isset(ACTIVITY_LOG_SYSTEM_LABELS[$pv['system_key']]) ? ACTIVITY_LOG_SYSTEM_LABELS[$pv['system_key']] : $pv['system_key'];
+        $isExport = strpos((string)$pv['action_key'], 'page_export:') === 0;
+        $pageName = (string)($pv['entity_id'] ?? '');
+    ?>
+    <tr>
+      <td style="white-space:nowrap"><?= h(date('d/m/Y H:i', strtotime($pv['created_at']))) ?></td>
+      <td><span class="badge-pill <?= $pv['system_key'] === 'parts' ? 'bp-info' : 'bp-success' ?>" style="font-size:10px"><?= h($sysLbl) ?></span></td>
+      <td><b><?= h($pv['actor_name'] ?: '-') ?></b></td>
+      <td><?= $isExport ? 'Export CSV' : h($pv['summary']) ?><br><span class="muted" style="font-size:10.5px"><?= h($pageName) ?></span></td>
+      <td class="muted"><?= h($pv['ip_address'] ?: '-') ?></td>
+      <td class="muted" style="max-width:220px; word-break:break-word"><?= h($pv['detail'] ?: '-') ?></td>
+    </tr>
+    <?php } ?>
+  </table>
+  <p style="margin:8px 0 0; font-size:12px">
+    <a href="<?= BASE_URL ?>/activity_logs.php?action=page_view%3A">ดูประวัติเปิดดูทุกหน้า</a>
+    ·
+    <a href="<?= BASE_URL ?>/activity_logs.php?action=page_export%3A">ดูประวัติ Export</a>
+  </p>
+  <?php } ?>
+</div>
 
 <form method="get" class="filter" style="flex-wrap:wrap; gap:8px; margin-bottom:14px">
   <select name="system" style="min-width:160px">
@@ -56,7 +97,7 @@ page_header('Activity Log — ระบบหลังบ้าน');
     <?php } ?>
   </select>
   <input type="text" name="actor" value="<?= h($filters['actor']) ?>" placeholder="ผู้ใช้" style="width:120px">
-  <input type="text" name="action" value="<?= h($filters['action']) ?>" placeholder="action" style="width:120px">
+  <input type="text" name="action" value="<?= h($filters['action']) ?>" placeholder="action เช่น page_view:" style="width:140px">
   <input type="text" name="q" value="<?= h($filters['q']) ?>" placeholder="ค้นหาสรุป/รายละเอียด" style="width:min(220px,100%)">
   <input type="date" name="date_from" value="<?= h($filters['date_from']) ?>" title="ตั้งแต่">
   <input type="date" name="date_to" value="<?= h($filters['date_to']) ?>" title="ถึง">
