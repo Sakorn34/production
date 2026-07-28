@@ -263,6 +263,41 @@ function is_latest_update_log(int $logId, int $assetId, string $type, ?string $c
 }
 
 /**
+ * ล็อกการจัดสรรเลขรอบ MA ต่อเครื่อง (GET_LOCK) — คืน round ถัดไปเมื่อได้ lock
+ *
+ * @param int $assetId
+ * @return array{ok:bool, round?:int, lock_key?:string, error?:string}
+ */
+function ma_round_lock_acquire(int $assetId): array
+{
+    $assetId = (int) $assetId;
+    if ($assetId <= 0) {
+        return ['ok' => false, 'error' => 'ไม่พบเครื่อง'];
+    }
+    $lockKey = 'ma_round_' . $assetId;
+    $lock = qr('SELECT GET_LOCK(?,10) l', 's', [$lockKey])->fetch_assoc();
+    if (!$lock || (int) $lock['l'] !== 1) {
+        return ['ok' => false, 'error' => 'ระบบกำลังบันทึก MA ให้เครื่องนี้อยู่ กรุณาลองใหม่'];
+    }
+    $r = qr('SELECT COALESCE(MAX(ma_round),0)+1 r FROM ma_records WHERE asset_id=?', 'i', [$assetId])->fetch_assoc();
+    return ['ok' => true, 'round' => (int) ($r['r'] ?? 1), 'lock_key' => $lockKey];
+}
+
+/**
+ * ปล่อย lock การจัดสรรเลขรอบ MA
+ *
+ * @param string $lockKey
+ * @return void
+ */
+function ma_round_lock_release(string $lockKey): void
+{
+    if ($lockKey === '') {
+        return;
+    }
+    qr('SELECT RELEASE_LOCK(?)', 's', [$lockKey]);
+}
+
+/**
  * แปลง errno MySQL เป็นข้อความที่ผู้ใช้เข้าใจ
  *
  * @param int    $errno

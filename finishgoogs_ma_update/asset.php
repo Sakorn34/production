@@ -46,10 +46,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_asset'])) {
     if ($newCode === '') { flash_set('รหัสเครื่องห้ามว่าง', 'err'); header('Location: ' . BASE_URL . '/asset.php?id=' . $id); exit; }
     $dup = qr("SELECT id FROM assets WHERE asset_code=? AND id<>?", 'si', [$newCode, $id])->fetch_assoc();
     if ($dup) { flash_set("รหัส $newCode ถูกใช้กับเครื่องอื่นแล้ว", 'err'); header('Location: ' . BASE_URL . '/asset.php?id=' . $id); exit; }
-    // คำนวณเลขรันนิ่งใหม่จากรหัส (ถ้ารุ่นเป็นแบบ gen และรหัสเข้าสูตร)
     $np = qr("SELECT code_mode, code_prefix, running_digits, code_use_prefix, code_use_year, code_use_month FROM products WHERE id=?", 'i', [$newPid])->fetch_assoc();
+    if (!$np) {
+        flash_set('ไม่พบรุ่นสินค้าที่เลือก กรุณาเลือกรุ่นใหม่', 'err');
+        header('Location: ' . BASE_URL . '/asset.php?id=' . $id);
+        exit;
+    }
+    // คำนวณเลขรันนิ่งใหม่จากรหัส (ถ้ารุ่นเป็นแบบ gen และรหัสเข้าสูตร)
     $run = null;
-    if ($np && $np['code_mode'] === 'generated') {
+    if ($np['code_mode'] === 'generated') {
         $run = parse_running_from_asset_code($np, $newCode);
     }
     q("UPDATE assets SET asset_code=?, factory_serial=?, product_id=?, running_no=?, produced_at=NULLIF(?,''), lot_label=NULLIF(?,''), note=NULLIF(?,'') WHERE id=?",

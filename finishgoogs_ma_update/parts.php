@@ -349,7 +349,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['move_part'])) {
     $code = trim(isset($_POST['asset_code']) ? $_POST['asset_code'] : '');
     if ($code !== '') {
         $a = qr("SELECT id FROM assets WHERE asset_code=? OR factory_serial=?", 'ss', [$code, $code])->fetch_assoc();
-        if ($a) $refId = (int)$a['id'];
+        if (!$a) {
+            flash_set('ไม่พบเครื่องรหัส "' . $code . '" — กรุณาเลือกจากรายการหรือตรวจสอบรหัสอีกครั้ง', 'err');
+            header('Location: ' . ($back !== '' ? $back : BASE_URL . '/parts.php'));
+            exit;
+        }
+        $refId = (int) $a['id'];
     }
     $remark = trim(isset($_POST['remark']) ? $_POST['remark'] : '') ?: null;
     $modeCategory = trim(isset($_POST['mode_category']) ? $_POST['mode_category'] : 'เบิกใช้');

@@ -395,8 +395,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_ma'])) {
     $result = $fixItems ? 'repair' : ($repItems ? 'replace' : ($okItems ? 'ok' : null));
     $fw      = trim($_POST['fw_version']);
     $newStatus = in_array($_POST['machine_status'], ['rental','spare'], true) ? $_POST['machine_status'] : 'rental';
-    $round   = qr("SELECT COALESCE(MAX(ma_round),0)+1 r FROM ma_records WHERE asset_id=?", 'i', [$a['id']])->fetch_assoc()['r'];
+    $roundAlloc = ma_round_lock_acquire((int) $a['id']);
+    if (!$roundAlloc['ok']) {
+        flash_set($roundAlloc['error'], 'err');
+        header('Location: ' . BASE_URL . '/ma.php?product=' . $maProductId);
+        exit;
+    }
+    $round = $roundAlloc['round'];
+    $maRoundLock = $roundAlloc['lock_key'];
 
+    try {
     q("INSERT INTO ma_records (asset_id,ma_round,visited_at,result,ok_items,replace_items,repair_items,fw_version,remark,done_by)
        VALUES (?,?,?,?,?,?,?,?,?,?)", 'iissssssss',
       [$a['id'], $round, $visited, $result, $okItems ?: null, $repItems ?: null, $fixItems ?: null,
@@ -441,6 +449,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_ma'])) {
     }
     flash_set($flashMsg);
     header('Location: ' . BASE_URL . '/ma.php?product=' . $maProductId); exit;
+    } finally {
+        ma_round_lock_release($maRoundLock);
+    }
 }
 
 // ---------------------------------------------------------------

@@ -560,6 +560,11 @@ class StockService
         return $this->db->query($sql)->fetchAll();
     }
 
+    /**
+     * เบิกผ่าน webhook (legacy — endpoint คืน 410 แล้ว, ไม่ sync production)
+     *
+     * @deprecated dead code — รายงานไว้ ยังไม่ลบเพื่ออ้างอิงประวัติ
+     */
     public function stockOutByWebhook(string $productCode, int $quantity, string $purpose): string
     {
         if ($quantity <= 0) {
@@ -937,13 +942,14 @@ class StockService
             }
             $n = count($sns);
             $totalQty = (int) ($row['total_qty'] ?? 0);
-            $displayQty = $n > 0 ? (int) round($totalQty / $n) : $totalQty;
+            $baseQty = $n > 0 ? intdiv($totalQty, $n) : $totalQty;
+            $remainder = $n > 0 ? ($totalQty % $n) : 0;
 
-            foreach ($sns as $sn) {
+            foreach ($sns as $i => $sn) {
                 $copy = $row;
                 $copy['asset_code'] = $sn;
                 $copy['asset_code_raw'] = $rawSn;
-                $copy['display_qty'] = $displayQty;
+                $copy['display_qty'] = $baseQty + ($i < $remainder ? 1 : 0);
                 $expanded[] = $copy;
             }
         }
