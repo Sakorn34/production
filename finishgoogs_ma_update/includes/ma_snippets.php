@@ -26,29 +26,29 @@ function ma_snippets_inner_html($pfx, array $opts = []) {
     <div class="ma-snippet">
       <div class="ma-snippet-hd">
         <span>1. ตั้งค่า Serial (MobaXterm)</span>
-        <button type="button" class="btn-sm btn-line ma-copy-btn" data-target="<?= h($pfx) ?>-serial"><?= ui_btn_label('copy', 'คัดลอก', 13) ?></button>
+        <button type="button" class="btn-sm btn-line btn-with-icon ma-copy-btn" data-target="<?= h($pfx) ?>-serial"><?= ui_btn_label('copy', 'คัดลอก', 13) ?></button>
       </div>
       <textarea class="ma-snippet-txt" id="<?= h($pfx) ?>-serial" readonly rows="3" aria-label="คำสั่งตั้งค่า Serial"></textarea>
     </div>
     <div class="ma-snippet">
       <div class="ma-snippet-hd">
         <span>2. ตั้งค่า MAC — เปิดไฟล์ (MobaXterm)</span>
-        <button type="button" class="btn-sm btn-line ma-copy-btn" data-target="<?= h($pfx) ?>-mac"><?= ui_btn_label('copy', 'คัดลอก', 13) ?></button>
+        <button type="button" class="btn-sm btn-line btn-with-icon ma-copy-btn" data-target="<?= h($pfx) ?>-mac"><?= ui_btn_label('copy', 'คัดลอก', 13) ?></button>
       </div>
       <textarea class="ma-snippet-txt" id="<?= h($pfx) ?>-mac" readonly rows="3" aria-label="คำสั่งเปิด cmdline.txt">sudo nano /boot/cmdline.txt</textarea>
     </div>
     <div class="ma-snippet">
       <div class="ma-snippet-hd">
         <span>3. MAC Address จากหมายเลขสินค้า</span>
-        <button type="button" class="btn-sm btn-line ma-copy-btn" data-target="<?= h($pfx) ?>-macaddr"><?= ui_btn_label('copy', 'คัดลอก', 13) ?></button>
+        <button type="button" class="btn-sm btn-line btn-with-icon ma-copy-btn" data-target="<?= h($pfx) ?>-macaddr"><?= ui_btn_label('copy', 'คัดลอก', 13) ?></button>
       </div>
       <textarea class="ma-snippet-txt" id="<?= h($pfx) ?>-macaddr" readonly rows="3" aria-label="MAC Address ที่คำนวณจากหมายเลขสินค้า" placeholder="(กรอกหมายเลขสินค้าก่อน)"></textarea>
-      <p class="muted ma-snippet-note">เช่น BS22120047 → be:99:22:12:00:47</p>
+      <p class="muted ma-snippet-note">เช่น BS22120047 → 22:12:00:47</p>
     </div>
     <div class="ma-snippet">
       <div class="ma-snippet-hd">
         <span>4. สรุปส่งงานเช่า Office</span>
-        <button type="button" class="btn-sm btn-line ma-copy-btn" data-target="<?= h($pfx) ?>-rental"><?= ui_btn_label('copy', 'คัดลอก', 13) ?></button>
+        <button type="button" class="btn-sm btn-line btn-with-icon ma-copy-btn" data-target="<?= h($pfx) ?>-rental"><?= ui_btn_label('copy', 'คัดลอก', 13) ?></button>
       </div>
       <textarea class="ma-snippet-txt ma-snippet-txt-tall" id="<?= h($pfx) ?>-rental" readonly rows="8" aria-label="ข้อความสรุป MA งานเช่า"></textarea>
     </div>

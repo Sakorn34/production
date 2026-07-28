@@ -232,6 +232,19 @@ function deploy_build_paths_php(array $paths): string
 }
 
 /**
+ * ล้าง OPcache หลังเขียนไฟล์ config (ป้องกัน require ค่าเก่าหลังบันทึก)
+ *
+ * @param string $path
+ * @return void
+ */
+function deploy_invalidate_opcache(string $path): void
+{
+    if (function_exists('opcache_invalidate') && is_file($path)) {
+        @opcache_invalidate($path, true);
+    }
+}
+
+/**
  * เขียนไฟล์อย่างปลอดภัย (สร้างโฟลเดอร์ถ้ายังไม่มี)
  *
  * @param string $path
@@ -262,6 +275,7 @@ function deploy_write_file(string $path, string $content): array
         return ['ok' => false, 'message' => 'ย้ายไฟล์ tmp ไม่สำเร็จ: ' . $path];
     }
     @chmod($path, 0640);
+    deploy_invalidate_opcache($path);
     return ['ok' => true, 'message' => 'OK'];
 }
 

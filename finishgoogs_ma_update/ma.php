@@ -153,7 +153,7 @@ function ma_rental_office_summary($replace, $repair, $fw, $remark) {
 /**
  * แปลงหมายเลขสินค้าเป็น MAC Address สำหรับตั้งค่าใน cmdline.txt
  *
- * ใช้เลข 8 หลักท้ายจากรหัส (เช่น BS22120047 → be:99:22:12:00:47)
+ * ใช้เลข 8 หลักท้ายจากรหัส (เช่น BS22120047 → 22:12:00:47)
  *
  * @param string $assetCode หมายเลขสินค้า / asset_code
  * @return string MAC หรือค่าว่างถ้าแปลงไม่ได้
@@ -168,8 +168,7 @@ function ma_asset_code_to_mac($assetCode) {
         return '';
     }
     $digits = str_pad(substr($digits, -8), 8, '0', STR_PAD_LEFT);
-    return 'be:99:'
-        . substr($digits, 0, 2) . ':'
+    return substr($digits, 0, 2) . ':'
         . substr($digits, 2, 2) . ':'
         . substr($digits, 4, 2) . ':'
         . substr($digits, 6, 2);
@@ -186,7 +185,7 @@ function ma_row_data_attrs(array $rec) {
     $rep = ma_record_items($rec, 'replace_items', 'Replace');
     $fix = ma_record_items($rec, 'repair_items', 'Repair');
     $extra = [
-        'data-date' => dthai($rec['visited_at']),
+        'data-date' => dthai_full($rec['visited_at']),
         'data-round' => $rec['ma_round'] ? (string)(int)$rec['ma_round'] : '-',
         'data-asset' => (string)$rec['asset_code'],
         'data-ok' => $ok ? implode("\n", $ok) : '-',
@@ -278,9 +277,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'history') {
     $res = qr("SELECT * FROM ma_records WHERE asset_id=? ORDER BY visited_at DESC, id DESC LIMIT 15", 'i', [$a['id']]);
     echo '<b>📅 ประวัติ MA (' . $res->num_rows . ' ครั้งล่าสุด)</b>';
     if ($res->num_rows) {
-        echo '<table class="list" style="margin:6px 0 12px"><tr><th>วันที่</th><th>FW</th><th>รายละเอียด</th><th>โดย</th>' . ($canMa ? '<th></th>' : '') . '</tr>';
+        echo '<table class="list" style="margin:6px 0 12px"><tr><th>วันเวลา</th><th>FW</th><th>รายละเอียด</th><th>โดย</th>' . ($canMa ? '<th></th>' : '') . '</tr>';
         while ($m = $res->fetch_assoc()) {
-            echo '<tr><td style="white-space:nowrap">' . dthai($m['visited_at']) . '</td>'
+            echo '<tr><td style="white-space:nowrap">' . dthai_full($m['visited_at']) . '</td>'
                . '<td>' . h($m['fw_version'] ?: '-') . '</td>'
                . '<td style="max-width:420px">' . ma_items_html($m) . ma_parts_withdrawn_html((int)$m['id']) . '</td>'
                . '<td>' . h($m['done_by'] ?: '-') . '</td>'
@@ -298,13 +297,13 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'history') {
                WHERE asset_id=? ORDER BY updated_at DESC, id DESC LIMIT 8", 'i', [$a['id']]);
     if ($res->num_rows) {
         echo '<b>🔩 การอัปเดต FW/HW (' . $res->num_rows . ' ครั้งล่าสุด)</b>';
-        echo '<table class="list" style="margin:6px 0 12px"><tr><th>วันที่</th><th>ประเภท</th><th>รายละเอียด</th></tr>';
+        echo '<table class="list" style="margin:6px 0 12px"><tr><th>วันเวลา</th><th>ประเภท</th><th>รายละเอียด</th></tr>';
         while ($u = $res->fetch_assoc()) {
             $d = [];
             if ($u['component_name']) $d[] = $u['component_name'];
             if ($u['old_value'] || $u['new_value']) $d[] = ($u['old_value'] ?: '?') . ' → ' . ($u['new_value'] ?: '?');
             if ($u['detail']) $d[] = $u['detail'];
-            echo '<tr><td>' . dthai($u['updated_at']) . '</td>'
+            echo '<tr><td>' . dthai_full($u['updated_at']) . '</td>'
                . '<td>' . ['firmware' => '📲 FW', 'hardware' => '🔩 HW', 'other' => '⚙️'][$u['update_type']] . '</td>'
                . '<td style="max-width:400px; font-size:13px">' . h(mb_strimwidth(implode(' | ', $d), 0, 170, '…')) . '</td></tr>';
         }
@@ -378,14 +377,15 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'parts') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_ma'])) {
     csrf_check(); require_can('ma');
     $code = trim($_POST['asset_code']);
-    $a = qr("SELECT id, asset_code FROM assets WHERE asset_code=? OR factory_serial=?", 'ss', [$code, $code])->fetch_assoc();
+    $a = qr("SELECT id, asset_code, product_id FROM assets WHERE asset_code=? OR factory_serial=?", 'ss', [$code, $code])->fetch_assoc();
     if (!$a) { flash_set("ไม่พบเครื่องรหัส $code", 'err'); header('Location: ' . BASE_URL . '/ma.php'); exit; }
+    $maProductId = (int)$a['product_id'];
 
-    $visited = $_POST['visited_at'] ?: date('Y-m-d');
+    $visited = dt_from_input($_POST['visited_at'] ?? '');
     $san = ma_sanitize_item_sets($_POST['ok_items'] ?? '', $_POST['replace_items'] ?? '', $_POST['repair_items'] ?? '');
     if ($san === null) {
         flash_set('รายการใน ✅ ปกติ / 🔄 เปลี่ยน / 🔧 ซ่อม ห้ามซ้ำกันข้ามช่อง', 'err');
-        header('Location: ' . BASE_URL . '/ma.php?product=' . (int)(qr("SELECT product_id FROM assets WHERE id=?", 'i', [$a['id']])->fetch_assoc()['product_id'] ?? 0));
+        header('Location: ' . BASE_URL . '/ma.php?product=' . $maProductId);
         exit;
     }
     $okItems = $san['ok'];
@@ -413,7 +413,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_ma'])) {
         if (!$w['ok']) {
             q("DELETE FROM ma_records WHERE id=?", 'i', [$maRecordId]);
             flash_set($w['error'], 'err');
-            header('Location: ' . BASE_URL . '/ma.php?product=' . (int)(qr("SELECT product_id FROM assets WHERE id=?", 'i', [$a['id']])->fetch_assoc()['product_id'] ?? 0));
+            header('Location: ' . BASE_URL . '/ma.php?product=' . $maProductId);
             exit;
         }
     }
@@ -425,7 +425,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_ma'])) {
     if (!empty($w['count'])) {
         $flashMsg .= ' · เบิกอะไหล่ ' . (int)$w['count'] . ' รายการ';
     }
-    if ($result === 'repair' && function_exists('line_notify_dispatch') && date('Y-m-d', strtotime($visited)) === date('Y-m-d')) {
+    if ($result === 'repair' && function_exists('line_notify_instant_enabled') && line_notify_instant_enabled('ma.repair_required') && date('Y-m-d', strtotime($visited)) === date('Y-m-d')) {
         line_notify_dispatch('ma.repair_required', [
             'asset_id'     => (int)$a['id'],
             'asset_code'   => (string)$a['asset_code'],
@@ -440,7 +440,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_ma'])) {
         ]);
     }
     flash_set($flashMsg);
-    header('Location: ' . BASE_URL . '/asset.php?id=' . $a['id']); exit;
+    header('Location: ' . BASE_URL . '/ma.php?product=' . $maProductId); exit;
 }
 
 // ---------------------------------------------------------------
@@ -449,9 +449,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_ma'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_ma'])) {
     csrf_check(); require_can('ma');
     $mid = (int)$_POST['edit_id'];
-    $rec = qr("SELECT asset_id FROM ma_records WHERE id=?", 'i', [$mid])->fetch_assoc();
+    $rec = qr("SELECT m.asset_id, a.product_id FROM ma_records m JOIN assets a ON a.id=m.asset_id WHERE m.id=?", 'i', [$mid])->fetch_assoc();
     if (!$rec) { flash_set('ไม่พบรายการ MA ที่จะแก้ไข', 'err'); header('Location: ' . BASE_URL . '/ma.php'); exit; }
-    $visited = $_POST['visited_at'] ?: date('Y-m-d');
+    $maProductId = (int)$rec['product_id'];
+    $visited = dt_from_input($_POST['visited_at'] ?? '');
     $san = ma_sanitize_item_sets($_POST['ok_items'] ?? '', $_POST['replace_items'] ?? '', $_POST['repair_items'] ?? '');
     if ($san === null) {
         flash_set('รายการใน ✅ ปกติ / 🔄 เปลี่ยน / 🔧 ซ่อม ห้ามซ้ำกันข้ามช่อง', 'err');
@@ -487,7 +488,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_ma'])) {
         exit;
     }
     flash_set('แก้ไขรายการ MA เรียบร้อยแล้ว');
-    header('Location: ' . BASE_URL . '/asset.php?id=' . $rec['asset_id']); exit;
+    header('Location: ' . BASE_URL . '/ma.php?product=' . $maProductId); exit;
 }
 // ---------------------------------------------------------------
 // ลบรายการ MA
@@ -734,8 +735,8 @@ require __DIR__ . '/includes/list_search.php';
         <div class="muted ma-field-hint">รุ่น <?= h($product['name']) ?> · พิมพ์แล้วเลือกจากรายการ</div>
       </div>
 
-      <label>วันที่เข้า MA</label>
-      <input type="date" name="visited_at" value="<?= h($ea ? $ea['visited_at'] : date('Y-m-d')) ?>">
+      <label>วันเวลาเข้า MA</label>
+      <input type="datetime-local" name="visited_at" value="<?= h(dt_for_input($ea ? $ea['visited_at'] : dt_now())) ?>">
 
       <label class="ma-lbl-top">✅ ใช้งานได้ปกติ</label>
       <div class="ma-field" id="mf-ok"></div>
@@ -1250,7 +1251,7 @@ list_search_form([
 <?php } else { ?>
 <table class="list ma-list-table">
   <tr>
-    <th><?= ma_sort_th('วันที่', 'date_asc', 'date_desc', $msort, $productId) ?></th>
+    <th><?= ma_sort_th('วันเวลา', 'date_asc', 'date_desc', $msort, $productId) ?></th>
     <th><?= ma_sort_th('รอบ', 'round_asc', 'round_desc', $msort, $productId) ?></th>
     <th><?= ma_sort_th('เครื่อง', 'asset_asc', 'asset_desc', $msort, $productId) ?></th>
     <th><?= ma_sort_th('✅ ปกติ', 'ok_asc', 'ok_desc', $msort, $productId) ?></th>
@@ -1262,7 +1263,7 @@ list_search_form([
   </tr>
   <?php while ($m = $recentMA->fetch_assoc()) { ?>
   <tr class="ma-row-click" title="คลิกดูรายละเอียด MA และข้อความประจำสินค้า" <?= ma_row_data_attrs($m) ?>>
-    <td style="white-space:nowrap"><?= dthai($m['visited_at']) ?></td>
+    <td style="white-space:nowrap"><?= dthai_full($m['visited_at']) ?></td>
     <td style="text-align:center"><?= $m['ma_round'] ? (int)$m['ma_round'] : '-' ?></td>
     <td><a href="<?= BASE_URL ?>/asset.php?id=<?= (int)$m['asset_id'] ?>"><?= h($m['asset_code']) ?></a></td>
     <td style="max-width:200px; font-size:12.5px"><?= ma_items_cell($m, 'ok_items', 'OK') ?></td>

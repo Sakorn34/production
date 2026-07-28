@@ -55,7 +55,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'sn_basket') {
                 <th class="text-right">จำนวน</th>
                 <th>เลขที่</th>
                 <th>ผู้เบิก</th>
-                <th>วันที่</th>
+                <th>วันเวลา</th>
                 <th class="col-actions">จัดการ</th>
             </tr>
         </thead>
@@ -183,7 +183,7 @@ function history_sn_latest(array $g): array
 }
 
 /**
- * ป้ายรายการเบิก (Set / รายชิ้น)
+ * ป้ายรายการเบิก (Set / รายชิ้น / เบิกชุด)
  *
  * @param array<string,mixed> $h
  * @return string
@@ -193,6 +193,10 @@ function history_row_label(array $h): string
     global $partProdLabels;
     if (!empty($h['set_id'])) {
         return '[Set] [' . e($h['set_code']) . '] ' . e($h['set_name']);
+    }
+    $itemCount = (int) ($h['item_count'] ?? 1);
+    if ($itemCount > 1) {
+        return '<span class="badge badge-info">เบิกชุด</span> ' . $itemCount . ' รายการอะไหล่';
     }
     $code = (string) ($h['single_product_code'] ?? '');
     $name = parts_label_for_code($code, (string) ($h['single_product_name'] ?? ''), $partProdLabels ?? []);
@@ -222,7 +226,68 @@ function history_row_actions(array $h): string
 }
 
 /**
- * รูปอะไหล่สำหรับแถวประวัติเบิก
+ * ประเภทการเบิกจากหมายเหตุใบงาน — ใช้ chip ในคอลัมน์หมายเหตุ
+ *
+ * @param array<string,mixed> $h
+ * @return string prod|ma|repair|other
+ */
+function history_withdraw_kind(array $h): string
+{
+    $note = trim((string) ($h['note'] ?? ''));
+    if ($note === 'MA' || preg_match('/\bMA\b/u', $note)) {
+        return 'ma';
+    }
+    if ($note === 'เบิกงานซ่อม' || $note === 'ซ่อม' || mb_strpos($note, 'ซ่อม') !== false) {
+        return 'repair';
+    }
+    if ($note === 'เบิกผลิต' || mb_strpos($note, 'ผลิต') !== false || mb_strpos($note, 'BOM') !== false) {
+        return 'prod';
+    }
+    return 'other';
+}
+
+/**
+ * รายการประเภทการเบิกในกลุ่ม S/N (คั่นด้วย comma สำหรับ filter)
+ *
+ * @param array<string,mixed> $g
+ * @return string
+ */
+function history_sn_withdraw_kinds_attr(array $g): string
+{
+    $set = [];
+    foreach ($g['items'] as $h) {
+        $set[history_withdraw_kind($h)] = true;
+    }
+    return implode(',', array_keys($set));
+}
+
+/**
+ * chip หมายเหตุประจำประเภทการเบิก (ผลิต / MA / ซ่อม)
+ *
+ * @param array<string,mixed> $h
+ * @return string HTML
+ */
+function history_note_badge(array $h): string
+{
+    $note = trim((string) ($h['note'] ?? ''));
+    if ($note === '') {
+        return '<span class="text-muted">-</span>';
+    }
+    $kind = history_withdraw_kind($h);
+    switch ($kind) {
+        case 'ma':
+            return '<span class="badge history-note-badge history-note-ma">MA</span>';
+        case 'repair':
+            return '<span class="badge history-note-badge history-note-repair">เบิกซ่อม</span>';
+        case 'prod':
+            return '<span class="badge history-note-badge history-note-prod">เบิกผลิต</span>';
+        default:
+            return '<span class="badge badge-info">' . e($note) . '</span>';
+    }
+}
+
+/**
+ * รูปอะไหล่ — เฉพาะเบิกรายชิ้น 1 อะไหล่ต่อ 1 ใบงาน
  *
  * @param array<string,mixed> $h
  * @param array<string,string> $partIcons
@@ -234,9 +299,27 @@ function history_row_thumb(array $h, array $partIcons): string
     if (!empty($h['set_id'])) {
         return '';
     }
+    if ((int) ($h['item_count'] ?? 1) !== 1) {
+        return '';
+    }
     $code = (string) ($h['single_product_code'] ?? '');
     $name = parts_label_for_code($code, (string) ($h['single_product_name'] ?? ''), $partProdLabels ?? []);
     return parts_img_tag($partIcons[$code] ?? '', $name);
+}
+
+/**
+ * รูปสำหรับแถวสรุป S/N — แสดงเมื่อมี 1 ใบงานและ 1 อะไหล่
+ *
+ * @param array<string,mixed> $g
+ * @param array<string,string> $partIcons
+ * @return string
+ */
+function history_sn_row_thumb(array $g, array $partIcons): string
+{
+    if ((int) ($g['doc_count'] ?? $g['count'] ?? 0) > 1) {
+        return '';
+    }
+    return history_row_thumb(history_sn_latest($g), $partIcons);
 }
 ?>
 
@@ -269,7 +352,7 @@ function history_row_thumb(array $h, array $partIcons): string
             <dd><?= e($detail['note'] ?: '-') ?></dd>
         </div>
         <div>
-            <dt>วันที่</dt>
+            <dt>วันเวลา</dt>
             <dd><?= formatDate($detail['created_at']) ?></dd>
         </div>
         <?php if (!empty($detail['part_movement_id'])): ?>
@@ -320,6 +403,12 @@ function history_row_thumb(array $h, array $partIcons): string
 <?php else: ?>
 
 <div class="card parts-list-card">
+    <div class="history-kind-legend" role="group" aria-label="กรองประเภทการเบิก">
+        <button type="button" class="history-kind-filter is-active" data-history-filter="all">ทั้งหมด</button>
+        <button type="button" class="history-kind-filter badge history-note-badge history-note-prod" data-history-filter="prod">เบิกผลิต</button>
+        <button type="button" class="history-kind-filter badge history-note-badge history-note-ma" data-history-filter="ma">MA</button>
+        <button type="button" class="history-kind-filter badge history-note-badge history-note-repair" data-history-filter="repair">เบิกซ่อม</button>
+    </div>
     <div class="table-wrap">
     <table class="parts-table">
         <thead>
@@ -331,19 +420,20 @@ function history_row_thumb(array $h, array $partIcons): string
                 <th class="text-right">จำนวนรวม</th>
                 <th>ผู้เบิก</th>
                 <th>หมายเหตุ</th>
-                <th>วันที่</th>
+                <th>วันเวลา</th>
                 <th class="col-actions">จัดการ</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody id="history-list-body">
             <?php if (empty($grouped)): ?>
             <tr><td colspan="9" class="text-center text-muted">ยังไม่มีประวัติการเบิก</td></tr>
             <?php else: ?>
+            <tr id="history-filter-empty" hidden><td colspan="9" class="text-center text-muted">ไม่พบรายการในประเภทที่เลือก</td></tr>
             <?php foreach ($grouped as $g): ?>
             <?php if ($g['type'] === 'sn'): ?>
             <?php $latest = history_sn_latest($g); ?>
-            <tr class="history-sn-row" data-sn-basket-row="<?= e($g['sn']) ?>" title="คลิกดูรายการเบิกทั้งหมดของ S/N นี้">
-                <td class="col-img"></td>
+            <tr class="history-sn-row" data-sn-basket-row="<?= e($g['sn']) ?>" data-withdraw-kinds="<?= e(history_sn_withdraw_kinds_attr($g)) ?>" title="คลิกดูรายการเบิกทั้งหมดของ S/N นี้">
+                <td class="col-img"><?= history_sn_row_thumb($g, $partIcons) ?></td>
                 <td>
                     <?php if (($g['doc_count'] ?? $g['count']) > 1): ?>
                     <span class="text-muted"><?= (int) ($g['doc_count'] ?? $g['count']) ?> ใบเบิก</span>
@@ -355,7 +445,7 @@ function history_row_thumb(array $h, array $partIcons): string
                 <td><strong><?= e($g['sn']) ?></strong></td>
                 <td class="text-right"><?= formatNumber($g['total_qty']) ?></td>
                 <td><?= e($latest['issued_by'] ?: '-') ?></td>
-                <td class="text-muted"><?= e($latest['note'] ?: '-') ?></td>
+                <td><?= history_note_badge($latest) ?></td>
                 <td class="text-muted"><?= formatDate($latest['created_at']) ?></td>
                 <td class="col-actions">
                     <?= actionIcon('basket', $g['sn'], 'ดูรายการเบิกทั้งหมด') ?>
@@ -363,14 +453,14 @@ function history_row_thumb(array $h, array $partIcons): string
             </tr>
             <?php else: ?>
             <?php foreach ($g['items'] as $h): ?>
-            <tr>
+            <tr data-withdraw-kinds="<?= e(history_withdraw_kind($h)) ?>">
                 <td class="col-img"><?= history_row_thumb($h, $partIcons) ?></td>
                 <td><strong><?= e($h['doc_no']) ?></strong></td>
                 <td><?= history_row_label($h) ?></td>
                 <td>-</td>
                 <td class="text-right"><?= formatNumber($h['display_qty'] ?? $h['total_qty'] ?? 0) ?></td>
                 <td><?= e($h['issued_by'] ?: '-') ?></td>
-                <td class="text-muted"><?= e($h['note'] ?: '-') ?></td>
+                <td><?= history_note_badge($h) ?></td>
                 <td class="text-muted"><?= formatDate($h['created_at']) ?></td>
                 <td class="col-actions"><?= history_row_actions($h) ?></td>
             </tr>

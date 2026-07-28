@@ -25,3 +25,6 @@ Appscript*.txt
 
 # ชุด deploy server (มีรหัส DB — อย่า commit)
 /deploy/hostatom/
+/deploy/release/
+/deploy/.last-deploy.json
+/deploy/.last-build.json

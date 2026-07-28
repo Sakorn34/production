@@ -318,13 +318,22 @@ function theme_font_scale_percent(): int {
  */
 function theme_font_css_sizes(): string {
     $s = theme_font_scale_percent() / 100;
+    $sf = rtrim(rtrim(sprintf('%.4f', $s), '0'), '.');
     return sprintf(
-        '--fs-body:%spx; --fs-h1:%spx; --fs-table:%spx; --fs-badge:%spx;',
-        round(15 * $s, 1),
-        round(22 * $s, 1),
-        round(13.5 * $s, 1),
-        round(12 * $s, 1)
+        '--font-scale:%s; --fs-body:calc(15px * var(--font-scale)); --fs-h1:calc(22px * var(--font-scale)); --fs-table:calc(13.5px * var(--font-scale)); --fs-badge:calc(12px * var(--font-scale));',
+        $sf
     );
+}
+
+/**
+ * ค่า font-size สำหรับ inline style — คูณตาม --font-scale จาก appearance.php
+ *
+ * @param float $px ขนาดฐานเมื่อ scale = 100%
+ * @return string เช่น calc(13px * var(--font-scale, 1))
+ */
+function theme_fs_css(float $px): string {
+    $px = max(1, $px);
+    return 'calc(' . $px . 'px * var(--font-scale, 1))';
 }
 
 /** ชื่อเดือนย่อภาษาไทย จาก Y-m */
@@ -456,6 +465,7 @@ function require_login() {
     ss_sync_session_employee_from_profile();
     ensure_field_input_mode_schema();
     ensure_asset_serial_identity();
+    ensure_ma_datetime_schema();
     // ล้าง cache ของระบบ role/users เก่าใน session ถ้ายังค้างอยู่
     unset($_SESSION['user']);
 }
@@ -611,15 +621,17 @@ function role_th($r) {
     $m = ['admin' => 'ผู้ดูแลระบบ', 'qc' => 'ทีมผลิต/QC', 'technician' => 'ช่างเทคนิค', 'executive' => 'ผู้บริหาร'];
     return isset($m[$r]) ? $m[$r] : $r;
 }
-function dthai($d) { // แสดงวันที่แบบสั้น
-    if (!$d || $d === '0000-00-00') return '-';
-    $t = strtotime($d);
-    return $t ? date('d/m/Y', $t) : h($d);
+function dthai($d) { // แสดงวันที่ — มีเวลาเมื่อข้อมูลมีส่วนเวลา
+    if (!function_exists('dt_display')) {
+        require_once dirname(__DIR__) . '/shared/datetime_helpers.php';
+    }
+    return dt_display($d);
 }
 function dthai_full($d) {
-    if (!$d) return '-';
-    $t = strtotime($d);
-    return $t ? date('d/m/Y H:i', $t) : h($d);
+    if (!function_exists('dt_display_full')) {
+        require_once dirname(__DIR__) . '/shared/datetime_helpers.php';
+    }
+    return dt_display_full($d);
 }
 
 // ---------- แจ้งเตือนอะไหล่ครบกำหนดเปลี่ยน (SD Card / Battery Backup RTC) ----------
@@ -1654,6 +1666,36 @@ function ensure_asset_serial_identity() {
 }
 
 /**
+ * อัปเกรดคอลัมน์วันเวลาที่ควรเก็บทั้งวันและเวลา (เช่น ma_records.visited_at)
+ *
+ * @return void
+ */
+function ensure_ma_datetime_schema() {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+
+    try {
+        $res = db()->query("SHOW COLUMNS FROM ma_records LIKE 'visited_at'");
+        if (!$res) {
+            return;
+        }
+        $col = $res->fetch_assoc();
+        if (!$col) {
+            return;
+        }
+        $type = strtolower((string) ($col['Type'] ?? ''));
+        if (strpos($type, 'datetime') === false) {
+            db()->query('ALTER TABLE ma_records MODIFY visited_at DATETIME NOT NULL');
+        }
+    } catch (\mysqli_sql_exception $e) {
+        error_log('[ensure_ma_datetime_schema] ' . $e->getMessage());
+    }
+}
+
+/**
  * ค่าเริ่มต้นส่วนประกอบรหัสจากแถว products
  *
  * @param array<string, mixed> $p
@@ -1730,6 +1772,54 @@ function parse_running_from_asset_code(array $p, $assetCode) {
         return (int)$m[1];
     }
     return null;
+}
+
+/**
+ * รหัสเครื่องล่าสุดของรุ่น — generated ใช้ running_no สูงสุด (ให้ตรงกับเลข running ถัดไป)
+ *
+ * @param array<string, mixed> $p         แถว products
+ * @param int                  $productId
+ * @return string
+ */
+function latest_asset_code_for_product(array $p, int $productId): string {
+    $productId = (int)$productId;
+    if ($productId <= 0) {
+        return '';
+    }
+
+    if (($p['code_mode'] ?? '') === 'generated') {
+        $prefix = trim((string)($p['code_prefix'] ?? ''));
+        if ($prefix !== '') {
+            $row = qr(
+                "SELECT a.asset_code FROM assets a
+                 INNER JOIN products pr ON pr.id = a.product_id
+                 WHERE pr.code_prefix = ? AND a.running_no IS NOT NULL
+                 ORDER BY a.running_no DESC, a.id DESC
+                 LIMIT 1",
+                's',
+                [$prefix]
+            )->fetch_assoc();
+        } else {
+            $row = qr(
+                "SELECT asset_code FROM assets
+                 WHERE product_id = ? AND running_no IS NOT NULL
+                 ORDER BY running_no DESC, id DESC
+                 LIMIT 1",
+                'i',
+                [$productId]
+            )->fetch_assoc();
+        }
+        if ($row) {
+            return (string)$row['asset_code'];
+        }
+    }
+
+    $row = qr(
+        "SELECT asset_code FROM assets WHERE product_id = ? ORDER BY id DESC LIMIT 1",
+        'i',
+        [$productId]
+    )->fetch_assoc();
+    return $row ? (string)$row['asset_code'] : '';
 }
 
 /**
@@ -2264,9 +2354,11 @@ function effective_ma_form_fields($productId) {
 require_once __DIR__ . '/includes/part_stock_bridge.php';
 
 require_once dirname(__DIR__) . '/shared/activity_log_core.php';
+require_once dirname(__DIR__) . '/shared/datetime_helpers.php';
 require_once dirname(__DIR__) . '/shared/line_notify_core.php';
 require_once dirname(__DIR__) . '/shared/line_flex_templates.php';
 require_once dirname(__DIR__) . '/shared/line_notify_jobs.php';
+ensure_ma_datetime_schema();
 activity_log_ensure_schema();
 line_notify_ensure_schema();
 if (PHP_SAPI !== 'cli' && session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION['profile'])) {

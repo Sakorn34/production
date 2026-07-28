@@ -109,7 +109,7 @@ parts_page_header('stock-out-set', 'เบิกออก (Set)', 'เบิก�
                     <th class="text-right">จำนวนรวม</th>
                     <th>ผู้เบิก</th>
                     <th>หมายเหตุ</th>
-                    <th>วันที่</th>
+                    <th>วันเวลา</th>
                     <th class="col-actions">จัดการ</th>
                 </tr>
             </thead>

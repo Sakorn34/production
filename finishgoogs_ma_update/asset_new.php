@@ -40,8 +40,10 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fields') {
     }
     $out['checklist_items'] = effective_production_checklist($pid);
 
-    $la = qr("SELECT asset_code FROM assets WHERE product_id=? ORDER BY id DESC LIMIT 1", 'i', [$pid])->fetch_assoc();
-    if ($la) $out['last_asset_code'] = (string)$la['asset_code'];
+    $lastCode = latest_asset_code_for_product($p, $pid);
+    if ($lastCode !== '') {
+        $out['last_asset_code'] = $lastCode;
+    }
 
     // บันทึกผลิตล่าสุดของรุ่นนี้ = ข้อมูลต้นแบบ
     $last = qr("SELECT pr.*, a.id aid FROM production_records pr JOIN assets a ON a.id=pr.asset_id
@@ -347,7 +349,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ];
         }
     }
-    if (!$err && $notifyAssets !== [] && function_exists('line_notify_dispatch')) {
+    if (!$err && $notifyAssets !== [] && function_exists('line_notify_instant_enabled') && line_notify_instant_enabled('production.problem_found')) {
         foreach ($notifyAssets as $na) {
             line_notify_dispatch('production.problem_found', $na, [
                 'dedup_key' => 'production.problem_found:' . (int)$na['asset_id'] . ':' . date('Y-m-d'),
@@ -517,12 +519,8 @@ function loadProduct(pid){
         ? '(ระบบออกเลข running อัตโนมัติ — หมายเลขสินค้าจริงยืนยันตอนกดบันทึก)'
         : '(กรอกหมายเลขสินค้าเองหรือสแกน QR ทีละเครื่อง)';
       var hintEl = document.getElementById('last-asset-hint');
-      if (d.last_asset_code) {
-        hintEl.textContent = 'อ้างอิงจากหมายเลขสินค้าล่าสุดของรุ่นนี้: ' + d.last_asset_code + ' — ค่าฟอร์มด้านล่างดึงจากเครื่องนี้';
-        hintEl.style.display = '';
-      } else {
-        hintEl.style.display = 'none';
-      }
+      hintEl.style.display = 'none';
+      hintEl.textContent = '';
       renderFields(d);
       renderChecklist(d.checklist_items || [], d.checklist_last || '');
       renderBom(d);
@@ -909,6 +907,26 @@ function doConfirmSubmit(){
     });
 }
 
+function updateAssetHints(){
+  var hintEl = document.getElementById('last-asset-hint');
+  if (!cfg) { hintEl.style.display = 'none'; return; }
+  var lines = [];
+  if (cfg.last_asset_code) {
+    lines.push('เครื่องล่าสุดในระบบ: ' + cfg.last_asset_code + ' — ค่าฟอร์มด้านล่างดึงจากเครื่องนี้');
+  }
+  if (cfg.mode === 'generated' && unitCount > 0) {
+    var next = previewCode(0);
+    lines.push('หมายเลขถัดไป (ตามวันที่ผลิตที่เลือก): ' + next
+      + (unitCount > 1 ? ' · เครื่องที่ ' + unitCount + ': ' + previewCode(unitCount - 1) : ''));
+  }
+  if (lines.length) {
+    hintEl.innerHTML = lines.join('<br>');
+    hintEl.style.display = '';
+  } else {
+    hintEl.style.display = 'none';
+  }
+}
+
 // ---------- รายการเครื่อง (+ / สแกน) ----------
 function previewCode(idx){
   if (!cfg || cfg.mode !== 'generated') return '?';
@@ -929,18 +947,21 @@ function addUnit(){
   if (!cfg) return;
   var list = document.getElementById('unit-list');
   var row = document.createElement('div');
+  row.className = 'unit-row';
   row.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:6px';
   unitCount++;
   if (cfg.mode === 'generated') {
     row.innerHTML = '<span class="badge st-new">#' + unitCount + '</span>'
       + '<code class="gen-preview" style="font-size:15px; font-weight:600"></code>'
-      + '<button type="button" class="btn-sm btn-line" onclick="removeUnit(this)">ลบ</button>';
+      + '<button type="button" class="btn-sm btn-line" style="margin-left:auto" onclick="removeUnit(this)">ลบ</button>';
     document.getElementById('gen_count').value = unitCount;
   } else {
     row.innerHTML = '<span class="badge st-new">#' + unitCount + '</span>'
-      + '<input type="text" name="serials[]" placeholder="หมายเลขสินค้า" style="flex:1" required autocomplete="off">'
+      + '<input type="text" name="serials[]" placeholder="หมายเลขสินค้า" style="flex:1; min-width:0" required autocomplete="off">'
+      + '<div style="display:flex; gap:8px; margin-left:auto; flex-shrink:0">'
       + '<button type="button" class="btn-sm btn-line" onclick="scanInto(this)">📷 สแกน</button>'
-      + '<button type="button" class="btn-sm btn-line" onclick="removeUnit(this)">ลบ</button>';
+      + '<button type="button" class="btn-sm btn-line" onclick="removeUnit(this)">ลบ</button>'
+      + '</div>';
     list.appendChild(row);
     var serialInp = row.querySelector('input[name="serials[]"]');
     if (serialInp) serialInp.focus();
@@ -960,7 +981,9 @@ document.getElementById('unit-list').addEventListener('keydown', function(e){
   addUnit();
 });
 function removeUnit(btn){
-  btn.parentNode.remove();
+  var row = btn.closest('.unit-row');
+  if (row) row.remove();
+  else btn.parentNode.remove();
   var rows = document.getElementById('unit-list').children;
   unitCount = rows.length;
   document.getElementById('gen_count').value = (cfg && cfg.mode === 'generated') ? unitCount : 0;
@@ -968,15 +991,20 @@ function removeUnit(btn){
   refreshPreviews();
 }
 function refreshPreviews(){
-  if (!cfg || cfg.mode !== 'generated') return;
+  if (!cfg || cfg.mode !== 'generated') {
+    updateAssetHints();
+    return;
+  }
   var codes = document.querySelectorAll('.gen-preview');
   for (var i = 0; i < codes.length; i++) codes[i].textContent = previewCode(i);
+  updateAssetHints();
 }
 
 // ---------- สแกน QR เข้าช่องกรอก ----------
 var qrScanner = null, qrTarget = null;
 function scanInto(btn){
-  qrTarget = btn.parentNode.querySelector('input[name="serials[]"]');
+  var row = btn.closest('.unit-row');
+  qrTarget = row ? row.querySelector('input[name="serials[]"]') : btn.parentNode.querySelector('input[name="serials[]"]');
   document.getElementById('qr-overlay').hidden = false;
   document.getElementById('qr-status').textContent = 'กำลังเปิดกล้อง…';
   if (typeof Html5Qrcode === 'undefined') {

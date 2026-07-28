@@ -129,9 +129,9 @@ page_header('ปรับแต่งหน้าตาระบบ');
           <label style="display:block; font-weight:400"><input type="checkbox" name="remove_logo" value="1"> ลบโลโก้ (กลับไปใช้ชื่อระบบ)</label><?php } ?>
         <input type="file" name="brand_logo" accept="image/*,.svg">
         <div style="display:flex; align-items:center; gap:8px; margin-top:8px">
-          <label style="font-weight:400; font-size:13px; margin:0">ความสูงโลโก้:</label>
+          <label style="font-weight:400; font-size:<?= theme_fs_css(13) ?>; margin:0">ความสูงโลโก้:</label>
           <input type="range" name="brand_logo_h" min="20" max="160" step="2" value="<?= (int)setting('brand_logo_h', 56) ?>" oninput="document.getElementById('logo-h-val').textContent=this.value" style="flex:1">
-          <span style="font-size:13px; min-width:44px"><b id="logo-h-val"><?= (int)setting('brand_logo_h', 56) ?></b> px</span>
+          <span style="font-size:<?= theme_fs_css(13) ?>; min-width:44px"><b id="logo-h-val"><?= (int)setting('brand_logo_h', 56) ?></b> px</span>
         </div></div>
       <div class="field"><label>ไอคอนบนแท็บเบราว์เซอร์ (Favicon)</label>
         <?php $favCur = setting('favicon'); if ($favCur) { ?>
@@ -141,7 +141,7 @@ page_header('ปรับแต่งหน้าตาระบบ');
           </div>
         <?php } ?>
         <input type="file" name="favicon" accept="image/*,.ico,.svg">
-        <div class="muted" style="font-size:12px; margin-top:3px">แนะนำรูปสี่เหลี่ยมจัตุรัส PNG ขนาด 64×64 ขึ้นไป · รองรับ PNG / JPG / GIF / WebP / ICO / SVG · ขนาดไม่เกิน <?= h(ini_get('upload_max_filesize')) ?></div>      </div>
+        <div class="muted" style="font-size:<?= theme_fs_css(12) ?>; margin-top:3px">แนะนำรูปสี่เหลี่ยมจัตุรัส PNG ขนาด 64×64 ขึ้นไป · รองรับ PNG / JPG / GIF / WebP / ICO / SVG · ขนาดไม่เกิน <?= h(ini_get('upload_max_filesize')) ?></div>      </div>
 
       <h3 class="h-with-icon" style="margin:18px 0 10px"><?= ui_icon_html('clipboard', 18, 'h-svg') ?><span>ขนาดตัวอักษร</span></h3>
       <?php $fontScaleCur = theme_font_scale_percent(); ?>
@@ -152,9 +152,9 @@ page_header('ปรับแต่งหน้าตาระบบ');
             value="<?= (int) $fontScaleCur ?>"
             oninput="document.getElementById('font-scale-val').textContent=this.value + '%'"
             style="flex:1; min-width:160px">
-          <span style="font-size:13px; min-width:52px"><b id="font-scale-val"><?= (int) $fontScaleCur ?>%</b></span>
+          <span style="font-size:<?= theme_fs_css(13) ?>; min-width:52px"><b id="font-scale-val"><?= (int) $fontScaleCur ?>%</b></span>
         </div>
-        <div class="muted" style="font-size:12px; margin-top:4px">100% = ค่าเริ่มต้น · มีผลกับเนื้อหา หัวข้อ ตาราง และป้ายสถานะ</div>
+        <div class="muted" style="font-size:<?= theme_fs_css(12) ?>; margin-top:4px">100% = ค่าเริ่มต้น · มีผลกับเนื้อหา หัวข้อ ตาราง และป้ายสถานะ</div>
       </div>
 
       <?= ui_heading('font', 'ฟอนต์ภาษาไทย', 'h3') ?>
@@ -171,7 +171,7 @@ page_header('ปรับแต่งหน้าตาระบบ');
           <option value="noto" <?= $fontPreset === 'noto' ? 'selected' : '' ?>>Noto Sans Thai (Google Fonts)</option>
           <option value="custom" <?= $fontPreset === 'custom' || $fontFile ? 'selected' : '' ?>>อัปโหลดไฟล์ฟอนต์เอง</option>
         </select>
-        <div class="muted" style="font-size:12px; margin-top:4px">มีผลทั้งระบบหลังบันทึก · เลือก "อัปโหลดเอง" แล้วแนบไฟล์ด้านล่าง</div>
+        <div class="muted" style="font-size:<?= theme_fs_css(12) ?>; margin-top:4px">มีผลทั้งระบบหลังบันทึก · เลือก "อัปโหลดเอง" แล้วแนบไฟล์ด้านล่าง</div>
       </div>
       <div class="field"><label>ไฟล์ฟอนต์ (WOFF / WOFF2 / TTF / OTF)</label>
         <?php if ($fontFile) { ?>
@@ -192,11 +192,11 @@ page_header('ปรับแต่งหน้าตาระบบ');
         <?php foreach ($COLORS as $k => $meta) { ?>
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:7px" class="color-row" data-color-key="<?= h($k) ?>">
           <input type="color" id="c_<?= $k ?>" name="<?= $k ?>" value="<?= h(theme_color($k, $meta[1])) ?>" style="width:46px; height:32px; padding:2px; border:1px solid #c9d2e0; border-radius:6px; cursor:pointer">
-          <span style="font-size:13px; flex:1"><?= h($meta[0]) ?></span>
-          <span id="contrast_<?= $k ?>" class="contrast-badge" style="font-size:11px; padding:2px 8px; border-radius:999px; font-weight:600"></span>
+          <span style="font-size:<?= theme_fs_css(13) ?>; flex:1"><?= h($meta[0]) ?></span>
+          <span id="contrast_<?= $k ?>" class="contrast-badge" style="font-size:<?= theme_fs_css(11) ?>; padding:2px 8px; border-radius:999px; font-weight:600"></span>
         </div>
         <?php } ?>
-        <div id="contrast-hint" class="muted" style="font-size:12px; margin-top:6px"></div>
+        <div id="contrast-hint" class="muted" style="font-size:<?= theme_fs_css(12) ?>; margin-top:6px"></div>
       </div>
     </div>
 
@@ -210,7 +210,7 @@ page_header('ปรับแต่งหน้าตาระบบ');
         <tr>
           <td class="drag muted" style="cursor:grab; text-align:center">≡<input type="hidden" name="nav_file[]" value="<?= h($r['file']) ?>"></td>
           <td><input type="text" name="nav_icon[]" value="<?= h($r['icon']) ?>" style="width:72px; text-align:center" placeholder="dashboard"></td>
-          <td><input type="text" name="nav_label[]" value="<?= h($r['label']) ?>" style="width:100%"><div class="muted" style="font-size:11px"><?= h($r['file']) ?></div></td>
+          <td><input type="text" name="nav_label[]" value="<?= h($r['label']) ?>" style="width:100%"><div class="muted" style="font-size:<?= theme_fs_css(11) ?>"><?= h($r['file']) ?></div></td>
           <td style="text-align:center">
             <input type="hidden" name="nav_show[]" value="<?= $r['hidden'] ? '0' : '1' ?>">
             <input type="checkbox" <?= $r['hidden'] ? '' : 'checked' ?> onchange="this.previousElementSibling.value=this.checked?'1':'0'">

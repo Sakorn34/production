@@ -152,8 +152,42 @@ function line_flex_model_image_map(): array
 /** @var string ไอคอน Production System ใน footer link */
 const LINE_FLEX_DEFAULT_PART_ICON = 'https://drive.google.com/thumbnail?id=10fdOt4i3yf0AQI3ibojw0wv2Hh8qpjZJ&sz=w100';
 
-/** @var int จำนวนรายการอะไหล่ต่ำสูงสุดต่อการ์ด (Appscript2) */
-const LINE_FLEX_LOW_STOCK_ITEMS_PER_CARD = 20;
+/** @var int จำนวนรายการอะไหล่ต่ำสูงสุดในการ์ดเดียว (ไม่แบ่ง carousel) */
+const LINE_FLEX_LOW_STOCK_SINGLE_CARD_MAX = 10;
+
+/**
+ * แบ่งรายการอะไหล่ต่ำเป็นกลุ่มต่อการ์ด — ≤10 การ์ดเดียว, มากกว่านั้นแบ่งเฉลี่ย 2–4 การ์ด
+ *
+ * @param array<int,array<string,mixed>> $items
+ * @return array<int,array<int,array<string,mixed>>>
+ */
+function line_flex_low_stock_card_chunks(array $items): array
+{
+    $total = count($items);
+    if ($total <= LINE_FLEX_LOW_STOCK_SINGLE_CARD_MAX) {
+        return [$items];
+    }
+    if ($total <= 20) {
+        $numCards = 2;
+    } elseif ($total <= 30) {
+        $numCards = 3;
+    } else {
+        $numCards = 4;
+    }
+    $base = intdiv($total, $numCards);
+    $extra = $total % $numCards;
+    $chunks = [];
+    $offset = 0;
+    for ($i = 0; $i < $numCards; $i++) {
+        $size = $base + ($i < $extra ? 1 : 0);
+        if ($size <= 0) {
+            continue;
+        }
+        $chunks[] = array_slice($items, $offset, $size);
+        $offset += $size;
+    }
+    return $chunks === [] ? [$items] : $chunks;
+}
 
 /**
  * URL ไอคอน Production System สำหรับ footer link (ต้องเป็น https)
@@ -408,6 +442,10 @@ function line_flex_build_messages(string $eventKey, array $payload): array
         case 'ma.repair_required':
             return [line_flex_ma_repair($payload)];
         case 'stock.manual_withdraw':
+            if (!empty($payload['withdraw_items']) && is_array($payload['withdraw_items'])) {
+                $flex = line_flex_withdraw_daily_summary($payload['withdraw_items']);
+                return $flex !== null ? [$flex] : [];
+            }
             return [line_flex_manual_withdraw($payload)];
         case 'production.summary.daily':
             if (!empty($payload['no_data'])) {
@@ -509,21 +547,25 @@ function line_flex_low_stock_part_row(array $item): array
         }
     }
     $iconUrl = line_flex_text($iconRaw, 500);
-    if ($iconUrl === '' || !preg_match('#^https://#i', line_notify_normalize_public_url($iconUrl, ''))) {
-        $iconUrl = LINE_FLEX_DEFAULT_PART_ICON;
-    } else {
+    if ($iconUrl !== '' && preg_match('#^https://#i', line_notify_normalize_public_url($iconUrl, ''))) {
         $iconUrl = line_notify_normalize_public_url($iconUrl, '');
+    } else {
+        $iconUrl = '';
     }
     $linkUrl = line_flex_action_uri((string)($item['link_url'] ?? line_flex_parts_link_from_payload([
         'product_id' => (int)($item['product_id'] ?? $item['id'] ?? 0),
     ])));
 
-    $imageComponent = [
-        'type' => 'image', 'url' => $iconUrl, 'size' => 'xs',
-        'aspectMode' => 'cover', 'aspectRatio' => '1:1', 'flex' => 0, 'gravity' => 'center',
-    ];
-    if ($linkUrl !== '') {
-        $imageComponent['action'] = ['type' => 'uri', 'uri' => $linkUrl];
+    $thumbContents = [];
+    if ($iconUrl !== '') {
+        $imageComponent = [
+            'type' => 'image', 'url' => $iconUrl, 'size' => 'xs',
+            'aspectMode' => 'cover', 'aspectRatio' => '1:1', 'flex' => 0, 'gravity' => 'center',
+        ];
+        if ($linkUrl !== '') {
+            $imageComponent['action'] = ['type' => 'uri', 'uri' => $linkUrl];
+        }
+        $thumbContents[] = $imageComponent;
     }
 
     return [
@@ -532,8 +574,8 @@ function line_flex_low_stock_part_row(array $item): array
         'contents' => [
             [
                 'type' => 'box', 'layout' => 'vertical', 'flex' => 0,
-                'width' => '40px', 'height' => '40px', 'cornerRadius' => '6px', 'backgroundColor' => '#f5f5f5',
-                'contents' => [$imageComponent],
+                'width' => '40px', 'height' => '40px', 'cornerRadius' => '6px', 'backgroundColor' => '#f0f0f0',
+                'contents' => $thumbContents,
             ],
             [
                 'type' => 'box', 'layout' => 'vertical', 'flex' => 1, 'paddingStart' => '10px',
@@ -649,15 +691,15 @@ function line_flex_low_stock_alert_messages(array $payload): array
     $total = count($items);
     $altText = '⚠️ อะไหล่ต่ำกว่ากำหนด ' . $total . ' รายการ';
 
-    if ($total <= LINE_FLEX_LOW_STOCK_ITEMS_PER_CARD) {
+    $chunks = line_flex_low_stock_card_chunks($items);
+    if (count($chunks) === 1) {
         return [[
             'type'     => 'flex',
             'altText'  => $altText,
-            'contents' => line_flex_low_stock_alert_bubble($items, $total, $timestamp),
+            'contents' => line_flex_low_stock_alert_bubble($chunks[0], $total, $timestamp),
         ]];
     }
 
-    $chunks = array_chunk($items, LINE_FLEX_LOW_STOCK_ITEMS_PER_CARD);
     $totalPages = count($chunks);
     $bubbles = [];
     foreach ($chunks as $i => $chunk) {
@@ -679,7 +721,8 @@ function line_flex_ma_repair(array $p): array
 {
     $code = line_flex_text((string)($p['asset_code'] ?? '-'), 80);
     $round = (int)($p['ma_round'] ?? 0);
-    $visited = line_flex_text((string)($p['visited_at'] ?? ''), 40);
+    $visitedRaw = (string) ($p['visited_at'] ?? '');
+    $visited = line_flex_text(function_exists('dt_display_full') ? dt_display_full($visitedRaw) : $visitedRaw, 40);
     $repair = line_flex_text((string)($p['repair_items'] ?? ''), 200);
     $remark = line_flex_text((string)($p['remark'] ?? ''), 120);
     $doneBy = line_flex_text((string)($p['done_by'] ?? ''), 60);
@@ -867,20 +910,14 @@ function line_flex_withdraw_daily_summary(array $items): ?array
 }
 
 /**
- * รวมเบิกอะไหล่ + สรุปผลิตรายวันในชุดเดียว
+ * รวม carousel สรุปผลิตรายวัน (ไม่รวมเบิกอะไหล่ — ใช้ stock.manual_withdraw แยก)
  *
  * @param array<string,mixed> $payload
  * @return array<int,array<string,mixed>>
  */
 function line_flex_production_daily_bundle(array $payload): array
 {
-    $messages = [];
-    $withdrawItems = (array)($payload['withdraw_items'] ?? []);
-    $withdrawFlex = line_flex_withdraw_daily_summary($withdrawItems);
-    if ($withdrawFlex !== null) {
-        $messages[] = $withdrawFlex;
-    }
-    return array_merge($messages, line_flex_production_daily_carousel($payload));
+    return line_flex_production_daily_carousel($payload);
 }
 
 /**

@@ -40,6 +40,16 @@ function app_paths_config_file(): string
 }
 
 /**
+ * ล้าง cache path config ใน request ปัจจุบัน (หลังเขียน config.paths.php)
+ *
+ * @return void
+ */
+function app_paths_clear_cache(): void
+{
+    $GLOBALS['_app_paths_force_reload'] = true;
+}
+
+/**
  * โหลดและ merge path config (cache ต่อ request)
  *
  * @return array<string,string>
@@ -47,6 +57,10 @@ function app_paths_config_file(): string
 function app_paths(): array
 {
     static $merged = null;
+    if (!empty($GLOBALS['_app_paths_force_reload'])) {
+        $merged = null;
+        $GLOBALS['_app_paths_force_reload'] = false;
+    }
     if ($merged !== null) {
         return $merged;
     }

@@ -60,7 +60,7 @@ page_header('ประวัติการซ่อม');
   <?php $n = 0; while ($r = $rows->fetch_assoc()) { $n++; ?>
   <tr>
     <td style="text-align:center"><span class="badge st-spare"><?= (int)$r['repair_no'] ?></span></td>
-    <td><?= dthai($r['opened_at']) ?></td>
+    <td><?= dthai_full($r['opened_at']) ?></td>
     <td><a href="<?= BASE_URL ?>/asset.php?id=<?= $r['asset_id'] ?>"><?= h($r['asset_code']) ?></a></td>
     <td><?= h($r['pname']) ?></td>
     <td><?php if ($r['customer_id']) { echo h($r['cust'] . ($r['site_label'] ? ' (' . $r['site_label'] . ')' : '')); } else echo '-'; ?></td>

@@ -197,6 +197,30 @@ function production_sync_part_icon_by_code(string $stockCode, ?string $iconPath)
 }
 
 /**
+ * อัปเดต part_code ใน production.parts ตาม stock_code
+ *
+ * @param string $stockCode รหัส products.code
+ * @param string $partCode  ค่า Code Part (ว่างได้)
+ * @return bool true ถ้ามีแถว parts ที่อัปเดต
+ */
+function production_sync_part_code_by_code(string $stockCode, string $partCode): bool
+{
+    $stockCode = trim($stockCode);
+    if ($stockCode === '') {
+        return false;
+    }
+    $partId = production_part_id_by_product_code($stockCode);
+    if (!$partId) {
+        return false;
+    }
+    $partCode = trim($partCode);
+    $prod = production_db();
+    $st = $prod->prepare('UPDATE parts SET part_code = ? WHERE stock_code = ?');
+    $st->execute([$partCode !== '' ? $partCode : null, $stockCode]);
+    return $st->rowCount() > 0;
+}
+
+/**
  *
  * @param string|null $assetCode
  * @return int|null

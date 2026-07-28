@@ -169,7 +169,7 @@ function asset_stockparts_withdraw_card_html(array $info): string
     }
 
     if ($ts) {
-        $out .= '<dt>วันที่บันทึก stock</dt><dd>' . h(dthai($ts)) . '</dd>';
+        $out .= '<dt>วันเวลาบันทึก stock</dt><dd>' . h(dthai_full($ts)) . '</dd>';
     }
     if (isset($stock['active'])) {
         $out .= '<dt>Active</dt><dd>' . ((int) $stock['active'] === 1 ? 'ใช้งาน' : 'ไม่นับ stock') . '</dd>';

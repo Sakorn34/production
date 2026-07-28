@@ -435,7 +435,7 @@ $B = BASE_URL;
     <tr><td class="col-pk col-key">id</td><td>BIGINT UNSIGNED PK AUTO</td><td></td></tr>
     <tr><td class="col-fk col-key">asset_id</td><td>BIGINT UNSIGNED</td><td>FK → assets(id) CASCADE</td></tr>
     <tr><td>ma_round</td><td>INT UNSIGNED NULL</td><td>รอบที่ (นับต่อเนื่องต่อเครื่อง)</td></tr>
-    <tr><td>visited_at</td><td>DATE</td><td>วันที่ทำ MA</td></tr>
+    <tr><td>visited_at</td><td>DATETIME</td><td>วันเวลาเข้า MA</td></tr>
     <tr><td>result</td><td>ENUM('ok','replace','repair') NULL</td><td>ผลโดยรวม</td></tr>
     <tr><td>ok_items</td><td>TEXT NULL</td><td>อุปกรณ์ที่ตรวจ OK (comma-separated)</td></tr>
     <tr><td>replace_items</td><td>TEXT NULL</td><td>อุปกรณ์ที่เปลี่ยน (comma-separated)</td></tr>

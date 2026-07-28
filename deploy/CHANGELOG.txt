@@ -1,0 +1,702 @@
+﻿# Production Deploy Changelog
+# Append-only log of each release/patch
+
+================================================================
+v2026-07-22_170749-full | Full | 2026-07-22 17:07:50
+From: 2026-07-22 16:51:11 / eae087a  ->  To: eae087a  |  Files: 97
+----------------------------------------------------------------
+- First deploy: finishgoogs + parts + shared
+- Dashboard drill-down and parts filters
+- Production part labels from DB
+- Vendor import from Excel
+- Theme v2 and parts modal UI
+- Deploy pipeline with secrets separation
+
+Files: 97 (see README.txt in version archive)
+
+
+================================================================
+v2026-07-22_172113 | Patch | 2026-07-22 17:21:15
+From: 2026-07-22_170749-full  ->  To: eae087a  |  Files: 16
+----------------------------------------------------------------
+- Record and display full datetime across system
+- MA visited_at: DATE -> DATETIME with datetime-local input
+- Unified dt_display helpers in shared/datetime_helpers.php
+- Show date+time in MA, parts stock, dashboard, updates tables
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/repairs.php
+  finishgoogs_ma_update/system_doc.php
+  finishgoogs_ma_update/updates.php
+  parts/includes/helpers.php
+  parts/pages/history.php
+  parts/pages/product-detail.php
+  parts/pages/stock-in.php
+  parts/pages/stock-out.php
+  parts/pages/stock-out-item.php
+  shared/datetime_helpers.php
+  shared/line_flex_templates.php
+
+
+================================================================
+v2026-07-22_172853 | Patch | 2026-07-22 17:28:54
+From: 2026-07-22_170749-full  ->  To: eae087a  |  Files: 16
+----------------------------------------------------------------
+- Deploy docs: README.html replaces README.txt and Thai UPLOAD.txt
+- Open in browser for version info, file list, FTP steps
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/repairs.php
+  finishgoogs_ma_update/system_doc.php
+  finishgoogs_ma_update/updates.php
+  parts/includes/helpers.php
+  parts/pages/history.php
+  parts/pages/product-detail.php
+  parts/pages/stock-in.php
+  parts/pages/stock-out.php
+  parts/pages/stock-out-item.php
+  shared/datetime_helpers.php
+  shared/line_flex_templates.php
+
+
+================================================================
+v2026-07-22_173308 | Patch | 2026-07-22 17:33:10
+From: 2026-07-22_170749-full  ->  To: eae087a  |  Files: 18
+----------------------------------------------------------------
+- Style datetime-local inputs to match text fields (MA form, update_edit, share)
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/repairs.php
+  finishgoogs_ma_update/system_doc.php
+  finishgoogs_ma_update/updates.php
+  parts/includes/helpers.php
+  parts/pages/history.php
+  parts/pages/product-detail.php
+  parts/pages/stock-in.php
+  parts/pages/stock-out.php
+  parts/pages/stock-out-item.php
+  shared/datetime_helpers.php
+  shared/line_flex_templates.php
+
+
+================================================================
+v2026-07-22_174206 | Patch | 2026-07-22 17:42:07
+From: 2026-07-22_173308  ->  To: eae087a  |  Files: 18
+----------------------------------------------------------------
+- Fix sidebar toggle: hide when menu open (CSS :has selector)
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/repairs.php
+  finishgoogs_ma_update/system_doc.php
+  finishgoogs_ma_update/updates.php
+  parts/includes/helpers.php
+  parts/pages/history.php
+  parts/pages/product-detail.php
+  parts/pages/stock-in.php
+  parts/pages/stock-out.php
+  parts/pages/stock-out-item.php
+  shared/datetime_helpers.php
+  shared/line_flex_templates.php
+
+
+================================================================
+v2026-07-22_174608 | Patch | 2026-07-22 17:46:09
+From: 2026-07-22_173308  ->  To: eae087a  |  Files: 1
+----------------------------------------------------------------
+- Fix patch detection: only files changed since baseline hash (not all uncommitted git files)
+
+Files:
+  finishgoogs_ma_update/assets/style.css
+
+
+================================================================
+v2026-07-22_175343 | Patch | 2026-07-22 17:53:45
+From: 2026-07-22_174608  ->  To: eae087a  |  Files: 6
+----------------------------------------------------------------
+- แก้ font scale 140% ไม่มีผล — ใช้ --font-scale กับ CSS calc ทั้งระบบ
+
+Files:
+  finishgoogs_ma_update/appearance.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  parts/assets/style.css
+  parts/includes/main_theme.php
+
+
+================================================================
+v2026-07-22_180616 | Patch | 2026-07-22 18:06:17
+From: 2026-07-22_175343  ->  To: eae087a  |  Files: 1
+----------------------------------------------------------------
+- หลังบันทึก/แก้ไข MA กลับไป ma.php?product= ของรุ่นนั้น
+
+Files:
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-07-22_181529 | Patch | 2026-07-22 18:15:30
+From: 2026-07-22_175343  ->  To: eae087a  |  Files: 1
+----------------------------------------------------------------
+- compare before/after folders + MA redirect to ma.php?product=
+
+Files:
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-07-22_182010 | Patch | 2026-07-22 18:20:12
+From: 2026-07-22_175343  ->  To: eae087a  |  Files: 1
+----------------------------------------------------------------
+- compare: before + production only (drop after duplicate)
+
+Files:
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-07-22_183245 | Patch | 2026-07-22 18:32:47
+From: 2026-07-22_182010  ->  To: eae087a  |  Files: 1
+----------------------------------------------------------------
+- asset_new: แก้ hint SN ถัดไป + ปุ่มลบชิดขวา
+
+Files:
+  finishgoogs_ma_update/asset_new.php
+
+
+================================================================
+v2026-07-22_183718 | Patch | 2026-07-22 18:37:22
+From: 2026-07-22_182010  ->  To: eae087a  |  Files: 2
+----------------------------------------------------------------
+- แก้ SN ล่าสุดใช้ MAX(running_no) แทน ORDER BY id
+
+Files:
+  finishgoogs_ma_update/asset_new.php
+  finishgoogs_ma_update/config.php
+
+
+================================================================
+v2026-07-23_094727 | Patch | 2026-07-23 09:47:29
+From: 2026-07-22_183718  ->  To: eae087a  |  Files: 3
+----------------------------------------------------------------
+- history: รูปเมื่อ 1 อะไหล่/ใบ + แถบสีผลิต/MA/ซ่อม
+
+Files:
+  parts/assets/style.css
+  parts/includes/StockService.php
+  parts/pages/history.php
+
+
+================================================================
+v2026-07-23_095422 | Patch | 2026-07-23 09:54:23
+From: 2026-07-22_183718  ->  To: eae087a  |  Files: 3
+----------------------------------------------------------------
+- history: แถบสี -> chip หมายเหตุ (ผลิต/MA/ซ่อม)
+
+Files:
+  parts/assets/style.css
+  parts/includes/StockService.php
+  parts/pages/history.php
+
+
+================================================================
+v2026-07-23_095724 | Patch | 2026-07-23 09:57:26
+From: 2026-07-22_183718  ->  To: eae087a  |  Files: 4
+----------------------------------------------------------------
+- history: ปุ่ม filter chip ผลิต/MA/ซ่อม
+
+Files:
+  parts/assets/app.js
+  parts/assets/style.css
+  parts/includes/StockService.php
+  parts/pages/history.php
+
+
+================================================================
+v2026-07-23_100935 | Patch | 2026-07-23 10:09:36
+From: 2026-07-23_095724  ->  To: eae087a  |  Files: 1
+----------------------------------------------------------------
+- ma: เว้นระยะ icon ปุ่มคัดลอก
+
+Files:
+  finishgoogs_ma_update/includes/ma_snippets.php
+
+
+================================================================
+v2026-07-23_101046 | Patch | 2026-07-23 10:10:48
+From: 2026-07-23_095724  ->  To: eae087a  |  Files: 3
+----------------------------------------------------------------
+- ma: MAC snippet ตัด be:99: เหลือส่วน SN
+
+Files:
+  finishgoogs_ma_update/assets/ma-snippets.js
+  finishgoogs_ma_update/includes/ma_snippets.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-07-23_131725 | Patch | 2026-07-23 13:17:27
+From: 2026-07-23_095724  ->  To: eae087a  |  Files: 4
+----------------------------------------------------------------
+- history: ป้ายเบิกชุดเมื่อมากกว่า 1 อะไหล่
+
+Files:
+  finishgoogs_ma_update/assets/ma-snippets.js
+  finishgoogs_ma_update/includes/ma_snippets.php
+  finishgoogs_ma_update/ma.php
+  parts/pages/history.php
+
+
+================================================================
+v2026-07-24_102726 | Patch | 2026-07-24 10:27:28
+From: 2026-07-23_131725  ->  To: eae087a  |  Files: 4
+----------------------------------------------------------------
+- stock-out-item: combobox เลือกอะไหล่ + หมายเหตุนับใหม่
+
+Files:
+  parts/assets/app.js
+  parts/assets/style.css
+  parts/includes/helpers.php
+  parts/pages/stock-out-item.php
+
+
+================================================================
+v2026-07-25_130442 | Patch | 2026-07-25 13:04:44
+From: 2026-07-23_131725  ->  To: eae087a  |  Files: 8
+----------------------------------------------------------------
+- preview: ClickSpark effect (localhost/?spark=1)
+
+Files:
+  finishgoogs_ma_update/includes/layout.php
+  parts/assets/app.js
+  parts/assets/style.css
+  parts/includes/footer.php
+  parts/includes/helpers.php
+  parts/pages/stock-out-item.php
+  shared/click_spark_boot.php
+  shared/click-spark.js
+
+
+================================================================
+v2026-07-25_131023 | Patch | 2026-07-25 13:10:27
+From: 2026-07-23_131725  ->  To: eae087a  |  Files: 14
+----------------------------------------------------------------
+- UI: SpecularButton ปุ่ม CTA + รวม effects boot
+
+Files:
+  finishgoogs_ma_update/includes/layout.php
+  parts/assets/app.js
+  parts/assets/style.css
+  parts/includes/footer.php
+  parts/includes/helpers.php
+  parts/includes/ui_parts.php
+  parts/pages/stock-in.php
+  parts/pages/stock-out.php
+  parts/pages/stock-out-item.php
+  shared/click_spark_boot.php
+  shared/click-spark.js
+  shared/specular-button.css
+  shared/specular-button.js
+  shared/ui_effects_boot.php
+
+
+================================================================
+v2026-07-25_131745 | Patch | 2026-07-25 13:17:50
+From: 2026-07-23_131725  ->  To: eae087a  |  Files: 14
+----------------------------------------------------------------
+- UI effects: เปิด spark+specular ถาวร
+
+Files:
+  finishgoogs_ma_update/includes/layout.php
+  parts/assets/app.js
+  parts/assets/style.css
+  parts/includes/footer.php
+  parts/includes/helpers.php
+  parts/includes/ui_parts.php
+  parts/pages/stock-in.php
+  parts/pages/stock-out.php
+  parts/pages/stock-out-item.php
+  shared/click_spark_boot.php
+  shared/click-spark.js
+  shared/specular-button.css
+  shared/specular-button.js
+  shared/ui_effects_boot.php
+
+
+================================================================
+v2026-07-25_132046 | Patch | 2026-07-25 13:20:50
+From: 2026-07-23_131725  ->  To: eae087a  |  Files: 9
+----------------------------------------------------------------
+- UI: ถอด SpecularButton เหลือ ClickSpark
+
+Files:
+  finishgoogs_ma_update/includes/layout.php
+  parts/assets/app.js
+  parts/assets/style.css
+  parts/includes/footer.php
+  parts/includes/helpers.php
+  parts/pages/stock-out-item.php
+  shared/click_spark_boot.php
+  shared/click-spark.js
+  shared/ui_effects_boot.php
+
+
+================================================================
+v2026-07-25_132320 | Patch | 2026-07-25 13:23:22
+From: 2026-07-23_131725  ->  To: eae087a  |  Files: 4
+----------------------------------------------------------------
+- UI: ถอด ClickSpark ออกทั้งหมด
+
+Files:
+  parts/assets/app.js
+  parts/assets/style.css
+  parts/includes/helpers.php
+  parts/pages/stock-out-item.php
+
+
+================================================================
+v2026-07-25_132855 | Patch | 2026-07-25 13:29:00
+From: 2026-07-23_131725  ->  To: eae087a  |  Files: 9
+----------------------------------------------------------------
+- UI: ถอด effects ครบ (footer+layout+ลบ shared)
+
+Files:
+  finishgoogs_ma_update/includes/layout.php
+  parts/assets/app.js
+  parts/assets/style.css
+  parts/includes/footer.php
+  parts/includes/helpers.php
+  parts/includes/ui_parts.php
+  parts/pages/stock-in.php
+  parts/pages/stock-out.php
+  parts/pages/stock-out-item.php
+
+
+================================================================
+v2026-07-25_151331 | Patch | 2026-07-25 15:13:33
+From: 2026-07-25_132855  ->  To: eae087a  |  Files: 6
+----------------------------------------------------------------
+- parts: ปุ่มแก้ไขรายละเอียดอะไหล่ทุกรายการ
+
+Files:
+  parts/assets/app.js
+  parts/includes/helpers.php
+  parts/includes/product_edit.php
+  parts/includes/StockService.php
+  parts/pages/product-detail.php
+  parts/pages/products.php
+
+
+================================================================
+v2026-07-25_151346 | Patch | 2026-07-25 15:13:47
+From: 2026-07-25_132855  ->  To: eae087a  |  Files: 7
+----------------------------------------------------------------
+- parts: CSS หัวข้อแก้ไขอะไหล่
+
+Files:
+  parts/assets/app.js
+  parts/assets/style.css
+  parts/includes/helpers.php
+  parts/includes/product_edit.php
+  parts/includes/StockService.php
+  parts/pages/product-detail.php
+  parts/pages/products.php
+
+
+================================================================
+v2026-07-25_152001 | Patch | 2026-07-25 15:20:03
+From: 2026-07-25_132855  ->  To: eae087a  |  Files: 7
+----------------------------------------------------------------
+- products: แก้ไขรายละเอียดอะไหล่ + sort หัวคอลัมน์ตาราง
+
+Files:
+  parts/assets/app.js
+  parts/assets/style.css
+  parts/includes/helpers.php
+  parts/includes/product_edit.php
+  parts/includes/StockService.php
+  parts/pages/product-detail.php
+  parts/pages/products.php
+
+
+================================================================
+v2026-07-25_153043 | Patch | 2026-07-25 15:30:44
+From: 2026-07-25_152001  ->  To: eae087a  |  Files: 2
+----------------------------------------------------------------
+- products: เอาปุ่มราคา/แก้ไขซ้ำในตารางออก
+
+Files:
+  parts/includes/helpers.php
+  parts/pages/products.php
+
+
+================================================================
+v2026-07-25_154509 | Patch | 2026-07-25 15:45:11
+From: 2026-07-25_152001  ->  To: eae087a  |  Files: 5
+----------------------------------------------------------------
+- product edit: เพิ่มฟิลด์ Code Part ใน modal แก้ไข
+
+Files:
+  parts/assets/app.js
+  parts/includes/helpers.php
+  parts/includes/product_edit.php
+  parts/includes/production_sync.php
+  parts/pages/products.php
+
+
+================================================================
+v2026-07-25_155042 | Patch | 2026-07-25 15:50:43
+From: 2026-07-25_154509  ->  To: eae087a  |  Files: 2
+----------------------------------------------------------------
+- stock-in: combobox เลือกอะไหล่แบบเบิกรายชิ้น
+
+Files:
+  parts/includes/helpers.php
+  parts/pages/stock-in.php
+
+
+================================================================
+v2026-07-25_155804 | Patch | 2026-07-25 15:58:05
+From: 2026-07-25_155042  ->  To: eae087a  |  Files: 1
+----------------------------------------------------------------
+- BOM chip-dd: แก้กรอบสูงเกินเมื่อเลือกอะไหล่มีรูป
+
+Files:
+  finishgoogs_ma_update/assets/style.css
+
+
+================================================================
+v2026-07-25_161328 | Patch | 2026-07-25 16:13:30
+From: 2026-07-25_155042  ->  To: eae087a  |  Files: 8
+----------------------------------------------------------------
+- LINE: เลือกโหมดส่งอิสระ + แก้ Flex อะไหล่ใกล้หมด
+
+Files:
+  finishgoogs_ma_update/asset_new.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/includes/line_notify_settings.php
+  finishgoogs_ma_update/line_notify_settings.php
+  finishgoogs_ma_update/ma.php
+  shared/line_flex_templates.php
+  shared/line_notify_core.php
+  shared/line_notify_jobs.php
+
+
+================================================================
+v2026-07-25_162133 | Patch | 2026-07-25 16:21:34
+From: 2026-07-25_161328  ->  To: eae087a  |  Files: 3
+----------------------------------------------------------------
+- LINE settings: เลือกวันจ-ส + เวลา 24 ชม.
+
+Files:
+  finishgoogs_ma_update/includes/line_notify_settings.php
+  finishgoogs_ma_update/line_notify_settings.php
+  shared/line_notify_jobs.php
+
+
+================================================================
+v2026-07-25_162635 | Patch | 2026-07-25 16:26:36
+From: 2026-07-25_162133  ->  To: eae087a  |  Files: 1
+----------------------------------------------------------------
+- LINE: สรุปผลิตรายวัน default จ-สทุกวัน
+
+Files:
+  shared/line_notify_jobs.php
+
+
+================================================================
+v2026-07-25_162712 | Patch | 2026-07-25 16:27:13
+From: 2026-07-25_162133  ->  To: eae087a  |  Files: 1
+----------------------------------------------------------------
+- LINE schedule Mon-Sat daily summary
+
+Files:
+  shared/line_notify_jobs.php
+
+
+================================================================
+v2026-07-25_163224 | Patch | 2026-07-25 16:32:26
+From: 2026-07-25_162712  ->  To: eae087a  |  Files: 2
+----------------------------------------------------------------
+- LINE: แยกสรุปผลิตรายวันกับเบิกอะไหล่
+
+Files:
+  shared/line_flex_templates.php
+  shared/line_notify_jobs.php
+
+
+================================================================
+v2026-07-25_165940 | Patch | 2026-07-25 16:59:42
+From: 2026-07-25_162712  ->  To: eae087a  |  Files: 3
+----------------------------------------------------------------
+- LINE: cron tick ส่ง outbox ทันที + patch สะสมตั้งแต่ 162712
+
+Files:
+  finishgoogs_ma_update/cron/line_notify_scheduled.php
+  shared/line_flex_templates.php
+  shared/line_notify_jobs.php
+
+
+================================================================
+v2026-07-25_170325 | Patch | 2026-07-25 17:03:28
+From: 2026-07-25_162712  ->  To: eae087a  |  Files: 8
+----------------------------------------------------------------
+- LINE settings: แก้บันทึกเวลาไม่อัปเดต (OPcache + form submit)
+
+Files:
+  finishgoogs_ma_update/cron/line_notify_scheduled.php
+  finishgoogs_ma_update/includes/deploy_config.php
+  finishgoogs_ma_update/includes/line_notify_settings.php
+  finishgoogs_ma_update/line_notify_settings.php
+  shared/app_paths.php
+  shared/line_flex_templates.php
+  shared/line_notify_core.php
+  shared/line_notify_jobs.php
+
+
+================================================================
+v2026-07-25_171316 | Patch | 2026-07-25 17:13:17
+From: 2026-07-25_170325  ->  To: eae087a  |  Files: 3
+----------------------------------------------------------------
+- Plesk cron: wrapper plesk_line_tick/worker แก้ chroot passwd error
+
+Files:
+  finishgoogs_ma_update/cron/plesk_line_tick.php
+  finishgoogs_ma_update/cron/plesk_line_worker.php
+  finishgoogs_ma_update/cron/README.md
+
+
+================================================================
+v2026-07-25_181833 | Patch | 2026-07-25 18:18:36
+From: 2026-07-25_170325  ->  To: eae087a  |  Files: 5
+----------------------------------------------------------------
+- แก้ parse error plesk_line_worker.php (comment */2)
+
+Files:
+  finishgoogs_ma_update/cron/plesk_line_tick.php
+  finishgoogs_ma_update/cron/plesk_line_worker.php
+  finishgoogs_ma_update/cron/README.md
+  parts/includes/product_edit.php
+  shared/datetime_helpers.php
+
+
+================================================================
+v2026-07-25_182515 | Patch | 2026-07-25 18:25:17
+From: 2026-07-25_181833  ->  To: eae087a  |  Files: 2
+----------------------------------------------------------------
+- LINE tick: log + preview schedule debug สำหรับ cron
+
+Files:
+  finishgoogs_ma_update/cron/line_notify_scheduled.php
+  shared/line_notify_jobs.php
+
+
+================================================================
+v2026-07-25_182834 | Patch | 2026-07-25 18:28:38
+From: 2026-07-25_181833  ->  To: eae087a  |  Files: 10
+----------------------------------------------------------------
+- LINE: Plesk trigger รายการละ script + คอลัมน์ในหลังบ้าน
+
+Files:
+  finishgoogs_ma_update/cron/line_notify_scheduled.php
+  finishgoogs_ma_update/cron/plesk_line_job_daily.php
+  finishgoogs_ma_update/cron/plesk_line_job_daily_update.php
+  finishgoogs_ma_update/cron/plesk_line_job_low_stock.php
+  finishgoogs_ma_update/cron/plesk_line_job_monthly.php
+  finishgoogs_ma_update/cron/plesk_line_job_weekly.php
+  finishgoogs_ma_update/cron/plesk_line_run_job.php
+  finishgoogs_ma_update/cron/README.md
+  finishgoogs_ma_update/line_notify_settings.php
+  shared/line_notify_jobs.php
+
+
+================================================================
+v2026-07-25_184920 | Patch | 2026-07-25 18:49:24
+From: 2026-07-25_181833  ->  To: eae087a  |  Files: 11
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/cron/line_notify_scheduled.php
+  finishgoogs_ma_update/cron/plesk_line_job_daily.php
+  finishgoogs_ma_update/cron/plesk_line_job_daily_update.php
+  finishgoogs_ma_update/cron/plesk_line_job_low_stock.php
+  finishgoogs_ma_update/cron/plesk_line_job_monthly.php
+  finishgoogs_ma_update/cron/plesk_line_job_weekly.php
+  finishgoogs_ma_update/cron/plesk_line_run_job.php
+  finishgoogs_ma_update/cron/README.md
+  finishgoogs_ma_update/includes/line_notify_settings.php
+  finishgoogs_ma_update/line_notify_settings.php
+  shared/line_notify_jobs.php
+
+
+================================================================
+v2026-07-25_202135 | Patch | 2026-07-25 20:21:39
+From: 2026-07-25_184920  ->  To: eae087a  |  Files: 2
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/includes/line_notify_settings.php
+  finishgoogs_ma_update/line_notify_settings.php
+
+
+================================================================
+v2026-07-27_102047 | Patch | 2026-07-27 10:20:50
+From: 2026-07-25_184920  ->  To: 6a300af  |  Files: 2
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/includes/line_notify_settings.php
+  finishgoogs_ma_update/line_notify_settings.php
+
+
+================================================================
+v2026-07-27_103244 | Patch | 2026-07-27 10:32:46
+From: 2026-07-27_102047  ->  To: 6a300af  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/cron/plesk_line_job_monthly.php
+  finishgoogs_ma_update/cron/plesk_line_run_job.php
+  finishgoogs_ma_update/cron/README.md
+  shared/line_notify_jobs.php
+
+
+================================================================
+v2026-07-27_110906 | Patch | 2026-07-27 11:09:10
+From: 2026-07-27_102047  ->  To: 9957825  |  Files: 8
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/activity_logs.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/cron/plesk_line_job_monthly.php
+  finishgoogs_ma_update/cron/plesk_line_run_job.php
+  finishgoogs_ma_update/cron/README.md
+  parts/includes/parts_bootstrap.php
+  shared/activity_log_core.php
+  shared/line_notify_jobs.php
+

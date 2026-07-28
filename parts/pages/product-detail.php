@@ -1,10 +1,22 @@
 <?php
- 
+/**
+ * pages/product-detail.php — รายละเอียดอะไหล่ + แก้ไขข้อมูลพื้นฐาน
+ */
+
 $pageTitle = 'รายละเอียดอะไหล่';
+require_once __DIR__ . '/../includes/parts_bootstrap.php';
+require_once __DIR__ . '/../includes/product_edit.php';
+
+$productId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+$returnTo = url('/pages/product-detail.php' . ($productId ? '?id=' . $productId : ''));
+
+if (parts_product_forms_handle_post($db, $stock, $returnTo)) {
+    exit;
+}
+
 $partsShowBack = false;
 require_once __DIR__ . '/../includes/header.php';
 
-$productId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 $rawProduct = $productId ? $stock->getProduct($productId) : null;
 $product = $rawProduct ? parts_enrich_product($rawProduct) : null;
 $history = $product ? $stock->getProductStockOutHistory($productId, 50) : [];
@@ -23,11 +35,21 @@ parts_page_header('products', 'รายละเอียดอะไหล่'
         <p><a href="<?= url('/pages/products.php') ?>" class="btn btn-outline">← กลับไปหน้าอะไหล่</a></p>
     <?php else: ?>
         <div class="product-detail-hero">
-            <?php if ($icon): ?>
-                <?= parts_img_tag($icon, parts_display_name($product), 'parts-thumb-lg') ?>
-            <?php else: ?>
-                <div class="parts-thumb-lg-placeholder" aria-hidden="true"></div>
-            <?php endif; ?>
+            <div class="product-detail-hero-media">
+                <?php if ($icon): ?>
+                    <?= parts_img_tag($icon, parts_display_name($product), 'parts-thumb-lg') ?>
+                <?php else: ?>
+                    <div class="parts-thumb-lg-placeholder" aria-hidden="true"></div>
+                <?php endif; ?>
+                <button type="button" class="btn btn-sm btn-outline btn-with-icon" style="margin-top:0.5rem"
+                    data-open-modal="product-icon-modal"
+                    data-fill-modal="product-icon-modal"
+                    data-product-id="<?= (int) $product['id'] ?>"
+                    data-product-name="<?= e(parts_display_name($product)) ?>"
+                    data-product-return-to="<?= e($returnTo) ?>">
+                    <?= ui_icon_html('edit', 14, 'btn-svg') ?> เปลี่ยนรูป
+                </button>
+            </div>
             <div>
                 <h2 style="margin:0 0 0.35rem;font-size:1.2rem"><?= e(parts_display_name($product)) ?></h2>
                 <?php if (!empty($product['display_sub']) && $product['display_sub'] !== $product['code']): ?>
@@ -47,8 +69,11 @@ parts_page_header('products', 'รายละเอียดอะไหล่'
 
         <div class="grid-2" style="margin-bottom:1.25rem">
             <div>
-                <h3 style="margin-bottom:0.75rem;font-size:1rem">ข้อมูลพื้นฐาน</h3>
-                <table class="parts-table">
+                <div class="section-hd-row">
+                    <h3 style="margin:0;font-size:1rem">ข้อมูลพื้นฐาน</h3>
+                    <?= parts_product_edit_button($product, $returnTo) ?>
+                </div>
+                <table class="parts-table" style="margin-top:0.75rem">
                     <tbody>
                         <tr><th>สต็อกขั้นต่ำ</th><td><?= formatNumber($product['min_stock']) ?> <?= e($product['unit']) ?></td></tr>
                         <tr><th>ผู้จำหน่าย</th><td><?= !empty($product['supplier']) ? e($product['supplier']) : '-' ?></td></tr>
@@ -83,7 +108,7 @@ parts_page_header('products', 'รายละเอียดอะไหล่'
                         <th class="text-right">จำนวน</th>
                         <th>ผู้เบิก</th>
                         <th>หมายเหตุ</th>
-                        <th>วันที่</th>
+                        <th>วันเวลา</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -113,5 +138,7 @@ parts_page_header('products', 'รายละเอียดอะไหล่'
         <p style="margin-top: 1rem;"><a href="<?= url('/pages/products.php') ?>" class="btn btn-outline">← กลับไปหน้าอะไหล่</a></p>
     <?php endif; ?>
 </div>
+
+<?php parts_product_edit_modals(); ?>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

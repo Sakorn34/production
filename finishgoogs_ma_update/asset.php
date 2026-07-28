@@ -437,7 +437,7 @@ $addWithdrawModalUrl = BASE_URL . '/parts.php?ajax=add_move_form&asset_id=' . (i
   </button>
 </div>
 <table class="list" style="max-width:920px; margin-bottom:20px">
-  <tr><th>อะไหล่</th><th style="text-align:right">จำนวน</th><th>ประเภท</th><th>วันที่</th><th>รหัส Stock</th><th></th></tr>
+  <tr><th>อะไหล่</th><th style="text-align:right">จำนวน</th><th>ประเภท</th><th>วันเวลา</th><th>รหัส Stock</th><th></th></tr>
   <?php foreach ($partsSummary['movements'] as $mv) {
       $modeLabel = part_movement_mode_label($mv['mode'] ?? '');
       $modeClass = $modeLabel === 'MA' ? 'st-spare' : ($modeLabel === 'ผลิต' ? 'st-new' : 'st-rental');
@@ -447,7 +447,7 @@ $addWithdrawModalUrl = BASE_URL . '/parts.php?ajax=add_move_form&asset_id=' . (i
     <td><?= h($mv['pname']) ?><?php if (!empty($mv['part_code']) && trim((string)$mv['part_code']) !== trim((string)$mv['pname'])) { ?><br><span class="muted" style="font-size:11px"><?= h($mv['part_code']) ?></span><?php } ?></td>
     <td style="text-align:right"><b><?= qty_fmt($mv['qty']) ?></b><?= !empty($mv['unit']) ? ' ' . h($mv['unit']) : '' ?></td>
     <td><span class="badge <?= h($modeClass) ?>"><?= h($modeLabel) ?></span></td>
-    <td style="white-space:nowrap"><?= dthai($mv['moved_at']) ?></td>
+    <td style="white-space:nowrap"><?= dthai_full($mv['moved_at']) ?></td>
     <td class="muted"><?= h($mv['stock_code'] ?: '—') ?></td>
     <td style="white-space:nowrap">
       <button type="button" class="btn btn-sm btn-line" onclick="showListModal(<?= h(json_encode('แก้ไข: ' . $mv['pname'], JSON_UNESCAPED_UNICODE)) ?>,<?= h(json_encode($editUrl)) ?>,'')">แก้ไข</button>

@@ -160,6 +160,46 @@ class StockService
         $stmt->execute([round($price, 2), $productId]);
     }
 
+    /**
+     * อัปเดตรายละเอียดอะไหล่ (ชื่อ หน่วย ขั้นต่ำ ราคา ผู้จำหน่าย ลิงก์)
+     *
+     * @param int $productId
+     * @param array{name:string,unit:string,min_stock:int,price:float,supplier:?string,purchase_link:?string} $data
+     * @return void
+     */
+    public function updateProductDetails(int $productId, array $data): void
+    {
+        if ($productId <= 0) {
+            throw new InvalidArgumentException('รหัสอะไหล่ไม่ถูกต้อง');
+        }
+        $name = trim((string) ($data['name'] ?? ''));
+        $unit = trim((string) ($data['unit'] ?? ''));
+        if ($name === '' || $unit === '') {
+            throw new InvalidArgumentException('ชื่อและหน่วยต้องไม่ว่าง');
+        }
+        $minStock = (int) ($data['min_stock'] ?? 0);
+        if ($minStock < 0) {
+            throw new InvalidArgumentException('สต็อกขั้นต่ำต้องไม่ติดลบ');
+        }
+        $price = round((float) ($data['price'] ?? 0), 2);
+        if ($price < 0) {
+            throw new InvalidArgumentException('ราคาต้องไม่ติดลบ');
+        }
+
+        $stmt = $this->db->prepare(
+            'UPDATE products SET name = ?, unit = ?, min_stock = ?, price = ?, supplier = ?, purchase_link = ? WHERE id = ?'
+        );
+        $stmt->execute([
+            $name,
+            $unit,
+            $minStock,
+            $price,
+            $data['supplier'] ?? null,
+            $data['purchase_link'] ?? null,
+            $productId,
+        ]);
+    }
+
     public function getRecentMovements(int $limit = 10): array
     {
         $sql = "
@@ -405,6 +445,7 @@ class StockService
         $sql = "
             SELECT so.*, s.name AS set_name, s.code AS set_code,
                    (SELECT SUM(quantity) FROM stock_out_items WHERE stock_out_id = so.id) AS total_qty,
+                   (SELECT COUNT(*) FROM stock_out_items WHERE stock_out_id = so.id) AS item_count,
                    (SELECT p.name FROM stock_out_items soi
                     JOIN products p ON p.id = soi.product_id
                     WHERE soi.stock_out_id = so.id LIMIT 1) AS single_product_name,

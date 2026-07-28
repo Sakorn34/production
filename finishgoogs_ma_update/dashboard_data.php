@@ -164,7 +164,7 @@ function render_stock_today_table(array $rows, $partsBase) {
             $detail = $bits ? implode(' · ', $bits) : '-';
         }
         echo '<tr>'
-           . '<td>' . dthai($mv['created_at']) . '</td>'
+           . '<td>' . dthai_full($mv['created_at']) . '</td>'
            . '<td>' . ($isIn
                ? '<span class="part-move-badge part-move-badge-in">รับเข้า</span>'
                : '<span class="part-move-badge part-move-badge-out">เบิกออก</span>') . '</td>'
@@ -335,7 +335,7 @@ switch ($type) {
         $n = 0;
         while ($r = $res->fetch_assoc()) {
             $n++;
-            echo '<tr><td>' . dthai($r['opened_at']) . '</td>'
+            echo '<tr><td>' . dthai_full($r['opened_at']) . '</td>'
                . '<td><a href="' . BASE_URL . '/asset.php?id=' . $r['aid'] . '"><b>' . h($r['asset_code']) . '</b></a></td>'
                . '<td>' . h($r['pname']) . '</td>'
                . '<td>' . h(mb_strimwidth((string)$r['reported_issue'], 0, 80, '…')) . '</td></tr>';
@@ -454,7 +454,7 @@ switch ($type) {
             }
 
             echo '<tr>'
-               . '<td>' . dthai($mv['created_at']) . '</td>'
+               . '<td>' . dthai_full($mv['created_at']) . '</td>'
                . '<td>' . ($isIn
                    ? '<span class="part-move-badge part-move-badge-in">รับเข้า</span>'
                    : '<span class="part-move-badge part-move-badge-out">เบิกออก</span>') . '</td>'

@@ -60,7 +60,7 @@ parts_page_header('stock-in', 'รับเข้า', 'บันทึกกา
                     <th>ผู้รับ</th>
                     <th class="text-right">จำนวน</th>
                     <th>หมายเหตุ</th>
-                    <th>วันที่</th>
+                    <th>วันเวลา</th>
                     <th class="col-actions">จัดการ</th>
                 </tr>
             </thead>
@@ -96,25 +96,15 @@ parts_page_header('stock-in', 'รับเข้า', 'บันทึกกา
 
 <?php parts_modal_begin('stock-in-add-modal', 'บันทึกรับเข้า'); ?>
 <form method="POST">
-    <div class="form-group">
-        <label>ค้นหาอะไหล่</label>
-        <input type="text" data-product-search="stock-in-product" placeholder="พิมพ์ชื่อหรือรหัสอะไหล่" autocomplete="off" data-autofocus>
-    </div>
-    <div class="form-group">
-        <label>เลือกอะไหล่</label>
-        <select name="product_id" id="stock-in-product" required>
-            <option value="">-- เลือกอะไหล่ --</option>
-            <?php foreach ($products as $p): ?>
-            <option value="<?= (int) $p['id'] ?>">
-                <?= e(parts_format_product_option($p)) ?> (คงเหลือ: <?= formatNumber($p['quantity']) ?>)
-            </option>
-            <?php endforeach; ?>
-        </select>
-    </div>
+    <?= parts_product_picker_html('product_id', $products, $partIcons, [
+        'id'             => 'stock-in-product',
+        'autofocus'      => true,
+        'disableZeroQty' => false,
+    ]) ?>
     <div class="form-row">
         <div class="form-group">
             <label>จำนวนรับเข้า</label>
-            <input type="number" name="quantity" min="1" required>
+            <input type="number" name="quantity" min="1" value="1" required>
         </div>
         <div class="form-group">
             <label>หมายเหตุ</label>

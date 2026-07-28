@@ -64,7 +64,7 @@ parts_page_header('stock-out-item', 'เบิกรายชิ้น', 'เบ
                     <th class="text-right">จำนวน</th>
                     <th>ผู้เบิก</th>
                     <th>หมายเหตุ</th>
-                    <th>วันที่</th>
+                    <th>วันเวลา</th>
                     <th class="col-actions">จัดการ</th>
                 </tr>
             </thead>
@@ -101,23 +101,10 @@ parts_page_header('stock-out-item', 'เบิกรายชิ้น', 'เบ
 
 <?php parts_modal_begin('stock-out-item-add-modal', 'บันทึกเบิกรายชิ้น'); ?>
 <form method="POST">
-    <div class="form-group">
-        <label>ค้นหาอะไหล่</label>
-        <input type="text" data-product-search="stock-out-item-product" placeholder="พิมพ์ชื่อหรือรหัสอะไหล่" autocomplete="off" data-autofocus>
-    </div>
-    <div class="form-group">
-        <label>เลือกอะไหล่</label>
-        <select name="product_id" id="stock-out-item-product" required>
-            <option value="">-- เลือกอะไหล่ --</option>
-            <?php foreach ($products as $p): ?>
-            <option value="<?= (int) $p['id'] ?>" <?= $p['quantity'] <= 0 ? 'disabled' : '' ?>>
-                <?= e(parts_format_product_option($p)) ?>
-                (คงเหลือ: <?= formatNumber($p['quantity']) ?> <?= e($p['unit']) ?>)
-                <?= $p['quantity'] <= 0 ? '(หมด)' : '' ?>
-            </option>
-            <?php endforeach; ?>
-        </select>
-    </div>
+    <?= parts_product_picker_html('product_id', $products, $partIcons, [
+        'id' => 'stock-out-item-product',
+        'autofocus' => true,
+    ]) ?>
     <div class="form-row">
         <div class="form-group">
             <label>จำนวนเบิก</label>

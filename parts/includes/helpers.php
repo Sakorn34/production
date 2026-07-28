@@ -64,10 +64,10 @@ function generateSetCode(PDO $db): string
 
 function formatDate(?string $datetime): string
 {
-    if (!$datetime) {
-        return '-';
+    if (!function_exists('dt_display_full')) {
+        require_once dirname(__DIR__, 2) . '/shared/datetime_helpers.php';
     }
-    return date('d/m/Y H:i', strtotime($datetime));
+    return dt_display_full($datetime);
 }
 
 function formatNumber($num): string
@@ -250,6 +250,22 @@ function part_product_display_sub(array $productRow, array $prodLabels): string
 }
 
 /**
+ * ค่า Code Part ดิบจาก production (ไม่ fallback เป็นรหัสสต็อก)
+ *
+ * @param array<string,mixed> $product
+ * @return string
+ */
+function parts_product_part_code_raw(array $product): string
+{
+    $code = trim((string) ($product['code'] ?? ''));
+    if ($code === '') {
+        return '';
+    }
+    $labels = production_part_labels_by_stock_codes([$code]);
+    return trim((string) ($labels[$code]['part_code'] ?? ''));
+}
+
+/**
  * ชื่อแสดงผลจากรหัส + ชื่อ fallback
  *
  * @param string $code
@@ -348,6 +364,59 @@ function parts_format_product_option(array $product): string
 {
     $code = trim((string) ($product['code'] ?? ''));
     return '[' . $code . '] ' . parts_display_name($product);
+}
+
+/**
+ * combobox เลือกอะไหล่ — ค้นหาและเลือกในช่องเดียว พร้อมรูป/ชื่อ/คงเหลือ
+ *
+ * @param string $inputName ชื่อ field ที่ส่ง (เช่น product_id)
+ * @param array<int,array<string,mixed>> $products จาก parts_enrich_products()
+ * @param array<string,string> $partIcons map รหัส → icon path
+ * @param array{id?:string,label?:string,placeholder?:string,required?:bool,autofocus?:bool,selected?:int,disableZeroQty?:bool} $opts
+ * @return string HTML
+ */
+function parts_product_picker_html(string $inputName, array $products, array $partIcons, array $opts = []): string
+{
+    $pickerId = $opts['id'] ?? preg_replace('/[^a-z0-9_-]/i', '-', $inputName);
+    $label = $opts['label'] ?? 'เลือกอะไหล่';
+    $placeholder = $opts['placeholder'] ?? 'พิมพ์ชื่อหรือรหัสอะไหล่เพื่อค้นหา…';
+    $required = !array_key_exists('required', $opts) || (bool) $opts['required'];
+    $selectedId = (int) ($opts['selected'] ?? 0);
+    $disableZeroQty = !array_key_exists('disableZeroQty', $opts) || (bool) $opts['disableZeroQty'];
+
+    $items = [];
+    foreach ($products as $p) {
+        $code = trim((string) ($p['code'] ?? ''));
+        $items[] = [
+            'id'       => (int) ($p['id'] ?? 0),
+            'code'     => $code,
+            'name'     => parts_display_name($p),
+            'label'    => parts_format_product_option($p),
+            'qty'      => (int) ($p['quantity'] ?? 0),
+            'unit'     => (string) ($p['unit'] ?? 'ชิ้น'),
+            'icon'     => parts_upload_img_url($partIcons[$code] ?? '') ?? '',
+            'disabled' => $disableZeroQty && (int) ($p['quantity'] ?? 0) <= 0,
+        ];
+    }
+
+    $json = htmlspecialchars(json_encode($items, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8');
+    $inputId = $pickerId . '-input';
+
+    ob_start(); ?>
+    <div class="form-group parts-product-picker-wrap">
+        <label for="<?= e($inputId) ?>"><?= e($label) ?></label>
+        <div class="parts-product-picker" id="<?= e($pickerId) ?>" data-product-picker data-products="<?= $json ?>"<?= $selectedId ? ' data-selected="' . $selectedId . '"' : '' ?>>
+            <input type="hidden" name="<?= e($inputName) ?>" value="<?= $selectedId ?: '' ?>"<?= $required ? ' required' : '' ?>>
+            <div class="parts-product-picker-control">
+                <div class="parts-product-picker-thumb is-empty" aria-hidden="true"></div>
+                <input type="text" id="<?= e($inputId) ?>" class="parts-product-picker-input" placeholder="<?= e($placeholder) ?>" autocomplete="off"<?= !empty($opts['autofocus']) ? ' data-autofocus' : '' ?>>
+                <button type="button" class="parts-product-picker-clear" hidden aria-label="ล้างการเลือก">&times;</button>
+            </div>
+            <ul class="parts-product-picker-list" role="listbox" hidden></ul>
+        </div>
+    </div>
+    <?php
+    return (string) ob_get_clean();
 }
 
 /**
@@ -455,6 +524,195 @@ function product_has_price(array $product): bool
 }
 
 /**
+ * คอลัมน์ที่ sort ได้ในตารางรายการอะไหล่ (key => ป้ายหัวคอลัมน์)
+ *
+ * @return array<string,string>
+ */
+function parts_products_sort_columns(): array
+{
+    return [
+        'code'      => 'รหัส',
+        'name'      => 'ชื่อ',
+        'status'    => 'สถานะ',
+        'price'     => 'ราคา',
+        'link'      => 'ลิงก์',
+        'quantity'  => 'คงเหลือ',
+        'unit'      => 'หน่วย',
+        'min_stock' => 'ขั้นต่ำ',
+    ];
+}
+
+/**
+ * อ่าน sort/dir จาก query string ของหน้ารายการอะไหล่
+ *
+ * @return array{sort:string,dir:string}
+ */
+function parts_products_sort_state(): array
+{
+    $columns = parts_products_sort_columns();
+    $sort = isset($_GET['sort']) ? (string) $_GET['sort'] : 'name';
+    if (!isset($columns[$sort])) {
+        $sort = 'name';
+    }
+    $dir = isset($_GET['dir']) ? strtolower((string) $_GET['dir']) : 'asc';
+    if ($dir !== 'asc' && $dir !== 'desc') {
+        $dir = 'asc';
+    }
+    return ['sort' => $sort, 'dir' => $dir];
+}
+
+/**
+ * URL หน้ารายการอะไหล่ พร้อมพารามิเตอร์ sort ปัจจุบัน
+ *
+ * @param array{sort:string,dir:string}|null $sortState
+ * @return string
+ */
+function parts_products_page_url(?array $sortState = null): string
+{
+    if ($sortState === null) {
+        $sortState = parts_products_sort_state();
+    }
+    if ($sortState['sort'] === 'name' && $sortState['dir'] === 'asc') {
+        return url('/pages/products.php');
+    }
+    return url('/pages/products.php?' . http_build_query([
+        'sort' => $sortState['sort'],
+        'dir'  => $sortState['dir'],
+    ]));
+}
+
+/**
+ * URL สลับทิศทาง sort เมื่อกดหัวคอลัมน์
+ *
+ * @param string $column
+ * @param array{sort:string,dir:string} $sortState
+ * @return string
+ */
+function parts_products_sort_href(string $column, array $sortState): string
+{
+    $columns = parts_products_sort_columns();
+    if (!isset($columns[$column])) {
+        return parts_products_page_url();
+    }
+    $dir = 'asc';
+    if ($sortState['sort'] === $column) {
+        $dir = $sortState['dir'] === 'asc' ? 'desc' : 'asc';
+    }
+    return parts_products_page_url(['sort' => $column, 'dir' => $dir]);
+}
+
+/**
+ * HTML หัวคอลัมน์ที่กด sort ได้
+ *
+ * @param string $label
+ * @param string $column
+ * @param array{sort:string,dir:string} $sortState
+ * @param string|null $extraClass
+ * @return string
+ */
+function parts_products_sort_th(string $label, string $column, array $sortState, ?string $extraClass = null): string
+{
+    $isActive = $sortState['sort'] === $column;
+    $classes = ['sortable-th'];
+    if ($extraClass !== null && $extraClass !== '') {
+        $classes[] = $extraClass;
+    }
+    if ($isActive) {
+        $classes[] = 'is-sorted';
+        $classes[] = 'is-sorted-' . $sortState['dir'];
+    }
+    $ariaSort = 'none';
+    if ($isActive) {
+        $ariaSort = $sortState['dir'] === 'asc' ? 'ascending' : 'descending';
+    }
+    $href = parts_products_sort_href($column, $sortState);
+    $arrow = '<span class="sort-indicator" aria-hidden="true"></span>';
+    return '<th class="' . e(implode(' ', $classes)) . '" aria-sort="' . e($ariaSort) . '">'
+        . '<a class="sortable-th-link" href="' . e($href) . '">'
+        . e($label) . ($isActive ? $arrow : '')
+        . '</a></th>';
+}
+
+/**
+ * คีย์สำหรับ sort คอลัมน์ลิงก์ (ผู้จำหน่าย + URL)
+ *
+ * @param array<string,mixed> $product
+ * @return string
+ */
+function parts_product_link_sort_key(array $product): string
+{
+    $link = trim((string) ($product['purchase_link'] ?? ''));
+    $supplier = trim((string) ($product['supplier'] ?? ''));
+    if ($link === '' && $supplier === '') {
+        return '';
+    }
+    if ($supplier !== '') {
+        return $supplier . ' ' . $link;
+    }
+    return $link;
+}
+
+/**
+ * เปรียบเทียบอะไหล่สองรายการตามคอลัมน์ sort
+ *
+ * @param array<string,mixed> $a
+ * @param array<string,mixed> $b
+ * @param string $sort
+ * @return int
+ */
+function parts_compare_products(array $a, array $b, string $sort): int
+{
+    switch ($sort) {
+        case 'code':
+            return strnatcasecmp((string) ($a['code'] ?? ''), (string) ($b['code'] ?? ''));
+        case 'name':
+            return strcasecmp(parts_display_name($a), parts_display_name($b));
+        case 'status':
+            $va = product_is_active($a) ? 1 : 0;
+            $vb = product_is_active($b) ? 1 : 0;
+            return $va <=> $vb;
+        case 'price':
+            $pa = product_has_price($a) ? (float) $a['price'] : -1.0;
+            $pb = product_has_price($b) ? (float) $b['price'] : -1.0;
+            return $pa <=> $pb;
+        case 'link':
+            return strcasecmp(parts_product_link_sort_key($a), parts_product_link_sort_key($b));
+        case 'quantity':
+            return ((int) ($a['quantity'] ?? 0)) <=> ((int) ($b['quantity'] ?? 0));
+        case 'unit':
+            return strcasecmp((string) ($a['unit'] ?? ''), (string) ($b['unit'] ?? ''));
+        case 'min_stock':
+            return ((int) ($a['min_stock'] ?? 0)) <=> ((int) ($b['min_stock'] ?? 0));
+        default:
+            return 0;
+    }
+}
+
+/**
+ * เรียงรายการอะไหล่ตามคอลัมน์และทิศทาง
+ *
+ * @param array<int,array<string,mixed>> $products
+ * @param string $sort
+ * @param string $dir asc|desc
+ * @return array<int,array<string,mixed>>
+ */
+function parts_sort_products(array $products, string $sort, string $dir): array
+{
+    $columns = parts_products_sort_columns();
+    if (!isset($columns[$sort])) {
+        $sort = 'name';
+    }
+    if ($dir !== 'asc' && $dir !== 'desc') {
+        $dir = 'asc';
+    }
+    $mult = $dir === 'desc' ? -1 : 1;
+    usort($products, static function (array $a, array $b) use ($sort, $mult): int {
+        return parts_compare_products($a, $b, $sort) * $mult;
+    });
+    return $products;
+}
+
+/**
  * บันทึกรูปอะไหล่ลง uploads/parts ของ finishgoogs (validate MIME + ขนาด)
  *
  * @param string $field ชื่อ field ใน $_FILES
@@ -495,16 +753,17 @@ function parts_save_product_image(string $field): ?string
  * @param array<string,mixed> $product
  * @return string HTML
  */
-function parts_product_img_cell(?string $iconPath, array $product): string
+function parts_product_img_cell(?string $iconPath, array $product, string $returnTo = ''): string
 {
     $name = parts_display_name($product);
+    $returnAttr = $returnTo !== '' ? ' data-product-return-to="' . e($returnTo) . '"' : '';
     if ($iconPath !== '') {
         $html = parts_img_tag($iconPath, $name);
         $html .= '<button type="button" class="btn-cell-mini btn-cell-img" title="เปลี่ยนรูป"'
             . ' data-open-modal="product-icon-modal"'
             . ' data-fill-modal="product-icon-modal"'
             . ' data-product-id="' . (int) ($product['id'] ?? 0) . '"'
-            . ' data-product-name="' . e($name) . '">'
+            . ' data-product-name="' . e($name) . '"' . $returnAttr . '>'
             . ui_icon_html('edit', 12, 'btn-svg') . '</button>';
         return '<div class="col-img-wrap">' . $html . '</div>';
     }
@@ -512,35 +771,22 @@ function parts_product_img_cell(?string $iconPath, array $product): string
         . ' data-open-modal="product-icon-modal"'
         . ' data-fill-modal="product-icon-modal"'
         . ' data-product-id="' . (int) ($product['id'] ?? 0) . '"'
-        . ' data-product-name="' . e($name) . '">'
+        . ' data-product-name="' . e($name) . '"' . $returnAttr . '>'
         . ui_icon_html('plus', 14, 'btn-svg') . ' รูป</button>';
 }
 
 /**
- * คอลัมน์ราคา — แสดงราคาหรือปุ่มกรอกราคา
+ * คอลัมน์ราคา — แสดงราคาหรือขีดเมื่อยังไม่กำหนด (แก้ไขผ่านปุ่มในคอลัมน์จัดการ)
  *
  * @param array<string,mixed> $product
  * @return string HTML
  */
-function parts_product_price_cell(array $product): string
+function parts_product_price_cell(array $product, string $returnTo = ''): string
 {
     if (product_has_price($product)) {
-        return '<span class="price-value">' . formatCurrency($product['price']) . '</span>'
-            . ' <button type="button" class="btn-cell-mini" title="แก้ไขราคา"'
-            . ' data-open-modal="product-price-modal"'
-            . ' data-fill-modal="product-price-modal"'
-            . ' data-product-id="' . (int) ($product['id'] ?? 0) . '"'
-            . ' data-product-name="' . e(parts_display_name($product)) . '"'
-            . ' data-product-price="' . e(number_format((float) $product['price'], 2, '.', '')) . '">'
-            . ui_icon_html('edit', 12, 'btn-svg') . '</button>';
+        return '<span class="price-value">' . formatCurrency($product['price']) . '</span>';
     }
-    return '<button type="button" class="btn btn-sm btn-outline btn-cell-action"'
-        . ' data-open-modal="product-price-modal"'
-        . ' data-fill-modal="product-price-modal"'
-        . ' data-product-id="' . (int) ($product['id'] ?? 0) . '"'
-        . ' data-product-name="' . e(parts_display_name($product)) . '"'
-        . ' data-product-price="">'
-        . ui_icon_html('plus', 14, 'btn-svg') . ' ราคา</button>';
+    return '<span class="text-muted">-</span>';
 }
 
 function ensureStockInColumns(PDO $db): void
@@ -553,7 +799,7 @@ function ensureStockInColumns(PDO $db): void
 
 function getStockOutNoteOptions(): array
 {
-    return ['เบิกผลิต', 'เบิกงานซ่อม', 'เบิกงาน Test'];
+    return ['เบิกผลิต', 'เบิกงานซ่อม', 'เบิกงาน Test', 'นับใหม่'];
 }
 
 function validateStockOutNote(?string $note): string

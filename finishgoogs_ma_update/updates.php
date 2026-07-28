@@ -166,7 +166,7 @@ page_header('อัปเดต FW/HW — ' . $product['name'] . ' (' . number_f
   <p class="muted"><?= ($searchSn !== '' || $searchDetail !== '') ? 'ไม่พบรายการตามเงื่อนไขค้นหา' : 'ยังไม่มีรายการอัปเดตของรุ่นนี้' ?></p>
 <?php } else { ?>
 <table class="list">
-  <tr><th>วันที่</th><th>เครื่อง</th><th>ประเภท</th><th>รายละเอียด</th><th>รูป</th><th>โดย</th><th style="width:130px">จัดการ</th></tr>
+  <tr><th>วันเวลา</th><th>เครื่อง</th><th>ประเภท</th><th>รายละเอียด</th><th>รูป</th><th>โดย</th><th style="width:130px">จัดการ</th></tr>
   <?php while ($r = $rows->fetch_assoc()) { ?>
   <tr>
     <td><?= dthai_full($r['updated_at']) ?></td>

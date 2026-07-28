@@ -138,12 +138,10 @@ function main_font_scale_percent(): int
 function main_font_css_sizes(): string
 {
     $s = main_font_scale_percent() / 100;
+    $sf = rtrim(rtrim(sprintf('%.4f', $s), '0'), '.');
     return sprintf(
-        '--fs-body:%spx; --fs-h1:%spx; --fs-table:%spx; --fs-badge:%spx;',
-        round(15 * $s, 1),
-        round(22 * $s, 1),
-        round(13.5 * $s, 1),
-        round(12 * $s, 1)
+        '--font-scale:%s; --fs-body:calc(15px * var(--font-scale)); --fs-h1:calc(22px * var(--font-scale)); --fs-table:calc(13.5px * var(--font-scale)); --fs-badge:calc(12px * var(--font-scale));',
+        $sf
     );
 }
 

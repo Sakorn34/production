@@ -13,7 +13,7 @@
     if (!digits) return '';
     if (digits.length > 8) digits = digits.slice(-8);
     while (digits.length < 8) digits = '0' + digits;
-    return 'be:99:' + digits.slice(0, 2) + ':' + digits.slice(2, 4) + ':' + digits.slice(4, 6) + ':' + digits.slice(6, 8);
+    return digits.slice(0, 2) + ':' + digits.slice(2, 4) + ':' + digits.slice(4, 6) + ':' + digits.slice(6, 8);
   }
 
   function buildRentalSummaryFromData(rep, fix, fw, remark) {
