@@ -333,14 +333,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'ยกเลิกเบิกอัตโนมัติ',
                     $bomBy
                 );
-                foreach (array_reverse($deductedThisUnit) as $rev) {
-                    tech_parts_stock_in_by_part_id($rev['part_id'], $rev['qty'], 'ยกเลิกเบิกอัตโนมัติ', $bomBy);
+                if (function_exists('ma_rollback_partial_movements')) {
+                    ma_rollback_partial_movements($deductedThisUnit, $bomBy, 'ยกเลิกเบิกอัตโนมัติ');
+                } else {
+                    foreach (array_reverse($deductedThisUnit) as $rev) {
+                        tech_parts_stock_in_by_part_id($rev['part_id'], $rev['qty'], 'ยกเลิกเบิกอัตโนมัติ', $bomBy);
+                        if (!empty($rev['movement_id'])) {
+                            q('DELETE FROM part_movements WHERE id=?', 'i', [(int) $rev['movement_id']]);
+                        }
+                    }
                 }
                 $err = $ins['error'] ?? 'บันทึก movement ไม่สำเร็จ';
                 break 2;
             }
-            $deductedThisUnit[] = ['part_id' => $partId, 'qty' => (int)($out['qty'] ?? tech_parts_qty_to_int($bq))];
             $bomMid = (int)($ins['insert_id'] ?? 0);
+            $deductedThisUnit[] = [
+                'part_id'     => $partId,
+                'qty'         => (int)($out['qty'] ?? tech_parts_qty_to_int($bq)),
+                'movement_id' => $bomMid,
+            ];
             if (!empty($out['stock_out_id']) && function_exists('production_link_stock_out')) {
                 $ac = qr('SELECT asset_code FROM assets WHERE id=?', 'i', [$r['asset_id']])->fetch_assoc();
                 production_link_stock_out(dbParts(), (int)$out['stock_out_id'], $bomMid, $ac['asset_code'] ?? null);
@@ -841,14 +852,14 @@ function buildConfirm(){
     document.querySelectorAll('input[name="serials[]"]').forEach(function(i){ if (i.value.trim()) machines.push(i.value.trim()); });
   }
   var mcount = machines.length;
-  var html = '<table class="list">';
+  var html = '<div class="table-wrap"><table class="list">';
   html += rowHtml('รุ่นสินค้า', '<b>' + esc(prodName) + '</b>');
   html += rowHtml('วันที่ผลิต', esc(val('#produced_at')));
   html += rowHtml('จำนวนเครื่อง', '<b>' + mcount + '</b> เครื่อง' + (machines.length ? '<br><span class="muted">' + machines.map(esc).join(', ') + '</span>' : ''));
   html += rowHtml('ผู้ผลิต/ประกอบ', esc(val('[name="made_by"]')) || '-');
   if (val('[name="fw_version"]')) html += rowHtml('Firmware', esc(val('[name="fw_version"]')));
   if (val('[name="lot_label"]')) html += rowHtml('Lot', esc(val('[name="lot_label"]')));
-  html += '</table>';
+  html += '</table></div>';
   // ข้อมูลประจำรุ่น
   var dynRows = '';
   document.querySelectorAll('#dyn-fields input[name="field_names[]"]').forEach(function(nm){
@@ -857,7 +868,7 @@ function buildConfirm(){
     var v = vi ? vi.value.trim() : '';
     if (v) dynRows += rowHtml(esc(nm.value), esc(v));
   });
-  if (dynRows) html += '<h3 style="margin:14px 0 6px">ข้อมูลประจำรุ่น</h3><table class="list">' + dynRows + '</table>';
+  if (dynRows) html += '<h3 style="margin:14px 0 6px">ข้อมูลประจำรุ่น</h3><div class="table-wrap"><table class="list">' + dynRows + '</table></div>';
   // ชุดอะไหล่ที่จะเบิก (× จำนวนเครื่อง)
   var bomRows = '';
   document.querySelectorAll('#bom-list .bom-row').forEach(function(r){
@@ -871,7 +882,7 @@ function buildConfirm(){
       bomRows += rowHtml(esc(nm), qty + ' × ' + mcount + ' = <b>' + (Math.round(qty * mcount * 100) / 100) + '</b>');
     }
   });
-  if (bomRows) html += '<h3 style="margin:14px 0 6px">🔩 อะไหล่ที่จะเบิก (รวมทั้งชุด)</h3><table class="list">' + bomRows + '</table>';
+  if (bomRows) html += '<h3 style="margin:14px 0 6px">🔩 อะไหล่ที่จะเบิก (รวมทั้งชุด)</h3><div class="table-wrap"><table class="list">' + bomRows + '</table></div>';
   // checklist / ปัญหา / แก้ไข / หมายเหตุ
   var chk = [];
   document.querySelectorAll('#chk-list input[type=checkbox]:checked').forEach(function(c){ chk.push(c.dataset.item); });
@@ -880,7 +891,7 @@ function buildConfirm(){
   if (val('[name="problems_found"]')) extra += rowHtml('ปัญหาที่พบ', esc(val('[name="problems_found"]')));
   if (val('[name="fix"]')) extra += rowHtml('การแก้ไข', esc(val('[name="fix"]')));
   if (val('[name="note"]')) extra += rowHtml('หมายเหตุ', esc(val('[name="note"]')));
-  if (extra) html += '<h3 style="margin:14px 0 6px">ตรวจสอบ / หมายเหตุ</h3><table class="list">' + extra + '</table>';
+  if (extra) html += '<h3 style="margin:14px 0 6px">ตรวจสอบ / หมายเหตุ</h3><div class="table-wrap"><table class="list">' + extra + '</table></div>';
   document.getElementById('confirm-body').innerHTML = html;
 }
 var confirmedSubmit = false;

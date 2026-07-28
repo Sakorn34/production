@@ -61,7 +61,7 @@ table.list tr:hover td { background: #faf8fe; }
 /* ── ฟอร์ม ── */
 input[type=text], input[type=number], input[type=date], input[type=datetime-local], input[type=url],
 input[type=password], select, textarea { border-radius: var(--radius-sm); }
-input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, .btn:focus-visible, a:focus-visible {
   outline: 2px solid var(--primary); outline-offset: 1px;
 }
 .prod-pick .pp.sel { border-color: var(--primary); background: #fce7f3; background: color-mix(in srgb, var(--primary) 10%, #fff); }

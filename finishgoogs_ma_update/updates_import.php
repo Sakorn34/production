@@ -298,6 +298,7 @@ page_header('นำเข้าประวัติอัปเดต FW/HW');
 
 <div class="card" style="padding:14px">
   <b>คอลัมน์ที่รองรับ</b>
+  <div class="table-wrap">
   <table class="list" style="margin-top:8px">
     <tr><th>คอลัมน์</th><th>จำเป็น</th><th>คำอธิบาย</th></tr>
     <tr><td><code>asset_code</code></td><td>ใช่</td><td>รหัสเครื่อง (S/N)</td></tr>
@@ -309,6 +310,7 @@ page_header('นำเข้าประวัติอัปเดต FW/HW');
     <tr><td><code>made_by</code></td><td>ไม่</td><td>ผู้บันทึก (ค่าเริ่มต้น Admin)</td></tr>
     <tr><td><code>model</code></td><td>ไม่</td><td>ชื่อรุ่นจากระบบ (map จาก S/N ตอนสร้างไฟล์)</td></tr>
   </table>
+  </div>
 </div>
 
 <?php

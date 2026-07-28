@@ -342,6 +342,7 @@ page_header('หลังบ้าน — เปรียบเทียบ asse
   <div id="rc-bulk-hidden"></div>
 </form>
 
+<div class="table-wrap">
 <table class="list" id="rc-table">
   <tr>
     <th style="width:32px"><input type="checkbox" id="rc-all" title="เลือกทั้งหน้า"></th>
@@ -433,6 +434,7 @@ page_header('หลังบ้าน — เปรียบเทียบ asse
   <tr><td colspan="7" class="muted" style="text-align:center;padding:24px">✅ ไม่พบรายการที่ต่างกัน<?= $flt || $search ? ' (ตามฟิลเตอร์)' : '' ?></td></tr>
   <?php } ?>
 </table>
+</div>
 
 <?php if ($list['pages'] > 1) {
     $base = BASE_URL . '/share_admin.php?' . http_build_query(array_filter(['f' => $flt ?: null, 'q' => $search ?: null])); ?>

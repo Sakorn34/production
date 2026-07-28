@@ -75,6 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_update'])) {
             q("INSERT INTO asset_components (asset_id,component_name,component_value) VALUES (?,?,?)
                ON DUPLICATE KEY UPDATE component_value=VALUES(component_value)", 'iss', [$log['asset_id'], $comp, $new]);
         }
+    } else {
+        recompute_asset_fw((int) $log['asset_id']);
     }
 
     flash_set('แก้ไขรายการอัปเดตของ ' . $log['asset_code'] . ' แล้ว');

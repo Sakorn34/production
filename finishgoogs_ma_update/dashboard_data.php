@@ -15,7 +15,7 @@ function drill_onclick($title, $url) {
 }
 
 function asset_table($res, $clickTimeline = false) {
-    echo '<table class="list"><tr><th>รหัสเครื่อง</th><th>รุ่น</th><th>สถานะ</th><th>ผลิตเมื่อ</th></tr>';
+    echo '<div class="table-wrap"><table class="list"><tr><th>รหัสเครื่อง</th><th>รุ่น</th><th>สถานะ</th><th>ผลิตเมื่อ</th></tr>';
     $n = 0;
     while ($r = $res->fetch_assoc()) {
         $n++;
@@ -28,7 +28,7 @@ function asset_table($res, $clickTimeline = false) {
            . '<td>' . h($r['pname']) . '</td><td>' . status_badge($r['status']) . '</td>'
            . '<td>' . dthai($r['produced_at']) . '</td></tr>';
     }
-    echo '</table>';
+    echo '</table></div>';
     if ($n === 0) echo '<p class="muted">ไม่มีข้อมูล</p>';
     elseif ($clickTimeline) echo '<p class="muted" style="margin-top:6px; font-size:12px">กดแถวเพื่อดู timeline ของเครื่อง · กดรหัสเครื่องเพื่อเปิดหน้าเต็ม</p>';
 }
@@ -313,7 +313,7 @@ switch ($type) {
         if (!$prod) exit('พารามิเตอร์ไม่ถูกต้อง');
         [$ms, $me] = ym_range($v);
         $res = qr("$ASSET_SQL WHERE a.product_id=? AND a.produced_at>=? AND a.produced_at<? ORDER BY a.asset_code LIMIT $LIMIT", 'iss', [$pid, $ms, $me]);
-        echo '<table class="list"><tr><th>หมายเลขเครื่อง</th><th>สถานะ</th><th>ผลิตเมื่อ</th></tr>';
+        echo '<div class="table-wrap"><table class="list"><tr><th>หมายเลขเครื่อง</th><th>สถานะ</th><th>ผลิตเมื่อ</th></tr>';
         $n = 0;
         while ($r = $res->fetch_assoc()) {
             $n++;
@@ -322,7 +322,7 @@ switch ($type) {
                . '<td>' . status_badge($r['status']) . '</td>'
                . '<td>' . dthai($r['produced_at']) . '</td></tr>';
         }
-        echo '</table>';
+        echo '</table></div>';
         if ($n === 0) echo '<p class="muted">ไม่มีข้อมูล</p>';
         else echo '<p class="muted" style="margin-top:6px; font-size:12px">กดแถวเพื่อเปิดโปรไฟล์สินค้า (หน้าเครื่อง)</p>';
         break;
@@ -331,7 +331,7 @@ switch ($type) {
         $res = qr("SELECT r.id, r.opened_at, r.reported_issue, r.status, a.id aid, a.asset_code, p.name pname
                    FROM repairs r JOIN assets a ON a.id=r.asset_id JOIN products p ON p.id=a.product_id
                    WHERE r.status IN ('received','in_progress') ORDER BY r.opened_at LIMIT $LIMIT");
-        echo '<table class="list"><tr><th>รับแจ้ง</th><th>เครื่อง</th><th>รุ่น</th><th>อาการ</th></tr>';
+        echo '<div class="table-wrap"><table class="list"><tr><th>รับแจ้ง</th><th>เครื่อง</th><th>รุ่น</th><th>อาการ</th></tr>';
         $n = 0;
         while ($r = $res->fetch_assoc()) {
             $n++;
@@ -340,7 +340,7 @@ switch ($type) {
                . '<td>' . h($r['pname']) . '</td>'
                . '<td>' . h(mb_strimwidth((string)$r['reported_issue'], 0, 80, '…')) . '</td></tr>';
         }
-        echo '</table>';
+        echo '</table></div>';
         if ($n === 0) echo '<p class="muted">ไม่มีงานซ่อมค้าง</p>';
         break;
 
@@ -615,7 +615,7 @@ switch ($type) {
         );
         echo '<div class="muted" style="margin-bottom:8px">' . h($prod['name']) . ' · '
            . h(thai_month_period_label($v)) . ' · ' . h(asset_status_label($st)) . '</div>';
-        echo '<table class="list"><tr><th>หมายเลขเครื่อง</th><th>สถานะ</th><th>ผลิตเมื่อ</th></tr>';
+        echo '<div class="table-wrap"><table class="list"><tr><th>หมายเลขเครื่อง</th><th>สถานะ</th><th>ผลิตเมื่อ</th></tr>';
         $n = 0;
         while ($r = $res->fetch_assoc()) {
             $n++;
@@ -624,7 +624,7 @@ switch ($type) {
                . '<td>' . status_badge($r['status']) . '</td>'
                . '<td>' . dthai($r['produced_at']) . '</td></tr>';
         }
-        echo '</table>';
+        echo '</table></div>';
         if ($n === 0) {
             echo '<p class="muted">ไม่มีข้อมูล</p>';
         } else {

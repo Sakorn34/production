@@ -277,6 +277,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'history') {
     $res = qr("SELECT * FROM ma_records WHERE asset_id=? ORDER BY visited_at DESC, id DESC LIMIT 15", 'i', [$a['id']]);
     echo '<b>📅 ประวัติ MA (' . $res->num_rows . ' ครั้งล่าสุด)</b>';
     if ($res->num_rows) {
+        echo '<div class="table-wrap">';
         echo '<table class="list" style="margin:6px 0 12px"><tr><th>วันเวลา</th><th>FW</th><th>รายละเอียด</th><th>โดย</th>' . ($canMa ? '<th></th>' : '') . '</tr>';
         while ($m = $res->fetch_assoc()) {
             echo '<tr><td style="white-space:nowrap">' . dthai_full($m['visited_at']) . '</td>'
@@ -290,6 +291,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'history') {
                . '</tr>';
         }
         echo '</table>';
+        echo '</div>';
     } else echo '<p class="muted" style="margin:4px 0 12px">ยังไม่เคยเข้า MA</p>';
 
     // การอัปเดต/เปลี่ยนชิ้นส่วนจาก update_logs
@@ -297,6 +299,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'history') {
                WHERE asset_id=? ORDER BY updated_at DESC, id DESC LIMIT 8", 'i', [$a['id']]);
     if ($res->num_rows) {
         echo '<b>🔩 การอัปเดต FW/HW (' . $res->num_rows . ' ครั้งล่าสุด)</b>';
+        echo '<div class="table-wrap">';
         echo '<table class="list" style="margin:6px 0 12px"><tr><th>วันเวลา</th><th>ประเภท</th><th>รายละเอียด</th></tr>';
         while ($u = $res->fetch_assoc()) {
             $d = [];
@@ -308,6 +311,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'history') {
                . '<td style="max-width:400px; font-size:13px">' . h(mb_strimwidth(implode(' | ', $d), 0, 170, '…')) . '</td></tr>';
         }
         echo '</table>';
+        echo '</div>';
     }
     exit;
 }
@@ -405,10 +409,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_ma'])) {
     $maRoundLock = $roundAlloc['lock_key'];
 
     try {
-    q("INSERT INTO ma_records (asset_id,ma_round,visited_at,result,ok_items,replace_items,repair_items,fw_version,remark,done_by)
-       VALUES (?,?,?,?,?,?,?,?,?,?)", 'iissssssss',
+    q("INSERT INTO ma_records (asset_id,ma_round,visited_at,result,ok_items,replace_items,repair_items,fw_version,machine_status,remark,done_by)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)", 'iisssssssss',
       [$a['id'], $round, $visited, $result, $okItems ?: null, $repItems ?: null, $fixItems ?: null,
-       $fw ?: null, trim($_POST['remark']) ?: null, actor_name()]);
+       $fw ?: null, $newStatus, trim($_POST['remark']) ?: null, actor_name()]);
 
     $maRecordId = (int)db()->insert_id;
     $withdrawLines = ma_parse_withdraw_lines(
@@ -475,8 +479,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_ma'])) {
     $fixItems = $san['repair'];
     $result = $fixItems ? 'repair' : ($repItems ? 'replace' : ($okItems ? 'ok' : null));
     $fw = trim($_POST['fw_version']);
-    q("UPDATE ma_records SET visited_at=?, result=?, ok_items=?, replace_items=?, repair_items=?, fw_version=?, remark=? WHERE id=?",
-      'sssssssi', [$visited, $result, $okItems ?: null, $repItems ?: null, $fixItems ?: null, $fw ?: null, trim($_POST['remark']) ?: null, $mid]);
+    q("UPDATE ma_records SET visited_at=?, result=?, ok_items=?, replace_items=?, repair_items=?, fw_version=?, machine_status=?, remark=? WHERE id=?",
+      'ssssssssi', [$visited, $result, $okItems ?: null, $repItems ?: null, $fixItems ?: null, $fw ?: null,
+       in_array($_POST['machine_status'] ?? '', ['rental', 'spare'], true) ? $_POST['machine_status'] : null,
+       trim($_POST['remark']) ?: null, $mid]);
     $newStatus = in_array($_POST['machine_status'], ['rental', 'spare'], true) ? $_POST['machine_status'] : null;
     if ($newStatus) q("UPDATE assets SET status=? WHERE id=?", 'si', [$newStatus, $rec['asset_id']]);
     if ($fw !== '') q("UPDATE assets SET current_fw_version=? WHERE id=?", 'si', [$fw, $rec['asset_id']]);
@@ -521,6 +527,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_ma'])) {
     q("DELETE FROM ma_records WHERE id=?", 'i', [$mid]);
     if ($rec) {
         recompute_asset_status_from_ma((int) $rec['asset_id']);
+        recompute_asset_fw((int) $rec['asset_id']);
     }
     flash_set('ลบรายการ MA เรียบร้อยแล้ว');
     $back = (isset($_POST['back']) && $_POST['back'] !== '') ? $_POST['back']
@@ -1220,6 +1227,20 @@ document.getElementById('ma-form').addEventListener('submit', function(e){
     btn.textContent = 'กำลังบันทึก…';
   }
 });
+
+window.addEventListener('pageshow', function(e) {
+  if (!e.persisted) return;
+  var btn = document.getElementById('ma-submit-btn');
+  if (!btn) return;
+  btn.disabled = false;
+  btn.textContent = btn.dataset.defaultLabel || '💾 บันทึก MA';
+});
+(function(){
+  var btn = document.getElementById('ma-submit-btn');
+  if (btn && !btn.dataset.defaultLabel) {
+    btn.dataset.defaultLabel = btn.textContent;
+  }
+})();
 
 document.getElementById('ma_remark').addEventListener('input', updateMaSnippets);
 

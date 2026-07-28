@@ -204,6 +204,7 @@ page_header('ปรับแต่งหน้าตาระบบ');
     <div class="panel">
       <?= ui_heading('clipboard', 'เมนู (ไอคอน · ชื่อ · ลำดับ · แสดง)', 'h3') ?>
       <p class="muted" style="margin-bottom:8px">ลาก ≡ จัดลำดับ · ใส่ icon key (เช่น dashboard, parts, scan) หรือ emoji · ติ๊กออกเพื่อซ่อนเมนู · <b>ระบบหลังบ้าน</b> แสดงเป็นไอคón ⚙️ ข้างชื่อผู้ใช้เสมอ</p>
+      <div class="table-wrap">
       <table class="list" id="tbl-nav">
         <tr><th style="width:26px"></th><th style="width:56px">ไอคอน</th><th>ชื่อเมนู</th><th style="width:44px; text-align:center">แสดง</th></tr>
         <?php foreach ($navRows as $r) { ?>
@@ -218,6 +219,7 @@ page_header('ปรับแต่งหน้าตาระบบ');
         </tr>
         <?php } ?>
       </table>
+      </div>
 
       <?= ui_heading('tag', 'ตำแหน่งแถบเมนู', 'h3') ?>
       <div class="field">

@@ -272,6 +272,7 @@ class StockService
             FROM set_items si
             JOIN products p ON p.id = si.product_id
             WHERE si.set_id = ?
+            ORDER BY si.product_id
         ");
         $stmt->execute([$setId]);
         $set['items'] = $stmt->fetchAll();
@@ -637,24 +638,41 @@ class StockService
             throw new InvalidArgumentException('ไม่พบรายการรับเข้า');
         }
         $diff = $quantity - (int) $old['quantity'];
-        if ($diff < 0) {
-            $product = $this->getProduct((int) $old['product_id']);
-            $need = abs($diff);
-            if (!$product || (int) $product['quantity'] < $need) {
-                $have = $product ? (int) $product['quantity'] : 0;
-                throw new InvalidArgumentException(
-                    "ไม่สามารถแก้ไขได้ เพราะอะไหล่ถูกเบิกออกไปแล้ว (คงเหลือ {$have} ชิ้น ต้องการลด {$need} ชิ้น)"
-                );
-            }
-        }
+        $productId = (int) $old['product_id'];
 
         $this->db->beginTransaction();
         try {
+            if ($diff < 0) {
+                $need = abs($diff);
+                $lockStmt = $this->db->prepare('SELECT quantity FROM products WHERE id = ? FOR UPDATE');
+                $lockStmt->execute([$productId]);
+                $prow = $lockStmt->fetch(PDO::FETCH_ASSOC);
+                if (!$prow || (int) $prow['quantity'] < $need) {
+                    $have = $prow ? (int) $prow['quantity'] : 0;
+                    throw new InvalidArgumentException(
+                        "ไม่สามารถแก้ไขได้ เพราะอะไหล่ถูกเบิกออกไปแล้ว (คงเหลือ {$have} ชิ้น ต้องการลด {$need} ชิ้น)"
+                    );
+                }
+            }
+
             $this->db->prepare('UPDATE stock_in SET quantity = ?, note = ? WHERE id = ?')
                 ->execute([$quantity, $note, $id]);
             if ($diff !== 0) {
-                $this->db->prepare('UPDATE products SET quantity = quantity + ? WHERE id = ?')
-                    ->execute([$diff, (int) $old['product_id']]);
+                if ($diff < 0) {
+                    $need = abs($diff);
+                    $upd = $this->db->prepare(
+                        'UPDATE products SET quantity = quantity + ? WHERE id = ? AND quantity >= ?'
+                    );
+                    $upd->execute([$diff, $productId, $need]);
+                    if ($upd->rowCount() === 0) {
+                        throw new InvalidArgumentException(
+                            'ไม่สามารถแก้ไขได้ เพราะอะไหล่ถูกเบิกออกไปแล้ว กรุณาตรวจสอบยอดคงเหลือใหม่'
+                        );
+                    }
+                } else {
+                    $this->db->prepare('UPDATE products SET quantity = quantity + ? WHERE id = ?')
+                        ->execute([$diff, $productId]);
+                }
             }
             $this->db->commit();
         } catch (Exception $e) {
@@ -679,19 +697,30 @@ class StockService
         }
 
         $delQty = (int) $old['quantity'];
-        $product = $this->getProduct((int) $old['product_id']);
-        if (!$product || (int) $product['quantity'] < $delQty) {
-            $have = $product ? (int) $product['quantity'] : 0;
-            throw new InvalidArgumentException(
-                "ไม่สามารถลบได้ เพราะอะไหล่ถูกเบิกออกไปแล้ว (คงเหลือ {$have} ชิ้น ต้องการลด {$delQty} ชิ้น)"
-            );
-        }
+        $productId = (int) $old['product_id'];
 
         $this->db->beginTransaction();
         try {
-            $this->db->prepare('UPDATE products SET quantity = quantity - ? WHERE id = ?')
-                ->execute([$delQty, (int) $old['product_id']]);
+            $lockStmt = $this->db->prepare('SELECT quantity FROM products WHERE id = ? FOR UPDATE');
+            $lockStmt->execute([$productId]);
+            $prow = $lockStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$prow || (int) $prow['quantity'] < $delQty) {
+                $have = $prow ? (int) $prow['quantity'] : 0;
+                throw new InvalidArgumentException(
+                    "ไม่สามารถลบได้ เพราะอะไหล่ถูกเบิกออกไปแล้ว (คงเหลือ {$have} ชิ้น ต้องการลด {$delQty} ชิ้น)"
+                );
+            }
+
             $this->db->prepare('DELETE FROM stock_in WHERE id = ?')->execute([$id]);
+            $upd = $this->db->prepare(
+                'UPDATE products SET quantity = quantity - ? WHERE id = ? AND quantity >= ?'
+            );
+            $upd->execute([$delQty, $productId, $delQty]);
+            if ($upd->rowCount() === 0) {
+                throw new InvalidArgumentException(
+                    'ไม่สามารถลบได้ เพราะอะไหล่ถูกเบิกออกไปแล้ว กรุณาตรวจสอบยอดคงเหลือใหม่'
+                );
+            }
             $this->db->commit();
         } catch (Exception $e) {
             $this->db->rollBack();

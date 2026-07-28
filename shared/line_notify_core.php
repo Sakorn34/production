@@ -536,6 +536,13 @@ function line_notify_process_outbox(int $limit = 20): array
     }
     line_notify_ensure_schema();
 
+    $workerLock = $db->query("SELECT GET_LOCK('line_notify_outbox_worker', 0) l");
+    $workerLockRow = $workerLock ? $workerLock->fetch_assoc() : null;
+    if (!$workerLockRow || (int)($workerLockRow['l'] ?? 0) !== 1) {
+        return $stats;
+    }
+
+    try {
     if (!function_exists('line_flex_build_messages')) {
         require_once __DIR__ . '/line_flex_templates.php';
     }
@@ -616,6 +623,9 @@ function line_notify_process_outbox(int $limit = 20): array
         }
     }
     return $stats;
+    } finally {
+        $db->query("SELECT RELEASE_LOCK('line_notify_outbox_worker')");
+    }
 }
 
 /**

@@ -135,6 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_ma_asset'])) {
     }
     q("DELETE FROM ma_records WHERE id=? AND asset_id=?", 'ii', [$mid, $id]);
     recompute_asset_status_from_ma($id);
+    recompute_asset_fw($id);
     flash_set('ลบรายการ MA แล้ว');
     header('Location: ' . BASE_URL . '/asset.php?id=' . $id); exit;
 }
@@ -443,6 +444,7 @@ $addWithdrawModalUrl = BASE_URL . '/parts.php?ajax=add_move_form&asset_id=' . (i
     <?= ui_btn_label('stock-out-item', 'เพิ่มรายการเบิก') ?>
   </button>
 </div>
+<div class="table-wrap">
 <table class="list" style="max-width:920px; margin-bottom:20px">
   <tr><th>อะไหล่</th><th style="text-align:right">จำนวน</th><th>ประเภท</th><th>วันเวลา</th><th>รหัส Stock</th><th></th></tr>
   <?php foreach ($partsSummary['movements'] as $mv) {
@@ -468,6 +470,7 @@ $addWithdrawModalUrl = BASE_URL . '/parts.php?ajax=add_move_form&asset_id=' . (i
   </tr>
   <?php } ?>
 </table>
+</div>
 <?php } elseif ($partsUsed) {
     $stockCodeMap = [];
     $scRes = qr('SELECT name, stock_code FROM parts WHERE stock_code IS NOT NULL AND TRIM(stock_code)<>""');
@@ -476,6 +479,7 @@ $addWithdrawModalUrl = BASE_URL . '/parts.php?ajax=add_move_form&asset_id=' . (i
     }
 ?>
 <?= ui_heading('parts', 'อะไหล่ที่เบิกใช้กับเครื่องนี้', 'h2') ?>
+<div class="table-wrap">
 <table class="list" style="max-width:640px; margin-bottom:20px">
   <tr><th>อะไหล่</th><th style="text-align:right">จำนวนที่เบิกใช้</th><th>รหัส Stock</th></tr>
   <?php foreach ($partsUsed as $pu) { ?>
@@ -486,6 +490,7 @@ $addWithdrawModalUrl = BASE_URL . '/parts.php?ajax=add_move_form&asset_id=' . (i
   </tr>
   <?php } ?>
 </table>
+</div>
 <?php } else { ?>
 <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px">
   <?= ui_heading('parts', 'อะไหล่ที่เบิกใช้กับเครื่องนี้', 'h2') ?>

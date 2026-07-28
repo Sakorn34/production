@@ -436,6 +436,7 @@ page_header('ทะเบียนสินค้า (stock)');
   <div id="stock-bulk-hidden"></div>
 </form>
 
+<div class="table-wrap">
 <table class="list" id="stock-table">
   <tr>
     <th style="width:36px; text-align:center"><input type="checkbox" id="stock-pick-all" title="เลือกทั้งหมดในหน้านี้"></th>
@@ -475,6 +476,7 @@ page_header('ทะเบียนสินค้า (stock)');
   </tr>
   <?php } ?>
 </table>
+</div>
 
 <style>
 .stock-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px; }

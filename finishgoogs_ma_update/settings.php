@@ -406,6 +406,7 @@ foreach ($prodEff as $f) if (!isset($KIND_LABELS[$f['kind']]) && $f['kind'] !== 
     </div>
   </div>
 
+  <div class="table-wrap">
   <table class="list" id="tbl-production">
     <tr><th style="width:34px"></th><th>ชื่อฟิลด์</th><th style="width:170px">ชนิด</th><th style="width:200px">รูปแบบช่องกรอก</th><th>ตัวเลือก (บรรทัดละ 1 ค่า)</th><th style="width:50px"></th></tr>
     <?php foreach ($prodEff as $i => $f) { ?>
@@ -419,6 +420,7 @@ foreach ($prodEff as $f) if (!isset($KIND_LABELS[$f['kind']]) && $f['kind'] !== 
     </tr>
     <?php } ?>
   </table>
+  </div>
   <div style="margin:8px 0; display:flex; gap:8px">
     <button type="button" class="btn btn-line" onclick="addRow('tbl-production','production')">➕ เพิ่มฟิลด์</button>
     <button type="submit" class="btn-with-icon"><?= ui_btn_label('save', 'บันทึกฟิลด์ผลิต') ?></button>
@@ -449,6 +451,7 @@ if (!$maEff) $maEff = derive_ma_form_fields($pid);
   <?= csrf_field() ?>
   <input type="hidden" name="product_id" value="<?= $pid ?>">
   <input type="hidden" name="context" value="ma">
+  <div class="table-wrap">
   <table class="list" id="tbl-ma">
     <tr><th style="width:34px"></th><th>ชื่อฟิลด์</th><th style="width:200px">ชนิด</th><th style="width:200px">รูปแบบช่องกรอก</th><th>ตัวเลือก (บรรทัดละ 1 ค่า)</th><th style="width:50px"></th></tr>
     <?php foreach ($maEff as $f) { ?>
@@ -462,6 +465,7 @@ if (!$maEff) $maEff = derive_ma_form_fields($pid);
     </tr>
     <?php } ?>
   </table>
+  </div>
   <div style="margin:8px 0; display:flex; gap:8px; flex-wrap:wrap">
     <button type="button" class="btn btn-line" onclick="addRow('tbl-ma','ma')">➕ เพิ่มฟิลด์</button>
     <button type="submit" class="btn-with-icon"><?= ui_btn_label('save', 'บันทึกฟิลด์ MA') ?></button>
@@ -486,6 +490,7 @@ if (!$updEff) $updEff = derive_update_fields($pid);
   <?= csrf_field() ?>
   <input type="hidden" name="product_id" value="<?= $pid ?>">
   <input type="hidden" name="context" value="update">
+  <div class="table-wrap">
   <table class="list" id="tbl-update">
     <tr><th style="width:34px"></th><th>ชื่อชิ้นส่วน</th><th style="width:200px">รูปแบบช่องกรอก</th><th>ตัวเลือกค่า (บรรทัดละ 1 ค่า)</th><th style="width:50px"></th></tr>
     <?php foreach ($updEff as $f) { ?>
@@ -499,6 +504,7 @@ if (!$updEff) $updEff = derive_update_fields($pid);
     </tr>
     <?php } ?>
   </table>
+  </div>
   <div style="margin:8px 0; display:flex; gap:8px">
     <button type="button" class="btn btn-line" onclick="addRow('tbl-update','update')">➕ เพิ่มชิ้นส่วน</button>
     <button type="submit" class="btn-with-icon"><?= ui_btn_label('save', 'บันทึกฟิลด์อัปเดต') ?></button>

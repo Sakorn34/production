@@ -206,14 +206,23 @@ function recompute_asset_status_from_ma(int $assetId): void
     if ($assetId <= 0) {
         return;
     }
-    $row = qr('SELECT COUNT(*) c FROM ma_records WHERE asset_id=?', 'i', [$assetId])->fetch_assoc();
-    if ((int) ($row['c'] ?? 0) === 0) {
+    $row = qr(
+        'SELECT machine_status FROM ma_records WHERE asset_id=? ORDER BY visited_at DESC, id DESC LIMIT 1',
+        'i',
+        [$assetId]
+    )->fetch_assoc();
+    if (!$row) {
         q("UPDATE assets SET status='new' WHERE id=?", 'i', [$assetId]);
+        return;
     }
+    $status = in_array($row['machine_status'] ?? '', ['rental', 'spare'], true)
+        ? (string) $row['machine_status']
+        : 'rental';
+    q('UPDATE assets SET status=? WHERE id=?', 'si', [$status, $assetId]);
 }
 
 /**
- * คำนวณ current_fw_version จากประวัติ firmware ล่าสุดที่เหลือ
+ * คำนวณ current_fw_version จาก update_logs และ ma_records — ใช้แหล่งที่ใหม่กว่า
  *
  * @param int $assetId
  * @return void
@@ -224,14 +233,40 @@ function recompute_asset_fw(int $assetId): void
     if ($assetId <= 0) {
         return;
     }
-    $row = qr(
-        "SELECT new_value FROM update_logs WHERE asset_id=? AND update_type='firmware'
+    $bestFw = null;
+    $bestTs = 0;
+
+    $ul = qr(
+        "SELECT new_value, updated_at FROM update_logs
+         WHERE asset_id=? AND update_type='firmware' AND new_value IS NOT NULL AND TRIM(new_value)<>''
          ORDER BY updated_at DESC, id DESC LIMIT 1",
         'i',
         [$assetId]
     )->fetch_assoc();
-    $fw = ($row && ($row['new_value'] ?? '') !== '') ? (string) $row['new_value'] : null;
-    q('UPDATE assets SET current_fw_version=? WHERE id=?', 'si', [$fw, $assetId]);
+    if ($ul) {
+        $ts = strtotime((string) $ul['updated_at']) ?: 0;
+        if ($ts >= $bestTs) {
+            $bestTs = $ts;
+            $bestFw = (string) $ul['new_value'];
+        }
+    }
+
+    $ma = qr(
+        "SELECT fw_version, visited_at FROM ma_records
+         WHERE asset_id=? AND fw_version IS NOT NULL AND TRIM(fw_version)<>''
+         ORDER BY visited_at DESC, id DESC LIMIT 1",
+        'i',
+        [$assetId]
+    )->fetch_assoc();
+    if ($ma) {
+        $ts = strtotime((string) $ma['visited_at']) ?: 0;
+        if ($ts >= $bestTs) {
+            $bestTs = $ts;
+            $bestFw = (string) $ma['fw_version'];
+        }
+    }
+
+    q('UPDATE assets SET current_fw_version=? WHERE id=?', 'si', [$bestFw, $assetId]);
 }
 
 /**
@@ -1799,6 +1834,30 @@ function ensure_ma_datetime_schema() {
 }
 
 /**
+ * เพิ่มคอลัมน์ machine_status ใน ma_records สำหรับ recompute สถานะหลังลบ MA
+ *
+ * @return void
+ */
+function ensure_ma_status_schema() {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+
+    try {
+        $res = db()->query("SHOW COLUMNS FROM ma_records LIKE 'machine_status'");
+        if ($res && $res->num_rows === 0) {
+            db()->query(
+                "ALTER TABLE ma_records ADD COLUMN machine_status VARCHAR(16) NULL DEFAULT NULL AFTER fw_version"
+            );
+        }
+    } catch (\mysqli_sql_exception $e) {
+        error_log('[ensure_ma_status_schema] ' . $e->getMessage());
+    }
+}
+
+/**
  * ค่าเริ่มต้นส่วนประกอบรหัสจากแถว products
  *
  * @param array<string, mixed> $p
@@ -2462,6 +2521,7 @@ require_once dirname(__DIR__) . '/shared/line_notify_core.php';
 require_once dirname(__DIR__) . '/shared/line_flex_templates.php';
 require_once dirname(__DIR__) . '/shared/line_notify_jobs.php';
 ensure_ma_datetime_schema();
+ensure_ma_status_schema();
 activity_log_ensure_schema();
 line_notify_ensure_schema();
 if (PHP_SAPI !== 'cli' && session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION['profile'])) {

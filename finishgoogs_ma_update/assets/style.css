@@ -127,7 +127,7 @@ table.list tr:hover td { background: #f7f9fc; }
 
 form.filter { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
 input[type=text], input[type=date], input[type=datetime-local], input[type=password], input[type=number], select, textarea {
-  padding: 7px 10px; border: 1px solid #c9d2e0; border-radius: 6px; font-family: inherit; font-size: calc(14px * var(--font-scale, 1)); background: #fff; transition: border-color .12s, box-shadow .12s; min-height: 44px; }
+  padding: 7px 10px; border: 1px solid #c9d2e0; border-radius: 6px; font-family: inherit; font-size: calc(14px * var(--font-scale, 1)); background: #fff; transition: border-color .12s, box-shadow .12s; min-height: var(--input-h); }
 input[type=text]:focus, input[type=date]:focus, input[type=datetime-local]:focus, input[type=password]:focus, input[type=number]:focus, select:focus, textarea:focus {
   outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(225,29,116,.13); }
 input[type=datetime-local] { color-scheme: light; }
@@ -136,9 +136,9 @@ input[type=datetime-local]::-webkit-calendar-picker-indicator:hover { opacity: 1
 textarea { width: 100%; min-height: 52px; max-height: 140px; resize: vertical; }
 textarea.field-note { min-height: 48px; rows: 2; }
 button, .btn { display: inline-block; background: var(--primary); color: #fff; border: 0; padding: 8px 16px; border-radius: 6px;
-  font-size: calc(14px * var(--font-scale, 1)); font-family: inherit; cursor: pointer; min-height: 40px; }
+  font-size: calc(14px * var(--font-scale, 1)); font-family: inherit; cursor: pointer; min-height: var(--input-h); }
 button:hover, .btn:hover { background: var(--primary-dark); text-decoration: none; }
-.btn-sm { padding: 6px 12px; font-size: calc(13px * var(--font-scale, 1)); min-height: 40px; }
+.btn-sm { padding: 4px 10px; font-size: calc(13px * var(--font-scale, 1)); }
 .btn-line { background: #fff; color: var(--primary); border: 1px solid var(--primary); }
 .btn-line:hover { background: #eef2f9; }
 .btn-danger { background: #a33; }
@@ -453,7 +453,7 @@ span.thumb-sm { display: inline-flex; align-items: center; justify-content: cent
 .chip-dd-chips { display: contents; }
 .chip-dd-chips .chip { font-size: calc(12.5px * var(--font-scale, 1)); padding: 3px 8px; max-width: 100%; }
 .chip-dd-chips .chip b { cursor: pointer; }
-.chip-dd-filter { flex: 1 1 72px; min-width: 72px; max-width: 100%;
+.chip-dd-filter { flex: 1 1 72px; min-width: 72px; max-width: 100%; min-height: auto;
   border: none !important; outline: none !important; box-shadow: none !important;
   padding: 2px 0; font-size: calc(13.5px * var(--font-scale, 1)); background: transparent !important; font-family: inherit; }
 .chip-dd-filter:focus { border: none !important; outline: none !important; box-shadow: none !important; }
@@ -490,10 +490,10 @@ span.thumb-sm { display: inline-flex; align-items: center; justify-content: cent
 
 /* stepper จำนวน — เพิ่ม/ลดทีละ 0.5 */
 .qty-stepper { display: inline-flex; align-items: center; gap: 2px; }
-.qty-stepper input[type=number] { width: 58px; text-align: center; padding: 5px 4px; font-size: calc(13.5px * var(--font-scale, 1)); -moz-appearance: textfield; }
+.qty-stepper input[type=number] { width: 58px; text-align: center; padding: 5px 4px; font-size: calc(13.5px * var(--font-scale, 1)); -moz-appearance: textfield; min-height: auto; }
 .qty-stepper input[type=number]::-webkit-inner-spin-button,
 .qty-stepper input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-.qty-stepper .qty-btn { width: 30px; height: 30px; padding: 0; font-size: calc(16px * var(--font-scale, 1)); line-height: 1;
+.qty-stepper .qty-btn { width: 30px; height: 30px; min-height: auto; padding: 0; font-size: calc(16px * var(--font-scale, 1)); line-height: 1;
   background: #fff; color: var(--primary); border: 1px solid #c9d2e0; border-radius: 6px; cursor: pointer; }
 .qty-stepper .qty-btn:hover { background: #eef2f9; }
 

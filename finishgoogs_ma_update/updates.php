@@ -163,13 +163,12 @@ page_header('อัปเดต FW/HW — ' . $product['name'] . ' (' . number_f
   <p class="muted" style="margin-bottom:10px">พบ <b><?= number_format($total) ?></b> รายการจากการค้นหา</p>
 <?php } ?>
 
-<?php if ($total === 0) { ?>
-  <p class="muted"><?= ($searchSn !== '' || $searchDetail !== '') ? 'ไม่พบรายการตามเงื่อนไขค้นหา' : 'ยังไม่มีรายการอัปเดตของรุ่นนี้' ?></p>
-<?php } else { ?>
 <div class="table-wrap">
 <table class="list">
   <tr><th>วันเวลา</th><th>เครื่อง</th><th>ประเภท</th><th>รายละเอียด</th><th>รูป</th><th>โดย</th><th style="width:130px">จัดการ</th></tr>
-  <?php while ($r = $rows->fetch_assoc()) { ?>
+  <?php if ($total === 0) { ?>
+  <tr><td colspan="7" class="muted" style="text-align:center;padding:20px"><?= ($searchSn !== '' || $searchDetail !== '') ? 'ไม่พบรายการตามเงื่อนไขค้นหา' : 'ยังไม่มีรายการอัปเดตของรุ่นนี้' ?></td></tr>
+  <?php } else { while ($r = $rows->fetch_assoc()) { ?>
   <tr>
     <td><?= dthai_full($r['updated_at']) ?></td>
     <td><a href="<?= BASE_URL ?>/asset.php?id=<?= (int)$r['asset_id'] ?>"><?= h($r['asset_code']) ?></a></td>
@@ -196,11 +195,10 @@ page_header('อัปเดต FW/HW — ' . $product['name'] . ' (' . number_f
       </form>
     </td>
   </tr>
-  <?php } ?>
+  <?php } } ?>
 </table>
 </div>
-<?php
-if ($pages > 1) { ?>
+<?php if ($pages > 1) { ?>
 <div class="pager">
   <?php for ($i = max(1, $page - 3); $i <= min($pages, $page + 3); $i++) {
       $url = '?' . http_build_query(array_filter([
@@ -214,5 +212,4 @@ if ($pages > 1) { ?>
   <span class="muted" style="border:0;background:none"><?= number_format($total) ?> รายการ</span>
 </div>
 <?php }
-}
 page_footer();

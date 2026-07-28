@@ -15,7 +15,7 @@ if (isset($_GET['part_used'])) {
                 LEFT JOIN products p ON p.id  = a.product_id
                 WHERE  pm.part_id = ? AND pm.direction = 'out'
                 ORDER  BY pm.moved_at DESC, pm.id DESC LIMIT 300", 'i', [$pid]);
-    echo '<table class="list"><tr><th>วันที่</th><th>เครื่อง</th><th>รุ่น</th><th style="text-align:right">จำนวน</th><th>ผู้เบิก</th></tr>';
+    echo '<div class="table-wrap"><table class="list"><tr><th>วันที่</th><th>เครื่อง</th><th>รุ่น</th><th style="text-align:right">จำนวน</th><th>ผู้เบิก</th></tr>';
     $n = 0;
     while ($r = $res->fetch_assoc()) {
         $n++;
@@ -33,7 +33,7 @@ if (isset($_GET['part_used'])) {
            . '</tr>';
     }
     if (!$n) echo '<tr><td colspan="5" class="muted" style="text-align:center;padding:14px">ยังไม่มีการเบิกอะไหล่ชิ้นนี้</td></tr>';
-    echo '</table>';
+    echo '</table></div>';
     exit;
 }
 
@@ -95,7 +95,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'group_detail') {
             . '</p>';
     }
     $baseUrl = BASE_URL;
-    echo '<table class="list"><tr><th>วันที่</th><th>อะไหล่</th><th>ประเภท</th><th style="text-align:right">จำนวน</th><th>โดย</th><th>หมายเหตุ</th>';
+    echo '<div class="table-wrap"><table class="list"><tr><th>วันที่</th><th>อะไหล่</th><th>ประเภท</th><th style="text-align:right">จำนวน</th><th>โดย</th><th>หมายเหตุ</th>';
     if (can('parts')) {
         echo '<th style="width:120px">จัดการ</th>';
     }
@@ -120,7 +120,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'group_detail') {
         }
         echo '</tr>';
     }
-    echo '</table>';
+    echo '</table></div>';
     exit;
 }
 
@@ -150,6 +150,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'parts_list') {
       <button type="submit">ค้นหา</button>
     </form>
     <p class="muted" style="font-size:12px;margin:0 0 8px">จำนวนคงเหลืออ่านจากระบบสต็อกกลาง (biton_tech_parts)</p>
+    <div class="table-wrap">
     <table class="list">
       <tr><th></th><th>อะไหล่</th><th>หมวด</th><th style="text-align:right">คงเหลือ</th><th style="text-align:right">เบิกแล้ว</th><th>ร้านค้า</th><?= can('parts') ? '<th style="white-space:nowrap">การดำเนินการ</th>' : '' ?></tr>
       <?php
@@ -192,6 +193,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'parts_list') {
       </tr>
       <?php } if (!$hasRows) echo '<tr><td colspan="' . (can('parts') ? 7 : 6) . '" class="muted" style="text-align:center;padding:16px">ไม่พบอะไหล่</td></tr>'; ?>
     </table>
+    </div>
     <?php
     exit;
 }
@@ -659,6 +661,7 @@ list_search_form([
 </form>
 <p class="muted ma-table-hint">คลิกแถวเพื่อดูรายละเอียดอะไหล่ที่เบิก</p>
 
+<div class="table-wrap">
 <table class="list">
   <tr>
     <th>วันที่</th>
@@ -718,6 +721,7 @@ list_search_form([
   <?php
   } ?>
 </table>
+</div>
 
 <!-- ─── Modal เบิกอะไหล่ ─────────────────────────────────────────── -->
 <div id="withdraw-overlay" class="notif-overlay" hidden>

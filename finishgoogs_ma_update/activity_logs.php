@@ -57,6 +57,7 @@ page_header('Activity Log — ระบบหลังบ้าน');
   <?php if (!$recentPageViews) { ?>
     <p class="muted" style="margin:0; font-size:12.5px">ยังไม่มีประวัติ page view (เริ่มบันทึกหลังอัป patch นี้)</p>
   <?php } else { ?>
+  <div class="table-wrap">
   <table class="list" style="font-size:12.5px; margin:0">
     <tr>
       <th style="white-space:nowrap">เวลา</th>
@@ -81,6 +82,7 @@ page_header('Activity Log — ระบบหลังบ้าน');
     </tr>
     <?php } ?>
   </table>
+  </div>
   <p style="margin:8px 0 0; font-size:12px">
     <a href="<?= BASE_URL ?>/activity_logs.php?action=page_view%3A">ดูประวัติเปิดดูทุกหน้า</a>
     ·
@@ -107,6 +109,7 @@ page_header('Activity Log — ระบบหลังบ้าน');
 
 <p class="muted" style="margin-bottom:8px">พบ <?= number_format($total) ?> รายการ · หน้า <?= $page ?>/<?= $totalPages ?></p>
 
+<div class="table-wrap">
 <table class="list" style="font-size:13px">
   <tr>
     <th style="white-space:nowrap">เวลา</th>
@@ -136,6 +139,7 @@ page_header('Activity Log — ระบบหลังบ้าน');
   </tr>
   <?php } ?>
 </table>
+</div>
 
 <?php if ($totalPages > 1) { ?>
 <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap">

@@ -180,12 +180,6 @@ function tech_parts_stock_out($productCode, $quantity, $purpose, $issuedBy, $ass
     if (!$product) {
         return ['ok' => false, 'error' => 'ไม่พบอะไหล่ในระบบสต็อก รหัส: ' . $productCode];
     }
-    if ((int)$product['quantity'] < $quantity) {
-        return [
-            'ok'    => false,
-            'error' => 'อะไหล่ ' . $product['name'] . ' คงเหลือไม่พอ (ต้องการ ' . $quantity . ' ' . $product['unit'] . ', มี ' . (int)$product['quantity'] . ')',
-        ];
-    }
 
     $pdo = dbParts();
     if (function_exists('ensure_stock_production_sync_schema')) {
@@ -193,6 +187,7 @@ function tech_parts_stock_out($productCode, $quantity, $purpose, $issuedBy, $ass
     }
 
     $sn = trim((string) $assetCode);
+    $productId = (int) $product['id'];
 
     try {
         $pdo->beginTransaction();
@@ -217,6 +212,18 @@ function tech_parts_stock_out($productCode, $quantity, $purpose, $issuedBy, $ass
         if (!function_exists('generateDocNo')) {
             throw new RuntimeException('generateDocNo ไม่พร้อมใช้งาน');
         }
+
+        $pq = $pdo->prepare('SELECT id, name, unit, quantity FROM products WHERE id = ? FOR UPDATE');
+        $pq->execute([$productId]);
+        $prow = $pq->fetch(PDO::FETCH_ASSOC);
+        if (!$prow || (int) $prow['quantity'] < $quantity) {
+            $have = $prow ? (int) $prow['quantity'] : 0;
+            throw new RuntimeException(
+                'อะไหล่ ' . ($prow['name'] ?? $productCode) . ' คงเหลือไม่พอ (ต้องการ '
+                . $quantity . ' ' . ($prow['unit'] ?? '') . ', มี ' . $have . ')'
+            );
+        }
+
         $docNo = generateDocNo($pdo);
 
         $st = $pdo->prepare('INSERT INTO stock_out (doc_no, set_id, note, issued_by, asset_code, stock_deducted) VALUES (?, NULL, ?, ?, ?, 1)');
@@ -224,10 +231,13 @@ function tech_parts_stock_out($productCode, $quantity, $purpose, $issuedBy, $ass
         $outId = (int) $pdo->lastInsertId();
 
         $st = $pdo->prepare('INSERT INTO stock_out_items (stock_out_id, product_id, quantity) VALUES (?, ?, ?)');
-        $st->execute([$outId, (int) $product['id'], $quantity]);
+        $st->execute([$outId, $productId, $quantity]);
 
-        $st = $pdo->prepare('UPDATE products SET quantity = quantity - ? WHERE id = ?');
-        $st->execute([$quantity, (int) $product['id']]);
+        $st = $pdo->prepare('UPDATE products SET quantity = quantity - ? WHERE id = ? AND quantity >= ?');
+        $st->execute([$quantity, $productId, $quantity]);
+        if ($st->rowCount() === 0) {
+            throw new RuntimeException('จำนวนอะไหล่ไม่พอ กรุณาตรวจสอบยอดคงเหลือใหม่');
+        }
 
         $pdo->commit();
         return ['ok' => true, 'doc_no' => $docNo, 'stock_out_id' => $outId];
@@ -885,6 +895,23 @@ function ma_withdrawal_count($maRecordId) {
 }
 
 /**
+ * คืนสต็อกและลบ part_movements ที่บันทึกไปแล้วบางส่วน (rollback กลางทาง)
+ *
+ * @param array<int,array{part_id:int,qty:int,movement_id?:int}> $deducted
+ * @param string $actor
+ * @param string $note
+ * @return void
+ */
+function ma_rollback_partial_movements(array $deducted, $actor, $note = 'ยกเลิกเบิก MA') {
+    foreach (array_reverse($deducted) as $rev) {
+        tech_parts_stock_in_by_part_id((int) $rev['part_id'], (int) $rev['qty'], $note, $actor);
+        if (!empty($rev['movement_id'])) {
+            q('DELETE FROM part_movements WHERE id=?', 'i', [(int) $rev['movement_id']]);
+        }
+    }
+}
+
+/**
  * เบิกอะไหล่สำหรับรอบ MA — ตัดสต็อก tech_parts + INSERT part_movements
  *
  * @param int    $maRecordId
@@ -907,9 +934,7 @@ function ma_withdraw_parts($maRecordId, $assetId, $assetCode, array $lines, $act
         $qty = (float)$line['qty'];
         $out = tech_parts_stock_out_by_part_id($partId, $qty, 'MA', $actor, $assetCode);
         if (!$out['ok']) {
-            foreach (array_reverse($deducted) as $rev) {
-                tech_parts_stock_in_by_part_id($rev['part_id'], $rev['qty'], 'ยกเลิกเบิก MA', $actor);
-            }
+            ma_rollback_partial_movements($deducted, $actor);
             return ['ok' => false, 'error' => $out['error']];
         }
 
@@ -933,9 +958,7 @@ function ma_withdraw_parts($maRecordId, $assetId, $assetCode, array $lines, $act
                 'ยกเลิกเบิก MA',
                 $actor
             );
-            foreach (array_reverse($deducted) as $rev) {
-                tech_parts_stock_in_by_part_id($rev['part_id'], $rev['qty'], 'ยกเลิกเบิก MA', $actor);
-            }
+            ma_rollback_partial_movements($deducted, $actor);
             return ['ok' => false, 'error' => $ins['error'] ?? 'บันทึก movement ไม่สำเร็จ'];
         }
         $mid = (int)($ins['insert_id'] ?? 0);
@@ -943,8 +966,9 @@ function ma_withdraw_parts($maRecordId, $assetId, $assetCode, array $lines, $act
             production_link_stock_out(dbParts(), (int)$out['stock_out_id'], $mid, $assetCode !== '' ? $assetCode : null);
         }
         $deducted[] = [
-            'part_id' => $partId,
-            'qty'     => (int)($out['qty'] ?? tech_parts_qty_to_int($qty)),
+            'part_id'     => $partId,
+            'qty'         => (int)($out['qty'] ?? tech_parts_qty_to_int($qty)),
+            'movement_id' => $mid,
         ];
     }
 
