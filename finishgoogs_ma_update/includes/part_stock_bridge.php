@@ -913,7 +913,7 @@ function ma_withdraw_parts($maRecordId, $assetId, $assetCode, array $lines, $act
             return ['ok' => false, 'error' => $out['error']];
         }
 
-        q(
+        $ins = q_try(
             "INSERT INTO part_movements (part_id,moved_at,direction,qty,mode,ref_asset_id,ma_record_id,made_by,remark,tech_stock_out_id)
              VALUES (?,NOW(),'out',?,'MA',?,?,?,NULL,?)",
             'idiisi',
@@ -926,7 +926,19 @@ function ma_withdraw_parts($maRecordId, $assetId, $assetCode, array $lines, $act
                 (int)($out['stock_out_id'] ?? 0),
             ]
         );
-        $mid = (int)db()->insert_id;
+        if (!$ins['ok']) {
+            tech_parts_stock_in_by_part_id(
+                $partId,
+                (int)($out['qty'] ?? tech_parts_qty_to_int($qty)),
+                'ยกเลิกเบิก MA',
+                $actor
+            );
+            foreach (array_reverse($deducted) as $rev) {
+                tech_parts_stock_in_by_part_id($rev['part_id'], $rev['qty'], 'ยกเลิกเบิก MA', $actor);
+            }
+            return ['ok' => false, 'error' => $ins['error'] ?? 'บันทึก movement ไม่สำเร็จ'];
+        }
+        $mid = (int)($ins['insert_id'] ?? 0);
         if (!empty($out['stock_out_id']) && function_exists('production_link_stock_out')) {
             production_link_stock_out(dbParts(), (int)$out['stock_out_id'], $mid, $assetCode !== '' ? $assetCode : null);
         }

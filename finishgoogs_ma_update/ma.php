@@ -508,6 +508,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_ma'])) {
         }
     }
     q("DELETE FROM ma_records WHERE id=?", 'i', [$mid]);
+    if ($rec) {
+        recompute_asset_status_from_ma((int) $rec['asset_id']);
+    }
     flash_set('ลบรายการ MA เรียบร้อยแล้ว');
     $back = (isset($_POST['back']) && $_POST['back'] !== '') ? $_POST['back']
           : ($rec ? BASE_URL . '/asset.php?id=' . $rec['asset_id'] : BASE_URL . '/ma.php');
@@ -729,14 +732,14 @@ require __DIR__ . '/includes/list_search.php';
       <input type="hidden" name="replace_items" id="h-replace">
       <input type="hidden" name="repair_items" id="h-repair">
 
-      <label>หมายเลขสินค้า</label>
+      <label for="ma_code">หมายเลขสินค้า</label>
       <div>
         <input type="text" name="asset_code" id="ma_code" class="asset-search" data-product="<?= (int)$productId ?>" value="<?= h($ea ? $ea['asset_code'] : ($recAsset ? $recAsset['asset_code'] : '')) ?>" <?= $ea ? 'readonly' : '' ?> required placeholder="พิมพ์เลือก S/N">
         <div class="muted ma-field-hint">รุ่น <?= h($product['name']) ?> · พิมพ์แล้วเลือกจากรายการ</div>
       </div>
 
-      <label>วันเวลาเข้า MA</label>
-      <input type="datetime-local" name="visited_at" value="<?= h(dt_for_input($ea ? $ea['visited_at'] : dt_now())) ?>">
+      <label for="ma_visited_at">วันเวลาเข้า MA</label>
+      <input type="datetime-local" name="visited_at" id="ma_visited_at" value="<?= h(dt_for_input($ea ? $ea['visited_at'] : dt_now())) ?>">
 
       <label class="ma-lbl-top">✅ ใช้งานได้ปกติ</label>
       <div class="ma-field" id="mf-ok"></div>
@@ -763,13 +766,13 @@ require __DIR__ . '/includes/list_search.php';
       </div>
       <?php } ?>
 
-      <label>สถานะเครื่อง</label>
+      <label for="machine_status">สถานะเครื่อง</label>
       <select name="machine_status" id="machine_status" required>
         <option value="rental" <?= $ea && $ea['ast_status'] === 'rental' ? 'selected' : '' ?>>เครื่องเช่า</option>
         <option value="spare" <?= $ea && $ea['ast_status'] === 'spare' ? 'selected' : '' ?>>เครื่องสำรอง</option>
       </select>
 
-      <label>Firmware หลังตรวจ</label>
+      <label for="ma_fw_input">Firmware หลังตรวจ</label>
       <div id="ma-fw-slot" class="ma-fw-wrap">
         <?php $maFwVal = $ea ? (string)$ea['fw_version'] : (string)($maProductPrefill['fw_version'] ?? ''); ?>
         <input type="text" name="fw_version" id="ma_fw_input" class="ma-fw-fallback"
@@ -783,11 +786,11 @@ require __DIR__ . '/includes/list_search.php';
         <?php } ?>
       </div>
 
-      <label class="full">หมายเหตุ</label>
+      <label for="ma_remark" class="full">หมายเหตุ</label>
       <textarea name="remark" id="ma_remark" class="full field-note ma-remark" rows="2" placeholder="บันทึกเพิ่มเติม…"><?= h($ea ? $ea['remark'] : ($maProductPrefill['remark'] ?? '')) ?></textarea>
 
       <div class="full ma-form-actions">
-        <button type="submit"><?= $ea ? '💾 บันทึกการแก้ไข' : '💾 บันทึก MA' ?></button>
+        <button type="submit" id="ma-submit-btn"><?= $ea ? '💾 บันทึกการแก้ไข' : '💾 บันทึก MA' ?></button>
         <?php if ($ea) { ?><a class="btn btn-line" href="<?= h($maListUrl) ?>">ยกเลิก</a><?php } ?>
       </div>
     </form>
@@ -1200,6 +1203,11 @@ document.getElementById('ma-form').addEventListener('submit', function(e){
     }
     document.getElementById({ok:'h-ok', replace:'h-replace', repair:'h-repair'}[key]).value = vals.join(' , ');
   }
+  var btn = document.getElementById('ma-submit-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'กำลังบันทึก…';
+  }
 });
 
 document.getElementById('ma_remark').addEventListener('input', updateMaSnippets);
@@ -1249,6 +1257,7 @@ list_search_form([
 <?php if ($total === 0) { ?>
   <p class="muted">ยังไม่มีรายการ MA ของรุ่นนี้</p>
 <?php } else { ?>
+<div class="table-wrap">
 <table class="list ma-list-table">
   <tr>
     <th><?= ma_sort_th('วันเวลา', 'date_asc', 'date_desc', $msort, $productId) ?></th>
@@ -1283,6 +1292,7 @@ list_search_form([
   </tr>
   <?php } ?>
 </table>
+</div>
 <?php if ($pages > 1) { ?>
 <div class="pager">
   <?php for ($i = max(1, $page - 3); $i <= min($pages, $page + 3); $i++) {

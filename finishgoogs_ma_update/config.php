@@ -195,6 +195,74 @@ function q_try($sql, $types = '', $params = []) {
 }
 
 /**
+ * คำนวณสถานะเครื่องจากประวัติ MA ที่เหลือ — ถ้าไม่มี MA เหลือ กลับเป็น new
+ *
+ * @param int $assetId
+ * @return void
+ */
+function recompute_asset_status_from_ma(int $assetId): void
+{
+    $assetId = (int) $assetId;
+    if ($assetId <= 0) {
+        return;
+    }
+    $row = qr('SELECT COUNT(*) c FROM ma_records WHERE asset_id=?', 'i', [$assetId])->fetch_assoc();
+    if ((int) ($row['c'] ?? 0) === 0) {
+        q("UPDATE assets SET status='new' WHERE id=?", 'i', [$assetId]);
+    }
+}
+
+/**
+ * คำนวณ current_fw_version จากประวัติ firmware ล่าสุดที่เหลือ
+ *
+ * @param int $assetId
+ * @return void
+ */
+function recompute_asset_fw(int $assetId): void
+{
+    $assetId = (int) $assetId;
+    if ($assetId <= 0) {
+        return;
+    }
+    $row = qr(
+        "SELECT new_value FROM update_logs WHERE asset_id=? AND update_type='firmware'
+         ORDER BY updated_at DESC, id DESC LIMIT 1",
+        'i',
+        [$assetId]
+    )->fetch_assoc();
+    $fw = ($row && ($row['new_value'] ?? '') !== '') ? (string) $row['new_value'] : null;
+    q('UPDATE assets SET current_fw_version=? WHERE id=?', 'si', [$fw, $assetId]);
+}
+
+/**
+ * เช็คว่า update_logs เป็นรายการล่าสุดของประเภทนั้นหรือไม่
+ *
+ * @param int         $logId
+ * @param int         $assetId
+ * @param string      $type
+ * @param string|null $componentName
+ * @return bool
+ */
+function is_latest_update_log(int $logId, int $assetId, string $type, ?string $componentName = null): bool
+{
+    if ($type === 'hardware' && $componentName !== null && $componentName !== '') {
+        $latest = qr(
+            "SELECT id FROM update_logs WHERE asset_id=? AND update_type='hardware' AND component_name=?
+             ORDER BY updated_at DESC, id DESC LIMIT 1",
+            'is',
+            [$assetId, $componentName]
+        )->fetch_assoc();
+    } else {
+        $latest = qr(
+            'SELECT id FROM update_logs WHERE asset_id=? AND update_type=? ORDER BY updated_at DESC, id DESC LIMIT 1',
+            'is',
+            [$assetId, $type]
+        )->fetch_assoc();
+    }
+    return $latest && (int) $latest['id'] === $logId;
+}
+
+/**
  * แปลง errno MySQL เป็นข้อความที่ผู้ใช้เข้าใจ
  *
  * @param int    $errno

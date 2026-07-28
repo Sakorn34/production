@@ -274,11 +274,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $bomList[] = ['part_id' => $partId, 'qty_per_unit' => $bq];
         $seenBom[$partId] = true;
     }
-    // บันทึกชุดอะไหล่เป็นเทมเพลตของรุ่น (ครั้งถัดไปจะ prefill ให้)
-    q("DELETE FROM bom_items WHERE product_id=?", 'i', [$pid]);
-    foreach ($bomList as $bi) {
-        q("INSERT INTO bom_items (product_id, part_id, qty_per_unit) VALUES (?,?,?)", 'iid', [$pid, $bi['part_id'], $bi['qty_per_unit']]);
-    }
     $bomBy = $madeBy;
 
     $codes = []; $err = null;
@@ -325,11 +320,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $err = $out['error'];
                 break 2;
             }
+            $ins = q_try(
+                "INSERT INTO part_movements (part_id,moved_at,direction,qty,mode,ref_asset_id,made_by,remark,tech_stock_out_id)
+                 VALUES (?,NOW(),'out',?,?,?,?,NULL,?)",
+                'idsisi',
+                [$partId, $bq, 'เบิกอัตโนมัติ (ชุดอะไหล่รุ่น)', $r['asset_id'], $bomBy, (int)($out['stock_out_id'] ?? 0)]
+            );
+            if (!$ins['ok']) {
+                tech_parts_stock_in_by_part_id(
+                    $partId,
+                    (int)($out['qty'] ?? tech_parts_qty_to_int($bq)),
+                    'ยกเลิกเบิกอัตโนมัติ',
+                    $bomBy
+                );
+                foreach (array_reverse($deductedThisUnit) as $rev) {
+                    tech_parts_stock_in_by_part_id($rev['part_id'], $rev['qty'], 'ยกเลิกเบิกอัตโนมัติ', $bomBy);
+                }
+                $err = $ins['error'] ?? 'บันทึก movement ไม่สำเร็จ';
+                break 2;
+            }
             $deductedThisUnit[] = ['part_id' => $partId, 'qty' => (int)($out['qty'] ?? tech_parts_qty_to_int($bq))];
-            q("INSERT INTO part_movements (part_id,moved_at,direction,qty,mode,ref_asset_id,made_by,remark,tech_stock_out_id)
-               VALUES (?,NOW(),'out',?,?,?,?,NULL,?)", 'idsisi',
-              [$partId, $bq, 'เบิกอัตโนมัติ (ชุดอะไหล่รุ่น)', $r['asset_id'], $bomBy, (int)($out['stock_out_id'] ?? 0)]);
-            $bomMid = (int)db()->insert_id;
+            $bomMid = (int)($ins['insert_id'] ?? 0);
             if (!empty($out['stock_out_id']) && function_exists('production_link_stock_out')) {
                 $ac = qr('SELECT asset_code FROM assets WHERE id=?', 'i', [$r['asset_id']])->fetch_assoc();
                 production_link_stock_out(dbParts(), (int)$out['stock_out_id'], $bomMid, $ac['asset_code'] ?? null);
@@ -347,6 +358,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'problems'    => $problems,
                 'fix'         => $fix,
             ];
+        }
+    }
+    if (!$err && $bomList !== []) {
+        q("DELETE FROM bom_items WHERE product_id=?", 'i', [$pid]);
+        foreach ($bomList as $bi) {
+            q("INSERT INTO bom_items (product_id, part_id, qty_per_unit) VALUES (?,?,?)", 'iid', [$pid, $bi['part_id'], $bi['qty_per_unit']]);
         }
     }
     if (!$err && $notifyAssets !== [] && function_exists('line_notify_instant_enabled') && line_notify_instant_enabled('production.problem_found')) {
@@ -399,7 +416,7 @@ page_header('บันทึกสินค้าผลิตใหม่');
     <div class="panel">
       <h3>🏭 ข้อมูลการผลิต</h3>
       <div class="field">
-        <label>วันที่ผลิต</label>
+        <label for="produced_at">วันที่ผลิต</label>
         <input type="date" name="produced_at" id="produced_at" value="<?= date('Y-m-d') ?>" required>
       </div>
       <div class="field">
@@ -423,9 +440,9 @@ page_header('บันทึกสินค้าผลิตใหม่');
       <div class="field">
         <label>📝 ปัญหา / การแก้ไข / หมายเหตุ</label>
         <div class="note-stack">
-          <div class="field"><label>ปัญหาที่พบ (ถ้ามี)</label><textarea name="problems_found" class="field-note" rows="2"></textarea></div>
-          <div class="field"><label>การแก้ไข (ถ้ามี)</label><textarea name="fix" class="field-note" rows="2"></textarea></div>
-          <div class="field"><label>หมายเหตุประจำเครื่อง</label><textarea name="note" class="field-note" rows="2"></textarea></div>
+          <div class="field"><label for="problems_found">ปัญหาที่พบ (ถ้ามี)</label><textarea name="problems_found" id="problems_found" class="field-note" rows="2"></textarea></div>
+          <div class="field"><label for="fix">การแก้ไข (ถ้ามี)</label><textarea name="fix" id="fix" class="field-note" rows="2"></textarea></div>
+          <div class="field"><label for="note">หมายเหตุประจำเครื่อง</label><textarea name="note" id="note" class="field-note" rows="2"></textarea></div>
         </div>
       </div>
     </div>

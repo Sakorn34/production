@@ -94,6 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_update'])) {
     csrf_check();
     $uid = (int)$_POST['record_id'];
     q("DELETE FROM update_logs WHERE id=? AND asset_id=?", 'ii', [$uid, $id]);
+    recompute_asset_fw($id);
     flash_set('ลบรายการอัปเดตแล้ว');
     header('Location: ' . BASE_URL . '/asset.php?id=' . $id); exit;
 }
@@ -128,6 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_ma_asset'])) {
         }
     }
     q("DELETE FROM ma_records WHERE id=? AND asset_id=?", 'ii', [$mid, $id]);
+    recompute_asset_status_from_ma($id);
     flash_set('ลบรายการ MA แล้ว');
     header('Location: ' . BASE_URL . '/asset.php?id=' . $id); exit;
 }

@@ -67,12 +67,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_update'])) {
       'sssssssssi',
       [$updatedAt, $type, $comp ?: null, $old ?: null, $new ?: null, $detail ?: null, $img1, $img2, $madeBy, $logId]);
 
-    if ($type === 'firmware' && $new !== '') {
-        q("UPDATE assets SET current_fw_version=? WHERE id=?", 'si', [$new, $log['asset_id']]);
-    }
-    if ($type === 'hardware' && $comp !== '' && $new !== '') {
-        q("INSERT INTO asset_components (asset_id,component_name,component_value) VALUES (?,?,?)
-           ON DUPLICATE KEY UPDATE component_value=VALUES(component_value)", 'iss', [$log['asset_id'], $comp, $new]);
+    if (is_latest_update_log($logId, (int) $log['asset_id'], $type, $comp ?: null)) {
+        if ($type === 'firmware' && $new !== '') {
+            q("UPDATE assets SET current_fw_version=? WHERE id=?", 'si', [$new, $log['asset_id']]);
+        }
+        if ($type === 'hardware' && $comp !== '' && $new !== '') {
+            q("INSERT INTO asset_components (asset_id,component_name,component_value) VALUES (?,?,?)
+               ON DUPLICATE KEY UPDATE component_value=VALUES(component_value)", 'iss', [$log['asset_id'], $comp, $new]);
+        }
     }
 
     flash_set('แก้ไขรายการอัปเดตของ ' . $log['asset_code'] . ' แล้ว');

@@ -578,31 +578,69 @@ function line_notify_process_outbox(int $limit = 20): array
         }
 
         $allOk = true;
-        foreach (array_chunk($messages, 5) as $chunk) {
+        $sentChunks = max(0, (int)($payload['_sent_chunks'] ?? 0));
+        $pendingMessages = array_slice($messages, $sentChunks * 5);
+        $chunkIndex = $sentChunks;
+        $lastError = null;
+
+        foreach (array_chunk($pendingMessages, 5) as $chunk) {
             $push = line_notify_push($recipient, $chunk);
             line_notify_log_send($id, $eventKey, $recipient, $push);
             if (!$push['ok']) {
                 $allOk = false;
+                $lastError = $push['error'] ?? 'push failed';
                 break;
             }
+            $chunkIndex++;
+            $payload['_sent_chunks'] = $chunkIndex;
+            line_notify_outbox_save_payload($id, $payload);
         }
 
         if ($allOk) {
+            if (isset($payload['_sent_chunks'])) {
+                unset($payload['_sent_chunks']);
+                line_notify_outbox_save_payload($id, $payload);
+            }
             line_notify_mark_outbox($id, 'sent', null);
             $stats['sent']++;
         } else {
             $attempts = (int)$row['attempts'] + 1;
             if ($attempts >= LINE_NOTIFY_MAX_ATTEMPTS) {
-                line_notify_mark_outbox($id, 'dead', $push['error'] ?? 'max attempts');
+                line_notify_mark_outbox($id, 'dead', $lastError ?? 'max attempts');
                 $stats['dead']++;
             } else {
                 $delay = LINE_NOTIFY_RETRY_DELAYS[min($attempts - 1, count(LINE_NOTIFY_RETRY_DELAYS) - 1)] ?? 3600;
-                line_notify_mark_outbox($id, 'failed', $push['error'] ?? 'push failed', $attempts, $delay);
+                line_notify_mark_outbox($id, 'failed', $lastError ?? 'push failed', $attempts, $delay);
                 $stats['failed']++;
             }
         }
     }
     return $stats;
+}
+
+/**
+ * บันทึก payload_json ของ outbox (ใช้เก็บความคืบหน้า chunk ที่ส่งแล้ว)
+ *
+ * @param int                  $id
+ * @param array<string,mixed>  $payload
+ * @return void
+ */
+function line_notify_outbox_save_payload(int $id, array $payload): void
+{
+    $db = line_notify_db();
+    if (!$db) {
+        return;
+    }
+    $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
+    if ($json === false) {
+        return;
+    }
+    $stmt = $db->prepare('UPDATE notification_outbox SET payload_json=? WHERE id=?');
+    if ($stmt) {
+        $stmt->bind_param('si', $json, $id);
+        $stmt->execute();
+        $stmt->close();
+    }
 }
 
 /**

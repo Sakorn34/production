@@ -311,17 +311,27 @@ class StockService
             throw new InvalidArgumentException('ไม่พบชุดเบิกหรือชุดว่าง');
         }
 
-        foreach ($set['items'] as $item) {
-            $needed = (int) $item['quantity'] * $setCount;
-            if ((int) $item['stock_qty'] < $needed) {
-                throw new InvalidArgumentException(
-                    "อะไหล่ {$item['name']} คงเหลือไม่พอ (ต้องการ {$needed} {$item['unit']}, มี {$item['stock_qty']})"
-                );
-            }
-        }
-
         $this->db->beginTransaction();
         try {
+            $lockStmt = $this->db->prepare(
+                'SELECT id, name, code, unit, quantity FROM products WHERE id = ? FOR UPDATE'
+            );
+            $deductStmt = $this->db->prepare(
+                'UPDATE products SET quantity = quantity - ? WHERE id = ? AND quantity >= ?'
+            );
+
+            foreach ($set['items'] as $item) {
+                $needed = (int) $item['quantity'] * $setCount;
+                $lockStmt->execute([(int) $item['product_id']]);
+                $locked = $lockStmt->fetch(PDO::FETCH_ASSOC);
+                if (!$locked || (int) $locked['quantity'] < $needed) {
+                    $have = $locked ? (int) $locked['quantity'] : 0;
+                    throw new InvalidArgumentException(
+                        "อะไหล่ {$item['name']} คงเหลือไม่พอ (ต้องการ {$needed} {$item['unit']}, มี {$have})"
+                    );
+                }
+            }
+
             $docNo = generateDocNo($this->db);
 
             $stmt = $this->db->prepare(
@@ -333,21 +343,24 @@ class StockService
             $itemStmt = $this->db->prepare(
                 'INSERT INTO stock_out_items (stock_out_id, product_id, quantity) VALUES (?, ?, ?)'
             );
-            $updateStmt = $this->db->prepare(
-                'UPDATE products SET quantity = quantity - ? WHERE id = ?'
-            );
             $insertedItems = [];
 
             foreach ($set['items'] as $item) {
                 $qty = (int) $item['quantity'] * $setCount;
-                $itemStmt->execute([$outId, $item['product_id'], $qty]);
+                $productId = (int) $item['product_id'];
+                $itemStmt->execute([$outId, $productId, $qty]);
                 $insertedItems[] = [
                     'item_id'      => (int) $this->db->lastInsertId(),
-                    'product_id'   => (int) $item['product_id'],
+                    'product_id'   => $productId,
                     'product_code' => (string) $item['code'],
                     'quantity'     => $qty,
                 ];
-                $updateStmt->execute([$qty, $item['product_id']]);
+                $deductStmt->execute([$qty, $productId, $qty]);
+                if ($deductStmt->rowCount() === 0) {
+                    throw new InvalidArgumentException(
+                        'จำนวนอะไหล่ไม่พอ กรุณาตรวจสอบยอดคงเหลือใหม่'
+                    );
+                }
             }
 
             $this->db->commit();
@@ -370,19 +383,22 @@ class StockService
             throw new InvalidArgumentException('จำนวนเบิกต้องมากกว่า 0');
         }
 
-        $product = $this->getProduct($productId);
-        if (!$product) {
-            throw new InvalidArgumentException('ไม่พบอะไหล่');
-        }
-
-        if ((int) $product['quantity'] < $quantity) {
-            throw new InvalidArgumentException(
-                "อะไหล่ {$product['name']} คงเหลือไม่พอ (ต้องการ {$quantity} {$product['unit']}, มี {$product['quantity']})"
-            );
-        }
-
         $this->db->beginTransaction();
         try {
+            $lockStmt = $this->db->prepare(
+                'SELECT id, name, code, unit, quantity FROM products WHERE id = ? FOR UPDATE'
+            );
+            $lockStmt->execute([$productId]);
+            $product = $lockStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$product) {
+                throw new InvalidArgumentException('ไม่พบอะไหล่');
+            }
+            if ((int) $product['quantity'] < $quantity) {
+                throw new InvalidArgumentException(
+                    "อะไหล่ {$product['name']} คงเหลือไม่พอ (ต้องการ {$quantity} {$product['unit']}, มี {$product['quantity']})"
+                );
+            }
+
             $docNo = generateDocNo($this->db);
 
             $stmt = $this->db->prepare(
@@ -398,9 +414,14 @@ class StockService
             $itemId = (int) $this->db->lastInsertId();
 
             $stmt = $this->db->prepare(
-                'UPDATE products SET quantity = quantity - ? WHERE id = ?'
+                'UPDATE products SET quantity = quantity - ? WHERE id = ? AND quantity >= ?'
             );
-            $stmt->execute([$quantity, $productId]);
+            $stmt->execute([$quantity, $productId, $quantity]);
+            if ($stmt->rowCount() === 0) {
+                throw new InvalidArgumentException(
+                    'จำนวนอะไหล่ไม่พอ กรุณาตรวจสอบยอดคงเหลือใหม่'
+                );
+            }
 
             $this->db->commit();
             $this->syncProductionAfterSingleOut(
@@ -611,6 +632,16 @@ class StockService
             throw new InvalidArgumentException('ไม่พบรายการรับเข้า');
         }
         $diff = $quantity - (int) $old['quantity'];
+        if ($diff < 0) {
+            $product = $this->getProduct((int) $old['product_id']);
+            $need = abs($diff);
+            if (!$product || (int) $product['quantity'] < $need) {
+                $have = $product ? (int) $product['quantity'] : 0;
+                throw new InvalidArgumentException(
+                    "ไม่สามารถแก้ไขได้ เพราะอะไหล่ถูกเบิกออกไปแล้ว (คงเหลือ {$have} ชิ้น ต้องการลด {$need} ชิ้น)"
+                );
+            }
+        }
 
         $this->db->beginTransaction();
         try {
@@ -642,10 +673,19 @@ class StockService
             throw new InvalidArgumentException('ไม่พบรายการรับเข้า');
         }
 
+        $delQty = (int) $old['quantity'];
+        $product = $this->getProduct((int) $old['product_id']);
+        if (!$product || (int) $product['quantity'] < $delQty) {
+            $have = $product ? (int) $product['quantity'] : 0;
+            throw new InvalidArgumentException(
+                "ไม่สามารถลบได้ เพราะอะไหล่ถูกเบิกออกไปแล้ว (คงเหลือ {$have} ชิ้น ต้องการลด {$delQty} ชิ้น)"
+            );
+        }
+
         $this->db->beginTransaction();
         try {
             $this->db->prepare('UPDATE products SET quantity = quantity - ? WHERE id = ?')
-                ->execute([(int) $old['quantity'], (int) $old['product_id']]);
+                ->execute([$delQty, (int) $old['product_id']]);
             $this->db->prepare('DELETE FROM stock_in WHERE id = ?')->execute([$id]);
             $this->db->commit();
         } catch (Exception $e) {
@@ -854,7 +894,6 @@ class StockService
         ?string $issuedBy
     ): void {
         $mode = $note ?: 'เบิกใช้';
-        $firstMid = 0;
         foreach ($items as $row) {
             $partId = production_part_id_by_product_code((string) $row['product_code']);
             if ($partId === null) {
@@ -871,18 +910,9 @@ class StockService
                     $stockOutId
                 );
                 production_link_stock_out_item($this->db, (int) $row['item_id'], $mid);
-                if ($firstMid === 0) {
-                    $firstMid = $mid;
-                }
+                production_link_stock_out($this->db, $stockOutId, $mid, $assetCode);
             } catch (Throwable $e) {
                 error_log('[syncProductionAfterSetOut] ' . $e->getMessage());
-            }
-        }
-        if ($firstMid > 0) {
-            try {
-                production_link_stock_out($this->db, $stockOutId, $firstMid, $assetCode);
-            } catch (Throwable $e) {
-                error_log('[syncProductionAfterSetOut link] ' . $e->getMessage());
             }
         }
     }

@@ -12,12 +12,13 @@ require_login();
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_update'])) {
     csrf_check();
     $uid = (int)$_POST['update_id'];
-    $rec = qr("SELECT u.id, a.product_id, a.asset_code
+    $rec = qr("SELECT u.id, u.asset_id, a.product_id, a.asset_code
                FROM update_logs u JOIN assets a ON a.id=u.asset_id WHERE u.id=?", 'i', [$uid])->fetch_assoc();
     if (!$rec) {
         flash_set('ไม่พบรายการที่จะลบ', 'err');
     } else {
         q("DELETE FROM update_logs WHERE id=?", 'i', [$uid]);
+        recompute_asset_fw((int) $rec['asset_id']);
         flash_set('ลบรายการอัปเดตของ ' . $rec['asset_code'] . ' แล้ว');
     }
     $back = trim($_POST['back'] ?? '');
@@ -165,6 +166,7 @@ page_header('อัปเดต FW/HW — ' . $product['name'] . ' (' . number_f
 <?php if ($total === 0) { ?>
   <p class="muted"><?= ($searchSn !== '' || $searchDetail !== '') ? 'ไม่พบรายการตามเงื่อนไขค้นหา' : 'ยังไม่มีรายการอัปเดตของรุ่นนี้' ?></p>
 <?php } else { ?>
+<div class="table-wrap">
 <table class="list">
   <tr><th>วันเวลา</th><th>เครื่อง</th><th>ประเภท</th><th>รายละเอียด</th><th>รูป</th><th>โดย</th><th style="width:130px">จัดการ</th></tr>
   <?php while ($r = $rows->fetch_assoc()) { ?>
@@ -196,6 +198,7 @@ page_header('อัปเดต FW/HW — ' . $product['name'] . ' (' . number_f
   </tr>
   <?php } ?>
 </table>
+</div>
 <?php
 if ($pages > 1) { ?>
 <div class="pager">

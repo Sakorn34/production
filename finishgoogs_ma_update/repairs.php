@@ -52,6 +52,7 @@ page_header('ประวัติการซ่อม');
   <?php if ($custId || $search !== '') { ?><a class="btn btn-line" href="<?= BASE_URL ?>/repairs.php">ล้าง</a><?php } ?>
 </form>
 
+<div class="table-wrap">
 <table class="list">
   <tr>
     <th style="text-align:center">ครั้งที่</th><th>วันที่</th><th>รหัสเครื่อง</th><th>รุ่น</th>
@@ -71,4 +72,5 @@ page_header('ประวัติการซ่อม');
   <?php } ?>
   <?php if (!$n) { ?><tr><td colspan="8" class="muted" style="text-align:center; padding:20px">ไม่พบประวัติการซ่อม</td></tr><?php } ?>
 </table>
+</div>
 <?php page_footer();

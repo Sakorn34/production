@@ -231,8 +231,12 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
 })();
 </script>
 
+<div class="table-wrap">
 <table class="list">
   <tr><th></th><th>หมายเลขสินค้า</th><th>รุ่น</th><th>สถานะ</th><th>เบิกอะไหล่</th><th>ผู้บันทึกรายการ</th><th>ผลิตเมื่อ</th><th>FW</th></tr>
+  <?php if (!$assetRows) { ?>
+  <tr><td colspan="8" class="muted" style="text-align:center;padding:20px">ไม่พบเครื่องที่ตรงกับเงื่อนไข</td></tr>
+  <?php } ?>
   <?php foreach ($assetRows as $r) {
       $sn = trim((string)$r['asset_code']);
       $stockOutCnt = $sn !== '' ? (int)($partsSnCounts[$sn] ?? 0) : 0;
@@ -270,6 +274,7 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
   </tr>
   <?php } ?>
 </table>
+</div>
 
 <?php if ($pages > 1) {
     $qs = $_GET; ?>
