@@ -263,6 +263,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .model-card-fill { height: 100%; border-radius: 999px; }
 .model-card-num { font-size: calc(12px * var(--font-scale, 1)); color: #6b6480; font-weight: 600; }
 .model-card-num .text-warn { color: var(--warning, #a16207); font-weight: 600; }
+.model-card-num .text-danger { color: var(--danger, #dc2626); font-weight: 600; }
 .model-card-sub { font-size: calc(11px * var(--font-scale, 1)); margin: -4px 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .model-card-link { text-decoration: none; color: inherit; }
 .model-card-link:hover { text-decoration: none; }
@@ -326,6 +327,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   display: flex; flex-direction: column;
   background: #f7f9fc; border: 1px solid #dce3ef; border-radius: 10px;
   padding: 12px 14px; font-size: calc(13px * var(--font-scale, 1)); min-height: 100%;
+  min-width: 0;
 }
 .asset-sales-empty { flex: 1; margin: 0; font-size: calc(12px * var(--font-scale, 1)); }
 .asset-sales-card-head {
@@ -336,20 +338,56 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   margin: 0 0 10px; font-size: calc(12px * var(--font-scale, 1)); color: #6b6480;
   padding: 6px 10px; background: #eef4ff; border-radius: 6px;
   border-left: 3px solid var(--primary, #e11d74);
+  line-height: 1.4;
 }
-.asset-sales-dl {
-  display: grid; grid-template-columns: 110px 1fr; gap: 4px 10px; margin: 0;
+/* specificity ต้องชนะ .asset-head dl (3 คอลัมน์) มิฉะนั้นข้อความทับกัน */
+.asset-head .asset-sales-dl,
+.asset-sales-card .asset-sales-dl {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  margin: 0;
+  font-size: calc(13px * var(--font-scale, 1));
+  line-height: 1.4;
+  width: 100%;
 }
-.asset-sales-dl dt { color: #6b6480; font-size: calc(12px * var(--font-scale, 1)); }
-.asset-sales-dl dd { margin: 0; }
+.asset-head .asset-sales-dl dt,
+.asset-sales-card .asset-sales-dl dt {
+  color: #6b6480;
+  font-size: calc(11.5px * var(--font-scale, 1));
+  margin: 10px 0 2px;
+  padding: 0;
+  align-self: stretch;
+  line-height: 1.35;
+}
+.asset-head .asset-sales-dl dt:first-of-type,
+.asset-sales-card .asset-sales-dl dt:first-of-type {
+  margin-top: 0;
+}
+.asset-head .asset-sales-dl dd,
+.asset-sales-card .asset-sales-dl dd {
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  min-height: 0;
+  display: block;
+  color: #1f2937;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
 .asset-sales-setup-id { font-size: calc(15px * var(--font-scale, 1)); color: var(--primary, #e11d74); }
 .asset-sales-badge {
   display: inline-block; font-size: calc(11px * var(--font-scale, 1)); font-weight: 600;
   padding: 2px 8px; border-radius: 999px; background: #ede9fe; color: #6d28d9;
+  max-width: 100%; word-break: break-word;
 }
-.asset-sales-others { margin-top: 10px; font-size: calc(12px * var(--font-scale, 1)); }
-.asset-sales-others ul { margin: 4px 0 0; padding-left: 18px; color: #4b5563; }
-.asset-sales-foot { margin: 10px 0 0; font-size: calc(12px * var(--font-scale, 1)); }
+.asset-sales-badge.is-empty {
+  background: #eef2f7; color: #8a93a5; font-weight: 500;
+}
+.asset-sales-others { margin-top: 12px; font-size: calc(12px * var(--font-scale, 1)); }
+.asset-sales-others ul { margin: 4px 0 0; padding-left: 18px; color: #4b5563; line-height: 1.45; }
+.asset-sales-foot { margin: 12px 0 0; font-size: calc(12px * var(--font-scale, 1)); }
 @media (max-width: 960px) {
   .asset-head {
     grid-template-columns: 1fr;
@@ -444,6 +482,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .dash-parts-filter-btn.active {
   background: #fff; color: #c2410c;
   box-shadow: 0 1px 4px rgba(154, 52, 18, .12);
+}
+.dash-parts-filter-btn[data-filter="out"]:not(:disabled) { color: #991b1b; }
+.dash-parts-filter-btn[data-filter="out"]:hover:not(.active):not(:disabled) { color: #b91c1c; }
+.dash-parts-filter-btn[data-filter="out"].active {
+  color: #b91c1c;
+  box-shadow: 0 1px 4px rgba(185, 28, 28, .14);
 }
 .dash-parts-filter-btn:disabled { opacity: .45; cursor: not-allowed; }
 .dash-parts-filter-empty { margin: 8px 0 0; padding: 4px 0; }

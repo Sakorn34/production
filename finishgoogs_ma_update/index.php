@@ -80,10 +80,15 @@ if ($stock['ok']) {
 }
 
 $perPartLowCount = 0;
+$perPartOutCount = 0;
 $partSuppliers = [];
 $partSupplierNoneCount = 0;
 foreach ($perPart as $p) {
-    if ((int) $p['quantity'] <= (int) $p['min_stock']) {
+    $qty = (int) $p['quantity'];
+    $min = (int) $p['min_stock'];
+    if ($qty <= 0) {
+        $perPartOutCount++;
+    } elseif ($qty <= $min) {
         $perPartLowCount++;
     }
     $sup = trim((string) ($p['supplier'] ?? ''));
@@ -220,6 +225,7 @@ $partsBase = ui_parts_base_url();
         <div class="dash-parts-filter" id="dash-parts-filter" role="tablist" aria-label="ตัวกรองสต็อกอะไหล่">
           <button type="button" class="dash-parts-filter-btn active" data-filter="all" role="tab" aria-selected="true">อะไหล่ทั้งหมด</button>
           <button type="button" class="dash-parts-filter-btn" data-filter="low" role="tab" aria-selected="false"<?= $perPartLowCount <= 0 ? ' disabled title="ไม่มีอะไหล่ใกล้หมด"' : '' ?>>ใกล้หมด<?= $perPartLowCount > 0 ? ' (' . number_format($perPartLowCount) . ')' : '' ?></button>
+          <button type="button" class="dash-parts-filter-btn" data-filter="out" role="tab" aria-selected="false"<?= $perPartOutCount <= 0 ? ' disabled title="ไม่มีอะไหล่ที่หมดแล้ว"' : '' ?>>หมดแล้ว<?= $perPartOutCount > 0 ? ' (' . number_format($perPartOutCount) . ')' : '' ?></button>
         </div>
       </div>
       <?php if ($partSuppliers || $partSupplierNoneCount) { ?>
@@ -265,7 +271,14 @@ $partsBase = ui_parts_base_url();
     <?php $pi = 0; foreach ($perPart as $p) {
         $col = $PALETTE[$pi++ % count($PALETTE)];
         $qty = (int) $p['quantity'];
-        $low = $qty <= (int) $p['min_stock'];
+        $min = (int) $p['min_stock'];
+        if ($qty <= 0) {
+            $stockStatus = 'out';
+        } elseif ($qty <= $min) {
+            $stockStatus = 'low';
+        } else {
+            $stockStatus = 'ok';
+        }
         $icon = isset($partIcons[$p['code']]) ? $partIcons[$p['code']] : '';
         $supplier = trim((string) ($p['supplier'] ?? ''));
         $purchaseLink = trim((string) ($p['purchase_link'] ?? ''));
@@ -276,8 +289,11 @@ $partsBase = ui_parts_base_url();
         if ($displaySub !== '' && $displaySub !== $stockCode) {
             $cardTitle .= ' · ' . $displaySub;
         }
+        $barColor = $stockStatus === 'out'
+            ? 'var(--danger,#dc2626)'
+            : ($stockStatus === 'low' ? 'var(--warning,#f59e0b)' : h($col));
     ?>
-    <div class="model-card clickable dash-part-card" data-low-stock="<?= $low ? '1' : '0' ?>" data-supplier="<?= h($supplier) ?>"
+    <div class="model-card clickable dash-part-card" data-stock-status="<?= h($stockStatus) ?>" data-supplier="<?= h($supplier) ?>"
          onclick="showListModal(<?= h(json_encode('โปรไฟล์: ' . $displayName, JSON_UNESCAPED_UNICODE)) ?>, '<?= h("$B/dashboard_data.php?type=part_profile&v=" . (int) $p['id']) ?>', '<?= h("$partsBase/pages/product-detail.php?id=" . (int) $p['id']) ?>')"
          title="<?= h($cardTitle) ?>">
       <div class="model-card-img">
@@ -290,9 +306,15 @@ $partsBase = ui_parts_base_url();
       <div class="model-card-body">
         <div class="model-card-name" title="<?= h($displayName) ?>"><?= h($displayName) ?></div>
         <div class="model-card-sub muted"><?= h($displaySub) ?></div>
-        <div class="model-card-bar"><div class="model-card-fill" style="width:<?= pct($qty, $maxPart) ?>%; background:<?= $low ? 'var(--warning,#f59e0b)' : h($col) ?>"></div></div>
+        <div class="model-card-bar"><div class="model-card-fill" style="width:<?= pct($qty, $maxPart) ?>%; background:<?= $barColor ?>"></div></div>
         <div class="model-card-foot">
-          <div class="model-card-num"><?= number_format($qty) ?> <?= h($p['unit'] ?: 'ชิ้น') ?><?php if ($low) { ?> · <span class="text-warn">ใกล้หมด</span><?php } ?></div>
+          <div class="model-card-num"><?= number_format($qty) ?> <?= h($p['unit'] ?: 'ชิ้น') ?><?php
+            if ($stockStatus === 'out') {
+                echo ' · <span class="text-danger">หมดแล้ว</span>';
+            } elseif ($stockStatus === 'low') {
+                echo ' · <span class="text-warn">ใกล้หมด</span>';
+            }
+          ?></div>
           <?php if ($purchaseLink !== '') { ?>
           <a href="<?= h($purchaseLink) ?>" class="btn btn-sm btn-line dash-part-order-btn" target="_blank" rel="noopener noreferrer"
              onclick="event.stopPropagation();" title="เปิดลิงก์สั่งซื้อ"><?= ui_btn_label('external-link', 'สั่งซื้อ', 13) ?></a>
@@ -302,7 +324,7 @@ $partsBase = ui_parts_base_url();
     </div>
     <?php } ?>
   </div>
-  <p class="muted dash-parts-filter-empty" id="dash-parts-filter-empty" hidden>ไม่มีอะไหล่ใกล้หมดในรายการนี้</p>
+  <p class="muted dash-parts-filter-empty" id="dash-parts-filter-empty" hidden>ไม่มีอะไหล่ตามตัวกรองที่เลือก</p>
   <p style="margin-top:10px"><a href="<?= h($partsBase) ?>/pages/products.php">ดูรายการอะไหล่ทั้งหมด ›</a></p>
   <?php } ?>
   </div>
@@ -324,13 +346,18 @@ $partsBase = ui_parts_base_url();
   var viewBtns = panel.querySelectorAll('.dash-view-btn');
   var filterBtns = partsFilter ? partsFilter.querySelectorAll('.dash-parts-filter-btn') : [];
   var supplierBtns = partsSupplierFilter ? partsSupplierFilter.querySelectorAll('.dash-parts-supplier-btn') : [];
-  var partCards = partsGrid ? partsGrid.querySelectorAll('.dash-part-card[data-low-stock]') : [];
+  var partCards = partsGrid ? partsGrid.querySelectorAll('.dash-part-card[data-stock-status]') : [];
   var currentView = 'models';
   var currentPartsFilter = 'all';
   var currentSupplierFilter = '';
   var labels = {
     models: { title: 'จำนวนเครื่องรายรุ่น', meta: '<?= count($perModel) ?> รุ่น' },
     parts:  { title: 'สต็อกอะไหล่รายการ' }
+  };
+  var emptyMsgs = {
+    all: 'ไม่มีอะไหล่ตามตัวกรองที่เลือก',
+    low: 'ไม่มีอะไหล่ใกล้หมดตามตัวกรองที่เลือก',
+    out: 'ไม่มีอะไหล่ที่หมดแล้วตามตัวกรองที่เลือก'
   };
 
   function setFilterButtons(mode) {
@@ -358,9 +385,11 @@ $partsBase = ui_parts_base_url();
     setSupplierButtons(currentSupplierFilter);
     var shown = 0;
     partCards.forEach(function(card) {
-      var isLow = card.getAttribute('data-low-stock') === '1';
+      var status = card.getAttribute('data-stock-status') || 'ok';
       var supplier = card.getAttribute('data-supplier') || '';
-      var stockOk = currentPartsFilter === 'all' || (currentPartsFilter === 'low' && isLow);
+      var stockOk = currentPartsFilter === 'all'
+        || (currentPartsFilter === 'low' && status === 'low')
+        || (currentPartsFilter === 'out' && status === 'out');
       var supplierOk = currentSupplierFilter === '' || (currentSupplierFilter === '__none__' ? supplier === '' : supplier === currentSupplierFilter);
       var show = stockOk && supplierOk;
       card.hidden = !show;
@@ -370,9 +399,7 @@ $partsBase = ui_parts_base_url();
       var noMatch = shown === 0;
       partsEmpty.hidden = !noMatch;
       if (noMatch) {
-        partsEmpty.textContent = currentPartsFilter === 'low'
-          ? 'ไม่มีอะไหล่ใกล้หมดตามตัวกรองที่เลือก'
-          : 'ไม่มีอะไหล่ตามตัวกรองที่เลือก';
+        partsEmpty.textContent = emptyMsgs[currentPartsFilter] || emptyMsgs.all;
       }
     }
     if (updateMeta !== false && metaEl && currentView === 'parts') {

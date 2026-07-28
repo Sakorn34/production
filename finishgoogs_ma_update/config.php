@@ -2374,7 +2374,8 @@ function product_std_fields($productId) {
  *
  * - ถ้าตั้งค่าหลังบ้านไว้แล้ว (production): ใช้เฉพาะฟิลด์จาก config ตามลำดับที่ตั้ง
  *   แล้วเติม options จากประวัติเข้าไปในแต่ละฟิลด์ (ยังพิมพ์ค่าใหม่ได้อิสระที่ฟอร์ม)
- * - ข้ามชนิด fw/lot (เป็นช่องมาตรฐานแยกแสดงตามสวิตช์หลังบ้าน)
+ * - ข้ามชนิด fw/lot/made_by (เป็นช่องมาตรฐานแยกแสดงตามสวิตช์หลังบ้าน)
+ * - ข้าม checklist / watch_alert / watch_alert_cfg (ไม่ใช่ช่องกรอกในฟอร์มผลิต)
  * - context อื่น: พฤติกรรมเดิม (config ก่อน แล้วต่อด้วยฟิลด์ประวัติที่ไม่มีใน config)
  * - ถ้าไม่ได้ตั้ง: ใช้ประวัติล้วน
  *
@@ -2397,8 +2398,15 @@ function effective_fields($productId, $context) {
     $out = [];
     $used = [];
     foreach ($cfg as $c) {
-        // ข้ามชนิด fw/lot/made_by และสถานะปิด (จัดการแยกด้วยสวิตช์หลังบ้าน)
-        if (in_array($c['kind'], ['fw', 'lot', 'fw_off', 'lot_off', 'made_by', 'made_by_off'], true)) {
+        // ข้ามชนิดที่ไม่ได้เป็นช่องกรอกในฟอร์ม:
+        // - fw/lot/made_by (+ สถานะปิด) จัดการแยกด้วยสวิตช์หลังบ้าน
+        // - checklist โหลดผ่าน effective_production_checklist()
+        // - watch_alert / watch_alert_cfg เป็นแค่สวิตช์แจ้งเตือน MA (SD Card / RTC)
+        //   ไม่ใช่ฟิลด์กรอก — เก็บใต้ context=production ใน settings แต่ห้ามโผล่ในฟอร์มผลิต
+        if (in_array($c['kind'], [
+            'fw', 'lot', 'fw_off', 'lot_off', 'made_by', 'made_by_off',
+            'checklist', 'watch_alert', 'watch_alert_cfg',
+        ], true)) {
             continue;
         }
         $histOpts = isset($derivedByName[$c['name']]) ? $derivedByName[$c['name']]['options'] : [];

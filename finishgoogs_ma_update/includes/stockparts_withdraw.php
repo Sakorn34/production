@@ -163,16 +163,19 @@ function asset_stockparts_withdraw_card_html(array $info): string
             $out .= ' <span class="muted">(' . h((string) $sum['part_code']) . ')</span>';
         }
         $out .= '</dd>';
-        $out .= '<dt>สถานะ</dt><dd><span class="asset-sales-badge">' . h((string) ($sum['status_product'] ?: '-')) . '</span></dd>';
+        $statusRaw = trim((string) ($sum['status_product'] ?? ''));
+        $statusEmpty = ($statusRaw === '' || $statusRaw === '-');
+        $out .= '<dt>สถานะสินค้า</dt><dd><span class="asset-sales-badge' . ($statusEmpty ? ' is-empty' : '') . '">'
+            . h($statusEmpty ? 'ไม่ระบุ' : $statusRaw) . '</span></dd>';
     } elseif (!empty($stock['model'])) {
         $out .= '<dt>รุ่น (stock)</dt><dd>' . h((string) $stock['model']) . '</dd>';
     }
 
     if ($ts) {
-        $out .= '<dt>วันเวลาบันทึก stock</dt><dd>' . h(dthai_full($ts)) . '</dd>';
+        $out .= '<dt>บันทึกใน stock</dt><dd>' . h(dthai_full($ts)) . '</dd>';
     }
     if (isset($stock['active'])) {
-        $out .= '<dt>Active</dt><dd>' . ((int) $stock['active'] === 1 ? 'ใช้งาน' : 'ไม่นับ stock') . '</dd>';
+        $out .= '<dt>สถานะ Active</dt><dd>' . ((int) $stock['active'] === 1 ? 'ใช้งาน' : 'ไม่นับ stock') . '</dd>';
     }
     $out .= '</dl>';
 
