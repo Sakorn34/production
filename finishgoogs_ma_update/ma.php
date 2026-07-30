@@ -21,16 +21,60 @@ function ma_items($s) {
  * @param array<string,mixed> $rec แถว ma_records
  * @param string $col ชื่อคอลัมน์ ok_items|replace_items|repair_items
  * @param string $jsonKey คีย์ใน versions_json (OK|Replace|Repair)
+ * @param bool $jsonFallback อนุญาต fallback จาก versions_json (ปิดเมื่อโหลดฟอร์มแก้ไข)
  * @return array<int,string>
  */
-function ma_record_items(array $rec, $col, $jsonKey) {
-    $items = ma_items(isset($rec[$col]) ? $rec[$col] : '');
-    if ($items) return $items;
+function ma_record_items(array $rec, $col, $jsonKey, $jsonFallback = true) {
+    $colVal = isset($rec[$col]) ? $rec[$col] : null;
+    if ($colVal !== null && trim((string) $colVal) !== '') {
+        return ma_items($colVal);
+    }
+    if (!$jsonFallback) {
+        return [];
+    }
     if (!empty($rec['versions_json'])) {
         $vj = json_decode($rec['versions_json'], true) ?: [];
-        if (!empty($vj[$jsonKey])) return ma_items($vj[$jsonKey]);
+        if (!empty($vj[$jsonKey])) {
+            return ma_items($vj[$jsonKey]);
+        }
     }
     return [];
+}
+
+/**
+ * ตรวจว่ารายการ MA บันทึกในคอลัมน์ใหม่แล้วหรือยัง
+ *
+ * @param array<string,mixed> $rec แถว ma_records
+ * @return bool
+ */
+function ma_record_has_column_items(array $rec): bool {
+    foreach (['ok_items', 'replace_items', 'repair_items'] as $c) {
+        $v = isset($rec[$c]) ? trim((string) $rec[$c]) : '';
+        if ($v !== '') {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * ดึงรายการสำหรับฟอร์มแก้ไข MA
+ * — ใช้คอลัมน์ใหม่เป็นหลัก, fallback versions_json เฉพาะข้อมูล legacy
+ *
+ * @param array<string,mixed> $rec แถว ma_records
+ * @param string $col ok_items|replace_items|repair_items
+ * @param string $jsonKey OK|Replace|Repair
+ * @return array<int,string>
+ */
+function ma_record_items_for_edit(array $rec, $col, $jsonKey): array {
+    $colVal = isset($rec[$col]) ? $rec[$col] : null;
+    if ($colVal !== null && trim((string) $colVal) !== '') {
+        return ma_items($colVal);
+    }
+    if (ma_record_has_column_items($rec)) {
+        return [];
+    }
+    return ma_record_items($rec, $col, $jsonKey, true);
 }
 
 /**
@@ -479,7 +523,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_ma'])) {
     $fixItems = $san['repair'];
     $result = $fixItems ? 'repair' : ($repItems ? 'replace' : ($okItems ? 'ok' : null));
     $fw = trim($_POST['fw_version']);
-    q("UPDATE ma_records SET visited_at=?, result=?, ok_items=?, replace_items=?, repair_items=?, fw_version=?, machine_status=?, remark=? WHERE id=?",
+    q("UPDATE ma_records SET visited_at=?, result=?, ok_items=?, replace_items=?, repair_items=?, fw_version=?, machine_status=?, remark=?, versions_json=NULL WHERE id=?",
       'ssssssssi', [$visited, $result, $okItems ?: null, $repItems ?: null, $fixItems ?: null, $fw ?: null,
        in_array($_POST['machine_status'] ?? '', ['rental', 'spare'], true) ? $_POST['machine_status'] : null,
        trim($_POST['remark']) ?: null, $mid]);
@@ -545,6 +589,12 @@ $editRec = $editId ? qr("SELECT m.*, a.asset_code, a.status ast_status, a.produc
                          FROM ma_records m JOIN assets a ON a.id=m.asset_id WHERE m.id=?", 'i', [$editId])->fetch_assoc() : null;
 $formOpen = ($recAsset || $editRec) ? true : false;
 
+// ห้าม browser cache หน้าแก้ไข — ป้องกัน bfcache แสดงฟอร์มเก่าหลังบันทึกแล้วกดแก้ไขซ้ำ
+if ($editId > 0 && !headers_sent()) {
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    header('Pragma: no-cache');
+}
+
 // ถ้าเข้าแบบแก้ไข / บันทึกจากเครื่อง — ดึง product_id ของรุ่นนั้นให้อัตโนมัติ
 if ($productId <= 0 && $editRec) {
     $productId = (int)$editRec['product_id'];
@@ -605,6 +655,7 @@ if (!$product) {
     header('Location: ' . BASE_URL . '/ma.php');
     exit;
 }
+$maShowSnippets = product_show_snippets($productId);
 
 $page = max(1, (int)(isset($_GET['page']) ? $_GET['page'] : 1));
 $per = 50;
@@ -741,7 +792,7 @@ require __DIR__ . '/includes/list_search.php';
 <div id="ma-form-wrap" <?= $formOpen ? '' : 'hidden' ?>>
 <h3 style="margin:4px 0 10px" class="h-with-icon"><?= ui_icon_html('edit', 15, 'h-svg') ?><span><?= $ea ? 'แก้ไขรายการ MA' : 'เพิ่มรายการ MA ใหม่' ?></span></h3>
 <?php $maFwOpts = effective_ma_fw_options($productId); ?>
-<div class="ma-page-grid">
+<div class="<?= $maShowSnippets ? 'ma-page-grid' : '' ?>">
   <div class="ma-form-col">
     <form method="post" class="formgrid form-wide ma-formgrid" id="ma-form">
       <?= csrf_field() ?>
@@ -784,10 +835,18 @@ require __DIR__ . '/includes/list_search.php';
       </div>
       <?php } ?>
 
+      <?php
+      $maMachineStatus = 'rental';
+      if ($ea) {
+          $maMachineStatus = in_array($ea['machine_status'] ?? '', ['rental', 'spare'], true)
+              ? (string) $ea['machine_status']
+              : (in_array($ea['ast_status'] ?? '', ['rental', 'spare'], true) ? (string) $ea['ast_status'] : 'rental');
+      }
+      ?>
       <label for="machine_status">สถานะเครื่อง</label>
       <select name="machine_status" id="machine_status" required>
-        <option value="rental" <?= $ea && $ea['ast_status'] === 'rental' ? 'selected' : '' ?>>เครื่องเช่า</option>
-        <option value="spare" <?= $ea && $ea['ast_status'] === 'spare' ? 'selected' : '' ?>>เครื่องสำรอง</option>
+        <option value="rental" <?= $maMachineStatus === 'rental' ? 'selected' : '' ?>>เครื่องเช่า</option>
+        <option value="spare" <?= $maMachineStatus === 'spare' ? 'selected' : '' ?>>เครื่องสำรอง</option>
       </select>
 
       <label for="ma_fw_input">Firmware หลังตรวจ</label>
@@ -815,14 +874,18 @@ require __DIR__ . '/includes/list_search.php';
     <div id="ma-history" class="ma-history-box"></div>
   </div>
 
+  <?php if ($maShowSnippets) { ?>
   <aside class="panel ma-snippets-panel" id="ma-snippets">
     <?= ma_snippets_inner_html('ma-sn') ?>
   </aside>
+  <?php } ?>
 </div>
 </div><!-- /ma-form-wrap -->
 
 <script>
 <?php $maEditWithdrawLines = $editId ? ma_withdrawal_lines($editId) : []; ?>
+var maEditMode = <?= $editRec ? 'true' : 'false' ?>;
+var maShowSnippets = <?= $maShowSnippets ? 'true' : 'false' ?>;
 var maEditWithdrawLines = <?= json_encode($maEditWithdrawLines, JSON_UNESCAPED_UNICODE) ?>;
 var BASE = '<?= BASE_URL ?>';
 var MA_FW_OPTS = <?= json_encode(array_values($maFwOpts), JSON_UNESCAPED_UNICODE) ?>;
@@ -879,6 +942,7 @@ function maFwValue(){
 }
 
 function updateMaSnippets(){
+  if (!maShowSnippets) return;
   window.maFillSnippets('ma-sn', {
     code: (document.getElementById('ma_code') || {}).value || '',
     replace: chipValues('replace').join(' , '),
@@ -930,6 +994,7 @@ function addChip(key, val, silent){
   val = normItem(val);
   if (!val) return false;
   var chips = document.getElementById('chips-' + key);
+  if (!chips) return false;
   if (chipsInField(key)[val]) return false;
   var other = allChipValues(key);
   if (other[val]) {
@@ -1117,14 +1182,22 @@ if (document.readyState === 'loading') {
 }
 
 <?php if ($editRec) { ?>
-(function(){
-  var ed = <?= json_encode([
-    'ok' => ma_record_items($editRec, 'ok_items', 'OK'),
-    'replace' => ma_record_items($editRec, 'replace_items', 'Replace'),
-    'repair' => ma_record_items($editRec, 'repair_items', 'Repair'),
-  ], JSON_UNESCAPED_UNICODE) ?>;
-  FIELDS.forEach(function(k){ (ed[k] || []).forEach(function(v){ addChip(k, v, true); }); });
-})();
+var maEditChipData = <?= json_encode([
+  'ok' => ma_record_items_for_edit($editRec, 'ok_items', 'OK'),
+  'replace' => ma_record_items_for_edit($editRec, 'replace_items', 'Replace'),
+  'repair' => ma_record_items_for_edit($editRec, 'repair_items', 'Repair'),
+], JSON_UNESCAPED_UNICODE) ?>;
+function populateMaEditChips(){
+  if (!maEditMode || !maEditChipData) return;
+  FIELDS.forEach(function(k){
+    var box = document.getElementById('chips-' + k);
+    if (box) box.innerHTML = '';
+    (maEditChipData[k] || []).forEach(function(v){ addChip(k, v, true); });
+  });
+  updateMaSnippets();
+}
+<?php } else { ?>
+function populateMaEditChips(){}
 <?php } ?>
 
 document.addEventListener('click', function(e){
@@ -1229,6 +1302,15 @@ document.getElementById('ma-form').addEventListener('submit', function(e){
 });
 
 window.addEventListener('pageshow', function(e) {
+  if (e.persisted && maEditMode) {
+    populateMaEditChips();
+    var btn = document.getElementById('ma-submit-btn');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = btn.dataset.defaultLabel || '💾 บันทึกการแก้ไข';
+    }
+    return;
+  }
   if (!e.persisted) return;
   var btn = document.getElementById('ma-submit-btn');
   if (!btn) return;
@@ -1262,6 +1344,8 @@ document.getElementById('ma_remark').addEventListener('input', updateMaSnippets)
         itemPools.ok = d.pool_ok || d.pool || [];
         itemPools.replace = d.pool_replace || d.pool || [];
         itemPools.repair = d.pool_repair || d.pool || [];
+        // โหมดแก้ไข — ใช้ข้อมูลจากรายการ MA ที่เลือกเท่านั้น ห้าม prefill จาก MA ล่าสุดของเครื่อง
+        if (maEditMode) return;
         if (d.status === 'spare' || d.status === 'rental') document.getElementById('machine_status').value = d.status;
         if (document.getElementById('chips-ok').children.length === 0) {
           (d.prefill_ok || []).forEach(function(it){ addChip('ok', it, true); });
@@ -1273,6 +1357,11 @@ document.getElementById('ma_remark').addEventListener('input', updateMaSnippets)
   if (input.value.trim() !== '') loadAll();
   else updateMaSnippets();
 })();
+
+populateMaEditChips();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', populateMaEditChips);
+}
 </script>
 <?php } ?>
 

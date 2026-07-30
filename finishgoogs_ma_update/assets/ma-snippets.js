@@ -115,11 +115,17 @@
     if (overlay && !overlay.hidden && e.target === overlay) {
       closeOverlay('asset-snippet-overlay');
     }
+    overlay = document.getElementById('prod-snippet-overlay');
+    if (overlay && !overlay.hidden && e.target === overlay) {
+      closeOverlay('prod-snippet-overlay');
+    }
   });
 
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
     var overlay = document.getElementById('asset-snippet-overlay');
     if (overlay && !overlay.hidden) closeOverlay('asset-snippet-overlay');
+    overlay = document.getElementById('prod-snippet-overlay');
+    if (overlay && !overlay.hidden) closeOverlay('prod-snippet-overlay');
   });
 })();

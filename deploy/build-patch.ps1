@@ -1,6 +1,7 @@
 # build-patch.ps1 — สร้างชุด upload เฉพาะไฟล์ที่เปลี่ยน (patch)
 #
 # ใช้: deploy/build-patch.bat
+#       deploy/build-patch.ps1 -IncludeFiles finishgoogs_ma_update/ma.php
 # ผลลัพธ์:
 #   deploy/release/production/           ← อัปแค่โฟลเดอร์นี้ (มีเฉพาะไฟล์ patch)
 #   deploy/release/versions/YYYY-MM-DD_HHmmss/  ← เก็บประวัติแต่ละครั้ง
@@ -8,7 +9,8 @@
 param(
     [switch]$OpenFolder,
     [switch]$MarkDeployed,
-    [string]$Notes = ''
+    [string]$Notes = '',
+    [string[]]$IncludeFiles = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,36 +33,48 @@ $ChangelogFile = Join-Path $DeployDir 'CHANGELOG.txt'
 $VersionId = Get-Date -Format 'yyyy-MM-dd_HHmmss'
 $VersionDir = Join-Path $VersionsRoot $VersionId
 
-if (Test-Path -LiteralPath $Dest) {
-    Remove-Item -LiteralPath $Dest -Recurse -Force
-}
-New-Item -ItemType Directory -Force -Path $Dest | Out-Null
-New-Item -ItemType Directory -Force -Path $VersionDir | Out-Null
-
 $baseline = Read-DeployBaseline -BaselineFile $BaselineFile
 $fromVersion = Get-PreviousVersionLabel -Baseline $baseline
-$candidates = Get-PatchCandidatePaths -Root $Root -Baseline $baseline -VersionsRoot $VersionsRoot
 
 $toCopy = New-Object System.Collections.Generic.List[string]
 $toDelete = New-Object System.Collections.Generic.List[string]
 
-foreach ($item in $candidates) {
-    if ($item -like 'DELETE:*') {
-        $rel = $item.Substring(7)
-        if (Test-IsDeployableRelativePath -RelativePath $rel) {
-            $toDelete.Add($rel)
+if ($IncludeFiles.Count -gt 0) {
+    foreach ($raw in $IncludeFiles) {
+        $rel = ($raw -replace '\\', '/').Trim()
+        if ($rel -eq '') { continue }
+        if (-not (Test-IsDeployableRelativePath -RelativePath $rel)) {
+            Write-Warning "Skip non-deployable path: $rel"
+            continue
         }
-        continue
+        $full = Join-Path $Root ($rel -replace '/', [IO.Path]::DirectorySeparatorChar)
+        if (Test-Path -LiteralPath $full -PathType Leaf) {
+            $toCopy.Add($rel)
+        } else {
+            Write-Warning "File not found: $rel"
+        }
     }
+} else {
+    $candidates = Get-PatchCandidatePaths -Root $Root -Baseline $baseline -VersionsRoot $VersionsRoot
 
-    $rel = $item -replace '\\', '/'
-    if (-not (Test-IsDeployableRelativePath -RelativePath $rel)) {
-        continue
-    }
+    foreach ($item in $candidates) {
+        if ($item -like 'DELETE:*') {
+            $rel = $item.Substring(7)
+            if (Test-IsDeployableRelativePath -RelativePath $rel) {
+                $toDelete.Add($rel)
+            }
+            continue
+        }
 
-    $full = Join-Path $Root ($rel -replace '/', [IO.Path]::DirectorySeparatorChar)
-    if (Test-Path -LiteralPath $full -PathType Leaf) {
-        $toCopy.Add($rel)
+        $rel = $item -replace '\\', '/'
+        if (-not (Test-IsDeployableRelativePath -RelativePath $rel)) {
+            continue
+        }
+
+        $full = Join-Path $Root ($rel -replace '/', [IO.Path]::DirectorySeparatorChar)
+        if (Test-Path -LiteralPath $full -PathType Leaf) {
+            $toCopy.Add($rel)
+        }
     }
 }
 
@@ -69,10 +83,17 @@ if ($toCopy.Count -eq 0 -and $toDelete.Count -eq 0) {
     Write-Host 'No changed files to upload' -ForegroundColor Yellow
     Write-Host ""
     Write-Host 'First time or full deploy: use build-release.bat'
+    Write-Host 'Explicit files: build-patch.ps1 -IncludeFiles path/to/file.php'
     Write-Host 'After patch upload: run mark-deployed.bat'
     Write-Host ""
     exit 0
 }
+
+if (Test-Path -LiteralPath $Dest) {
+    Remove-Item -LiteralPath $Dest -Recurse -Force
+}
+New-Item -ItemType Directory -Force -Path $Dest | Out-Null
+New-Item -ItemType Directory -Force -Path $VersionDir | Out-Null
 
 foreach ($rel in $toCopy) {
     Copy-DeployFile -Root $Root -DestRoot $Dest -RelativePath $rel

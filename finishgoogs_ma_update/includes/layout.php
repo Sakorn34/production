@@ -531,6 +531,8 @@ function modalBack(){
   window.initChipDd = function(root){
     (root || document).querySelectorAll('.chip-dd').forEach(function(dd){
       if (dd.dataset.ready) return;
+      // ฟอร์ม MA ใช้ addChip/showList ของ ma.php — ห้าม chipDdSync ทับ chips ที่โหลดจากประวัติ
+      if (dd.classList.contains('ma-chip-dd')) return;
       dd.dataset.ready = '1';
       chipDdSync(dd, chipDdGetSelected(dd));
       var filt = dd.querySelector('.chip-dd-filter');

@@ -9,13 +9,14 @@
  * HTML บล็อกข้อความประจำสินค้า (4 รายการคัดลอกได้)
  *
  * @param string $pfx คำนำหน้า id ของ element (เช่น ma-sn, asset-tl-sn)
- * @param array{title?:bool,lead?:bool} $opts แสดงหัวข้อ/คำอธิบายหรือไม่
+ * @param array{title?:bool,lead?:bool,rental?:bool} $opts แสดงหัวข้อ/คำอธิบาย/สรุปงานเช่าหรือไม่
  * @return string
  */
 function ma_snippets_inner_html($pfx, array $opts = []) {
     $pfx = preg_replace('/[^a-z0-9_-]/', '', $pfx);
     $showTitle = !isset($opts['title']) || $opts['title'];
     $showLead = !isset($opts['lead']) || $opts['lead'];
+    $showRental = !isset($opts['rental']) || $opts['rental'];
     ob_start();
     if ($showTitle) { ?>
     <h3 class="ma-snippets-title h-with-icon"><?= ui_icon_html('clipboard', 15, 'h-svg') ?><span>ข้อความประจำสินค้า</span></h3>
@@ -45,6 +46,7 @@ function ma_snippets_inner_html($pfx, array $opts = []) {
       <textarea class="ma-snippet-txt" id="<?= h($pfx) ?>-macaddr" readonly rows="3" aria-label="MAC Address ที่คำนวณจากหมายเลขสินค้า" placeholder="(กรอกหมายเลขสินค้าก่อน)"></textarea>
       <p class="muted ma-snippet-note">เช่น BS22120047 → 22:12:00:47</p>
     </div>
+    <?php if ($showRental) { ?>
     <div class="ma-snippet">
       <div class="ma-snippet-hd">
         <span>4. สรุปส่งงานเช่า Office</span>
@@ -57,6 +59,7 @@ function ma_snippets_inner_html($pfx, array $opts = []) {
         <?= ui_icon_html('external-link', 14, 'btn-svg') ?><span>เปิดฟอร์มรอ MA — bit-online</span>
       </a>
     </div>
+    <?php } ?>
     <?php
     return ob_get_clean();
 }

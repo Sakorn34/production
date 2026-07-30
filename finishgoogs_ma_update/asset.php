@@ -226,6 +226,22 @@ if ($showPartsWithdraw && ($partsSummary['out_count'] > 0 || $partsUsed)) {
 $stockWithdraw = asset_stockparts_withdraw_info((string) $a['asset_code']);
 $assetBackHref = page_back_url('');
 
+$assetShowSnippets = product_show_snippets((int)$a['product_id']);
+$assetSnippetPayload = [
+    'code' => (string)$a['asset_code'],
+    'replace' => '',
+    'repair' => '',
+    'fw' => trim((string)($a['current_fw_version'] ?? '')),
+    'remark' => trim((string)($a['note'] ?? '')),
+];
+foreach ($tl as $e) {
+    if (($e['kind'] ?? '') === 'ma' && !empty($e['snippet']) && is_array($e['snippet'])) {
+        $assetSnippetPayload = array_merge($assetSnippetPayload, $e['snippet']);
+        $assetSnippetPayload['code'] = (string)$a['asset_code'];
+        break;
+    }
+}
+
 /** ปุ่มแก้ไข/ลบ/ข้อความประจำสินค้า ในประวัติ timeline */
 function asset_tl_actions($e, $assetId) {
     if (empty($e['kind']) || empty($e['rid'])) return '';
@@ -264,6 +280,9 @@ page_header('เครื่อง ' . $a['asset_code'], false);
   <div class="asset-toolbar-actions">
     <a class="btn btn-sm btn-with-icon" href="<?= BASE_URL ?>/update_new.php?asset=<?= $id ?>"><?= ui_btn_label('updates', 'บันทึกอัปเดต FW/HW') ?></a>
     <a class="btn btn-sm btn-with-icon" href="<?= BASE_URL ?>/ma.php?record=<?= $id ?>"><?= ui_btn_label('ma', 'บันทึก MA') ?></a>
+    <?php if ($assetShowSnippets) { ?>
+    <button type="button" class="btn btn-sm btn-with-icon asset-snippet-open"<?= ma_snippet_data_attrs($assetSnippetPayload) ?>><?= ui_btn_label('clipboard', 'ข้อความประจำสินค้า') ?></button>
+    <?php } ?>
   </div>
 </div>
 
@@ -516,7 +535,7 @@ $addWithdrawModalUrl = BASE_URL . '/parts.php?ajax=add_move_form&asset_id=' . (i
       </div>
       <button type="button" class="btn-sm btn-line" onclick="closeOverlay('asset-snippet-overlay')">✕ ปิด</button>
     </div>
-    <?= ma_snippets_inner_html('asset-tl-sn', ['title' => false, 'lead' => false]) ?>
+    <?= ma_snippets_inner_html('asset-tl-sn', ['title' => false, 'lead' => false, 'rental' => false]) ?>
   </div>
 </div>
 <script src="<?= BASE_URL ?>/assets/ma-snippets.js?v=<?= @filemtime(__DIR__ . '/assets/ma-snippets.js') ?: time() ?>"></script>

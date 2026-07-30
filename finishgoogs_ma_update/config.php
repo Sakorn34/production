@@ -1897,7 +1897,7 @@ function build_generated_asset_code(array $p, $producedDate, $runNo) {
     if ($cfg['code_use_month']) {
         $out .= date('m', $ts);
     }
-    $digits = max((int)$cfg['running_digits'], strlen((string)$runNo));
+    $digits = (int)$cfg['running_digits'];
     $out .= str_pad((string)$runNo, $digits, '0', STR_PAD_LEFT);
     return $out;
 }
@@ -1922,7 +1922,9 @@ function product_code_format_label(array $p) {
 }
 
 /**
- * ดึงเลข running จากท้ายรหัสเครื่อง (ใช้ตอนแก้ไขรหัส manual)
+ * ดึงเลข running จากท้ายรหัสเครื่อง (ใช้ตอนแก้ไขรหัส manual / คำนวณเลขถัดไป)
+ *
+ * รูปแบบ generated = … + running ความยาว running_digits ท้ายสุดเสมอ
  *
  * @param array<string, mixed> $p
  * @param string             $assetCode
@@ -1930,10 +1932,71 @@ function product_code_format_label(array $p) {
  */
 function parse_running_from_asset_code(array $p, $assetCode) {
     $digits = product_code_normalize($p)['running_digits'];
-    if (preg_match('/(\d{' . $digits . ',})$/', $assetCode, $m)) {
-        return (int)$m[1];
+    $assetCode = (string)$assetCode;
+    if ($digits <= 0 || strlen($assetCode) < $digits) {
+        return null;
     }
-    return null;
+    $tail = substr($assetCode, -$digits);
+    if (!ctype_digit($tail)) {
+        return null;
+    }
+    return (int)$tail;
+}
+
+/**
+ * หาเลข running สูงสุดของรุ่น — อ่านจากท้าย asset_code เป็นหลัก (กัน running_no ในฐานข้อมูลผิดรูป)
+ *
+ * @param array<string, mixed> $p         แถว products
+ * @param int                  $productId
+ * @return int
+ */
+function max_running_no_for_product(array $p, int $productId): int {
+    $productId = (int)$productId;
+    if ($productId <= 0 || ($p['code_mode'] ?? '') !== 'generated') {
+        return 0;
+    }
+    $maxRun = 0;
+    $prefix = trim((string)($p['code_prefix'] ?? ''));
+    if ($prefix !== '') {
+        $res = qr(
+            "SELECT a.asset_code, a.running_no FROM assets a
+             INNER JOIN products pr ON pr.id = a.product_id
+             WHERE pr.code_prefix = ?",
+            's',
+            [$prefix]
+        );
+    } else {
+        $res = qr(
+            "SELECT asset_code, running_no FROM assets WHERE product_id = ?",
+            'i',
+            [$productId]
+        );
+    }
+    $cfgDigits = product_code_normalize($p)['running_digits'];
+    $rnCap = (int)str_repeat('9', min(8, $cfgDigits + 1));
+    while ($row = $res->fetch_assoc()) {
+        $parsed = parse_running_from_asset_code($p, $row['asset_code']);
+        if ($parsed !== null) {
+            $maxRun = max($maxRun, $parsed);
+            continue;
+        }
+        $rn = (int)($row['running_no'] ?? 0);
+        if ($rn > 0 && $rn <= $rnCap) {
+            $maxRun = max($maxRun, $rn);
+        }
+    }
+    return $maxRun;
+}
+
+/**
+ * เลข running ถัดไปสำหรับออกรหัส generated
+ *
+ * @param array<string, mixed> $p
+ * @param int                  $productId
+ * @return int
+ */
+function next_running_no_for_product(array $p, int $productId): int {
+    return max_running_no_for_product($p, $productId) + 1;
 }
 
 /**
@@ -2004,12 +2067,8 @@ function preview_generated_asset_codes($productId, $producedDate, $count) {
         return ['error' => 'รุ่นนี้ยังไม่ได้ตั้งชื่อย่อ (prefix) ในหลังบ้าน'];
     }
 
-    if (trim((string)$p['code_prefix']) !== '') {
-        $r = qr("SELECT MAX(a.running_no) m FROM assets a JOIN products pr ON pr.id=a.product_id WHERE pr.code_prefix=?", 's', [$p['code_prefix']])->fetch_assoc();
-    } else {
-        $r = qr("SELECT MAX(running_no) m FROM assets WHERE product_id=?", 'i', [$productId])->fetch_assoc();
-    }
-    $run = (int)$r['m'] + 1;
+    $startRun = next_running_no_for_product($p, (int)$productId);
+    $run = $startRun;
     $codes = [];
     $conflicts = [];
 
@@ -2032,7 +2091,7 @@ function preview_generated_asset_codes($productId, $producedDate, $count) {
         }
     }
 
-    $out = ['codes' => $codes, 'start_run' => (int)$r['m'] + 1];
+    $out = ['codes' => $codes, 'start_run' => $startRun];
     if ($conflicts) $out['conflicts'] = $conflicts;
     return $out;
 }
@@ -2055,12 +2114,7 @@ function precheck_production_save($productId, $producedDate, $count, array $seri
         if (trim((string)$p['code_prefix']) === '' && product_code_normalize($p)['code_use_prefix']) {
             return ['ok' => false, 'message' => 'รุ่นนี้ยังไม่ได้ตั้งชื่อย่อ (prefix) ในหลังบ้าน'];
         }
-        if (trim((string)$p['code_prefix']) !== '') {
-            $r = qr("SELECT MAX(a.running_no) m FROM assets a JOIN products pr ON pr.id=a.product_id WHERE pr.code_prefix=?", 's', [$p['code_prefix']])->fetch_assoc();
-        } else {
-            $r = qr("SELECT MAX(running_no) m FROM assets WHERE product_id=?", 'i', [$productId])->fetch_assoc();
-        }
-        $startRun = (int)$r['m'] + 1;
+        $startRun = next_running_no_for_product($p, (int)$productId);
         $codes = [];
         for ($i = 0; $i < $count; $i++) {
             $codes[] = build_generated_asset_code($p, $producedDate, $startRun + $i);
@@ -2140,12 +2194,7 @@ function create_produced_asset($productId, $producedDate, $factorySerial, $note,
     $lock = qr("SELECT GET_LOCK(?,10) l", 's', [$lockKey])->fetch_assoc();
     if (!$lock || (int)$lock['l'] !== 1) return ['error' => 'ระบบกำลังออกเลขให้ผู้อื่น กรุณาลองใหม่'];
     try {
-        if (trim((string)$p['code_prefix']) !== '') {
-            $r = qr("SELECT MAX(a.running_no) m FROM assets a JOIN products pr ON pr.id=a.product_id WHERE pr.code_prefix=?", 's', [$p['code_prefix']])->fetch_assoc();
-        } else {
-            $r = qr("SELECT MAX(running_no) m FROM assets WHERE product_id=?", 'i', [$productId])->fetch_assoc();
-        }
-        $run = (int)$r['m'] + 1;
+        $run = next_running_no_for_product($p, (int)$productId);
         $code = null;
         for ($try = 0; $try < 200; $try++) {
             $candidate = build_generated_asset_code($p, $producedDate, $run);
@@ -2370,6 +2419,23 @@ function product_std_fields($productId) {
 }
 
 /**
+ * รุ่นนี้เปิดใช้แผง "ข้อความประจำสินค้า" (Serial / MAC) หรือไม่
+ *
+ * ตั้งจากระบบหลังบ้าน → ฟิลด์หน้า "บันทึกผลิตใหม่" → สวิตช์ข้อความประจำสินค้า
+ *
+ * @param int $productId
+ * @return bool
+ */
+function product_show_snippets($productId) {
+    ensure_field_input_mode_schema();
+    $r = qr("SELECT field_kind FROM product_field_config
+             WHERE product_id=? AND context='production'
+               AND field_kind IN ('product_snippets','product_snippets_off') AND is_active=1
+             LIMIT 1", 'i', [(int)$productId])->fetch_assoc();
+    return $r && $r['field_kind'] === 'product_snippets';
+}
+
+/**
  * รวม config จากหลังบ้าน + ประวัติจริง → ชุดฟิลด์ที่ใช้จริงในฟอร์ม
  *
  * - ถ้าตั้งค่าหลังบ้านไว้แล้ว (production): ใช้เฉพาะฟิลด์จาก config ตามลำดับที่ตั้ง
@@ -2406,6 +2472,7 @@ function effective_fields($productId, $context) {
         if (in_array($c['kind'], [
             'fw', 'lot', 'fw_off', 'lot_off', 'made_by', 'made_by_off',
             'checklist', 'watch_alert', 'watch_alert_cfg',
+            'product_snippets', 'product_snippets_off',
         ], true)) {
             continue;
         }

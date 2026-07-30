@@ -1,6 +1,7 @@
 <?php
 require __DIR__ . '/config.php';
 require_can('production');
+require __DIR__ . '/includes/ma_snippets.php';
 
 // ---------------------------------------------------------------
 // AJAX: ดึงฟิลด์เฉพาะรุ่น + ค่าเก่า (dropdown) + ค่าจากเครื่องล่าสุด
@@ -30,13 +31,8 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fields') {
         'checklist_last' => '', 'checklist_items' => [], 'lot_last' => '',
         'last_asset_code' => '',
     ];
-    if ($p['code_mode'] === 'generated' && $p['code_prefix']) {
-        $r = qr("SELECT MAX(a.running_no) m FROM assets a JOIN products pr ON pr.id=a.product_id WHERE pr.code_prefix=?",
-                's', [$p['code_prefix']])->fetch_assoc();
-        $out['nextRun'] = (int)$r['m'] + 1;
-    } elseif ($p['code_mode'] === 'generated') {
-        $r = qr("SELECT MAX(running_no) m FROM assets WHERE product_id=?", 'i', [$pid])->fetch_assoc();
-        $out['nextRun'] = (int)$r['m'] + 1;
+    if ($p['code_mode'] === 'generated') {
+        $out['nextRun'] = next_running_no_for_product($p, $pid);
     }
     $out['checklist_items'] = effective_production_checklist($pid);
 
@@ -46,14 +42,27 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fields') {
     }
 
     // บันทึกผลิตล่าสุดของรุ่นนี้ = ข้อมูลต้นแบบ
-    $last = qr("SELECT pr.*, a.id aid FROM production_records pr JOIN assets a ON a.id=pr.asset_id
+    $last = qr("SELECT pr.*, a.id aid, a.note asset_note FROM production_records pr JOIN assets a ON a.id=pr.asset_id
                 WHERE a.product_id=? ORDER BY pr.recorded_at DESC, pr.id DESC LIMIT 1", 'i', [$pid])->fetch_assoc();
+    $out['problems_last'] = '';
+    $out['fix_last'] = '';
+    $out['note_last'] = '';
     if ($last) {
         $out['fw']['last'] = (string)$last['fw_version'];
         $out['checklist_last'] = (string)$last['checklist'];
         $out['lot_last'] = (string)$last['lot_label'];
         if (!empty($last['made_by'])) {
             $out['made_by_last'] = (string)$last['made_by'];
+        }
+        foreach (['problems_found' => 'problems_last', 'fix' => 'fix_last'] as $col => $key) {
+            $v = trim((string)($last[$col] ?? ''));
+            if ($v !== '' && $v !== '-') {
+                $out[$key] = $v;
+            }
+        }
+        $noteVal = trim((string)($last['asset_note'] ?? ''));
+        if ($noteVal !== '' && $noteVal !== '-') {
+            $out['note_last'] = $noteVal;
         }
     }
 
@@ -127,6 +136,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fields') {
     $out['show_fw'] = $std['decided'] ? ($std['fw'] !== null) : true;
     $out['show_lot'] = $std['decided'] ? ($std['lot'] !== null) : true;
     $out['show_made_by'] = $std['decided'] ? ($std['made_by'] !== null) : true;
+    $out['show_product_snippets'] = product_show_snippets($pid);
     $out['made_by_input_mode'] = $std['made_by'] ? $std['made_by']['input_mode'] : 'chip_single_free';
     $out['fw_input_mode'] = $std['fw'] ? $std['fw']['input_mode'] : 'chip_single_free';
     $out['lot_input_mode'] = $std['lot'] ? $std['lot']['input_mode'] : 'chip_single_free';
@@ -422,6 +432,11 @@ page_header('บันทึกสินค้าผลิตใหม่');
     </div>
   </div>
 
+  <div id="prod-snippet-bar" style="margin-bottom:12px; display:none">
+    <button type="button" class="btn btn-line btn-with-icon" id="prod-snippet-btn" onclick="openProdSnippetModal()"><?= ui_btn_label('clipboard', 'ข้อความประจำสินค้า') ?></button>
+    <span class="muted" style="margin-left:8px; font-size:13px">Serial / MAC จากหมายเลขสินค้าในฟอร์ม · กดคัดลอกทีละข้อ</span>
+  </div>
+
   <div class="produce-cols">
     <!-- ซ้าย: ข้อมูลการผลิต + ข้อมูลประจำรุ่น (รวมผู้ผลิต/FW/Lot) -->
     <div class="panel">
@@ -479,6 +494,20 @@ page_header('บันทึกสินค้าผลิตใหม่');
   <div style="margin-top:16px"><button type="submit" id="save-btn" disabled>💾 บันทึกทั้งชุด</button></div>
 </form>
 
+<!-- popup ข้อความประจำสินค้า -->
+<div id="prod-snippet-overlay" class="notif-overlay ma-sn-overlay" hidden>
+  <div class="notif-box ma-sn-modal" role="dialog" aria-modal="true" aria-labelledby="prod-snippet-title">
+    <div class="ma-sn-modal-hd">
+      <div>
+        <h2 id="prod-snippet-title" class="ma-snippets-title h-with-icon"><?= ui_icon_html('clipboard', 16, 'h-svg') ?><span>ข้อความประจำสินค้า</span></h2>
+        <p class="muted ma-snippets-lead">อัปเดตตามหมายเลขสินค้าและฟอร์ม · กดคัดลอกทีละข้อ</p>
+      </div>
+      <button type="button" class="btn-sm btn-line" onclick="closeOverlay('prod-snippet-overlay')">✕ ปิด</button>
+    </div>
+    <?= ma_snippets_inner_html('prod-sn', ['title' => false, 'lead' => false, 'rental' => false]) ?>
+  </div>
+</div>
+
 <!-- popup ยืนยันก่อนบันทึก -->
 <div id="confirm-overlay" class="notif-overlay" hidden>
   <div class="notif-box" style="width:min(680px,94vw); max-height:84vh">
@@ -508,6 +537,7 @@ page_header('บันทึกสินค้าผลิตใหม่');
 </div>
 
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="<?= BASE_URL ?>/assets/ma-snippets.js?v=<?= @filemtime(__DIR__ . '/assets/ma-snippets.js') ?: time() ?>"></script>
 <script>
 var cfg = null, unitCount = 0;
 var BASE = '<?= BASE_URL ?>';
@@ -531,11 +561,13 @@ document.getElementById('produced_at').addEventListener('change', refreshPreview
 
 function loadProduct(pid){
   cfg = null; unitCount = 0;
+  toggleProdSnippets(false);
   document.getElementById('unit-list').innerHTML = '';
   document.getElementById('gen_count').value = 0;
   document.getElementById('add-unit').disabled = true;
   document.getElementById('save-btn').disabled = true;
   document.getElementById('dyn-fields').innerHTML = 'กำลังโหลดข้อมูลรุ่น…';
+  fillNoteFields({});
   fetch(BASE + '/asset_new.php?ajax=fields&product_id=' + pid)
     .then(function(r){ return r.json(); })
     .then(function(d){
@@ -552,9 +584,21 @@ function loadProduct(pid){
       renderFields(d);
       renderChecklist(d.checklist_items || [], d.checklist_last || '');
       renderBom(d);
+      fillNoteFields(d);
+      toggleProdSnippets(d.show_product_snippets === true);
       addUnit();
     })
     .catch(function(){ document.getElementById('dyn-fields').innerHTML = 'โหลดข้อมูลรุ่นไม่สำเร็จ'; });
+}
+
+function fillNoteFields(d){
+  d = d || {};
+  var pf = document.getElementById('problems_found');
+  var fx = document.getElementById('fix');
+  var nt = document.getElementById('note');
+  if (pf) pf.value = d.problems_last || '';
+  if (fx) fx.value = d.fix_last || '';
+  if (nt) nt.value = d.note_last || '';
 }
 
 // ---------- dropdown chip: ช่องกรอก + chip ค่าเก่าของรุ่น ----------
@@ -935,6 +979,38 @@ function doConfirmSubmit(){
     });
 }
 
+function toggleProdSnippets(show){
+  var bar = document.getElementById('prod-snippet-bar');
+  if (bar) bar.style.display = show ? '' : 'none';
+}
+
+function openProdSnippetModal(){
+  if (window.resetMaCopyButtonsInScope) resetMaCopyButtonsInScope('prod-sn');
+  updateProdSnippets(true);
+  var overlay = document.getElementById('prod-snippet-overlay');
+  if (overlay) overlay.hidden = false;
+}
+
+function prodSnippetCode(){
+  if (!cfg) return '';
+  if (cfg.mode === 'generated') {
+    return unitCount > 0 ? previewCode(0) : '';
+  }
+  var inp = document.querySelector('#unit-list input[name="serials[]"]');
+  return inp ? inp.value.trim() : '';
+}
+
+function updateProdSnippets(force){
+  if (!window.maFillSnippets) return;
+  var overlay = document.getElementById('prod-snippet-overlay');
+  if (!force && overlay && overlay.hidden) return;
+  window.maFillSnippets('prod-sn', { code: prodSnippetCode() });
+}
+
+document.getElementById('unit-list').addEventListener('input', function(e){
+  if (e.target && e.target.matches && e.target.matches('input[name="serials[]"]')) updateProdSnippets();
+});
+
 function updateAssetHints(){
   var hintEl = document.getElementById('last-asset-hint');
   if (!cfg) { hintEl.style.display = 'none'; return; }
@@ -953,6 +1029,7 @@ function updateAssetHints(){
   } else {
     hintEl.style.display = 'none';
   }
+  updateProdSnippets();
 }
 
 // ---------- รายการเครื่อง (+ / สแกน) ----------
@@ -1043,6 +1120,7 @@ function scanInto(btn){
   qrScanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: 200 },
     function(text){
       if (qrTarget) qrTarget.value = text.trim();
+      updateProdSnippets();
       stopScan();
     }, function(){}
   ).then(function(){ document.getElementById('qr-status').textContent = 'เล็งกล้องไปที่ QR/Barcode'; })

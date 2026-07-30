@@ -700,3 +700,190 @@ Files:
   shared/activity_log_core.php
   shared/line_notify_jobs.php
 
+
+================================================================
+v2026-07-28_193802 | Patch | 2026-07-28 19:38:09
+From: 2026-07-27_102047  ->  To: 5a81ce5  |  Files: 22
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/activity_logs.php
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/asset_new.php
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/cron/plesk_line_job_monthly.php
+  finishgoogs_ma_update/cron/plesk_line_run_job.php
+  finishgoogs_ma_update/cron/README.md
+  finishgoogs_ma_update/includes/part_stock_bridge.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/repairs.php
+  finishgoogs_ma_update/update_edit.php
+  finishgoogs_ma_update/updates.php
+  parts/assets/style.css
+  parts/config.php
+  parts/config/database.php
+  parts/includes/parts_bootstrap.php
+  parts/includes/StockService.php
+  shared/activity_log_core.php
+  shared/line_notify_core.php
+  shared/line_notify_jobs.php
+
+
+================================================================
+v2026-07-28_194804 | Patch | 2026-07-28 19:48:08
+From: 2026-07-27_102047  ->  To: 4a0060f  |  Files: 23
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/activity_logs.php
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/asset_new.php
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/cron/plesk_line_job_monthly.php
+  finishgoogs_ma_update/cron/plesk_line_run_job.php
+  finishgoogs_ma_update/cron/README.md
+  finishgoogs_ma_update/includes/part_stock_bridge.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/parts.php
+  finishgoogs_ma_update/repairs.php
+  finishgoogs_ma_update/update_edit.php
+  finishgoogs_ma_update/updates.php
+  parts/assets/style.css
+  parts/config.php
+  parts/config/database.php
+  parts/includes/parts_bootstrap.php
+  parts/includes/StockService.php
+  shared/activity_log_core.php
+  shared/line_notify_core.php
+  shared/line_notify_jobs.php
+
+
+================================================================
+v2026-07-28_221355 | Patch | 2026-07-28 22:14:04
+From: 2026-07-27_102047  ->  To: 811b8b0  |  Files: 31
+----------------------------------------------------------------
+
+Files: 31 (see README.html in version archive)
+
+
+================================================================
+v2026-07-28_231712 | Patch | 2026-07-28 23:17:19
+From: 2026-07-27_102047  ->  To: 5747ff1  |  Files: 31
+----------------------------------------------------------------
+
+Files: 31 (see README.html in version archive)
+
+
+================================================================
+v2026-07-28_232139 | Patch | 2026-07-28 23:21:47
+From: 2026-07-27_102047  ->  To: 5747ff1  |  Files: 32
+----------------------------------------------------------------
+
+Files: 32 (see README.html in version archive)
+
+
+================================================================
+v2026-07-28_232846 | Patch | 2026-07-28 23:28:54
+From: 2026-07-27_102047  ->  To: 5747ff1  |  Files: 33
+----------------------------------------------------------------
+
+Files: 33 (see README.html in version archive)
+
+
+================================================================
+v2026-07-29_091440 | Patch | 2026-07-29 09:14:45
+From: 2026-07-27_102047  ->  To: 6c90fe5  |  Files: 33
+----------------------------------------------------------------
+- Fix MA edit form showing stale data
+
+Files: 33 (see README.html in version archive)
+
+
+================================================================
+v2026-07-29_091521 | Patch | 2026-07-29 09:15:27
+From: 2026-07-27_102047  ->  To: 6c90fe5  |  Files: 33
+----------------------------------------------------------------
+- Fix MA edit form stale data (maEditMode, bfcache)
+
+Files: 33 (see README.html in version archive)
+
+
+================================================================
+v2026-07-29_092131 | Patch | 2026-07-29 09:21:36
+From: 2026-07-27_102047  ->  To: 6c90fe5  |  Files: 33
+----------------------------------------------------------------
+- Fix MA edit empty form for legacy records
+
+Files: 33 (see README.html in version archive)
+
+
+================================================================
+v2026-07-29_092408 | Patch | 2026-07-29 09:24:09
+From: 2026-07-29_092131  ->  To: 6c90fe5  |  Files: 1
+----------------------------------------------------------------
+- Fix MA edit form legacy data load
+
+Files:
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-07-29_093021 | Patch | 2026-07-29 09:30:22
+From: 2026-07-29_092131  ->  To: 6c90fe5  |  Files: 2
+----------------------------------------------------------------
+- Fix MA edit form chips cleared by initChipDd
+
+Files:
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-07-29_112204 | Patch | 2026-07-29 11:22:05
+From: 2026-07-29_093021  ->  To: 6c90fe5  |  Files: 1
+----------------------------------------------------------------
+- ข้อความประจำสินค้า: สวิตช์หลังบ้าน, popup หน้าบันทึกผลิต, prefill ปัญหา/แก้ไข/หมายเหตุ
+
+Files:
+  finishgoogs_ma_update/includes/ma_snippets.php
+
+
+================================================================
+v2026-07-29_112219 | Patch | 2026-07-29 11:22:20
+From: 2026-07-29_093021  ->  To: 6c90fe5  |  Files: 6
+----------------------------------------------------------------
+- ข้อความประจำสินค้า: สวิตช์หลังบ้าน, popup หน้าบันทึกผลิต, prefill ปัญหา/แก้ไข/หมายเหตุ
+
+Files:
+  finishgoogs_ma_update/asset_new.php
+  finishgoogs_ma_update/assets/ma-snippets.js
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/ma_snippets.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/settings.php
+
+
+================================================================
+v2026-07-29_113008 | Patch | 2026-07-29 11:30:08
+From: 2026-07-29_112219  ->  To: 6c90fe5  |  Files: 2
+----------------------------------------------------------------
+- Fix generated SN preview/save: parse running จากท้าย asset_code ไม่ใช้ MAX(running_no) ผิดรูป
+
+Files:
+  finishgoogs_ma_update/asset_new.php
+  finishgoogs_ma_update/config.php
+
+
+================================================================
+v2026-07-29_142953 | Patch | 2026-07-29 14:29:53
+From: 2026-07-29_113008  ->  To: 6c90fe5  |  Files: 1
+----------------------------------------------------------------
+- ปุ่ม popup ข้อความประจำสินค้าใน toolbar หน้าเครื่อง · ซ่อนข้อ 4 สรุปงานเช่า (แสดงเฉพาะหน้า MA)
+
+Files:
+  finishgoogs_ma_update/asset.php
+
