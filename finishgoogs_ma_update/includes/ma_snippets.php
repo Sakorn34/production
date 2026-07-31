@@ -22,7 +22,7 @@ function ma_snippets_inner_html($pfx, array $opts = []) {
     <h3 class="ma-snippets-title h-with-icon"><?= ui_icon_html('clipboard', 15, 'h-svg') ?><span>ข้อความประจำสินค้า</span></h3>
     <?php }
     if ($showLead) { ?>
-    <p class="muted ma-snippets-lead">อัปเดตตามหมายเลขสินค้าและฟอร์ม · กดคัดลอกทีละข้อ</p>
+    <p class="muted ma-snippets-lead">อัปเดตตามรหัสเครื่องและฟอร์ม · กดคัดลอกทีละข้อ</p>
     <?php } ?>
     <div class="ma-snippet">
       <div class="ma-snippet-hd">
@@ -40,10 +40,10 @@ function ma_snippets_inner_html($pfx, array $opts = []) {
     </div>
     <div class="ma-snippet">
       <div class="ma-snippet-hd">
-        <span>3. MAC Address จากหมายเลขสินค้า</span>
+        <span>3. MAC Address จากรหัสเครื่อง</span>
         <button type="button" class="btn-sm btn-line btn-with-icon ma-copy-btn" data-target="<?= h($pfx) ?>-macaddr"><?= ui_btn_label('copy', 'คัดลอก', 13) ?></button>
       </div>
-      <textarea class="ma-snippet-txt" id="<?= h($pfx) ?>-macaddr" readonly rows="3" aria-label="MAC Address ที่คำนวณจากหมายเลขสินค้า" placeholder="(กรอกหมายเลขสินค้าก่อน)"></textarea>
+      <textarea class="ma-snippet-txt" id="<?= h($pfx) ?>-macaddr" readonly rows="3" aria-label="MAC Address ที่คำนวณจากรหัสเครื่อง" placeholder="(กรอกรหัสเครื่องก่อน)"></textarea>
       <p class="muted ma-snippet-note">เช่น BS22120047 → 22:12:00:47</p>
     </div>
     <?php if ($showRental) { ?>

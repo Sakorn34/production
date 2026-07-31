@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash('success', 'ลบรายการออกจาก Set แล้ว');
         }
     } catch (PDOException $e) {
-        flash('error', 'เกิดข้อผิดพลาด: ' . $e->getMessage());
+        flash('error', safe_exception_message($e));
     }
     redirect(url('/pages/sets.php'));
 }

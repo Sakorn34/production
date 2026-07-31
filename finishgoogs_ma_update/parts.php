@@ -149,7 +149,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'parts_list') {
       <input name="q" type="text" value="<?= h($q) ?>" placeholder="ค้นหาชื่อ / รหัส / หมวด" style="flex:1;min-width:0">
       <button type="submit">ค้นหา</button>
     </form>
-    <p class="muted" style="font-size:12px;margin:0 0 8px">จำนวนคงเหลืออ่านจากระบบสต็อกกลาง (biton_tech_parts)</p>
+    <p class="muted" style="font-size:12px;margin:0 0 8px">จำนวนคงเหลืออ่านจากระบบสต็อกอะไหล่กลาง (แอป Parts)</p>
     <div class="table-wrap">
     <table class="list">
       <tr><th></th><th>อะไหล่</th><th>หมวด</th><th style="text-align:right">คงเหลือ</th><th style="text-align:right">เบิกแล้ว</th><th>ร้านค้า</th><?= can('parts') ? '<th style="white-space:nowrap">การดำเนินการ</th>' : '' ?></tr>
@@ -247,7 +247,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'edit_move_form') {
             <option value="<?= h($optVal) ?>"<?= $modeFormVal === $optVal ? ' selected' : '' ?>><?= h($optLabel) ?></option>
           <?php } ?>
         </select>
-        <label>หมายเลขสินค้า</label><input type="text" name="asset_code" class="asset-search" value="<?= h($m['asset_code'] ?? '') ?>" placeholder="พิมพ์แล้วเลือก">
+        <label>รหัสเครื่อง</label><input type="text" name="asset_code" class="asset-search" value="<?= h($m['asset_code'] ?? '') ?>" placeholder="พิมพ์แล้วเลือก">
         <label>หมายเหตุ</label><input type="text" name="remark" value="<?= h($m['remark'] ?? '') ?>">
         <div class="full" style="margin-top:10px; display:flex; gap:8px">
           <button type="submit" class="btn">บันทึกการแก้ไข</button>
@@ -295,7 +295,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'add_move_form') {
             <option value="<?= h($optVal) ?>"<?= $optVal === 'เบิกใช้' ? ' selected' : '' ?>><?= h($optLabel) ?></option>
           <?php } ?>
         </select>
-        <label>หมายเลขสินค้า</label>
+        <label>รหัสเครื่อง</label>
         <input type="text" name="asset_code" class="asset-search" value="<?= h($prefillCode) ?>" placeholder="พิมพ์แล้วเลือก"<?= $prefillCode !== '' ? ' required' : '' ?>>
         <label>หมายเหตุ</label><input type="text" name="remark" placeholder="ถ้ามี">
         <div class="full" style="margin-top:10px"><button type="submit" class="btn">บันทึกการเบิก</button></div>
@@ -320,7 +320,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'edit_part_form') {
       <div class="formgrid form-narrow">
         <label>ชื่ออะไหล่</label><input type="text" name="name"      value="<?= h($r['name']) ?>" required>
         <label>รหัสชิ้นส่วน</label><input type="text" name="part_code" value="<?= h($r['part_code'] ?? '') ?>">
-        <label>รหัสสต็อก (P00001)</label><input type="text" name="stock_code" value="<?= h($r['stock_code'] ?? '') ?>" placeholder="ตรงกับ code ใน biton_tech_parts">
+        <label>รหัสสต็อก (P00001)</label><input type="text" name="stock_code" value="<?= h($r['stock_code'] ?? '') ?>" placeholder="ตรงกับรหัสอะไหล่ในระบบสต็อกกลาง">
         <label>หมวด</label>      <input type="text" name="category"  value="<?= h($r['category'] ?? '') ?>">
         <label>หน่วย</label>     <input type="text" name="unit"      value="<?= h($r['unit'] ?? '') ?>" placeholder="ชิ้น, เมตร, ม้วน">
         <label>ร้านค้า</label>   <input type="text" name="dealer"    value="<?= h($r['dealer'] ?? '') ?>">
@@ -626,10 +626,10 @@ require __DIR__ . '/includes/list_search.php';
     <?= csrf_field() ?><input type="hidden" name="new_part" value="1">
     <label>ชื่ออะไหล่</label><input type="text" name="name" required>
     <label>รหัสชิ้นส่วน</label><input type="text" name="part_code">
-    <label>รหัสสต็อก</label>  <input type="text" name="stock_code" placeholder="P00001 — ตรงกับ biton_tech_parts">
+    <label>รหัสสต็อก</label>  <input type="text" name="stock_code" placeholder="P00001 — ตรงกับรหัสอะไหล่ในระบบสต็อกกลาง">
     <label>หมวด</label>      <input type="text" name="category">
     <label>หน่วย</label>     <input type="text" name="unit" placeholder="ชิ้น, เมตร, ม้วน">
-    <p class="muted full" style="margin:0;font-size:12px">จำนวนคงเหลือจัดการที่ระบบสต็อกอะไหล่ (biton_tech_parts) — รับเข้าที่แอป parts/</p>
+    <p class="muted full" style="margin:0;font-size:12px">จำนวนคงเหลือจัดการที่ระบบสต็อกอะไหล่กลาง — รับเข้าที่แอป Parts</p>
     <label>ร้านค้า</label>   <input type="text" name="dealer">
     <label>ลิงก์</label>    <input type="url"  name="link" placeholder="https://...">
     <label>รูปอะไหล่</label><input type="file" name="icon" accept="image/*">
@@ -642,7 +642,7 @@ require __DIR__ . '/includes/list_search.php';
 <h2>ความเคลื่อนไหวล่าสุด</h2>
 <?php
 list_search_form([
-    ['name' => 'rs', 'placeholder' => 'หมายเลขสินค้า', 'value' => $rs, 'width' => '140px'],
+    ['name' => 'rs', 'placeholder' => 'รหัสเครื่อง', 'value' => $rs, 'width' => '140px'],
     ['name' => 'rm', 'placeholder' => 'รุ่น', 'value' => $rm, 'width' => '110px'],
     ['name' => 'rd', 'placeholder' => 'วันที่', 'value' => $rd, 'width' => '135px', 'type' => 'date'],
     ['name' => 'rb', 'placeholder' => 'ผู้เบิก', 'value' => $rb, 'width' => '110px'],
@@ -654,7 +654,7 @@ list_search_form([
   <input type="hidden" name="rd" value="<?= h($rd) ?>">
   <input type="hidden" name="rb" value="<?= h($rb) ?>">
   <select name="sort" style="height:34px" onchange="this.form.submit()">
-    <?php foreach (['date_desc' => 'วันที่ล่าสุด', 'date_asc' => 'วันที่เก่าสุด', 'asset' => 'หมายเลขสินค้า', 'part' => 'ชื่ออะไหล่'] as $v => $l) {
+    <?php foreach (['date_desc' => 'วันที่ล่าสุด', 'date_asc' => 'วันที่เก่าสุด', 'asset' => 'รหัสเครื่อง', 'part' => 'ชื่ออะไหล่'] as $v => $l) {
         echo '<option value="' . h($v) . '"' . ($sort === $v ? ' selected' : '') . '>' . h($l) . '</option>';
     } ?>
   </select>
@@ -668,7 +668,7 @@ list_search_form([
     <th>อะไหล่</th>
     <th style="text-align:right">จำนวน</th>
     <th>รุ่น</th>
-    <th>หมายเลขสินค้า</th>
+    <th>รหัสเครื่อง</th>
     <th>โดย</th>
     <?php if (can('parts')) { ?><th style="width:120px">จัดการ</th><?php } ?>
   </tr>
@@ -738,7 +738,7 @@ list_search_form([
           <input type="number" name="qty" id="withdraw-qty" value="1" step="0.5" min="0.5">
           <button type="button" class="qty-btn" onclick="qtyStepClick(this)" data-delta="0.5">+</button>
         </div>
-        <label>หมายเลขสินค้า</label><input type="text" name="asset_code" class="asset-search" placeholder="พิมพ์แล้วเลือก">
+        <label>รหัสเครื่อง</label><input type="text" name="asset_code" class="asset-search" placeholder="พิมพ์แล้วเลือก">
         <label>หมายเหตุ</label><input type="text" name="remark" placeholder="ถ้ามี">
         <div class="full" style="display:flex;gap:8px;margin-top:6px">
           <button type="submit" class="btn">บันทึก</button>

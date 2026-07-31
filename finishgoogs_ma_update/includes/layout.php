@@ -211,8 +211,8 @@ function page_footer() {
 
 <!-- popup แจ้งเตือน -->
 <div id="notif-overlay" class="notif-overlay" hidden>
-  <div class="notif-box">
-    <h2 class="h-with-icon"><?= ui_icon_html('bell', 20, 'h-svg') ?><span>แจ้งเตือน</span></h2>
+  <div class="notif-box" role="dialog" aria-modal="true" aria-labelledby="notif-overlay-title">
+    <h2 id="notif-overlay-title" class="h-with-icon"><?= ui_icon_html('bell', 20, 'h-svg') ?><span>แจ้งเตือน</span></h2>
     <ul id="notif-list"></ul>
     <button onclick="closeOverlay('notif-overlay')">รับทราบ</button>
   </div>
@@ -223,7 +223,7 @@ function page_footer() {
 
 <!-- modal รายการเจาะลึก (dashboard ฯลฯ) — เจาะได้หลายชั้น มีปุ่มย้อนกลับ -->
 <div id="list-overlay" class="notif-overlay" hidden>
-  <div class="notif-box" style="width:min(820px,94vw); max-height:84vh">
+  <div class="notif-box" style="width:min(820px,94vw); max-height:84vh" role="dialog" aria-modal="true" aria-labelledby="list-title">
     <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px">
       <button id="list-back" class="btn-sm btn-line" onclick="modalBack()" hidden>← ย้อน</button>
       <h2 id="list-title" style="margin:0; flex:1; font-size:16px"></h2>

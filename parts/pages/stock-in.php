@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash('success', 'บันทึกรับเข้าเรียบร้อย');
         }
     } catch (Exception $e) {
-        flash('error', $e->getMessage());
+        flash('error', safe_exception_message($e));
     }
     redirect(url('/pages/stock-in.php'));
 }

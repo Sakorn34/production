@@ -151,7 +151,7 @@ page_header('อัปเดต FW/HW — ' . $product['name'] . ' (' . number_f
 
 <form class="filter" method="get" style="margin-bottom:14px">
   <input type="hidden" name="product" value="<?= (int)$productId ?>">
-  <input type="text" name="sn" value="<?= h($searchSn) ?>" placeholder="ค้นหาหมายเลขเครื่อง" style="width:200px">
+  <input type="text" name="sn" value="<?= h($searchSn) ?>" placeholder="ค้นหารหัสเครื่อง" style="width:200px">
   <input type="text" name="d" value="<?= h($searchDetail) ?>" placeholder="ค้นหารายละเอียดการอัปเดต" style="min-width:240px">
   <button type="submit">🔍 ค้นหา</button>
   <?php if ($searchSn !== '' || $searchDetail !== '') { ?>

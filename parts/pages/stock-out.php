@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash('success', "เบิกออกเรียบร้อย เลขที่: {$docNo}");
         }
     } catch (Exception $e) {
-        flash('error', $e->getMessage());
+        flash('error', safe_exception_message($e));
     }
     redirect(url('/pages/stock-out.php'));
 }
@@ -108,7 +108,7 @@ parts_page_header('stock-out-set', 'เบิกออก (Set)', 'เบิก�
                     <th>S/N</th>
                     <th class="text-right">จำนวนรวม</th>
                     <th>ผู้เบิก</th>
-                    <th>หมายเหตุ</th>
+                    <th>ประเภทการเบิก</th>
                     <th>วันเวลา</th>
                     <th class="col-actions">จัดการ</th>
                 </tr>
@@ -161,14 +161,14 @@ parts_page_header('stock-out-set', 'เบิกออก (Set)', 'เบิก�
             <input type="number" name="set_count" min="1" value="1" required>
         </div>
         <div class="form-group">
-            <label>หมายเลขสินค้า (S/N)</label>
+            <label>หมายเลขเครื่อง (S/N)</label>
             <input type="text" name="asset_code" placeholder="เช่น BP26072024">
         </div>
     </div>
     <div class="form-group">
-        <label>หมายเหตุ</label>
+        <label>ประเภทการเบิก</label>
         <select name="note" required>
-            <option value="">-- เลือกหมายเหตุ --</option>
+            <option value="">-- เลือกประเภทการเบิก --</option>
             <?php foreach ($noteOptions as $option): ?>
             <option value="<?= e($option) ?>"><?= e($option) ?></option>
             <?php endforeach; ?>
@@ -195,7 +195,7 @@ parts_page_header('stock-out-set', 'เบิกออก (Set)', 'เบิก�
         <input type="text" name="asset_code" value="<?= e($editRow['asset_code'] ?? '') ?>" placeholder="เช่น BP26072024" data-autofocus>
     </div>
     <div class="form-group">
-        <label>หมายเหตุ</label>
+        <label>ประเภทการเบิก</label>
         <select name="note" required>
             <?php foreach ($noteOptions as $option): ?>
             <option value="<?= e($option) ?>" <?= ($editRow['note'] ?? '') === $option ? 'selected' : '' ?>><?= e($option) ?></option>
@@ -204,7 +204,7 @@ parts_page_header('stock-out-set', 'เบิกออก (Set)', 'เบิก�
     </div>
     <div class="form-actions">
         <a href="<?= url('/pages/stock-out.php') ?>" class="btn btn-outline">ยกเลิก</a>
-        <button type="submit" class="btn btn-danger">บันทึกการแก้ไข</button>
+        <button type="submit" class="btn btn-success">บันทึกการแก้ไข</button>
     </div>
 </form>
 <?php parts_modal_end(); ?>

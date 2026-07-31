@@ -246,7 +246,7 @@ function tech_parts_stock_out($productCode, $quantity, $purpose, $issuedBy, $ass
             $pdo->rollBack();
         }
         error_log('[tech_parts_stock_out] ' . $e->getMessage());
-        return ['ok' => false, 'error' => 'เบิกสต็อกไม่สำเร็จ — ' . $e->getMessage()];
+        return ['ok' => false, 'error' => 'เบิกสต็อกไม่สำเร็จ — ' . safe_exception_message($e)];
     }
 }
 
@@ -337,7 +337,7 @@ function tech_parts_stock_in_by_part_id($partId, $qtyFloat, $note, $receivedBy) 
 }
 
 /**
- * ปรับสต็ock tech_parts เมื่อแก้จำนวน movement (diff = ใหม่ - เก่า, บวก = เบิกเพิ่ม)
+ * ปรับสต็อก tech_parts เมื่อแก้จำนวน movement (diff = ใหม่ - เก่า, บวก = เบิกเพิ่ม)
  *
  * @param int   $partId
  * @param float $diffQty
@@ -696,7 +696,7 @@ function asset_parts_needs_stock_sync(array $summary) {
 }
 
 /**
- * Sync เบิกอะไหล่ของเครื่อง → ผูก/สร้าง stock_out ใน Parts (ไม่หักสต็ockซ้ำ)
+ * Sync เบิกอะไหล่ของเครื่อง → ผูก/สร้าง stock_out ใน Parts (ไม่หักสต็อกซ้ำ)
  *
  * @param int $assetId
  * @return array{ok:bool,linked:int,created:int,repaired:int,skipped:int,failed:int,errors:array<int,string>,message?:string}
@@ -1018,7 +1018,7 @@ function ma_rollback_withdrawals($maRecordId, $actor) {
 }
 
 /**
- * ลบ part_movement (out) พร้อมคืนสต็ock tech_parts
+ * ลบ part_movement (out) พร้อมคืนสต็อก tech_parts
  *
  * @param int    $movementId
  * @param string $actor

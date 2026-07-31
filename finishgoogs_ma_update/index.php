@@ -138,16 +138,17 @@ $partsBase = ui_parts_base_url();
 ?>
 <div class="kpi-grid">
   <?php
-  kpi($total, 'เครื่องทั้งหมด', 'assets', 'primary', pct($byStatus['new'], $total) . '% อยู่ในคลัง',
+  kpi($total, 'เครื่องทั้งหมด', 'assets', 'primary',
+      number_format($byStatus['new']) . ' ใหม่ · ' . number_format($byStatus['rental']) . ' เช่า · ' . number_format($byStatus['spare']) . ' สำรอง',
       modal_js('เครื่องทั้งหมด — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=all", "$B/assets.php"), 'เครื่อง');
   kpi($byStatus['new'], 'ใหม่ (คลัง)', 'box', 'success', pct($byStatus['new'], $total) . '% ของทั้งหมด',
       modal_js('เครื่องใหม่ — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=new", "$B/assets.php?status=new"), 'เครื่อง');
   kpi($byStatus['rental'], 'เครื่องเช่า', 'updates', 'info', pct($byStatus['rental'], $total) . '% ของทั้งหมด',
       modal_js('เครื่องเช่า — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=rental", "$B/assets.php?status=rental"), 'เครื่อง');
-  kpi($byStatus['spare'], 'เครื่องสำรอง', 'box', 'warning', 'พร้อมสลับเปลี่ยนหน้างาน',
+  kpi($byStatus['spare'], 'เครื่องสำรอง', 'box', 'warning', pct($byStatus['spare'], $total) . '% ของทั้งหมด — พร้อมสลับเปลี่ยนหน้างาน',
       modal_js('เครื่องสำรอง — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=spare", "$B/assets.php?status=spare"), 'เครื่อง');
   if ($stock['ok']) {
-      kpi($stock['qty'], 'สต็อกคงเหลือรวม', 'parts', 'primary', number_format($stock['items']) . ' รายการ',
+      kpi($stock['qty'], 'สต็อกคงเหลือรวม', 'parts', 'primary', number_format($stock['items']) . ' รายการ (ผลรวมดิบข้ามหน่วย ใช้อ้างอิงคร่าวๆ)',
           "location.href='" . h($partsBase) . "/pages/products.php'", 'อะไหล่');
       kpi($stock['low'], 'อะไหล่ใกล้หมด', 'alert', $stock['low'] > 0 ? 'warning' : 'success', $stock['low'] > 0 ? '<span class="kpi-down">ต้องตรวจสอบ/สั่งซื้อ</span>' : 'ทุกรายการเพียงพอ',
           $stock['low'] > 0
@@ -156,7 +157,7 @@ $partsBase = ui_parts_base_url();
           'อะไหล่');
       kpi(0, 'รับเข้า / เบิกออก', 'history', 'info', 'ความเคลื่อนไหววันนี้',
           modal_js('รับเข้า / เบิกออกวันนี้', "$B/dashboard_data.php?type=stock_today", "$partsBase/pages/history.php"), 'วันนี้',
-          number_format($stock['in_today']) . ' / ' . number_format($stock['out_today']));
+          'รับเข้า ' . number_format($stock['in_today']) . ' / เบิกออก ' . number_format($stock['out_today']) . ' ชิ้น');
   } else {
       echo '<div class="kpi kpi-warning"><div class="kpi-top"><span class="kpi-ic">' . ui_icon_html('alert', 14) . '</span> สต็อกอะไหล่</div><b class="kpi-num">—</b><div class="kpi-sub">เชื่อมต่อระบบสต็อกไม่ได้</div></div>';
   }

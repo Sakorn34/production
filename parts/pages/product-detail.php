@@ -14,7 +14,6 @@ if (parts_product_forms_handle_post($db, $stock, $returnTo)) {
     exit;
 }
 
-$partsShowBack = false;
 require_once __DIR__ . '/../includes/header.php';
 
 $rawProduct = $productId ? $stock->getProduct($productId) : null;
@@ -26,7 +25,7 @@ if ($product) {
     $icon = $icons[$product['code']] ?? '';
 }
 
-parts_page_header('products', 'รายละเอียดอะไหล่', 'ข้อมูลสินค้า ราคา ลิงก์สั่งซื้อ และประวัติการเบิกของชิ้นนี้');
+parts_page_header('products', 'รายละเอียดอะไหล่', 'ข้อมูลอะไหล่ ราคา ลิงก์สั่งซื้อ และประวัติการเบิกของชิ้นนี้');
 ?>
 
 <div class="card parts-list-card">
@@ -53,9 +52,9 @@ parts_page_header('products', 'รายละเอียดอะไหล่'
             <div>
                 <h2 style="margin:0 0 0.35rem;font-size:1.2rem"><?= e(parts_display_name($product)) ?></h2>
                 <?php if (!empty($product['display_sub']) && $product['display_sub'] !== $product['code']): ?>
-                <p class="text-muted" style="margin:0;font-size:12px">Code Part : <?= e($product['display_sub']) ?></p>
+                <p class="text-muted" style="margin:0;font-size:12px">รหัสอะไหล่ (Production): <?= e($product['display_sub']) ?></p>
                 <?php endif; ?>
-                <p class="text-muted" style="margin:0.15rem 0 0;font-size:12px">ID Part : <?= e($product['code']) ?></p>
+                <p class="text-muted" style="margin:0.15rem 0 0;font-size:12px">รหัสอะไหล่ (สต็อก): <?= e($product['code']) ?></p>
                 <p style="margin:0.5rem 0 0">
                     <strong><?= formatNumber($product['quantity']) ?></strong> <?= e($product['unit']) ?> คงเหลือ
                     <?php if ($product['quantity'] <= $product['min_stock']): ?>

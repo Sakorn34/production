@@ -418,7 +418,7 @@ foreach ($prodEff as $f) if (!isset($KIND_LABELS[$f['kind']]) && $f['kind'] !== 
 
   <div class="panel" style="margin-bottom:14px; padding:12px 14px">
     <b>ข้อความประจำสินค้า (Serial / MAC)</b>
-    <p class="muted" style="margin:4px 0 10px; font-size:13px">เปิดใช้สำหรับรุ่นที่ต้องคัดลอกคำสั่ง MobaXterm และ MAC จากหมายเลขสินค้า · แสดงในหน้า "บันทึกผลิตใหม่" และ "บันทึก MA" (ข้อ 1–3 · ไม่รวมสรุปงานเช่า Office)</p>
+    <p class="muted" style="margin:4px 0 10px; font-size:13px">เปิดใช้สำหรับรุ่นที่ต้องคัดลอกคำสั่ง MobaXterm และ MAC จากรหัสเครื่อง · แสดงในหน้า "บันทึกผลิตใหม่" และ "บันทึก MA" (ข้อ 1–3 · ไม่รวมสรุปงานเช่า Office)</p>
     <label style="display:flex; align-items:center; gap:8px; font-weight:600">
       <input type="checkbox" name="show_product_snippets" value="1" <?= $snippetsChecked ? 'checked' : '' ?>>
       เปิดใช้แผงข้อความประจำสินค้าสำหรับรุ่นนี้

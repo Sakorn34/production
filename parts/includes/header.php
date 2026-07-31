@@ -72,9 +72,20 @@ ob_start();
 
     <main class="content">
         <?php if ($flash): ?>
-            <div class="alert alert-<?= e($flash['type']) ?>">
+            <div class="alert alert-<?= e($flash['type']) ?>" id="parts-flash-alert" role="status">
                 <?= e($flash['message']) ?>
             </div>
+            <script>
+            (function(){
+                var el = document.getElementById('parts-flash-alert');
+                if (!el) return;
+                var duration = <?= $flash['type'] === 'error' ? 5200 : 3600 ?>;
+                setTimeout(function(){
+                    el.classList.add('alert-fade-out');
+                    setTimeout(function(){ if (el.parentNode) el.parentNode.removeChild(el); }, 420);
+                }, duration);
+            })();
+            </script>
         <?php endif; ?>
         <?php
         $partsShowBack = $partsShowBack ?? !parts_is_menu_page($currentPage);

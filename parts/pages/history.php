@@ -107,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_stock_out'])) 
         $stock->deleteStockOut((int) $_POST['id']);
         flash('success', 'ลบรายการเบิกแล้ว');
     } catch (Exception $e) {
-        flash('error', $e->getMessage());
+        flash('error', safe_exception_message($e));
     }
     redirect(url('/pages/history.php'));
 }
@@ -340,7 +340,7 @@ function history_sn_row_thumb(array $g, array $partIcons): string
             </dd>
         </div>
         <div>
-            <dt>S/N สินค้า</dt>
+            <dt>S/N เครื่อง</dt>
             <dd><?= e($detail['asset_code'] ?: '-') ?></dd>
         </div>
         <div>
@@ -457,7 +457,7 @@ function history_sn_row_thumb(array $g, array $partIcons): string
                 <td class="col-img"><?= history_row_thumb($h, $partIcons) ?></td>
                 <td><strong><?= e($h['doc_no']) ?></strong></td>
                 <td><?= history_row_label($h) ?></td>
-                <td>-</td>
+                <td title="ไม่ได้ระบุ S/N สำหรับรายการนี้">-</td>
                 <td class="text-right"><?= formatNumber($h['display_qty'] ?? $h['total_qty'] ?? 0) ?></td>
                 <td><?= e($h['issued_by'] ?: '-') ?></td>
                 <td><?= history_note_badge($h) ?></td>

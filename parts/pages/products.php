@@ -108,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $deleted = true;
                     } catch (Exception $ex) {
                         $db->rollBack();
-                        flash('error', 'ไม่สามารถลบอะไหล่ได้: ' . $ex->getMessage());
+                        flash('error', 'ไม่สามารถลบอะไหล่ได้: ' . safe_exception_message($ex));
                         redirect($productsReturnTo);
                     }
                 } else {
@@ -275,7 +275,7 @@ $products = parts_sort_products($products, $sortState['sort'], $sortState['dir']
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>ราคา</label>
+                        <label>ราคา (บาท)</label>
                         <input type="number" name="price" value="0.00" min="0" step="0.01">
                     </div>
                     <div class="form-group">
@@ -287,7 +287,7 @@ $products = parts_sort_products($products, $sortState['sort'], $sortState['dir']
                     <label>ผู้จำหน่าย / บริษัทที่สั่งซื้อ</label>
                     <input type="text" name="supplier" maxlength="200" placeholder="เช่น Shopee, LCSC, ชื่อร้าน">
                 </div>
-                <p class="muted" style="font-size:12px;margin:0 0 12px">รหัสอะไหล่สร้างอัตโนมัติ · บันทึกแล้ว sync ไป production (parts.stock_code)</p>
+                <p class="muted" style="font-size:12px;margin:0 0 12px">รหัสอะไหล่สร้างอัตโนมัติ · บันทึกแล้วจะซิงก์ไปยังระบบทะเบียนเครื่องอัตโนมัติ</p>
                 <div class="form-actions">
                     <button type="button" class="btn btn-outline modal-close-btn">ยกเลิก</button>
                     <button type="submit" class="btn btn-primary"><?= ui_icon_html('plus', 16, 'btn-svg') ?> เพิ่มอะไหล่</button>

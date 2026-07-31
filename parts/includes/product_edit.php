@@ -87,7 +87,7 @@ function parts_product_forms_handle_post(PDO $db, StockService $stock, string $d
             redirect($returnTo);
         }
         if (mb_strlen($partCode) > 255) {
-            flash('error', 'Code Part ยาวเกิน 255 ตัวอักษร');
+            flash('error', 'รหัสอะไหล่ (Production) ยาวเกิน 255 ตัวอักษร');
             redirect($returnTo);
         }
 
@@ -211,12 +211,12 @@ function parts_product_edit_modals(): void
         <div class="form-group">
             <label for="edit-modal-name">ชื่ออะไหล่ (ในระบบ Stock)</label>
             <input type="text" name="name" id="edit-modal-name" required maxlength="255" data-autofocus>
-            <p class="form-hint">ถ้า sync กับ production ชื่อแสดงอาจมาจากฝั่ง production</p>
+            <p class="form-hint">ถ้าอะไหล่นี้เชื่อมกับระบบทะเบียนเครื่องแล้ว ชื่อที่แสดงในตารางอาจใช้ชื่อจากฝั่งนั้นแทนชื่อนี้</p>
         </div>
         <div class="form-group">
-            <label for="edit-modal-part-code">Code Part</label>
+            <label for="edit-modal-part-code">รหัสอะไหล่ (Production)</label>
             <input type="text" name="part_code" id="edit-modal-part-code" maxlength="255" placeholder="เช่น แผ่น PVC 35x20x5 mm.">
-            <p class="form-hint">รหัส/รายละเอียดอะไหล่ใน production (parts.part_code)</p>
+            <p class="form-hint">รหัส/รายละเอียดอะไหล่ในระบบทะเบียนเครื่อง</p>
         </div>
         <div class="form-row">
             <div class="form-group">
@@ -262,7 +262,7 @@ function parts_product_edit_modals(): void
         <div class="form-group">
             <label>เลือกรูป</label>
             <input type="file" name="icon" accept="image/jpeg,image/png,image/gif,image/webp" required data-autofocus>
-            <p class="form-hint">JPG, PNG, GIF, WEBP · ไม่เกิน 5MB · sync ไป production.parts.icon_path</p>
+            <p class="form-hint">JPG, PNG, GIF, WEBP · ไม่เกิน 5MB · รูปนี้จะถูกซิงก์ไปแสดงในระบบทะเบียนเครื่องด้วย</p>
         </div>
         <div class="form-actions">
             <button type="button" class="btn btn-outline modal-close-btn">ยกเลิก</button>

@@ -195,11 +195,11 @@ function ma_rental_office_summary($replace, $repair, $fw, $remark) {
 }
 
 /**
- * แปลงหมายเลขสินค้าเป็น MAC Address สำหรับตั้งค่าใน cmdline.txt
+ * แปลงรหัสเครื่องเป็น MAC Address สำหรับตั้งค่าใน cmdline.txt
  *
  * ใช้เลข 8 หลักท้ายจากรหัส (เช่น BS22120047 → 22:12:00:47)
  *
- * @param string $assetCode หมายเลขสินค้า / asset_code
+ * @param string $assetCode รหัสเครื่อง / asset_code
  * @return string MAC หรือค่าว่างถ้าแปลงไม่ได้
  */
 function ma_asset_code_to_mac($assetCode) {
@@ -752,7 +752,7 @@ require __DIR__ . '/includes/list_search.php';
       var rows = [
         ['วันที่เข้า MA', d.date || '-', false],
         ['รอบ MA', d.round || '-', false],
-        ['หมายเลขสินค้า', d.asset || d.code || '-', false],
+        ['รหัสเครื่อง', d.asset || d.code || '-', false],
         ['✅ ใช้งานได้ปกติ', d.ok || '-', true],
         ['🔄 เปลี่ยนอะไหล่', d.replaceDisp || '-', true],
         ['🔩 อะไหล่ที่เบิก (MA)', d.partsWithdraw || '-', true],
@@ -801,7 +801,7 @@ require __DIR__ . '/includes/list_search.php';
       <input type="hidden" name="replace_items" id="h-replace">
       <input type="hidden" name="repair_items" id="h-repair">
 
-      <label for="ma_code">หมายเลขสินค้า</label>
+      <label for="ma_code">รหัสเครื่อง</label>
       <div>
         <input type="text" name="asset_code" id="ma_code" class="asset-search" data-product="<?= (int)$productId ?>" value="<?= h($ea ? $ea['asset_code'] : ($recAsset ? $recAsset['asset_code'] : '')) ?>" <?= $ea ? 'readonly' : '' ?> required placeholder="พิมพ์เลือก S/N">
         <div class="muted ma-field-hint">รุ่น <?= h($product['name']) ?> · พิมพ์แล้วเลือกจากรายการ</div>
@@ -1369,7 +1369,7 @@ if (document.readyState === 'loading') {
 <p class="muted ma-table-hint">คลิกแถวเพื่อดูรายละเอียด MA และข้อความประจำสินค้า · กดหัวคอลัมน์เพื่อจัดเรียง</p>
 <?php
 list_search_form([
-    ['name' => 'mq', 'placeholder' => 'หมายเลขเครื่อง', 'value' => $mq, 'width' => '140px'],
+    ['name' => 'mq', 'placeholder' => 'รหัสเครื่อง', 'value' => $mq, 'width' => '140px'],
     ['name' => 'mround', 'placeholder' => 'รอบ MA', 'value' => $mround, 'width' => '80px'],
     ['name' => 'mby', 'placeholder' => 'ผู้บันทึก', 'value' => $mby, 'width' => '110px'],
     ['name' => 'mr', 'placeholder' => 'รายละเอียด', 'value' => $mr, 'width' => '160px'],
@@ -1439,7 +1439,7 @@ list_search_form([
     </section>
     <section class="ma-detail-section">
       <h3 class="ma-detail-sub h-with-icon"><?= ui_icon_html('clipboard', 14, 'h-svg') ?>ข้อความประจำสินค้า</h3>
-      <p class="muted ma-snippets-lead">อัปเดตตามหมายเลขสินค้าและฟอร์ม · กดคัดลอกทีละข้อ</p>
+      <p class="muted ma-snippets-lead">อัปเดตตามรหัสเครื่องและฟอร์ม · กดคัดลอกทีละข้อ</p>
       <?= ma_snippets_inner_html('ma-modal-sn', ['title' => false, 'lead' => false]) ?>
     </section>
   </div>

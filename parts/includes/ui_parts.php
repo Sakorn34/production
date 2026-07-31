@@ -48,7 +48,7 @@ function parts_modal_begin(string $id, string $title, bool $hidden = true, bool 
         <div class="modal-box" role="dialog" aria-labelledby="<?= e($id) ?>-title" aria-modal="true">
             <div class="modal-header">
                 <h3 id="<?= e($id) ?>-title"><?= e($title) ?></h3>
-                <button type="button" class="modal-close" aria-label="ปิด">&times;</button>
+                <button type="button" class="modal-close" aria-label="ปิด"><?= ui_icon_html('close', 16, 'btn-svg') ?></button>
             </div>
             <div class="modal-body">
     <?php

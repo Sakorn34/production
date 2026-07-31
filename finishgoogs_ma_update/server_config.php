@@ -180,7 +180,7 @@ page_header('ตั้งค่า Server / Deploy');
 
   <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:20px">
     <button type="submit" name="action" value="test" class="btn btn-line">🔌 ทดสอบการเชื่อมต่อ</button>
-    <button type="submit" name="action" value="save" class="btn btn-primary">💾 บันทึกการตั้งค่า</button>
+    <button type="submit" name="action" value="save" class="btn btn-primary"><?= ui_btn_label('save', 'บันทึกการตั้งค่า') ?></button>
   </div>
 </form>
 

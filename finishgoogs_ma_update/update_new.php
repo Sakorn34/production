@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 page_header('บันทึกอัปเดต FW/HW');
 if (!$a) { ?>
   <form class="filter" method="get">
-    <input type="text" name="code" placeholder="กรอกหมายเลขสินค้า เช่น BP23021294" required>
+    <input type="text" name="code" placeholder="กรอกรหัสเครื่อง เช่น BP23021294" required>
     <button formaction="<?= BASE_URL ?>/asset.php" type="submit">ค้นหาเครื่องก่อน</button>
   </form>
 <?php page_footer(); exit; }
@@ -88,7 +88,7 @@ foreach (effective_fields($a['product_id'], 'update') as $f) {
   <label>รูปประกอบ 2</label>
   <input type="file" name="image2" accept="image/*">
 
-  <div class="full"><button type="submit">💾 บันทึกการอัปเดต</button></div>
+  <div class="full"><button type="submit"><?= ui_btn_label('save', 'บันทึกการอัปเดต') ?></button></div>
 </form>
 <script>
 var comps = <?= json_encode($compData, JSON_UNESCAPED_UNICODE) ?>;

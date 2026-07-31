@@ -38,6 +38,7 @@ $line_name = $profile->login_name ?? 'User';
 require_once dirname(__DIR__, 2) . '/shared/activity_log_core.php';
 require_once dirname(__DIR__, 2) . '/shared/line_notify_core.php';
 require_once dirname(__DIR__, 2) . '/shared/line_flex_templates.php';
+require_once dirname(__DIR__, 2) . '/shared/error_messages.php';
 activity_log_register_post_shutdown('parts', $line_name);
 activity_log_register_page_view_shutdown('parts', $line_name);
 

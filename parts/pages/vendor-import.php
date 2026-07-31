@@ -124,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $importToken = 'default';
         }
     } catch (Throwable $e) {
-        $error = $e->getMessage();
+        $error = safe_exception_message($e);
     }
 }
 

@@ -290,7 +290,7 @@ page_header('เครื่อง ' . $a['asset_code'], false);
   <div class="asset-head-photo"><?= img_tag($a['icon_path'], $a['pname'], 'thumb-lg') ?></div>
   <div class="info asset-head-main">
     <dl>
-      <dt>หมายเลขสินค้า</dt><dd class="asset-dd-span"><b><?= h($a['asset_code']) ?></b>
+      <dt>รหัสเครื่อง</dt><dd class="asset-dd-span"><b><?= h($a['asset_code']) ?></b>
         <?php if ($a['running_no']) { ?><span class="muted" style="font-size:12px"> (running <?= (int)$a['running_no'] ?>)</span><?php } ?>
       </dd>
       <dt>รุ่น</dt><dd class="asset-dd-span"><?= h($a['pname']) ?></dd>
@@ -309,7 +309,7 @@ page_header('เครื่อง ' . $a['asset_code'], false);
       <dd class="asset-dd-act">
         <button class="btn-sm btn-with-icon" type="submit" form="asset-fw-form"><?= ui_btn_label('save', 'บันทึก FW') ?></button>
       </dd>
-      <dt>ประเภท</dt>
+      <dt>สถานะ</dt>
       <dd class="asset-dd-val">
         <form method="post" id="asset-status-form" class="asset-field-form asset-status-form">
           <?= csrf_field() ?>
@@ -360,10 +360,10 @@ page_header('เครื่อง ' . $a['asset_code'], false);
 <?php } ?>
 
 <details style="margin-bottom:16px">
-  <summary class="btn btn-line btn-sm btn-with-icon" style="list-style:none; cursor:pointer; display:inline-flex"><?= ui_btn_label('edit', 'แก้ไข / ลบเครื่องนี้') ?></summary>
+  <summary class="btn btn-line btn-sm btn-with-icon" style="list-style:none; cursor:pointer; display:inline-flex"><?= ui_btn_label('edit', 'แก้ไขข้อมูลเครื่อง') ?></summary>
   <form method="post" class="formgrid form-narrow" style="margin-top:10px">
     <?= csrf_field() ?><input type="hidden" name="edit_asset" value="1">
-    <label>หมายเลขสินค้า</label><input type="text" name="asset_code" value="<?= h($a['asset_code']) ?>" required>
+    <label>รหัสเครื่อง</label><input type="text" name="asset_code" value="<?= h($a['asset_code']) ?>" required>
     <label>รุ่นสินค้า</label>
     <select name="product_id">
       <?php while ($po = $productOptions->fetch_assoc()) { ?>
@@ -373,12 +373,16 @@ page_header('เครื่อง ' . $a['asset_code'], false);
     <label>วันที่ผลิต</label><input type="date" name="produced_at" value="<?= h($a['produced_at']) ?>">
     <label>Lot</label><input type="text" name="lot_label" value="<?= h($a['lot_label']) ?>">
     <label class="full">หมายเหตุ</label><textarea name="note" class="full field-note" rows="2"><?= h($a['note']) ?></textarea>
-    <div class="full" style="display:flex; gap:10px; align-items:center">
+    <div class="full">
       <button type="submit" class="btn-with-icon"><?= ui_btn_label('save', 'บันทึกการแก้ไข') ?></button>
-      <button type="submit" form="del-asset-form" class="btn-danger btn-with-icon"
-        onclick="return confirm('ลบเครื่อง <?= h($a['asset_code']) ?> พร้อมประวัติทั้งหมด (<?= count($tl) ?> รายการ)?\nการลบย้อนกลับไม่ได้!')"><?= ui_btn_label('trash', 'ลบเครื่องนี้') ?></button>
     </div>
   </form>
+  <div style="margin-top:16px;padding:12px 14px;border:1px solid #b91c1c;background:var(--danger-soft, #fee2e2);border-radius:8px">
+    <b style="font-size:13px;color:#b91c1c">โซนอันตราย</b>
+    <p class="muted" style="margin:4px 0 10px;font-size:12.5px">ลบเครื่องนี้พร้อมประวัติทั้งหมด — การลบย้อนกลับไม่ได้</p>
+    <button type="submit" form="del-asset-form" class="btn-danger btn-with-icon"
+      onclick="return confirm('ลบเครื่อง <?= h($a['asset_code']) ?> พร้อมประวัติทั้งหมด (<?= count($tl) ?> รายการ)?\nการลบย้อนกลับไม่ได้!')"><?= ui_btn_label('trash', 'ลบเครื่องนี้') ?></button>
+  </div>
   <form method="post" id="del-asset-form"><?= csrf_field() ?><input type="hidden" name="delete_asset" value="1"></form>
 </details>
 
@@ -426,7 +430,7 @@ page_header('เครื่อง ' . $a['asset_code'], false);
       $withdrawN = (int)($partsSummary['out_count'] ?? 0);
       $withdrawConfirm = "Sync ตามรายการเบิกในตาราง?\n\n";
       $withdrawConfirm .= "• ผูก Stock ตาม {$withdrawN} รายการในตาราง\n";
-      $withdrawConfirm .= "• ลบใบเบิกซ้ำ/เกินใน Parts (คืนสต็ockเมื่อหักแล้ว)\n\n";
+      $withdrawConfirm .= "• ลบใบเบิกซ้ำ/เกินใน Parts (คืนสต็อกเมื่อหักแล้ว)\n\n";
       $withdrawConfirm .= "รายการในตาราง production จะไม่ถูกลบ";
       ?>
       <form method="post" style="display:inline" onsubmit="return confirm(<?= h(json_encode($withdrawConfirm, JSON_UNESCAPED_UNICODE)) ?>)">
@@ -518,7 +522,7 @@ $addWithdrawModalUrl = BASE_URL . '/parts.php?ajax=add_move_form&asset_id=' . (i
     <?= ui_btn_label('stock-out-item', 'เพิ่มรายการเบิก') ?>
   </button>
 </div>
-<p class="muted" style="margin:-4px 0 16px;font-size:13px">ยังไม่มีรายการเบิกใน production — กดปุ่มด้านบนเพื่อเบิกอะไหล่ใช้กับเครื่องนี้ (หักสต็ock Parts อัตโนมัติ)</p>
+<p class="muted" style="margin:-4px 0 16px;font-size:13px">ยังไม่มีรายการเบิกใน production — กดปุ่มด้านบนเพื่อเบิกอะไหล่ใช้กับเครื่องนี้ (หักสต็อก Parts อัตโนมัติ)</p>
 <?php } ?>
 <?php } ?>
 
@@ -531,7 +535,7 @@ $addWithdrawModalUrl = BASE_URL . '/parts.php?ajax=add_move_form&asset_id=' . (i
     <div class="ma-sn-modal-hd">
       <div>
         <h2 id="asset-snippet-title" class="ma-snippets-title h-with-icon"><?= ui_icon_html('clipboard', 16, 'h-svg') ?><span>ข้อความประจำสินค้า</span></h2>
-        <p class="muted ma-snippets-lead">อัปเดตตามหมายเลขสินค้าและฟอร์ม · กดคัดลอกทีละข้อ</p>
+        <p class="muted ma-snippets-lead">อัปเดตตามรหัสเครื่องและฟอร์ม · กดคัดลอกทีละข้อ</p>
       </div>
       <button type="button" class="btn-sm btn-line" onclick="closeOverlay('asset-snippet-overlay')">✕ ปิด</button>
     </div>

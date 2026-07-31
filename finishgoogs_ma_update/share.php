@@ -465,7 +465,7 @@ page_header('ทะเบียนสินค้า (stock)');
           <input type="text" name="create_name" value="<?= h($r['create_name'] ?? '') ?>" required placeholder="ผู้บันทึก (ห้ามว่าง)">
           <input type="number" name="setup_id" value="<?= h($r['setup_id'] ?? '') ?>" placeholder="Setup ID">
           <select name="active"><option value="1" <?= (int)$r['active'] === 1 ? 'selected' : '' ?>>Active: 1 — นับเป็น stock</option><option value="0" <?= (int)$r['active'] === 0 ? 'selected' : '' ?>>Active: 0 — ไม่นับ</option></select>
-          <button class="btn-sm" type="submit">💾 บันทึก</button>
+          <button class="btn-sm" type="submit"><?= ui_btn_label('save', 'บันทึก', 13) ?></button>
         </form>
       </details>
       <form method="post" style="display:inline" onsubmit="return confirm('ลบรายการ <?= h($r['serial_number']) ?> ออกจากตาราง stock ?')">

@@ -180,7 +180,7 @@ foreach (effective_fields((int)$log['product_id'], 'update') as $f) {
   </div>
 
   <div class="full" style="display:flex; gap:8px; flex-wrap:wrap">
-    <button type="submit">💾 บันทึกการแก้ไข</button>
+    <button type="submit"><?= ui_btn_label('save', 'บันทึกการแก้ไข') ?></button>
     <a class="btn btn-line" href="<?= h($backUrl) ?>">ยกเลิก</a>
   </div>
 </form>

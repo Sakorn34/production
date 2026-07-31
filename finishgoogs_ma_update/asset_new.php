@@ -167,10 +167,12 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fields') {
         if ($f['kind'] === 'component') {
             $lastVal = isset($lastComp[$f['name']]) ? (string)$lastComp[$f['name']] : '';
         } elseif ($f['kind'] === 'ผู้ผลิต') {
-            if ($last && !empty($last['made_by'])) {
-                $lastVal = (string)$last['made_by'];
-            } elseif (isset($lastExtra[$f['name']])) {
+            // แยกจำค่าล่าสุดตามรายฟิลด์ (เช่นผู้ผลิตบอร์ด A / บอร์ด B ไม่ใช่ค่าเดียวกัน)
+            // fallback เป็น made_by ของ record ล่าสุด เฉพาะฟิลด์ที่ไม่เคยมีประวัติเลย
+            if (isset($lastExtra[$f['name']]) && $lastExtra[$f['name']] !== '') {
                 $lastVal = (string)$lastExtra[$f['name']];
+            } elseif ($last && !empty($last['made_by'])) {
+                $lastVal = (string)$last['made_by'];
             }
         } else {
             $lastVal = isset($lastExtra[$f['name']]) ? (string)$lastExtra[$f['name']] : '';
@@ -270,7 +272,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($s !== '') $units[] = $s;
         }
         $units = array_values(array_unique($units));
-        if (!$units) { flash_set('ยังไม่ได้กรอกหมายเลขสินค้า', 'err'); header('Location: ' . BASE_URL . '/asset_new.php'); exit; }
+        if (!$units) { flash_set('ยังไม่ได้กรอกรหัสเครื่อง', 'err'); header('Location: ' . BASE_URL . '/asset_new.php'); exit; }
     }
 
     // ชุดอะไหล่ประจำรุ่น (BOM) — จัดชุดในฟอร์มนี้ → บันทึกเป็นเทมเพลตรุ่น + เบิกอัตโนมัติต่อเครื่อง
@@ -412,7 +414,7 @@ require __DIR__ . '/includes/layout.php';
 $products = [];
 $res = qr("SELECT id, name, code_mode, icon_path FROM products WHERE is_active=1 ORDER BY name");
 while ($r = $res->fetch_assoc()) $products[] = $r;
-page_header('บันทึกสินค้าผลิตใหม่');
+page_header('บันทึกเครื่องผลิตใหม่');
 ?>
 <form method="post" id="mainform">
   <?= csrf_field() ?>
@@ -434,7 +436,7 @@ page_header('บันทึกสินค้าผลิตใหม่');
 
   <div id="prod-snippet-bar" style="margin-bottom:12px; display:none">
     <button type="button" class="btn btn-line btn-with-icon" id="prod-snippet-btn" onclick="openProdSnippetModal()"><?= ui_btn_label('clipboard', 'ข้อความประจำสินค้า') ?></button>
-    <span class="muted" style="margin-left:8px; font-size:13px">Serial / MAC จากหมายเลขสินค้าในฟอร์ม · กดคัดลอกทีละข้อ</span>
+    <span class="muted" style="margin-left:8px; font-size:13px">Serial / MAC จากรหัสเครื่องในฟอร์ม · กดคัดลอกทีละข้อ</span>
   </div>
 
   <div class="produce-cols">
@@ -491,7 +493,7 @@ page_header('บันทึกสินค้าผลิตใหม่');
     </div>
   </div>
 
-  <div style="margin-top:16px"><button type="submit" id="save-btn" disabled>💾 บันทึกทั้งชุด</button></div>
+  <div style="margin-top:16px"><button type="submit" id="save-btn" disabled><?= ui_btn_label('save', 'บันทึกทั้งชุด') ?></button></div>
 </form>
 
 <!-- popup ข้อความประจำสินค้า -->
@@ -500,7 +502,7 @@ page_header('บันทึกสินค้าผลิตใหม่');
     <div class="ma-sn-modal-hd">
       <div>
         <h2 id="prod-snippet-title" class="ma-snippets-title h-with-icon"><?= ui_icon_html('clipboard', 16, 'h-svg') ?><span>ข้อความประจำสินค้า</span></h2>
-        <p class="muted ma-snippets-lead">อัปเดตตามหมายเลขสินค้าและฟอร์ม · กดคัดลอกทีละข้อ</p>
+        <p class="muted ma-snippets-lead">อัปเดตตามรหัสเครื่องและฟอร์ม · กดคัดลอกทีละข้อ</p>
       </div>
       <button type="button" class="btn-sm btn-line" onclick="closeOverlay('prod-snippet-overlay')">✕ ปิด</button>
     </div>
@@ -528,7 +530,7 @@ page_header('บันทึกสินค้าผลิตใหม่');
 <div id="qr-overlay" class="notif-overlay" hidden>
   <div class="notif-box" style="width:min(460px,94vw)">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
-      <h2 style="margin:0">📷 สแกนหมายเลขสินค้า</h2>
+      <h2 style="margin:0">📷 สแกนรหัสเครื่อง</h2>
       <button type="button" class="btn-sm btn-line" onclick="stopScan()">✕ ปิด</button>
     </div>
     <div id="qr-reader"></div>
@@ -576,8 +578,8 @@ function loadProduct(pid){
       document.getElementById('save-btn').disabled = false;
       document.getElementById('add-free-field').disabled = false;
       document.getElementById('unit-hint').textContent = d.mode === 'generated'
-        ? '(ระบบออกเลข running อัตโนมัติ — หมายเลขสินค้าจริงยืนยันตอนกดบันทึก)'
-        : '(กรอกหมายเลขสินค้าเองหรือสแกน QR ทีละเครื่อง)';
+        ? '(ระบบออกเลข running อัตโนมัติ — รหัสเครื่องจริงยืนยันตอนกดบันทึก)'
+        : '(กรอกรหัสเครื่องเองหรือสแกน QR ทีละเครื่อง)';
       var hintEl = document.getElementById('last-asset-hint');
       hintEl.style.display = 'none';
       hintEl.textContent = '';
@@ -1062,7 +1064,7 @@ function addUnit(){
     document.getElementById('gen_count').value = unitCount;
   } else {
     row.innerHTML = '<span class="badge st-new">#' + unitCount + '</span>'
-      + '<input type="text" name="serials[]" placeholder="หมายเลขสินค้า" style="flex:1; min-width:0" required autocomplete="off">'
+      + '<input type="text" name="serials[]" placeholder="รหัสเครื่อง" style="flex:1; min-width:0" required autocomplete="off">'
       + '<div style="display:flex; gap:8px; margin-left:auto; flex-shrink:0">'
       + '<button type="button" class="btn-sm btn-line" onclick="scanInto(this)">📷 สแกน</button>'
       + '<button type="button" class="btn-sm btn-line" onclick="removeUnit(this)">ลบ</button>'

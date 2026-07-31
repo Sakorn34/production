@@ -167,7 +167,7 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
 <div class="filter" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
 <form method="get" style="display:contents">
   <span class="livesearch-wrap">
-    <input type="text" name="q" id="live-q" value="<?= h($search) ?>" placeholder="ค้นหา หมายเลขสินค้า / รุ่น / ผู้ผลิต / FW" style="width:min(360px,100%)" autocomplete="off">
+    <input type="text" name="q" id="live-q" value="<?= h($search) ?>" placeholder="ค้นหา รหัสเครื่อง / รุ่น / ผู้ผลิต / FW" style="width:min(360px,100%)" autocomplete="off">
     <div id="live-results" class="combo-list" hidden></div>
   </span>
   <select name="product">
@@ -192,7 +192,7 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
   <button type="submit">ค้นหา</button>
 </form>
   <?php if ($withdrawSyncPendingCount > 0) { ?>
-  <form method="post" style="display:inline-flex" onsubmit="return confirm('Sync ตามรายการเบิก <?= (int)$withdrawSyncPendingCount ?> เครื่อง (ตาม filter ปัจจุบัน)?\n\nผูก Stock ตามตาราง · ลบใบเบิกซ้ำ/เกิน (คืนสต็ock)')">
+  <form method="post" style="display:inline-flex" onsubmit="return confirm('จับคู่ยอดเบิกกับสต็อกให้ตรงกัน สำหรับ <?= (int)$withdrawSyncPendingCount ?> เครื่อง (ตามตัวกรองที่เลือกอยู่)?\n\nระบบจะจับคู่ยอดเบิกกับสต็อก และลบใบเบิกที่ซ้ำ/เกินออก (คืนสต็อกให้)')">
     <?= csrf_field() ?>
     <input type="hidden" name="sync_withdraw_list_bulk" value="1">
     <input type="hidden" name="filter_q" value="<?= h($search) ?>">
@@ -233,7 +233,7 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
 
 <div class="table-wrap">
 <table class="list">
-  <tr><th></th><th>หมายเลขสินค้า</th><th>รุ่น</th><th>สถานะ</th><th>เบิกอะไหล่</th><th>ผู้บันทึกรายการ</th><th>ผลิตเมื่อ</th><th>FW</th></tr>
+  <tr><th></th><th>รหัสเครื่อง</th><th>รุ่น</th><th>สถานะ</th><th>เบิกอะไหล่</th><th>ผู้บันทึกรายการ</th><th>ผลิตเมื่อ</th><th>FW</th></tr>
   <?php if (!$assetRows) { ?>
   <tr><td colspan="8" class="muted" style="text-align:center;padding:20px">ไม่พบเครื่องที่ตรงกับเงื่อนไข</td></tr>
   <?php } ?>

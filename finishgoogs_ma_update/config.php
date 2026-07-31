@@ -385,7 +385,7 @@ function theme_color($k, $default) {
 /** เมนูเริ่มต้น: [file, icon(emoji), label, ผู้มีสิทธิ์เห็น] — ไม่จำกัด role แล้ว (ใช้แค่ session profile) */
 function nav_default() {
     return [
-        ['index.php',      'dashboard', 'Dashboard',        true],
+        ['index.php',      'dashboard', 'หน้าหลัก',        true],
         ['assets.php',     'assets',    'ทะเบียนเครื่องผลิตใหม่', true],
         ['updates.php',    'updates',   'อัปเดต FW/HW',      true],
         ['ma.php',         'ma',        'บันทึก MA',         true],
@@ -1910,7 +1910,7 @@ function build_generated_asset_code(array $p, $producedDate, $runNo) {
  */
 function product_code_format_label(array $p) {
     if (($p['code_mode'] ?? '') !== 'generated') {
-        return 'กรอกหมายเลขสินค้าเอง / สแกน QR';
+        return 'กรอกรหัสเครื่องเอง / สแกน QR';
     }
     $cfg = product_code_normalize($p);
     $parts = [];
@@ -2121,7 +2121,7 @@ function precheck_production_save($productId, $producedDate, $count, array $seri
         }
     } else {
         $codes = array_values(array_unique(array_filter(array_map('trim', $serials))));
-        if (!$codes) return ['ok' => false, 'message' => 'ยังไม่ได้กรอกหมายเลขสินค้า'];
+        if (!$codes) return ['ok' => false, 'message' => 'ยังไม่ได้กรอกรหัสเครื่อง'];
     }
 
     $dupes = [];
@@ -2162,7 +2162,7 @@ function create_produced_asset($productId, $producedDate, $factorySerial, $note,
 
     if ($p['code_mode'] !== 'generated') {
         // กรอกหมายเลขสินค้าเอง / สแกน QR — ใช้เป็นรหัสเครื่องและ S/N เดียวกัน
-        if (trim((string)$factorySerial) === '') return ['error' => 'รุ่นนี้ต้องกรอกหมายเลขสินค้า (กรอกเองหรือสแกน QR)'];
+        if (trim((string)$factorySerial) === '') return ['error' => 'รุ่นนี้ต้องกรอกรหัสเครื่อง (กรอกเองหรือสแกน QR)'];
         $code = trim($factorySerial);
         $dup = qr("SELECT id FROM assets WHERE asset_code=?", 's', [$code])->fetch_assoc();
         if ($dup) return ['error' => db_error_user_message(1062, "Duplicate entry '$code' for key 'asset_code'")];
@@ -2592,6 +2592,7 @@ require_once __DIR__ . '/includes/part_stock_bridge.php';
 
 require_once dirname(__DIR__) . '/shared/activity_log_core.php';
 require_once dirname(__DIR__) . '/shared/datetime_helpers.php';
+require_once dirname(__DIR__) . '/shared/error_messages.php';
 require_once dirname(__DIR__) . '/shared/line_notify_core.php';
 require_once dirname(__DIR__) . '/shared/line_flex_templates.php';
 require_once dirname(__DIR__) . '/shared/line_notify_jobs.php';

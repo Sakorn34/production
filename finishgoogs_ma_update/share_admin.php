@@ -265,7 +265,7 @@ page_header('หลังบ้าน — เปรียบเทียบ asse
   <div style="margin-top:12px; display:flex; flex-wrap:wrap; gap:8px">
     <form method="post" style="display:inline">
       <?= csrf_field() ?><input type="hidden" name="act" value="sync_all"><input type="hidden" name="back" value="<?= h($qs) ?>">
-      <button type="submit" class="btn-line" onclick="return confirm('ซิงก์ครบทุกเครื่อง?')">🔄 Sync ทั้งหมดจากระบบหลัก</button>
+      <button type="submit" class="btn-line" onclick="return confirm('ซิงก์ครบทุกเครื่อง?')"><?= ui_btn_label('refresh', 'Sync ทั้งหมดจากระบบหลัก') ?></button>
     </form>
     <form method="post" style="display:inline">
       <?= csrf_field() ?><input type="hidden" name="act" value="sync"><input type="hidden" name="back" value="<?= h($qs) ?>">
@@ -327,8 +327,8 @@ page_header('หลังบ้าน — เปรียบเทียบ asse
 
 <div class="rc-bulk" id="rc-bulk" hidden>
   <span>เลือกแล้ว <b id="rc-bulk-n">0</b> รายการ</span>
-  <button type="button" class="btn btn-sm" id="rc-bulk-sync" disabled>🔄 Sync → stock</button>
-  <button type="button" class="btn btn-sm" id="rc-bulk-sync-stock" disabled>🔄 Sync → ระบบหลัก</button>
+  <button type="button" class="btn btn-sm" id="rc-bulk-sync" disabled><?= ui_btn_label('refresh', 'Sync → stock', 13) ?></button>
+  <button type="button" class="btn btn-sm" id="rc-bulk-sync-stock" disabled><?= ui_btn_label('refresh', 'Sync → ระบบหลัก', 13) ?></button>
   <button type="button" class="btn btn-sm btn-line" id="rc-bulk-fill-madeby" disabled>👤 เติมผู้ผลิต ← stock</button>
   <button type="button" class="btn btn-sm btn-danger" id="rc-bulk-del" disabled>🗑 ลบจาก stock</button>
   <button type="button" class="btn btn-sm btn-danger" id="rc-bulk-del-asset" disabled>🗑 ลบระบบหลัก</button>
@@ -392,13 +392,13 @@ page_header('หลังบ้าน — เปรียบเทียบ asse
       <?php if ($canSync) { ?>
       <form method="post" style="display:inline">
         <?= csrf_field() ?><input type="hidden" name="act" value="sync_one"><input type="hidden" name="serial" value="<?= h($r['serial']) ?>"><input type="hidden" name="back" value="<?= h($qs) ?>">
-        <button type="submit" class="btn-sm btn-line" title="ดึงค่าจากระบบหลักไป stock">🔄 Sync</button>
+        <button type="submit" class="btn-sm btn-line" title="ดึงค่าจากระบบหลักไป stock"><?= ui_btn_label('refresh', 'Sync', 13) ?></button>
       </form>
       <?php } ?>
       <?php if ($canSyncStock) { ?>
       <form method="post" style="display:inline">
         <?= csrf_field() ?><input type="hidden" name="act" value="sync_stock_one"><input type="hidden" name="serial" value="<?= h($r['serial']) ?>"><input type="hidden" name="back" value="<?= h($qs) ?>">
-        <button type="submit" class="btn-sm btn-line" title="สร้างเครื่องในระบบหลักจากข้อมูล stock">🔄 Sync → ระบบหลัก</button>
+        <button type="submit" class="btn-sm btn-line" title="สร้างเครื่องในระบบหลักจากข้อมูล stock"><?= ui_btn_label('refresh', 'Sync → ระบบหลัก', 13) ?></button>
       </form>
       <?php } ?>
       <?php if ($r['type'] !== 'assets_only') { ?>
@@ -413,7 +413,7 @@ page_header('หลังบ้าน — เปรียบเทียบ asse
           <input type="number" name="batch_id" value="<?= h((string)($r['s_batch'] ?? '')) ?>" min="1" placeholder="id ชุด">
           <input type="number" name="setup_id" value="" placeholder="Setup ID">
           <select name="active"><option value="1" <?= (int)($r['s_active'] ?? 1) === 1 ? 'selected' : '' ?>>active 1</option><option value="0" <?= (int)($r['s_active'] ?? 1) === 0 ? 'selected' : '' ?>>active 0</option></select>
-          <button type="submit" class="btn-sm">💾 บันทึก</button>
+          <button type="submit" class="btn-sm"><?= ui_btn_label('save', 'บันทึก', 13) ?></button>
         </form>
       </details>
       <form method="post" style="display:inline" onsubmit="return confirm('ลบ <?= h($r['serial']) ?> ออกจาก stock?')">

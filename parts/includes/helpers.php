@@ -799,14 +799,14 @@ function ensureStockInColumns(PDO $db): void
 
 function getStockOutNoteOptions(): array
 {
-    return ['เบิกผลิต', 'เบิกงานซ่อม', 'เบิกงาน Test', 'นับใหม่'];
+    return ['เบิกผลิต', 'เบิกงานซ่อม', 'เบิกงานทดสอบ', 'MA', 'นับใหม่'];
 }
 
 function validateStockOutNote(?string $note): string
 {
     $note = trim($note ?? '');
     if (!in_array($note, getStockOutNoteOptions(), true)) {
-        throw new InvalidArgumentException('กรุณาเลือกหมายเหตุ');
+        throw new InvalidArgumentException('กรุณาเลือกประเภทการเบิก');
     }
     return $note;
 }

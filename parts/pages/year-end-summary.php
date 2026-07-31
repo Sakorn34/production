@@ -115,7 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
         if ($db->inTransaction()) {
             $db->rollBack();
         }
-        flash('error', 'บันทึกราคาไม่สำเร็จ: ' . $e->getMessage());
+        flash('error', 'บันทึกราคาไม่สำเร็จ: ' . safe_exception_message($e));
     }
     redirect(url('/pages/year-end-summary.php'));
 }

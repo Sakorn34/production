@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash('success', "เบิกออกเรียบร้อย เลขที่: {$docNo}");
         }
     } catch (Exception $e) {
-        flash('error', $e->getMessage());
+        flash('error', safe_exception_message($e));
     }
     redirect(url('/pages/stock-out-item.php'));
 }
@@ -63,7 +63,7 @@ parts_page_header('stock-out-item', 'เบิกรายชิ้น', 'เบ
                     <th>S/N</th>
                     <th class="text-right">จำนวน</th>
                     <th>ผู้เบิก</th>
-                    <th>หมายเหตุ</th>
+                    <th>ประเภทการเบิก</th>
                     <th>วันเวลา</th>
                     <th class="col-actions">จัดการ</th>
                 </tr>
@@ -84,7 +84,7 @@ parts_page_header('stock-out-item', 'เบิกรายชิ้น', 'เบ
                     <td class="col-actions">
                         <div class="table-actions">
                             <?= actionIcon('edit', url('/pages/stock-out-item.php?edit_out=' . (int) $h['stock_out_id']), 'แก้ไข') ?>
-                            <form method="POST" onsubmit="return confirm('ลบรายการเบิกนี้? จะ sync กับ production ถ้ามีการเชื่อม')">
+                            <form method="POST" onsubmit="return confirm('ลบรายการเบิกนี้? ข้อมูลในระบบทะเบียนเครื่องที่เกี่ยวข้องจะถูกปรับตามด้วย')">
                                 <input type="hidden" name="delete_stock_out" value="1">
                                 <input type="hidden" name="id" value="<?= (int) $h['stock_out_id'] ?>">
                                 <?= actionIcon('delete', '', 'ลบ') ?>
@@ -111,15 +111,15 @@ parts_page_header('stock-out-item', 'เบิกรายชิ้น', 'เบ
             <input type="number" name="quantity" min="1" value="1" required>
         </div>
         <div class="form-group">
-            <label>หมายเลขสินค้า (S/N)</label>
+            <label>หมายเลขเครื่อง (S/N)</label>
             <input type="text" name="asset_code" placeholder="เช่น BP26072024">
         </div>
     </div>
-    <p class="form-hint">ระบุ S/N ถ้าเบิกไปใช้กับเครื่องสินค้า</p>
+    <p class="form-hint">ระบุ S/N ถ้าเบิกไปใช้กับเครื่อง</p>
     <div class="form-group">
-        <label>หมายเหตุ</label>
+        <label>ประเภทการเบิก</label>
         <select name="note" required>
-            <option value="">-- เลือกหมายเหตุ --</option>
+            <option value="">-- เลือกประเภทการเบิก --</option>
             <?php foreach ($noteOptions as $option): ?>
             <option value="<?= e($option) ?>"><?= e($option) ?></option>
             <?php endforeach; ?>
@@ -149,12 +149,12 @@ parts_page_header('stock-out-item', 'เบิกรายชิ้น', 'เบ
             <input type="number" name="quantity" min="1" value="<?= (int) $ei['quantity'] ?>" required data-autofocus>
         </div>
         <div class="form-group">
-            <label>หมายเลขสินค้า (S/N)</label>
+            <label>หมายเลขเครื่อง (S/N)</label>
             <input type="text" name="asset_code" value="<?= e($editRow['asset_code'] ?? '') ?>" placeholder="เช่น BP26072024">
         </div>
     </div>
     <div class="form-group">
-        <label>หมายเหตุ</label>
+        <label>ประเภทการเบิก</label>
         <select name="note" required>
             <?php foreach ($noteOptions as $option): ?>
             <option value="<?= e($option) ?>" <?= ($editRow['note'] ?? '') === $option ? 'selected' : '' ?>><?= e($option) ?></option>
@@ -162,11 +162,11 @@ parts_page_header('stock-out-item', 'เบิกรายชิ้น', 'เบ
         </select>
     </div>
     <?php if (!empty($editRow['part_movement_id'])): ?>
-    <p class="sync-badge"><?= ui_icon_html('switch', 12, 'sync-svg') ?> เชื่อมกับ production (movement #<?= (int) $editRow['part_movement_id'] ?>)</p>
+    <p class="sync-badge"><?= ui_icon_html('switch', 12, 'sync-svg') ?> เชื่อมกับระบบทะเบียนเครื่องแล้ว</p>
     <?php endif; ?>
     <div class="form-actions">
         <a href="<?= url('/pages/stock-out-item.php') ?>" class="btn btn-outline">ยกเลิก</a>
-        <button type="submit" class="btn btn-danger">บันทึกการแก้ไข</button>
+        <button type="submit" class="btn btn-success">บันทึกการแก้ไข</button>
     </div>
 </form>
 <?php parts_modal_end(); ?>

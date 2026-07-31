@@ -35,7 +35,7 @@ $customers = qr("SELECT id, name, site_label FROM customers WHERE id IN (SELECT 
 page_header('ประวัติการซ่อม');
 ?>
 <p class="muted" style="margin-bottom:14px">
-  ประวัติงานซ่อม (นำเข้าจากระบบเดิม — ตาราง Repair Display) · ทุกรายการเป็นงาน <b>ติดฟิล์มกันรอยหน้าจอ 2 ชั้น</b> · ทั้งหมด <?= number_format($total) ?> รายการ
+  ประวัติงานซ่อม (นำเข้าจากระบบเดิม — ตาราง Repair Display) · ทั้งหมด <?= number_format($total) ?> รายการ
 </p>
 
 <form class="filter" method="get">
@@ -60,7 +60,7 @@ page_header('ประวัติการซ่อม');
   </tr>
   <?php $n = 0; while ($r = $rows->fetch_assoc()) { $n++; ?>
   <tr>
-    <td style="text-align:center"><span class="badge st-spare"><?= (int)$r['repair_no'] ?></span></td>
+    <td style="text-align:center"><span class="badge" style="background:#eef1f5;color:#556072"><?= (int)$r['repair_no'] ?></span></td>
     <td><?= dthai_full($r['opened_at']) ?></td>
     <td><a href="<?= BASE_URL ?>/asset.php?id=<?= $r['asset_id'] ?>"><?= h($r['asset_code']) ?></a></td>
     <td><?= h($r['pname']) ?></td>
