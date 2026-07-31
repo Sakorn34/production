@@ -58,7 +58,8 @@ function Test-IsDeployableRelativePath {
         return $false
     }
 
-    $normalized = ($RelativePath -replace '\\', '/').TrimStart('./')
+    $normalized = ($RelativePath -replace '\\', '/')
+    $normalized = $normalized -replace '^\./', ''
     $segments = $normalized -split '/'
 
     foreach ($seg in $segments) {

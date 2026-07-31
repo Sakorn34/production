@@ -103,6 +103,23 @@ ksort($partSuppliers, SORT_NATURAL | SORT_FLAG_CASE);
 $PALETTE = ['#ec4899','#8b5cf6','#3b82f6','#f59e0b','#10b981','#06b6d4','#f43f5e','#a855f7','#14b8a6','#eab308','#6366f1','#ef4444'];
 function pct($v, $t) { return $t > 0 ? round($v / $t * 100) : 0; }
 
+/** เปอร์เซ็นต์สำหรับแสดง KPI — ไม่ปัดเป็น 0% เมื่อยังมีค่า (เช่น 77 จาก 18,228) */
+function pct_label($v, $t) {
+    if ($t <= 0 || $v <= 0) {
+        return '0%';
+    }
+    $p = $v / $t * 100;
+    if ($p < 0.05) {
+        return '<1%';
+    }
+    if ($p < 10) {
+        $s = number_format($p, 1, '.', '');
+        $s = rtrim(rtrim($s, '0'), '.');
+        return $s . '%';
+    }
+    return round($p) . '%';
+}
+
 page_header('Dashboard', true, 'ภาพรวมการผลิตและสต็อกอะไหล่');
 
 /**
@@ -116,14 +133,24 @@ page_header('Dashboard', true, 'ภาพรวมการผลิตและ
  * @param string $onclick JS เมื่อคลิก ('' = ไม่คลิก)
  * @param string $sys     ป้ายมุมขวา (เครื่อง/อะไหล่/วันนี้)
  * @param string $numText override ตัวเลข (เช่น "12 / 38")
+ * @param bool   $subHtml  อนุญาต HTML ใน $sub (เช่น <br>)
+ * @param bool   $numHtml  อนุญาต HTML ใน $numText
  */
-function kpi($num, $label, $icon, $tone, $sub = '', $onclick = '', $sys = '', $numText = '') {
+function kpi($num, $label, $icon, $tone, $sub = '', $onclick = '', $sys = '', $numText = '', $subHtml = false, $numHtml = false) {
     $click = $onclick !== '' ? ' clickable" onclick="' . h($onclick) : '';
     echo '<div class="kpi kpi-' . h($tone) . $click . '">';
     if ($sys !== '') echo '<span class="kpi-sys">' . h($sys) . '</span>';
     echo '<div class="kpi-top"><span class="kpi-ic">' . ui_icon_html($icon, 14) . '</span> ' . h($label) . '</div>';
-    echo '<b class="kpi-num">' . ($numText !== '' ? h($numText) : number_format($num)) . '</b>';
-    if ($sub !== '') echo '<div class="kpi-sub">' . $sub . '</div>';
+    if ($numText !== '') {
+        $numClass = 'kpi-num' . ($numHtml ? ' kpi-num-stack' : '');
+        echo '<b class="' . $numClass . '">' . ($numHtml ? $numText : h($numText)) . '</b>';
+    } else {
+        echo '<b class="kpi-num">' . number_format($num) . '</b>';
+    }
+    if ($sub !== '') {
+        $subClass = 'kpi-sub' . ($subHtml ? ' kpi-sub-stack' : '');
+        echo '<div class="' . $subClass . '">' . ($subHtml ? $sub : h($sub)) . '</div>';
+    }
     echo '</div>';
 }
 /** สร้างโค้ด JS ดิบสำหรับ onclick — ต้องครอบด้วย h() เมื่อใส่ใน attribute */
@@ -138,15 +165,16 @@ $partsBase = ui_parts_base_url();
 ?>
 <div class="kpi-grid">
   <?php
-  kpi($total, 'เครื่องทั้งหมด', 'assets', 'primary',
-      number_format($byStatus['new']) . ' ใหม่ · ' . number_format($byStatus['rental']) . ' เช่า · ' . number_format($byStatus['spare']) . ' สำรอง',
+  kpi($total, 'เครื่องทั้งหมด', 'assets', 'primary', '',
       modal_js('เครื่องทั้งหมด — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=all", "$B/assets.php"), 'เครื่อง');
-  kpi($byStatus['new'], 'ใหม่ (คลัง)', 'box', 'success', pct($byStatus['new'], $total) . '% ของทั้งหมด',
+  kpi($byStatus['new'], 'ใหม่ (คลัง)', 'box', 'success', pct_label($byStatus['new'], $total) . ' ของทั้งหมด',
       modal_js('เครื่องใหม่ — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=new", "$B/assets.php?status=new"), 'เครื่อง');
-  kpi($byStatus['rental'], 'เครื่องเช่า', 'updates', 'info', pct($byStatus['rental'], $total) . '% ของทั้งหมด',
+  kpi($byStatus['rental'], 'เครื่องเช่า', 'updates', 'info', pct_label($byStatus['rental'], $total) . ' ของทั้งหมด',
       modal_js('เครื่องเช่า — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=rental", "$B/assets.php?status=rental"), 'เครื่อง');
-  kpi($byStatus['spare'], 'เครื่องสำรอง', 'box', 'warning', pct($byStatus['spare'], $total) . '% ของทั้งหมด — พร้อมสลับเปลี่ยนหน้างาน',
-      modal_js('เครื่องสำรอง — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=spare", "$B/assets.php?status=spare"), 'เครื่อง');
+  kpi($byStatus['spare'], 'เครื่องสำรอง', 'box', 'warning',
+      pct_label($byStatus['spare'], $total) . ' ของทั้งหมด<br>คลังเครื่องสำรอง — ทดแทนเครื่องเช่า',
+      modal_js('เครื่องสำรอง — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=spare", "$B/assets.php?status=spare"), 'เครื่อง',
+      '', true);
   if ($stock['ok']) {
       kpi($stock['qty'], 'สต็อกคงเหลือรวม', 'parts', 'primary', number_format($stock['items']) . ' รายการ (ผลรวมดิบข้ามหน่วย ใช้อ้างอิงคร่าวๆ)',
           "location.href='" . h($partsBase) . "/pages/products.php'", 'อะไหล่');
@@ -154,10 +182,11 @@ $partsBase = ui_parts_base_url();
           $stock['low'] > 0
               ? modal_js('อะไหล่ใกล้หมด (' . number_format($stock['low']) . ' รายการ)', "$B/dashboard_data.php?type=low_stock", "$partsBase/pages/products.php")
               : "location.href='" . h($partsBase) . "/pages/products.php'",
-          'อะไหล่');
+          'อะไหล่', '', true);
       kpi(0, 'รับเข้า / เบิกออก', 'history', 'info', 'ความเคลื่อนไหววันนี้',
           modal_js('รับเข้า / เบิกออกวันนี้', "$B/dashboard_data.php?type=stock_today", "$partsBase/pages/history.php"), 'วันนี้',
-          'รับเข้า ' . number_format($stock['in_today']) . ' / เบิกออก ' . number_format($stock['out_today']) . ' ชิ้น');
+          'รับเข้า ' . number_format($stock['in_today']) . ' ชิ้น<br>เบิกออก ' . number_format($stock['out_today']) . ' ชิ้น',
+          false, true);
   } else {
       echo '<div class="kpi kpi-warning"><div class="kpi-top"><span class="kpi-ic">' . ui_icon_html('alert', 14) . '</span> สต็อกอะไหล่</div><b class="kpi-num">—</b><div class="kpi-sub">เชื่อมต่อระบบสต็อกไม่ได้</div></div>';
   }

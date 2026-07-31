@@ -137,6 +137,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .kpi-ic { width: 24px; height: 24px; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .kpi-num { display: block; font-size: calc(23px * var(--font-scale, 1)); font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.01em; margin-top: 4px; color: #211a2e; }
 .kpi-sub { font-size: calc(11.5px * var(--font-scale, 1)); color: #8b83a5; }
+.kpi-sub-stack { line-height: 1.45; margin-top: 2px; }
+.kpi-num-stack { font-size: calc(15px * var(--font-scale, 1)); font-weight: 700; line-height: 1.4; }
 .kpi-sub .kpi-down { color: var(--danger); font-weight: 600; }
 .kpi-sys { position: absolute; top: 9px; right: 12px; font-size: calc(9.5px * var(--font-scale, 1)); font-weight: 700; letter-spacing: .08em; color: #c8c2d6; }
 .kpi-primary { border-left: 4px solid var(--primary); }

@@ -5,6 +5,94 @@
 function qty_fmt($v) { return rtrim(rtrim(number_format((float)$v, 2), '0'), '.'); }
 
 /**
+ * แยกข้อความคั่นด้วย comma เป็นรายการ (ตัดช่องว่างและค่า "-")
+ *
+ * @param string|null $text
+ * @return array<int, string>
+ */
+function timeline_split_csv($text) {
+    return array_values(array_filter(array_map('trim', preg_split('/\s*,\s*/', (string)$text)), function ($x) {
+        return $x !== '' && $x !== '-';
+    }));
+}
+
+/**
+ * สร้าง HTML แถว label + chips สำหรับ timeline
+ *
+ * @param string $label หัวข้อด้านซ้าย
+ * @param array<int, string> $items รายการ chip
+ * @param string $chipClass class ของ chip
+ * @return string
+ */
+function timeline_chip_row($label, array $items, $chipClass = 'chip-ok') {
+    if (!$items) {
+        return '';
+    }
+    $chips = '';
+    foreach ($items as $it) {
+        $chips .= '<span class="chip ' . $chipClass . '">' . h($it) . '</span>';
+    }
+    return '<div class="tl-sec tl-chip-row"><span class="tl-sec-label">' . h($label) . '</span><span class="chips">' . $chips . '</span></div>';
+}
+
+/**
+ * สร้าง HTML คู่ key-value แบบกระชับ (ผู้ผลิต, Firmware ฯลฯ)
+ *
+ * @param array<string, string> $pairs label => value
+ * @return string
+ */
+function timeline_kv_html(array $pairs) {
+    if (!$pairs) {
+        return '';
+    }
+    $out = '<dl class="tl-kv">';
+    foreach ($pairs as $label => $val) {
+        $val = trim((string)$val);
+        if ($val === '' || $val === '-') {
+            continue;
+        }
+        $out .= '<dt>' . h($label) . '</dt><dd>' . h($val) . '</dd>';
+    }
+    $out .= '</dl>';
+    return $out;
+}
+
+/**
+ * สร้าง HTML บล็อกข้อความยาว (ปัญหา / การแก้ไข / หมายเหตุ)
+ *
+ * @param string $label หัวข้อ
+ * @param string $text เนื้อหา
+ * @param string $mod class เสริม เช่น tl-note-warn
+ * @return string
+ */
+function timeline_note_html($label, $text, $mod = '') {
+    $text = trim((string)$text);
+    if ($text === '' || $text === '-') {
+        return '';
+    }
+    $cls = 'tl-note' . ($mod !== '' ? ' ' . $mod : '');
+    return '<div class="' . $cls . '"><span class="tl-note-label">' . h($label) . '</span><span class="tl-note-text">' . h($text) . '</span></div>';
+}
+
+/**
+ * สร้างเนื้อหา timeline ของบันทึกผลิต — แสดงเฉพาะ checklist (meta อยู่ที่ asset-head)
+ *
+ * @param array<string, mixed> $r แถวจาก production_records
+ * @return string HTML (escape แล้ว)
+ */
+function timeline_production_body_html(array $r) {
+    $items = !empty($r['checklist']) ? timeline_split_csv($r['checklist']) : [];
+    if (!$items) {
+        return '<span class="muted">ไม่มี checklist</span>';
+    }
+    $out = '<ul class="tl-checklist">';
+    foreach ($items as $it) {
+        $out .= '<li>' . h($it) . '</li>';
+    }
+    return $out . '</ul>';
+}
+
+/**
  * รวมประวัติทุกประเภทของเครื่อง → ['tl' => รายการเรียงใหม่→เก่า, 'partsUsed' => สรุปอะไหล่ที่เบิก]
  * แต่ละรายการ: type_key สำหรับจัดกลุ่ม · type เป็น HTML SVG · html เป็นเนื้อหา (escape แล้ว)
  */
@@ -16,16 +104,10 @@ function asset_timeline_items($id) {
     $res = qr("SELECT id, recorded_at d, made_by, assembly_by, fw_version, problems_found, fix, checklist, lot_label, extra_json
                FROM production_records WHERE asset_id=?", 'i', [$id]);
     while ($r = $res->fetch_assoc()) {
-        $body = [];
-        if ($r['made_by'])       $body[] = 'ผู้ผลิต: ' . h($r['made_by']);
-        if ($r['assembly_by'])   $body[] = 'ประกอบ: ' . h($r['assembly_by']);
-        if ($r['fw_version'])    $body[] = 'Firmware: ' . h($r['fw_version']);
-        if ($r['lot_label'])     $body[] = 'Lot: ' . h($r['lot_label']);
-        if ($r['problems_found'] && $r['problems_found'] !== '-') $body[] = 'ปัญหาที่พบ: ' . h($r['problems_found']);
-        if ($r['fix'] && $r['fix'] !== '-')                       $body[] = 'การแก้ไข: ' . h($r['fix']);
-        if ($r['checklist'])     $body[] = 'Checklist: ' . h($r['checklist']);
-        if ($r['extra_json']) foreach (json_decode($r['extra_json'], true) ?: [] as $k => $v) $body[] = h("$k: $v");
-        $tl[] = ['d' => $r['d'], 'type_key' => 'production', 'type' => ui_timeline_type_html('production'), 'html' => implode('<br>', $body), 'kind' => 'production', 'rid' => (int)$r['id']];
+        $tl[] = [
+            'd' => $r['d'], 'type_key' => 'production', 'type' => ui_timeline_type_html('production'),
+            'html' => timeline_production_body_html($r), 'kind' => 'production', 'rid' => (int)$r['id'],
+        ];
     }
     $res = qr("SELECT id, updated_at d, update_type, component_name, old_value, new_value, detail, image1, image2, made_by
                FROM update_logs WHERE asset_id=?", 'i', [$id]);

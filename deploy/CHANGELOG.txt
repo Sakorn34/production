@@ -906,3 +906,95 @@ From: 2026-07-29_142953  ->  To: 57a9f3b  |  Files: 35
 
 Files: 35 (see README.html in version archive)
 
+
+================================================================
+v2026-07-31_104027 | Patch | 2026-07-31 10:40:28
+From: 2026-07-29_142953  ->  To: b23f119  |  Files: 4
+----------------------------------------------------------------
+- Dashboard KPI UX · ฟอร์มแก้ไขเครื่องครบเหมือนบันทึกผลิต
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/includes/asset_production_edit.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-07-31_104609 | Patch | 2026-07-31 10:46:18
+From: 2026-07-29_142953  ->  To: b23f119  |  Files: 61
+----------------------------------------------------------------
+- Catch-up vs server production_31072569_1021: 62 files (5 missing + 57 diff)
+
+Files: 61 (see README.html in version archive)
+
+
+================================================================
+v2026-07-31_104705 | Patch | 2026-07-31 10:47:14
+From: 2026-07-29_142953  ->  To: b23f119  |  Files: 61
+----------------------------------------------------------------
+- Catch-up vs server production_31072569_1021: 62 files (5 missing + 57 diff)
+
+Files: 61 (see README.html in version archive)
+
+
+================================================================
+v2026-07-31_104817 | Patch | 2026-07-31 10:48:31
+From: 2026-07-29_142953  ->  To: b23f119  |  Files: 62
+----------------------------------------------------------------
+- Catch-up vs server production_31072569_1021: 62 files (5 missing + 57 diff)
+
+Files: 62 (see README.html in version archive)
+
+
+================================================================
+v2026-07-31_111927 | Patch | 2026-07-31 11:19:38
+From: 2026-07-29_142953  ->  To: b23f119  |  Files: 62
+----------------------------------------------------------------
+- Catch-up vs server production_31072569_1021: 62 files (5 missing + 57 diff)
+
+Files: 62 (see README.html in version archive)
+
+
+================================================================
+v2026-07-31_113302 | Patch | 2026-07-31 11:33:03
+From: 2026-07-31_111927  ->  To: b23f119  |  Files: 3
+----------------------------------------------------------------
+- Asset head: read-only grouped production info; edit via form only
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/includes/asset_production_edit.php
+
+
+================================================================
+v2026-07-31_113848 | Patch | 2026-07-31 11:38:48
+From: 2026-07-31_111927  ->  To: b23f119  |  Files: 2
+----------------------------------------------------------------
+- Remove duplicate checklist from asset-head (shown in timeline)
+
+Files:
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/includes/asset_production_edit.php
+
+
+================================================================
+v2026-07-31_114753 | Patch | 2026-07-31 11:47:53
+From: 2026-07-31_113848  ->  To: b23f119  |  Files: 1
+----------------------------------------------------------------
+- Fix production head: show EXP/Display/HUB fields, remove confusing subsection label
+
+Files:
+  finishgoogs_ma_update/includes/asset_production_edit.php
+
+
+================================================================
+v2026-07-31_115453 | Patch | 2026-07-31 11:54:54
+From: 2026-07-31_114753  ->  To: b23f119  |  Files: 1
+----------------------------------------------------------------
+- Asset head: drop duplicate Firmware/recorded_at; show datetime on produced
+
+Files:
+  finishgoogs_ma_update/includes/asset_production_edit.php
+

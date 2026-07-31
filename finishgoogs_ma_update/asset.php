@@ -1,5 +1,6 @@
 <?php
 require __DIR__ . '/config.php';
+require __DIR__ . '/includes/asset_production_edit.php';
 require __DIR__ . '/includes/layout.php';
 require_login();
 
@@ -58,7 +59,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_asset'])) {
         $run = parse_running_from_asset_code($np, $newCode);
     }
     q("UPDATE assets SET asset_code=?, factory_serial=?, product_id=?, running_no=?, produced_at=NULLIF(?,''), lot_label=NULLIF(?,''), note=NULLIF(?,'') WHERE id=?",
-      'ssiisssi', [$newCode, $newCode, $newPid, $run, $_POST['produced_at'], trim($_POST['lot_label']), trim($_POST['note']), $id]);
+      'ssiisssi', [$newCode, $newCode, $newPid, $run, $_POST['produced_at'], trim($_POST['lot_label'] ?? ''), trim($_POST['note'] ?? ''), $id]);
+    $newStatus = isset($_POST['asset_status']) ? (string)$_POST['asset_status'] : $a['status'];
+    if (in_array($newStatus, status_list(), true) && $newStatus !== $a['status']) {
+        q("UPDATE assets SET status=? WHERE id=?", 'si', [$newStatus, $id]);
+        q("INSERT INTO stock_movements (asset_id,moved_at,direction,reason,made_by) VALUES (?,NOW(),?,?,?)",
+          'isss', [$id, $newStatus === 'new' ? 'in' : 'out', 'เปลี่ยนสถานะเป็น ' . status_th($newStatus), actor_name()]);
+    }
+    asset_production_edit_save($id, $newPid, $_POST);
     share_upsert_asset($id, $a['asset_code']); // sync ตารางแชร์ (ถ้าเปลี่ยนรหัส แถว serial เดิมจะถูกแทนที่)
     flash_set('แก้ไขข้อมูลเครื่อง ' . $newCode . ' เรียบร้อยแล้ว');
     header('Location: ' . BASE_URL . '/asset.php?id=' . $id); exit;
@@ -176,7 +184,12 @@ $componentRows = [];
 while ($row = $components->fetch_assoc()) {
     $componentRows[] = $row;
 }
-$productOptions = qr("SELECT id, name FROM products WHERE is_active=1 ORDER BY name");
+$productList = [];
+$resProd = qr("SELECT id, name FROM products WHERE is_active=1 ORDER BY name");
+while ($po = $resProd->fetch_assoc()) {
+    $productList[] = $po;
+}
+$assetEditCtx = asset_production_edit_load($id, (int)$a['product_id'], $componentRows, $a);
 
 /** ตัวเลือก FW ที่เคยใช้กับรุ่นนี้ (สำหรับ datalist) */
 $fwSuggest = [];
@@ -289,67 +302,8 @@ page_header('เครื่อง ' . $a['asset_code'], false);
 <div class="asset-head">
   <div class="asset-head-photo"><?= img_tag($a['icon_path'], $a['pname'], 'thumb-lg') ?></div>
   <div class="info asset-head-main">
-    <dl>
-      <dt>รหัสเครื่อง</dt><dd class="asset-dd-span"><b><?= h($a['asset_code']) ?></b>
-        <?php if ($a['running_no']) { ?><span class="muted" style="font-size:12px"> (running <?= (int)$a['running_no'] ?>)</span><?php } ?>
-      </dd>
-      <dt>รุ่น</dt><dd class="asset-dd-span"><?= h($a['pname']) ?></dd>
-      <dt>สถานะ</dt><dd class="asset-dd-span"><?= status_badge($a['status']) ?></dd>
-      <dt>ผลิตเมื่อ</dt><dd class="asset-dd-span"><?= dthai($a['produced_at']) ?><?= $a['lot_label'] ? ' (Lot ' . h($a['lot_label']) . ')' : '' ?></dd>
-      <dt>FW ปัจจุบัน</dt>
-      <dd class="asset-dd-val">
-        <form method="post" id="asset-fw-form" class="asset-field-form">
-          <?= csrf_field() ?><input type="hidden" name="edit_fw" value="1">
-          <input type="text" name="current_fw_version" value="<?= h($a['current_fw_version']) ?>" placeholder="เช่น 2.6.6c" list="fw-suggest" maxlength="50" autocomplete="off">
-        </form>
-        <datalist id="fw-suggest">
-          <?php foreach ($fwSuggest as $fo) { ?><option value="<?= h($fo) ?>"><?php } ?>
-        </datalist>
-      </dd>
-      <dd class="asset-dd-act">
-        <button class="btn-sm btn-with-icon" type="submit" form="asset-fw-form"><?= ui_btn_label('save', 'บันทึก FW') ?></button>
-      </dd>
-      <dt>สถานะ</dt>
-      <dd class="asset-dd-val">
-        <form method="post" id="asset-status-form" class="asset-field-form asset-status-form">
-          <?= csrf_field() ?>
-          <select name="set_status">
-            <?php foreach (status_list() as $s) { ?>
-              <option value="<?= $s ?>" <?= $a['status'] === $s ? 'selected' : '' ?>><?= h(status_th($s)) ?></option>
-            <?php } ?>
-          </select>
-        </form>
-      </dd>
-      <dd class="asset-dd-act">
-        <button class="btn-sm btn-with-icon" type="submit" form="asset-status-form"><?= ui_btn_label('save', 'เปลี่ยนสถานะ') ?></button>
-      </dd>
-      <?php if ($a['note']) { ?><dt>หมายเหตุ</dt><dd class="asset-dd-span"><?= h($a['note']) ?></dd><?php } ?>
-      <?php if ($componentRows) { ?>
-      <dt class="asset-dl-section">ชิ้นส่วนฮาร์ดแวร์</dt>
-      <?php foreach ($componentRows as $c) { ?>
-      <dt><?= h($c['component_name']) ?></dt>
-      <dd class="asset-dd-val"><?= h($c['component_value']) ?></dd>
-      <dd class="asset-dd-act">
-        <span class="asset-comp-actions">
-            <details class="asset-comp-edit">
-              <summary class="btn btn-sm btn-line btn-icon-only" aria-label="แก้ไข"><?= ui_icon_html('edit', 16, 'btn-svg') ?></summary>
-              <form method="post" class="asset-comp-edit-form">
-                <?= csrf_field() ?><input type="hidden" name="edit_component" value="1">
-                <input type="hidden" name="old_name" value="<?= h($c['component_name']) ?>">
-                <input type="text" name="component_name" value="<?= h($c['component_name']) ?>" required>
-                <input type="text" name="component_value" value="<?= h($c['component_value']) ?>">
-                <button class="btn-sm" type="submit">บันทึก</button>
-              </form>
-            </details>
-            <form method="post" class="asset-comp-del-form" onsubmit="return confirm('ลบชิ้นส่วนนี้?')">
-              <?= csrf_field() ?><input type="hidden" name="del_component" value="1">
-              <input type="hidden" name="component_name" value="<?= h($c['component_name']) ?>">
-              <button class="btn-sm btn-danger btn-icon-only" type="submit" aria-label="ลบ"><?= ui_icon_html('trash', 16, 'btn-svg') ?></button>
-            </form>
-        </span>
-      </dd>
-      <?php } ?>
-      <?php } ?>
+    <dl class="asset-head-dl">
+      <?= asset_head_dl_html($a, $assetEditCtx, $componentRows) ?>
     </dl>
   </div>
   <?= asset_stockparts_withdraw_card_html($stockWithdraw) ?>
@@ -359,24 +313,9 @@ page_header('เครื่อง ' . $a['asset_code'], false);
 <div style="margin-bottom:16px"><?= $partAlertsHtml ?></div>
 <?php } ?>
 
-<details style="margin-bottom:16px">
+<details style="margin-bottom:16px" class="asset-edit-details">
   <summary class="btn btn-line btn-sm btn-with-icon" style="list-style:none; cursor:pointer; display:inline-flex"><?= ui_btn_label('edit', 'แก้ไขข้อมูลเครื่อง') ?></summary>
-  <form method="post" class="formgrid form-narrow" style="margin-top:10px">
-    <?= csrf_field() ?><input type="hidden" name="edit_asset" value="1">
-    <label>รหัสเครื่อง</label><input type="text" name="asset_code" value="<?= h($a['asset_code']) ?>" required>
-    <label>รุ่นสินค้า</label>
-    <select name="product_id">
-      <?php while ($po = $productOptions->fetch_assoc()) { ?>
-        <option value="<?= $po['id'] ?>" <?= (int)$po['id'] === (int)$a['product_id'] ? 'selected' : '' ?>><?= h($po['name']) ?></option>
-      <?php } ?>
-    </select>
-    <label>วันที่ผลิต</label><input type="date" name="produced_at" value="<?= h($a['produced_at']) ?>">
-    <label>Lot</label><input type="text" name="lot_label" value="<?= h($a['lot_label']) ?>">
-    <label class="full">หมายเหตุ</label><textarea name="note" class="full field-note" rows="2"><?= h($a['note']) ?></textarea>
-    <div class="full">
-      <button type="submit" class="btn-with-icon"><?= ui_btn_label('save', 'บันทึกการแก้ไข') ?></button>
-    </div>
-  </form>
+  <?= asset_production_edit_form_html($a, $assetEditCtx, $productList, $fwSuggest) ?>
   <div style="margin-top:16px;padding:12px 14px;border:1px solid #b91c1c;background:var(--danger-soft, #fee2e2);border-radius:8px">
     <b style="font-size:13px;color:#b91c1c">โซนอันตราย</b>
     <p class="muted" style="margin:4px 0 10px;font-size:12.5px">ลบเครื่องนี้พร้อมประวัติทั้งหมด — การลบย้อนกลับไม่ได้</p>
