@@ -98,6 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_production'])) {
     csrf_check();
     $prId = (int)$_POST['record_id'];
     q("DELETE FROM production_records WHERE id=? AND asset_id=?", 'ii', [$prId, $id]);
+    recompute_asset_fw($id); // บันทึกผลิตเป็นแหล่ง FW ด้วย ต้องคำนวณใหม่หลังลบ
     flash_set('ลบบันทึกผลิตแล้ว');
     header('Location: ' . BASE_URL . '/asset.php?id=' . $id); exit;
 }

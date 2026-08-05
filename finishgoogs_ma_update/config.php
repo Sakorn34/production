@@ -197,6 +197,11 @@ function q_try($sql, $types = '', $params = []) {
 /**
  * คำนวณสถานะเครื่องจากประวัติ MA ที่เหลือ — ถ้าไม่มี MA เหลือ กลับเป็น new
  *
+ * ใช้เฉพาะ MA ที่ระบุสถานะเครื่องไว้จริงเท่านั้น เรคคอร์ดเก่าที่ machine_status
+ * ยังว่าง (บันทึกก่อนมีคอลัมน์นี้) ถือว่า "ไม่มีข้อมูล" จึงคงสถานะเดิมของเครื่องไว้
+ * ไม่เดาแทนผู้ใช้ — ก่อนหน้านี้ค่าว่างถูก fallback เป็น rental ทำให้เครื่องสำรอง
+ * ถูกเปลี่ยนเป็นเครื่องเช่าเองเมื่อมีการลบ MA
+ *
  * @param int $assetId
  * @return void
  */
@@ -206,23 +211,33 @@ function recompute_asset_status_from_ma(int $assetId): void
     if ($assetId <= 0) {
         return;
     }
+    // ไม่เหลือ MA เลย = ถอยกลับไปก่อนเคยเข้า MA จึงกลับเป็น new
+    // ยืนยันกับเจ้าของระบบแล้ว (2026-08-05) ว่าต้องการแบบนี้ แม้เครื่องจะเคยถูก
+    // ตั้งเป็น spare ด้วยมือแล้วสถานะนั้นหายไปก็ตาม — อย่าเปลี่ยนโดยไม่ถามก่อน
+    $any = qr('SELECT id FROM ma_records WHERE asset_id=? LIMIT 1', 'i', [$assetId])->fetch_assoc();
+    if (!$any) {
+        q("UPDATE assets SET status='new' WHERE id=?", 'i', [$assetId]);
+        return;
+    }
     $row = qr(
-        'SELECT machine_status FROM ma_records WHERE asset_id=? ORDER BY visited_at DESC, id DESC LIMIT 1',
+        "SELECT machine_status FROM ma_records
+         WHERE asset_id=? AND machine_status IN ('rental','spare')
+         ORDER BY visited_at DESC, id DESC LIMIT 1",
         'i',
         [$assetId]
     )->fetch_assoc();
     if (!$row) {
-        q("UPDATE assets SET status='new' WHERE id=?", 'i', [$assetId]);
-        return;
+        return; // ยังมี MA อยู่แต่ไม่มีรอบไหนระบุสถานะ — ไม่แตะสถานะเดิม
     }
-    $status = in_array($row['machine_status'] ?? '', ['rental', 'spare'], true)
-        ? (string) $row['machine_status']
-        : 'rental';
-    q('UPDATE assets SET status=? WHERE id=?', 'si', [$status, $assetId]);
+    q('UPDATE assets SET status=? WHERE id=?', 'si', [(string) $row['machine_status'], $assetId]);
 }
 
 /**
- * คำนวณ current_fw_version จาก update_logs และ ma_records — ใช้แหล่งที่ใหม่กว่า
+ * คำนวณ current_fw_version จาก production_records, update_logs และ ma_records
+ * — ใช้แหล่งที่ใหม่กว่า
+ *
+ * ไล่ตรวจจากแหล่งที่มีน้ำหนักน้อยสุดไปมากสุด (ผลิต → อัปเดต → MA) เพราะเงื่อนไข
+ * เทียบเวลาใช้ >= แหล่งที่ตรวจทีหลังจึงชนะเมื่อเวลาเท่ากัน
  *
  * @param int $assetId
  * @return void
@@ -235,6 +250,22 @@ function recompute_asset_fw(int $assetId): void
     }
     $bestFw = null;
     $bestTs = 0;
+
+    // FW ที่บันทึกตอนผลิต — เป็นค่าตั้งต้นของเครื่องที่ยังไม่เคยอัปเดตหรือเข้า MA
+    $pr = qr(
+        "SELECT fw_version, recorded_at FROM production_records
+         WHERE asset_id=? AND fw_version IS NOT NULL AND TRIM(fw_version)<>''
+         ORDER BY recorded_at DESC, id DESC LIMIT 1",
+        'i',
+        [$assetId]
+    )->fetch_assoc();
+    if ($pr) {
+        $ts = strtotime((string) $pr['recorded_at']) ?: 0;
+        if ($ts >= $bestTs) {
+            $bestTs = $ts;
+            $bestFw = (string) $pr['fw_version'];
+        }
+    }
 
     $ul = qr(
         "SELECT new_value, updated_at FROM update_logs

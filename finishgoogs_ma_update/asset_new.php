@@ -329,9 +329,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $out = tech_parts_stock_out_by_part_id($partId, $bq, 'เบิกผลิต', $bomBy, $bomAssetCode);
             if (!$out['ok']) {
-                foreach (array_reverse($deductedThisUnit) as $rev) {
-                    tech_parts_stock_in_by_part_id($rev['part_id'], $rev['qty'], 'ยกเลิกเบิกอัตโนมัติ', $bomBy);
-                }
+                // คืนสต็อก "และ" ลบ movement ที่บันทึกไปแล้วของเครื่องนี้
+                // เดิมคืนแต่ยอด ทำให้เครื่องมีรายการเบิกค้างทั้งที่อะไหล่ถูกคืนไปแล้ว
+                ma_rollback_partial_movements($deductedThisUnit, $bomBy, 'ยกเลิกเบิกอัตโนมัติ');
                 $err = $out['error'];
                 break 2;
             }
@@ -342,30 +342,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 [$partId, $bq, 'เบิกอัตโนมัติ (ชุดอะไหล่รุ่น)', $r['asset_id'], $bomBy, (int)($out['stock_out_id'] ?? 0)]
             );
             if (!$ins['ok']) {
-                tech_parts_stock_in_by_part_id(
-                    $partId,
-                    (int)($out['qty'] ?? tech_parts_qty_to_int($bq)),
-                    'ยกเลิกเบิกอัตโนมัติ',
-                    $bomBy
-                );
-                if (function_exists('ma_rollback_partial_movements')) {
-                    ma_rollback_partial_movements($deductedThisUnit, $bomBy, 'ยกเลิกเบิกอัตโนมัติ');
-                } else {
-                    foreach (array_reverse($deductedThisUnit) as $rev) {
-                        tech_parts_stock_in_by_part_id($rev['part_id'], $rev['qty'], 'ยกเลิกเบิกอัตโนมัติ', $bomBy);
-                        if (!empty($rev['movement_id'])) {
-                            q('DELETE FROM part_movements WHERE id=?', 'i', [(int) $rev['movement_id']]);
-                        }
-                    }
-                }
+                // บรรทัดนี้ตัดสต็อกไปแล้วแต่ยังไม่มี movement — รวมเข้า rollback ชุดเดียวกัน
+                $deductedThisUnit[] = [
+                    'part_id'      => $partId,
+                    'qty'          => (int)($out['qty'] ?? tech_parts_qty_to_int($bq)),
+                    'movement_id'  => 0,
+                    'stock_out_id' => (int)($out['stock_out_id'] ?? 0),
+                ];
+                ma_rollback_partial_movements($deductedThisUnit, $bomBy, 'ยกเลิกเบิกอัตโนมัติ');
                 $err = $ins['error'] ?? 'บันทึก movement ไม่สำเร็จ';
                 break 2;
             }
             $bomMid = (int)($ins['insert_id'] ?? 0);
             $deductedThisUnit[] = [
-                'part_id'     => $partId,
-                'qty'         => (int)($out['qty'] ?? tech_parts_qty_to_int($bq)),
-                'movement_id' => $bomMid,
+                'part_id'      => $partId,
+                'qty'          => (int)($out['qty'] ?? tech_parts_qty_to_int($bq)),
+                'movement_id'  => $bomMid,
+                'stock_out_id' => (int)($out['stock_out_id'] ?? 0),
             ];
             if (!empty($out['stock_out_id']) && function_exists('production_link_stock_out')) {
                 $ac = qr('SELECT asset_code FROM assets WHERE id=?', 'i', [$r['asset_id']])->fetch_assoc();

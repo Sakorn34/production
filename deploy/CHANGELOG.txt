@@ -1143,3 +1143,29 @@ Files:
   parts/includes/helpers.php
   parts/pages/products.php
 
+
+================================================================
+v2026-08-05_124750 | Patch | 2026-08-05 12:47:51
+From: 2026-08-05_105732  ->  To: feebd22  |  Files: 4
+----------------------------------------------------------------
+- แก้บั๊กความถูกต้องของข้อมูล: (1) rollback ตอนเบิกอะไหล่ล้มเหลว ลบทั้ง part_movements และใบเบิก stock_out ที่ค้าง เดิมคืนแต่ยอดทำให้เหลือรายการเบิกหลอก (2) recompute_asset_fw อ่าน production_records ด้วย เดิมล้าง FW ของเครื่องที่มีข้อมูลจากตอนผลิตอย่างเดียว (3) recompute_asset_status_from_ma ไม่เดาเป็น rental เมื่อ MA ไม่ระบุสถานะ เดิมทำให้เครื่องสำรองกลายเป็นเครื่องเช่า
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/asset_new.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/part_stock_bridge.php
+
+
+================================================================
+v2026-08-05_125303 | Patch | 2026-08-05 12:53:04
+From: 2026-08-05_105732  ->  To: feebd22  |  Files: 4
+----------------------------------------------------------------
+- แก้บั๊กความถูกต้องของข้อมูล: (1) rollback ตอนเบิกอะไหล่ล้มเหลว ลบทั้ง part_movements และใบเบิก stock_out ที่ค้าง เดิมคืนแต่ยอดทำให้เหลือรายการเบิกหลอก (2) recompute_asset_fw อ่าน production_records ด้วย เดิมล้าง FW ของเครื่องที่มีข้อมูลจากตอนผลิตอย่างเดียว (3) recompute_asset_status_from_ma ไม่เดาเป็น rental เมื่อ MA ไม่ระบุสถานะ เดิมทำให้เครื่องสำรองกลายเป็นเครื่องเช่า (ยืนยันแล้วว่าเคสไม่เหลือ MA เลยยังคงกลับเป็น new ตามเดิม)
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/asset_new.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/part_stock_bridge.php
+

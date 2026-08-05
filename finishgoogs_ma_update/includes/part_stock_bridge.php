@@ -919,16 +919,37 @@ function ma_withdrawal_count($maRecordId) {
 /**
  * คืนสต็อกและลบ part_movements ที่บันทึกไปแล้วบางส่วน (rollback กลางทาง)
  *
- * @param array<int,array{part_id:int,qty:int,movement_id?:int}> $deducted
+ * พยายามลบใบเบิก (stock_out) ที่สร้างค้างไว้ทิ้งก่อนเสมอ เพื่อไม่ให้ประวัติฝั่ง Stock
+ * เหลือคู่ "เบิก + รับคืน" ของรายการที่จริง ๆ แล้วไม่เคยบันทึกสำเร็จ ถ้าลบไม่ได้
+ * จึงค่อยคืนสต็อกด้วยใบรับเข้าแทน — ยอดคงเหลือถูกต้องทั้งสองทาง
+ *
+ * @param array<int,array{part_id:int,qty:int,movement_id?:int,stock_out_id?:int}> $deducted
  * @param string $actor
  * @param string $note
  * @return void
  */
 function ma_rollback_partial_movements(array $deducted, $actor, $note = 'ยกเลิกเบิก MA') {
     foreach (array_reverse($deducted) as $rev) {
+        $movementId = (int) ($rev['movement_id'] ?? 0);
+        $stockOutId = (int) ($rev['stock_out_id'] ?? 0);
+
+        if ($movementId > 0
+            && function_exists('production_sync_delete_stock_out_from_movement')
+            && production_sync_delete_stock_out_from_movement($movementId)) {
+            continue;
+        }
+        if ($stockOutId > 0
+            && function_exists('production_sync_delete_stock_out_by_id')
+            && production_sync_delete_stock_out_by_id($stockOutId)) {
+            if ($movementId > 0) {
+                q('DELETE FROM part_movements WHERE id=?', 'i', [$movementId]);
+            }
+            continue;
+        }
+
         tech_parts_stock_in_by_part_id((int) $rev['part_id'], (int) $rev['qty'], $note, $actor);
-        if (!empty($rev['movement_id'])) {
-            q('DELETE FROM part_movements WHERE id=?', 'i', [(int) $rev['movement_id']]);
+        if ($movementId > 0) {
+            q('DELETE FROM part_movements WHERE id=?', 'i', [$movementId]);
         }
     }
 }
@@ -974,12 +995,14 @@ function ma_withdraw_parts($maRecordId, $assetId, $assetCode, array $lines, $act
             ]
         );
         if (!$ins['ok']) {
-            tech_parts_stock_in_by_part_id(
-                $partId,
-                (int)($out['qty'] ?? tech_parts_qty_to_int($qty)),
-                'ยกเลิกเบิก MA',
-                $actor
-            );
+            // บรรทัดนี้ตัดสต็อกไปแล้วแต่ยังไม่มี movement — ส่งเข้า rollback ชุดเดียวกัน
+            // เพื่อให้ใบเบิกที่ค้างอยู่ถูกลบทิ้งด้วย ไม่ใช่แค่คืนยอด
+            $deducted[] = [
+                'part_id'      => $partId,
+                'qty'          => (int)($out['qty'] ?? tech_parts_qty_to_int($qty)),
+                'movement_id'  => 0,
+                'stock_out_id' => (int)($out['stock_out_id'] ?? 0),
+            ];
             ma_rollback_partial_movements($deducted, $actor);
             return ['ok' => false, 'error' => $ins['error'] ?? 'บันทึก movement ไม่สำเร็จ'];
         }
@@ -988,9 +1011,10 @@ function ma_withdraw_parts($maRecordId, $assetId, $assetCode, array $lines, $act
             production_link_stock_out(dbParts(), (int)$out['stock_out_id'], $mid, $assetCode !== '' ? $assetCode : null);
         }
         $deducted[] = [
-            'part_id'     => $partId,
-            'qty'         => (int)($out['qty'] ?? tech_parts_qty_to_int($qty)),
-            'movement_id' => $mid,
+            'part_id'      => $partId,
+            'qty'          => (int)($out['qty'] ?? tech_parts_qty_to_int($qty)),
+            'movement_id'  => $mid,
+            'stock_out_id' => (int)($out['stock_out_id'] ?? 0),
         ];
     }
 
