@@ -525,9 +525,69 @@
         if (m.id) openModal(m.id);
     });
 
+    // ── พรีวิวอะไหล่ใน Set ที่เลือก (ฟอร์มเบิกออก Set) ──────────────────────
+    // แสดงว่าจะตัดอะไรออกบ้างก่อนกดยืนยัน และคูณตามจำนวนชุดให้เห็นยอดจริง
+    // เพื่อให้เห็นตั้งแต่ตอนกรอกว่าของพอหรือไม่ ไม่ใช่ไปเจอ error ตอน submit
+    function initSetItemsPreview(root) {
+        (root || document).querySelectorAll('[data-set-preview]').forEach(function (form) {
+            var data;
+            try {
+                data = JSON.parse(form.getAttribute('data-set-items') || '{}');
+            } catch (e) {
+                return;
+            }
+            var select = form.querySelector('select[name="set_id"]');
+            var countInput = form.querySelector('input[name="set_count"]');
+            var box = form.querySelector('[data-set-preview-box]');
+            var list = form.querySelector('[data-set-preview-list]');
+            var countLabel = form.querySelector('[data-set-preview-count]');
+            if (!select || !box || !list) return;
+
+            function render() {
+                var items = data[select.value] || null;
+                if (!items || !items.length) {
+                    box.hidden = true;
+                    list.innerHTML = '';
+                    return;
+                }
+                var mult = Math.max(1, parseInt(countInput && countInput.value, 10) || 1);
+                list.innerHTML = items.map(function (it) {
+                    var need = it.qty * mult;
+                    var short = need > it.stock;
+                    var thumb = it.icon
+                        ? '<img src="' + it.icon + '" alt="" loading="lazy">'
+                        : '<span class="set-preview-thumb-empty" aria-hidden="true"></span>';
+                    return '<li class="set-preview-item' + (short ? ' is-short' : '') + '">'
+                        + '<span class="set-preview-thumb">' + thumb + '</span>'
+                        + '<span class="set-preview-info">'
+                        + '<span class="set-preview-name">' + escapeHtml(it.name) + '</span>'
+                        + '<span class="set-preview-meta">'
+                        + 'ใช้ <strong>' + need + '</strong> ' + escapeHtml(it.unit)
+                        + (mult > 1 ? ' <span class="set-preview-calc">(' + it.qty + ' × ' + mult + ')</span>' : '')
+                        + ' · คงเหลือ ' + it.stock
+                        + (short ? ' <span class="set-preview-warn">ไม่พอ</span>' : '')
+                        + '</span></span></li>';
+                }).join('');
+                if (countLabel) countLabel.textContent = items.length + ' รายการ';
+                box.hidden = false;
+            }
+
+            select.addEventListener('change', render);
+            if (countInput) countInput.addEventListener('input', render);
+            render();
+        });
+    }
+
+    function escapeHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
     initProductSearchIn(document);
     initProductPickers(document);
     initTableFilters(document);
+    initSetItemsPreview(document);
 
     document.querySelectorAll('.product-active-switch').forEach(function (input) {
         input.addEventListener('change', function () {

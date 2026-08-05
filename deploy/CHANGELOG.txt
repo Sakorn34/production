@@ -1169,3 +1169,69 @@ Files:
   finishgoogs_ma_update/config.php
   finishgoogs_ma_update/includes/part_stock_bridge.php
 
+
+================================================================
+v2026-08-05_155404 | Patch | 2026-08-05 15:54:10
+From: 2026-08-05_125303  ->  To: df6c127  |  Files: 11
+----------------------------------------------------------------
+- รวมหน้าอะไหล่: เมนู 6 เหลือ 4 รายการ | products.php เพิ่มปุ่มรับเข้า/เบิกรายชิ้น/เบิก Set (modal ย้ายมาจาก 3 หน้าเดิม) + ปุ่มไปหน้าจัดการ Set | history.php ยุบประวัติ 4 ชุดเป็นแท็บเดียว ?tab=sn|in|item|set | sets.php กลับมาเป็นหน้าจัดการ Set | stock-in.php, stock-out-item.php, stock-out.php เหลือเป็น redirect ให้ bookmark เดิมใช้ได้ | ทางลัดแดชบอร์ดยุบเหลือรายการเดียวชี้ที่ products.php
+
+Files:
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/system_doc.php
+  parts/assets/style.css
+  parts/includes/helpers.php
+  parts/pages/history.php
+  parts/pages/products.php
+  parts/pages/sets.php
+  parts/pages/stock-in.php
+  parts/pages/stock-out.php
+  parts/pages/stock-out-item.php
+  shared/ui_icons.php
+
+
+================================================================
+v2026-08-05_160408 | Patch | 2026-08-05 16:04:11
+From: 2026-08-05_125303  ->  To: df6c127  |  Files: 12
+----------------------------------------------------------------
+- รวมหน้าอะไหล่: เมนู 6 เหลือ 4 รายการ | products.php เพิ่มปุ่มรับเข้า/เบิกรายชิ้น/เบิก Set (modal ย้ายมาจาก 3 หน้าเดิม) + ปุ่มไปหน้าจัดการ Set | history.php ยุบประวัติ 4 ชุดเป็นแท็บเดียว ?tab=sn|in|item|set | sets.php กลับมาเป็นหน้าจัดการ Set | stock-in.php, stock-out-item.php, stock-out.php เหลือเป็น redirect ให้ bookmark เดิมใช้ได้ | ทางลัดแดชบอร์ดยุบเหลือรายการเดียวชี้ที่ products.php | เอาฟีเจอร์นำเข้าผู้จำหน่ายจาก Excel ออก (เลิกใช้แล้ว) ต้องลบไฟล์บนเซิร์ฟเวอร์เองด้วย ดูรายชื่อในรายงาน
+
+Files:
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/system_doc.php
+  parts/assets/style.css
+  parts/includes/helpers.php
+  parts/pages/history.php
+  parts/pages/products.php
+  parts/pages/sets.php
+  parts/pages/stock-in.php
+  parts/pages/stock-out.php
+  parts/pages/stock-out-item.php
+  shared/activity_log_core.php
+  shared/ui_icons.php
+
+
+================================================================
+v2026-08-05_161412 | Patch | 2026-08-05 16:14:13
+From: 2026-08-05_160408  ->  To: df6c127  |  Files: 3
+----------------------------------------------------------------
+- ฟอร์มเบิกออก Set: เลือก Set แล้วแสดงรายการอะไหล่ที่จะถูกตัดพร้อมรูป จำนวนที่ใช้ (คูณตามจำนวนชุด) และยอดคงเหลือ พร้อมเตือนตัวที่ของไม่พอ | เอาปุ่มจัดการ Set ออกจากหัวหน้าอะไหล่ (ซ้ำกับเมนูด้านซ้าย)
+
+Files:
+  parts/assets/app.js
+  parts/assets/style.css
+  parts/pages/products.php
+
+
+================================================================
+v2026-08-05_164951 | Patch | 2026-08-05 16:49:53
+From: 2026-08-05_160408  ->  To: df6c127  |  Files: 4
+----------------------------------------------------------------
+- แก้เลข running ของรหัสเครื่องกระโดด: parse_running_from_asset_code อ่าน 4 ตัวท้ายเสมอ ทำให้รหัสรูปแบบเก่าที่ running มี 3 หลัก (เช่น CC6309680 = CC+63+09+680) ถูกอ่านเป็น 9680 เพราะขโมยเลขจากเดือน 09 กระทบ Card Camera, Indoor Camera, Outdoor Camera | ตอนนี้อ่านจากรหัสเฉพาะเมื่อตรงรูปแบบปัจจุบัน ถ้าไม่ตรงใช้ running_no ในฐานข้อมูลแทน (ซึ่งถูกอยู่แล้ว) | เครื่องล่าสุดที่โชว์ในฟอร์มมาจากการนับชุดเดียวกับเลขถัดไปแล้ว ไม่ขัดกันเอง
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/app.js
+  parts/assets/style.css
+  parts/pages/products.php
+

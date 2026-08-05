@@ -229,8 +229,8 @@ $partsBase = ui_parts_base_url();
     <a href="<?= $B ?>/asset_new.php" class="quick-item"><span class="q-ic q-primary"><?= ui_icon_html('assets', 17) ?></span><span>บันทึกเครื่องใหม่<small>ทะเบียนเครื่อง</small></span></a>
     <a href="<?= $B ?>/ma.php" class="quick-item"><span class="q-ic q-warning"><?= ui_icon_html('ma', 17) ?></span><span>บันทึก MA<small>บำรุงรักษา</small></span></a>
     <a href="<?= $B ?>/update_new.php" class="quick-item"><span class="q-ic q-info"><?= ui_icon_html('updates', 17) ?></span><span>อัปเดต FW/HW<small>บันทึกเวอร์ชัน</small></span></a>
-    <a href="<?= h($partsBase) ?>/pages/stock-out.php" class="quick-item"><span class="q-ic q-info"><?= ui_icon_html('stock-out-set', 17) ?></span><span>เบิกอะไหล่<small>Set / รายชิ้น</small></span></a>
-    <a href="<?= h($partsBase) ?>/pages/stock-in.php" class="quick-item"><span class="q-ic q-success"><?= ui_icon_html('stock-in', 17) ?></span><span>รับอะไหล่เข้า<small>สต็อกอะไหล่</small></span></a>
+    <?php /* รับเข้า/เบิกออกอยู่ในหน้าเดียวกันแล้ว (parts/pages/products.php) จึงเหลือทางลัดเดียว */ ?>
+    <a href="<?= h($partsBase) ?>/pages/products.php" class="quick-item"><span class="q-ic q-info"><?= ui_icon_html('products', 17) ?></span><span>จัดการสต็อกอะไหล่<small>รับเข้า · เบิกออก</small></span></a>
     <a href="<?= $B ?>/scan.php" class="quick-item"><span class="q-ic q-primary"><?= ui_icon_html('scan', 17) ?></span><span>สแกน QR<small>ค้นเครื่องเร็ว</small></span></a>
   </div>
 </div>

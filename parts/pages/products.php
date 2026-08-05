@@ -1,6 +1,11 @@
 <?php
 /**
- * pages/products.php — รายการอะไหล่ทั้งหมด + เพิ่มอะไหล่ (modal) + sync production
+ * pages/products.php — รายการอะไหล่ + งานสต็อกประจำวันทั้งหมด (2026-08-05)
+ *
+ * เดิมการรับเข้า/เบิกออกแยกอยู่คนละหน้า (stock-in.php, stock-out-item.php, stock-out.php)
+ * ทั้งที่แต่ละหน้าเป็นแค่ "ปุ่มเปิด modal + ตารางประวัติ" ผู้ใช้ที่เห็นของใกล้หมดในหน้านี้
+ * จึงต้องออกไปอีกหน้าแล้วค้นหาอะไหล่ตัวเดิมซ้ำ ตอนนี้ modal ทำงานย้ายมาอยู่ที่นี่หมด
+ * ส่วนตารางประวัติไปรวมกันที่ history.php แบบแท็บ
  */
 
 $pageTitle = 'อะไหล่';
@@ -16,6 +21,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
     $action = $_POST['action'] ?? '';
+
+    // งานสต็อกประจำวัน (รับเข้า / เบิกออก) — ย้ายมาจาก stock-in.php, stock-out-item.php, stock-out.php
+    //
+    // ทุก branch ต้องมีชื่อ action ชัดเจน ห้ามใช้ else ตกท้ายเด็ดขาด: ฟอร์มสวิตช์เปิด/ปิดอะไหล่
+    // ถูก auto-submit จาก app.js ทุกครั้งที่คลิก ถ้ามี else ตกท้ายที่เรียกการเบิกออก
+    // แค่คลิกสวิตช์ก็จะตัดสต็อกจริงทันที
+    //
+    // และต้องแยก try ออกจากก้อนล่าง เพราะก้อนล่าง catch เฉพาะ PDOException
+    // แต่ StockService โยน Exception ธรรมดาเมื่อของไม่พอ — จะหลุดไปเป็น fatal
+    if ($action === 'stock_in' || $action === 'stock_out_item' || $action === 'stock_out_set') {
+        try {
+            if ($action === 'stock_in') {
+                ensureStockInColumns($db);
+                $stock->stockIn(
+                    (int) $_POST['product_id'],
+                    (int) $_POST['quantity'],
+                    trim($_POST['note'] ?? '') ?: null,
+                    $line_name
+                );
+                flash('success', 'บันทึกรับเข้าเรียบร้อย');
+                parts_log_stock_action('stock-in.php');
+            } elseif ($action === 'stock_out_item') {
+                $docNo = $stock->stockOutItem(
+                    (int) $_POST['product_id'],
+                    (int) $_POST['quantity'],
+                    validateStockOutNote($_POST['note'] ?? null),
+                    trim($line_name ?? '') ?: null,
+                    trim($_POST['asset_code'] ?? '') ?: null
+                );
+                flash('success', "เบิกออกเรียบร้อย เลขที่: {$docNo}");
+                parts_log_stock_action('stock-out-item.php');
+            } else {
+                // เดิมเป็น else ตกท้ายจึงไม่เคยตรวจค่า — ตอนนี้เรียกด้วยชื่อ action จึงต้องกันเอง
+                $setId = (int) ($_POST['set_id'] ?? 0);
+                $setCount = (int) ($_POST['set_count'] ?? 0);
+                if ($setId <= 0 || $setCount <= 0) {
+                    flash('error', 'กรุณาเลือก Set และระบุจำนวนชุดที่เบิก');
+                    redirect($productsReturnTo);
+                }
+                $docNo = $stock->stockOutBySet(
+                    $setId,
+                    $setCount,
+                    validateStockOutNote($_POST['note'] ?? null),
+                    trim($line_name ?? '') ?: null,
+                    trim($_POST['asset_code'] ?? '') ?: null
+                );
+                flash('success', "เบิกออกเรียบร้อย เลขที่: {$docNo}");
+                parts_log_stock_action('stock-out.php');
+            }
+        } catch (Exception $e) {
+            flash('error', safe_exception_message($e));
+        }
+        redirect($productsReturnTo);
+    }
+
     try {
         if ($action === 'add') {
             $code = generateProductCode($db);
@@ -154,7 +214,34 @@ require_once __DIR__ . '/../includes/header.php';
 
 $products = parts_enrich_products($stock->getAllProducts());
 $partIcons = parts_product_icon_map($products);
+// เก็บลำดับตามชื่อไว้ก่อนเรียงตาราง — ช่องค้นหาใน modal ไม่ควรเรียงตาม sort ของตาราง
+$pickerProducts = $products;
 $products = parts_sort_products($products, $sortState['sort'], $sortState['dir']);
+$sets = $stock->getAllSetsWithItems(); // ต้องใช้ตัวนี้ ไม่ใช่ getAllSets() เพราะต้องการ can_issue
+$noteOptions = getStockOutNoteOptions();
+
+// รายการอะไหล่ในแต่ละ Set สำหรับแสดงพรีวิวใน modal เบิกออก
+// ใช้ชื่อจาก $products ที่ enrich มาแล้ว (ไม่ query ข้ามฐานข้อมูลซ้ำ) ชื่อจึงตรงกับในตาราง
+$productNameById = [];
+foreach ($pickerProducts as $p) {
+    $productNameById[(int) $p['id']] = parts_display_name($p);
+}
+$setItemsData = [];
+foreach ($sets as $s) {
+    $list = [];
+    foreach ($s['items'] as $it) {
+        $code = trim((string) ($it['code'] ?? ''));
+        $list[] = [
+            'code'  => $code,
+            'name'  => $productNameById[(int) $it['product_id']] ?? (string) ($it['name'] ?? ''),
+            'qty'   => (int) $it['quantity'],
+            'unit'  => (string) ($it['unit'] ?? 'ชิ้น'),
+            'stock' => (int) ($it['stock_qty'] ?? 0),
+            'icon'  => parts_upload_img_url($partIcons[$code] ?? '') ?? '',
+        ];
+    }
+    $setItemsData[(int) $s['id']] = $list;
+}
 ?>
 
 <div class="page-header products-page-header">
@@ -163,8 +250,14 @@ $products = parts_sort_products($products, $sortState['sort'], $sortState['dir']
         <p>รายการอะไหล่และจำนวนคงเหลือ · แสดง <span id="products-shown-count"><?= number_format(count($products)) ?></span> จาก <?= number_format(count($products)) ?> รายการ</p>
     </div>
     <div class="parts-page-actions">
-        <a href="<?= url('/pages/vendor-import.php') ?>" class="btn btn-outline btn-sm">นำเข้าผู้จำหน่าย</a>
-        <?= parts_btn_open_modal('product-add-modal', 'เพิ่มอะไหล่', 'stock-in', 'btn-primary') ?>
+        <?= parts_btn_open_modal('product-add-modal', 'เพิ่มอะไหล่', 'plus', 'btn-outline btn-sm') ?>
+        <span class="parts-actions-sep" aria-hidden="true"></span>
+        <?= parts_btn_open_modal('stock-in-add-modal', 'รับเข้า', 'stock-in', 'btn-success') ?>
+        <?= parts_btn_open_modal('stock-out-item-add-modal', 'เบิกรายชิ้น', 'stock-out-item', 'btn-danger') ?>
+        <?php if (!empty($sets)): ?>
+        <?= parts_btn_open_modal('stock-out-set-modal', 'เบิก Set', 'stock-out-set', 'btn-danger') ?>
+        <?php endif; ?>
+        <?php // ไม่มีปุ่ม "จัดการ Set" ที่นี่ — มีในเมนูด้านซ้ายอยู่แล้ว ?>
     </div>
 </div>
 
@@ -336,6 +429,117 @@ $products = parts_sort_products($products, $sortState['sort'], $sortState['dir']
         </div>
     </div>
 </div>
+
+<?php
+// ── งานสต็อกประจำวัน ────────────────────────────────────────────────────────
+// ย้ายมาจาก stock-in.php / stock-out-item.php / stock-out.php เพื่อให้ทำงานได้จบในหน้าเดียว
+// ทุกฟอร์มมี action ชัดเจน (ดูเหตุผลที่บล็อก POST ด้านบน)
+?>
+<?php parts_modal_begin('stock-in-add-modal', 'บันทึกรับเข้า'); ?>
+<form method="POST">
+    <input type="hidden" name="action" value="stock_in">
+    <?= parts_product_picker_html('product_id', $pickerProducts, $partIcons, [
+        'id'             => 'stock-in-product',
+        'autofocus'      => true,
+        'disableZeroQty' => false,
+    ]) ?>
+    <div class="form-row">
+        <div class="form-group">
+            <label>จำนวนรับเข้า</label>
+            <input type="number" name="quantity" min="1" value="1" required>
+        </div>
+        <div class="form-group">
+            <label>หมายเหตุ</label>
+            <textarea name="note" rows="2" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea>
+        </div>
+    </div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-outline modal-close-btn">ยกเลิก</button>
+        <button type="submit" class="btn btn-success"><?= ui_icon_html('stock-in', 16, 'btn-svg') ?> บันทึกรับเข้า</button>
+    </div>
+</form>
+<?php parts_modal_end(); ?>
+
+<?php parts_modal_begin('stock-out-item-add-modal', 'บันทึกเบิกรายชิ้น'); ?>
+<form method="POST">
+    <input type="hidden" name="action" value="stock_out_item">
+    <?= parts_product_picker_html('product_id', $pickerProducts, $partIcons, [
+        'id' => 'stock-out-item-product',
+        'autofocus' => true,
+    ]) ?>
+    <div class="form-row">
+        <div class="form-group">
+            <label>จำนวนเบิก</label>
+            <input type="number" name="quantity" min="1" value="1" required>
+        </div>
+        <div class="form-group">
+            <label>หมายเลขเครื่อง (S/N)</label>
+            <input type="text" name="asset_code" placeholder="เช่น BP26072024">
+        </div>
+    </div>
+    <p class="form-hint">ระบุ S/N ถ้าเบิกไปใช้กับเครื่อง</p>
+    <div class="form-group">
+        <label>ประเภทการเบิก</label>
+        <select name="note" required>
+            <option value="">-- เลือกประเภทการเบิก --</option>
+            <?php foreach ($noteOptions as $option): ?>
+            <option value="<?= e($option) ?>"><?= e($option) ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-outline modal-close-btn">ยกเลิก</button>
+        <button type="submit" class="btn btn-danger"><?= ui_icon_html('stock-out-item', 16, 'btn-svg') ?> ยืนยันเบิกออก</button>
+    </div>
+</form>
+<?php parts_modal_end(); ?>
+
+<?php if (!empty($sets)): ?>
+<?php parts_modal_begin('stock-out-set-modal', 'เบิกออก Set'); ?>
+<form method="POST" data-set-preview data-set-items="<?= e(json_encode($setItemsData, JSON_UNESCAPED_UNICODE)) ?>">
+    <input type="hidden" name="action" value="stock_out_set">
+    <div class="form-group">
+        <label>เลือก Set</label>
+        <select name="set_id" required data-autofocus>
+            <option value="">-- เลือก Set --</option>
+            <?php foreach ($sets as $s): ?>
+            <option value="<?= (int) $s['id'] ?>" <?= !$s['can_issue'] ? 'disabled' : '' ?>>
+                [<?= e($s['code']) ?>] <?= e($s['name']) ?>
+                <?= !$s['can_issue'] ? '(สต็อกไม่พอ)' : '' ?>
+            </option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <div class="set-preview" data-set-preview-box hidden>
+        <p class="set-preview-head">อะไหล่ที่จะถูกตัดออก <span data-set-preview-count></span></p>
+        <ul class="set-preview-list" data-set-preview-list></ul>
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>จำนวนชุดที่เบิก</label>
+            <input type="number" name="set_count" min="1" value="1" required>
+        </div>
+        <div class="form-group">
+            <label>หมายเลขเครื่อง (S/N)</label>
+            <input type="text" name="asset_code" placeholder="เช่น BP26072024">
+        </div>
+    </div>
+    <div class="form-group">
+        <label>ประเภทการเบิก</label>
+        <select name="note" required>
+            <option value="">-- เลือกประเภทการเบิก --</option>
+            <?php foreach ($noteOptions as $option): ?>
+            <option value="<?= e($option) ?>"><?= e($option) ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-outline modal-close-btn">ยกเลิก</button>
+        <button type="submit" class="btn btn-danger"><?= ui_icon_html('stock-out-set', 16, 'btn-svg') ?> ยืนยันเบิกออก</button>
+    </div>
+</form>
+<?php parts_modal_end(); ?>
+<?php endif; ?>
 
 <?php parts_product_edit_modals(); ?>
 

@@ -1,6 +1,13 @@
 <?php
+/**
+ * pages/history.php — ประวัติสต็อกทั้งหมด แยกเป็นแท็บ ?tab=sn|in|item|set (2026-08-05)
+ *
+ * เดิมแยกเป็น 4 หน้า (history.php, stock-in.php, stock-out-item.php, stock-out.php)
+ * ยุบมารวมที่นี่ ส่วนฟอร์มบันทึกย้ายไปเป็น modal ที่ products.php
+ * แต่ละแท็บโหลด query ของตัวเองเท่านั้น
+ */
 
-$pageTitle = 'ประวัติเบิก';
+$pageTitle = 'ประวัติ';
 
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'sn_basket') {
     ob_start();
@@ -83,9 +90,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'sn_basket') {
                         <div class="table-actions">
                             <?= actionIcon('view', url('/pages/history.php?id=' . (int) $doc['id']), 'ดูรายละเอียด') ?>
                             <?php if (empty($doc['set_id'])): ?>
-                            <?= actionIcon('edit', url('/pages/stock-out-item.php?edit_out=' . (int) $doc['id']), 'แก้ไข') ?>
+                            <?= actionIcon('edit', url('/pages/history.php?tab=item&edit_out=' . (int) $doc['id']), 'แก้ไข') ?>
                             <?php else: ?>
-                            <?= actionIcon('edit', url('/pages/stock-out.php?edit_out=' . (int) $doc['id']), 'แก้ไข') ?>
+                            <?= actionIcon('edit', url('/pages/history.php?tab=set&edit_out=' . (int) $doc['id']), 'แก้ไข') ?>
                             <?php endif; ?>
                         </div>
                     </td>
@@ -100,24 +107,112 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'sn_basket') {
     exit;
 }
 
-require_once __DIR__ . '/../includes/header.php';
+// ต้องเรียกเองก่อน header.php เพราะต้องใช้ url() และ $stock ตอนคำนวณ $tab/$partsBackUrl
+// (header.php require ซ้ำได้ มี PARTS_BOOTSTRAP_LOADED กันไว้)
+require_once __DIR__ . '/../includes/parts_bootstrap.php';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_stock_out'])) {
-    try {
-        $stock->deleteStockOut((int) $_POST['id']);
-        flash('success', 'ลบรายการเบิกแล้ว');
-    } catch (Exception $e) {
-        flash('error', safe_exception_message($e));
-    }
-    redirect(url('/pages/history.php'));
+$historyTabs = [
+    'sn'   => ['label' => 'ตาม S/N',      'icon' => 'history',         'sub' => 'รายการเบิกออกทั้งหมด — 1 แถวต่อ S/N (คลิกแถวเพื่อดูรายละเอียด)'],
+    'in'   => ['label' => 'รับเข้า',       'icon' => 'stock-in',        'sub' => 'ประวัติการรับอะไหล่เข้าคลัง'],
+    'item' => ['label' => 'เบิกรายชิ้น',   'icon' => 'stock-out-item',  'sub' => 'ประวัติการเบิกอะไหล่ออกทีละรายการ'],
+    'set'  => ['label' => 'เบิก Set',      'icon' => 'stock-out-set',   'sub' => 'ประวัติการเบิกอะไหล่ออกเป็นชุด'],
+];
+
+$tab = (string) ($_GET['tab'] ?? 'sn');
+if (!isset($historyTabs[$tab])) {
+    $tab = 'sn';
+}
+
+$editIn = isset($_GET['edit_in']) ? (int) $_GET['edit_in'] : 0;
+$editOut = isset($_GET['edit_out']) ? (int) $_GET['edit_out'] : 0;
+$editInRow = $editIn ? $stock->getStockInRow($editIn) : null;
+$editOutRow = $editOut ? $stock->getStockOutDetail($editOut) : null;
+
+// ลิงก์เก่าจากหน้าที่ยุบไปแล้ว (และ bookmark) ไม่มี ?tab= มาด้วย — เดาแท็บให้จากรายการที่ขอแก้
+// ถ้าไม่ทำ modal จะไม่ถูก render เพราะอยู่คนละแท็บ แล้วกดแล้วเงียบโดยไม่มีอะไรเกิดขึ้น
+if ($editInRow) {
+    $tab = 'in';
+} elseif ($editOutRow) {
+    $tab = empty($editOutRow['set_id']) ? 'item' : 'set';
 }
 
 $detailId = isset($_GET['id']) ? (int) $_GET['id'] : null;
 $detail = $detailId ? $stock->getStockOutDetail($detailId) : null;
-$grouped = $stock->getStockOutHistoryGroupedBySn();
+
+// ต้องตั้งก่อน require header.php — header อ่านค่านี้ตอน include ตั้งทีหลังไม่มีผล
+if ($detail) {
+    $partsBackUrl = url('/pages/history.php?tab=' . $tab);
+}
+
+$pageTitle = 'ประวัติ — ' . $historyTabs[$tab]['label'];
+require_once __DIR__ . '/../includes/header.php';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // รวม handler ของ stock-in.php / stock-out-item.php / stock-out.php มาไว้ที่เดียว
+    // ไม่มี else ที่สร้างรายการใหม่ — การสร้างทั้งหมดอยู่ที่ products.php ภายใต้ชื่อ action ชัดเจน
+    try {
+        if (isset($_POST['delete_stock_in'])) {
+            $stock->deleteStockIn((int) $_POST['id']);
+            flash('success', 'ลบรายการรับเข้าแล้ว');
+        } elseif (isset($_POST['update_stock_in'])) {
+            $stock->updateStockIn(
+                (int) $_POST['id'],
+                (int) $_POST['quantity'],
+                trim($_POST['note'] ?? '') ?: null
+            );
+            flash('success', 'แก้ไขรายการรับเข้าแล้ว');
+        } elseif (isset($_POST['delete_stock_out'])) {
+            $stock->deleteStockOut((int) $_POST['id']);
+            flash('success', 'ลบรายการเบิกแล้ว');
+        } elseif (isset($_POST['update_stock_out'])) {
+            $stock->updateStockOutSingle(
+                (int) $_POST['id'],
+                (int) $_POST['quantity'],
+                validateStockOutNote($_POST['note'] ?? null),
+                trim($_POST['asset_code'] ?? '') ?: null,
+                $line_name
+            );
+            flash('success', 'แก้ไขรายการเบิกแล้ว');
+        } elseif (isset($_POST['update_stock_out_meta'])) {
+            $stock->updateStockOutMeta(
+                (int) $_POST['id'],
+                validateStockOutNote($_POST['note'] ?? null),
+                trim($_POST['asset_code'] ?? '') ?: null,
+                $line_name
+            );
+            flash('success', 'แก้ไขรายการเบิกแล้ว');
+        } else {
+            flash('error', 'คำสั่งไม่ถูกต้อง');
+        }
+    } catch (Exception $e) {
+        flash('error', safe_exception_message($e));
+    }
+    // กลับไปแท็บเดิมแต่ตัด edit_in/edit_out ทิ้ง ไม่งั้น modal จะเด้งขึ้นมาใหม่ทันทีที่บันทึกเสร็จ
+    redirect(url('/pages/history.php?tab=' . $tab));
+}
+
 $allProducts = parts_enrich_products($stock->getAllProducts());
 $partProdLabels = production_part_labels_by_stock_codes(array_column($allProducts, 'code'));
 $partIcons = parts_product_icon_map($allProducts);
+
+// โหลดเฉพาะ query ของแท็บที่กำลังดู
+$grouped = [];
+$history = [];
+$noteOptions = [];
+if ($detail) {
+    // หน้ารายละเอียดไม่ต้องใช้ตารางไหนเลย
+} elseif ($tab === 'sn') {
+    $grouped = $stock->getStockOutHistoryGroupedBySn();
+} elseif ($tab === 'in') {
+    $history = $stock->getStockInHistory(50);
+} elseif ($tab === 'item') {
+    $history = $stock->getSingleItemOutHistory(50);
+} else {
+    $history = $stock->getSetOutHistory(50);
+}
+if ($tab === 'item' || $tab === 'set') {
+    $noteOptions = getStockOutNoteOptions();
+}
 
 /**
  * สรุปรายการเบิกของ S/N (แถวยุบ)
@@ -213,9 +308,9 @@ function history_row_actions(array $h): string
 {
     $view = actionIcon('view', url('/pages/history.php?id=' . (int) $h['id']), 'ดูรายละเอียด');
     if (empty($h['set_id'])) {
-        $edit = actionIcon('edit', url('/pages/stock-out-item.php?edit_out=' . (int) $h['id']), 'แก้ไข');
+        $edit = actionIcon('edit', url('/pages/history.php?tab=item&edit_out=' . (int) $h['id']), 'แก้ไข');
     } else {
-        $edit = actionIcon('edit', url('/pages/stock-out.php?edit_out=' . (int) $h['id']), 'แก้ไข');
+        $edit = actionIcon('edit', url('/pages/history.php?tab=set&edit_out=' . (int) $h['id']), 'แก้ไข');
     }
     $delete = '<form method="POST" onsubmit="return confirm(\'ลบรายการเบิกนี้?\')">'
         . '<input type="hidden" name="delete_stock_out" value="1">'
@@ -323,7 +418,18 @@ function history_sn_row_thumb(array $g, array $partIcons): string
 }
 ?>
 
-<?php parts_page_header('history', 'ประวัติการเบิก', 'รายการเบิกออกทั้งหมด — 1 แถวต่อ S/N (คลิกแถวเพื่อดูรายละเอียด)'); ?>
+<?php parts_page_header($historyTabs[$tab]['icon'], 'ประวัติ — ' . $historyTabs[$tab]['label'], $historyTabs[$tab]['sub']); ?>
+
+<?php if (!$detail): ?>
+<?php // แท็บเป็นลิงก์ (navigation ฝั่งเซิร์ฟเวอร์) — ห้ามใส่ data-history-filter เพราะ app.js จะดักคลิกไปทำ filter ?>
+<nav class="history-kind-legend history-tabs" aria-label="ประเภทประวัติ">
+    <?php foreach ($historyTabs as $key => $def): ?>
+    <a href="<?= url('/pages/history.php?tab=' . $key) ?>"
+       class="history-kind-filter<?= $tab === $key ? ' is-active' : '' ?>"
+       <?= $tab === $key ? 'aria-current="page"' : '' ?>><?= e($def['label']) ?></a>
+    <?php endforeach; ?>
+</nav>
+<?php endif; ?>
 
 <?php if ($detail): ?>
 <div class="card parts-list-card">
@@ -387,11 +493,11 @@ function history_sn_row_thumb(array $g, array $partIcons): string
     </table>
     </div>
     <div class="form-actions">
-        <a href="<?= url('/pages/history.php') ?>" class="btn btn-outline">← กลับ</a>
+        <a href="<?= url('/pages/history.php?tab=' . $tab) ?>" class="btn btn-outline">← กลับ</a>
         <?php if (empty($detail['set_id'])): ?>
-        <?= actionIcon('edit', url('/pages/stock-out-item.php?edit_out=' . (int) $detail['id']), 'แก้ไข', false) ?>
+        <?= actionIcon('edit', url('/pages/history.php?tab=item&edit_out=' . (int) $detail['id']), 'แก้ไข', false) ?>
         <?php else: ?>
-        <?= actionIcon('edit', url('/pages/stock-out.php?edit_out=' . (int) $detail['id']), 'แก้ไข', false) ?>
+        <?= actionIcon('edit', url('/pages/history.php?tab=set&edit_out=' . (int) $detail['id']), 'แก้ไข', false) ?>
         <?php endif; ?>
         <form method="POST" onsubmit="return confirm('ลบรายการเบิกนี้?')">
             <input type="hidden" name="delete_stock_out" value="1">
@@ -400,7 +506,7 @@ function history_sn_row_thumb(array $g, array $partIcons): string
         </form>
     </div>
 </div>
-<?php else: ?>
+<?php elseif ($tab === 'sn'): ?>
 
 <div class="card parts-list-card">
     <div class="history-kind-legend" role="group" aria-label="กรองประเภทการเบิก">
@@ -482,6 +588,252 @@ function history_sn_row_thumb(array $g, array $partIcons): string
         <div id="sn-basket-body" class="modal-body"></div>
     </div>
 </div>
+
+<?php elseif ($tab === 'in'): ?>
+
+<div class="card parts-list-card">
+    <?php if (empty($history)): ?>
+        <p class="empty-state">ยังไม่มีประวัติรับเข้า — บันทึกรับเข้าได้ที่หน้า <a href="<?= url('/pages/products.php') ?>">อะไหล่</a></p>
+    <?php else: ?>
+    <div class="table-wrap">
+        <table class="parts-table">
+            <thead>
+                <tr>
+                    <th class="col-img">รูป</th>
+                    <th>รหัส</th>
+                    <th>อะไหล่</th>
+                    <th>ผู้รับ</th>
+                    <th class="text-right">จำนวน</th>
+                    <th>หมายเหตุ</th>
+                    <th>วันเวลา</th>
+                    <th class="col-actions">จัดการ</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($history as $h):
+                    $icon = $partIcons[$h['code']] ?? '';
+                ?>
+                <tr>
+                    <td class="col-img"><?= parts_img_tag($icon, parts_label_for_code((string) $h['code'], (string) $h['name'], $partProdLabels)) ?></td>
+                    <td><?= e($h['code']) ?></td>
+                    <td><?= e(parts_label_for_code((string) $h['code'], (string) $h['name'], $partProdLabels)) ?></td>
+                    <td><?= e($h['received_by'] ?: '-') ?></td>
+                    <td class="text-right text-success">+<?= formatNumber($h['quantity']) ?> <?= e($h['unit']) ?></td>
+                    <td class="text-muted"><?= e($h['note'] ?: '-') ?></td>
+                    <td class="text-muted"><?= formatDate($h['created_at']) ?></td>
+                    <td class="col-actions">
+                        <div class="table-actions">
+                            <?= actionIcon('edit', url('/pages/history.php?tab=in&edit_in=' . (int) $h['id']), 'แก้ไข') ?>
+                            <form method="POST" onsubmit="return confirm('ลบรายการรับเข้านี้?')">
+                                <input type="hidden" name="delete_stock_in" value="1">
+                                <input type="hidden" name="id" value="<?= (int) $h['id'] ?>">
+                                <?= actionIcon('delete', '', 'ลบ') ?>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php endif; ?>
+</div>
+
+<?php if ($editInRow): ?>
+<?php parts_modal_begin('stock-in-edit-modal', 'แก้ไขรายการรับเข้า', true, true); ?>
+<form method="POST">
+    <input type="hidden" name="update_stock_in" value="1">
+    <input type="hidden" name="id" value="<?= (int) $editInRow['id'] ?>">
+    <div class="form-group">
+        <label>อะไหล่</label>
+        <input type="text" value="<?= e(parts_label_for_code((string) ($editInRow['code'] ?? ''), (string) ($editInRow['name'] ?? ''), $partProdLabels)) ?>" readonly>
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>จำนวนรับเข้า</label>
+            <input type="number" name="quantity" min="1" value="<?= (int) $editInRow['quantity'] ?>" required data-autofocus>
+        </div>
+        <div class="form-group">
+            <label>หมายเหตุ</label>
+            <textarea name="note" rows="2"><?= e($editInRow['note'] ?? '') ?></textarea>
+        </div>
+    </div>
+    <div class="form-actions">
+        <a href="<?= url('/pages/history.php?tab=in') ?>" class="btn btn-outline">ยกเลิก</a>
+        <button type="submit" class="btn btn-success">บันทึกการแก้ไข</button>
+    </div>
+</form>
+<?php parts_modal_end(); ?>
+<?php endif; ?>
+
+<?php elseif ($tab === 'item'): ?>
+
+<div class="card parts-list-card">
+    <?php if (empty($history)): ?>
+        <p class="empty-state">ยังไม่มีประวัติเบิกรายชิ้น — เบิกออกได้ที่หน้า <a href="<?= url('/pages/products.php') ?>">อะไหล่</a></p>
+    <?php else: ?>
+    <div class="table-wrap">
+        <table class="parts-table">
+            <thead>
+                <tr>
+                    <th class="col-img">รูป</th>
+                    <th>เลขที่</th>
+                    <th>อะไหล่</th>
+                    <th>S/N</th>
+                    <th class="text-right">จำนวน</th>
+                    <th>ผู้เบิก</th>
+                    <th>ประเภทการเบิก</th>
+                    <th>วันเวลา</th>
+                    <th class="col-actions">จัดการ</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($history as $h):
+                    $icon = $partIcons[$h['code']] ?? '';
+                ?>
+                <tr>
+                    <td class="col-img"><?= parts_img_tag($icon, parts_label_for_code((string) $h['code'], (string) $h['name'], $partProdLabels)) ?></td>
+                    <td><?= e($h['doc_no']) ?></td>
+                    <td><?= e(parts_format_product_line((string) $h['code'], (string) $h['name'], $partProdLabels)) ?></td>
+                    <td><?= e($h['asset_code'] ?: '-') ?></td>
+                    <td class="text-right text-danger">-<?= formatNumber($h['quantity']) ?> <?= e($h['unit']) ?></td>
+                    <td><?= e($h['issued_by'] ?: '-') ?></td>
+                    <td class="text-muted"><?= e($h['note'] ?: '-') ?></td>
+                    <td class="text-muted"><?= formatDate($h['created_at']) ?></td>
+                    <td class="col-actions">
+                        <div class="table-actions">
+                            <?= actionIcon('edit', url('/pages/history.php?tab=item&edit_out=' . (int) $h['stock_out_id']), 'แก้ไข') ?>
+                            <form method="POST" onsubmit="return confirm('ลบรายการเบิกนี้? ข้อมูลในระบบทะเบียนเครื่องที่เกี่ยวข้องจะถูกปรับตามด้วย')">
+                                <input type="hidden" name="delete_stock_out" value="1">
+                                <input type="hidden" name="id" value="<?= (int) $h['stock_out_id'] ?>">
+                                <?= actionIcon('delete', '', 'ลบ') ?>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php endif; ?>
+</div>
+
+<?php $ei = $editOutRow ? ($editOutRow['items'][0] ?? null) : null; ?>
+<?php if ($editOutRow && $ei): ?>
+<?php parts_modal_begin('stock-out-item-edit-modal', 'แก้ไขรายการเบิก', true, true); ?>
+<form method="POST">
+    <input type="hidden" name="update_stock_out" value="1">
+    <input type="hidden" name="id" value="<?= (int) $editOutRow['id'] ?>">
+    <div class="form-group">
+        <label>อะไหล่</label>
+        <input type="text" value="<?= e(parts_label_for_code((string) ($ei['code'] ?? ''), (string) ($ei['name'] ?? ''), $partProdLabels)) ?>" readonly>
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>จำนวนเบิก</label>
+            <input type="number" name="quantity" min="1" value="<?= (int) $ei['quantity'] ?>" required data-autofocus>
+        </div>
+        <div class="form-group">
+            <label>หมายเลขเครื่อง (S/N)</label>
+            <input type="text" name="asset_code" value="<?= e($editOutRow['asset_code'] ?? '') ?>" placeholder="เช่น BP26072024">
+        </div>
+    </div>
+    <div class="form-group">
+        <label>ประเภทการเบิก</label>
+        <select name="note" required>
+            <?php foreach ($noteOptions as $option): ?>
+            <option value="<?= e($option) ?>" <?= ($editOutRow['note'] ?? '') === $option ? 'selected' : '' ?>><?= e($option) ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <?php if (!empty($editOutRow['part_movement_id'])): ?>
+    <p class="sync-badge"><?= ui_icon_html('switch', 12, 'sync-svg') ?> เชื่อมกับระบบทะเบียนเครื่องแล้ว</p>
+    <?php endif; ?>
+    <div class="form-actions">
+        <a href="<?= url('/pages/history.php?tab=item') ?>" class="btn btn-outline">ยกเลิก</a>
+        <button type="submit" class="btn btn-success">บันทึกการแก้ไข</button>
+    </div>
+</form>
+<?php parts_modal_end(); ?>
+<?php endif; ?>
+
+<?php else: ?>
+
+<div class="card parts-list-card">
+    <?php if (empty($history)): ?>
+        <p class="empty-state">ยังไม่มีประวัติเบิก Set — เบิกออกได้ที่หน้า <a href="<?= url('/pages/products.php') ?>">อะไหล่</a></p>
+    <?php else: ?>
+    <div class="table-wrap">
+        <table class="parts-table">
+            <thead>
+                <tr>
+                    <th>เลขที่</th>
+                    <th>Set</th>
+                    <th>S/N</th>
+                    <th class="text-right">จำนวนรวม</th>
+                    <th>ผู้เบิก</th>
+                    <th>ประเภทการเบิก</th>
+                    <th>วันเวลา</th>
+                    <th class="col-actions">จัดการ</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($history as $h): ?>
+                <tr>
+                    <td><?= e($h['doc_no']) ?></td>
+                    <td>[<?= e($h['set_code']) ?>] <?= e($h['set_name']) ?></td>
+                    <td><?= e($h['asset_code'] ?: '-') ?></td>
+                    <td class="text-right"><?= formatNumber($h['total_qty']) ?></td>
+                    <td><?= e($h['issued_by'] ?: '-') ?></td>
+                    <td class="text-muted"><?= e($h['note'] ?: '-') ?></td>
+                    <td class="text-muted"><?= formatDate($h['created_at']) ?></td>
+                    <td class="col-actions">
+                        <div class="table-actions">
+                            <?= actionIcon('edit', url('/pages/history.php?tab=set&edit_out=' . (int) $h['stock_out_id']), 'แก้ไข') ?>
+                            <form method="POST" onsubmit="return confirm('ลบรายการเบิก Set นี้?')">
+                                <input type="hidden" name="delete_stock_out" value="1">
+                                <input type="hidden" name="id" value="<?= (int) $h['stock_out_id'] ?>">
+                                <?= actionIcon('delete', '', 'ลบ') ?>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php endif; ?>
+</div>
+
+<?php if ($editOutRow && !empty($editOutRow['set_id'])): ?>
+<?php parts_modal_begin('stock-out-set-edit-modal', 'แก้ไขรายการเบิก Set — ' . $editOutRow['doc_no'], true, true); ?>
+<form method="POST">
+    <input type="hidden" name="update_stock_out_meta" value="1">
+    <input type="hidden" name="id" value="<?= (int) $editOutRow['id'] ?>">
+    <div class="form-group">
+        <label>ชุดเบิก</label>
+        <input type="text" value="[<?= e($editOutRow['set_code']) ?>] <?= e($editOutRow['set_name']) ?>" readonly>
+    </div>
+    <div class="form-group">
+        <label>หมายเลขเครื่อง (S/N)</label>
+        <input type="text" name="asset_code" value="<?= e($editOutRow['asset_code'] ?? '') ?>" placeholder="เช่น BP26072024" data-autofocus>
+    </div>
+    <div class="form-group">
+        <label>ประเภทการเบิก</label>
+        <select name="note" required>
+            <?php foreach ($noteOptions as $option): ?>
+            <option value="<?= e($option) ?>" <?= ($editOutRow['note'] ?? '') === $option ? 'selected' : '' ?>><?= e($option) ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <div class="form-actions">
+        <a href="<?= url('/pages/history.php?tab=set') ?>" class="btn btn-outline">ยกเลิก</a>
+        <button type="submit" class="btn btn-success">บันทึกการแก้ไข</button>
+    </div>
+</form>
+<?php parts_modal_end(); ?>
+<?php endif; ?>
+
 <?php endif; ?>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

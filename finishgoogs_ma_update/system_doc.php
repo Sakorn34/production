@@ -384,7 +384,7 @@ $B = BASE_URL;
   <div class="flow-steps">
     <div class="flow-step"><div class="flow-num">1</div><div class="flow-body">INSERT part_movements: direction out, qty, mode, ref_asset_id / ma_record_id (ถ้ามี)<div class="flow-writes"><span class="flow-write">เขียน: part_movements</span></div></div></div>
     <div class="flow-step"><div class="flow-num">2</div><div class="flow-body"><span class="inline-code">tech_parts_stock_out_by_part_id()</span> หรือ <span class="inline-code">tech_parts_stock_in_by_part_id()</span> — map ผ่าน <span class="inline-code">parts.stock_code</span> → <span class="inline-code">biton_tech_parts.products.code</span><div class="flow-writes"><span class="flow-write">sync: biton_tech_parts.products.quantity</span></div></div></div>
-    <div class="flow-step"><div class="flow-num">3</div><div class="flow-body">รับเข้าสต็อกจริงทำที่แอป <span class="inline-code">/production/parts/</span> (stock-in.php) — ไม่ใช่ parts.php<div class="flow-writes"><span class="flow-write">เขียน: biton_tech_parts.stock_in</span></div></div></div>
+    <div class="flow-step"><div class="flow-num">3</div><div class="flow-body">รับเข้าสต็อกจริงทำที่แอป <span class="inline-code">/production/parts/</span> (products.php) — ไม่ใช่ parts.php<div class="flow-writes"><span class="flow-write">เขียน: biton_tech_parts.stock_in</span></div></div></div>
   </div>
 </div>
 

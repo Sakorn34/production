@@ -813,6 +813,34 @@ function validateStockOutNote(?string $note): string
 }
 
 /**
+ * บันทึก activity log ของงานสต็อกด้วยชื่อเดิมของหน้าที่เคยทำงานนั้น
+ *
+ * งานรับเข้า/เบิกออกย้ายมารวมที่ products.php แล้ว ถ้าปล่อยให้ shutdown hook
+ * (activity_log_register_post_shutdown) บันทึกเอง ทุกอย่างจะกลายเป็น "จัดการอะไหล่"
+ * แยกไม่ออกว่าเป็นการรับเข้าหรือเบิกออก จึงบันทึกเองด้วย label เดิมของแต่ละงาน
+ * — activity_log_write() ตั้ง $GLOBALS['activity_log_written'] ให้ shutdown hook ข้ามเอง
+ *
+ * @param string $legacyScript ชื่อไฟล์เดิม เช่น stock-in.php (ใช้เปิด label ใน activity_log_script_label)
+ * @return void
+ */
+function parts_log_stock_action(string $legacyScript): void
+{
+    if (!function_exists('activity_log_write')) {
+        return;
+    }
+    $actor = $GLOBALS['line_name'] ?? '';
+    activity_log_write([
+        'system_key' => 'parts',
+        'actor_name' => (string) $actor,
+        'action_key' => 'post:' . preg_replace('/\.php$/', '', $legacyScript),
+        'summary'    => activity_log_script_label($legacyScript),
+        'detail'     => function_exists('activity_log_sanitize_post_detail')
+            ? activity_log_sanitize_post_detail()
+            : '',
+    ]);
+}
+
+/**
  * สร้างปุ่ม action แบบ icon (ดู / แก้ไข / ลบ)
  *
  * @param string $type view|edit|delete
@@ -884,8 +912,10 @@ function parts_is_menu_page(?string $cur = null): bool
         return false;
     }
     // ไม่มี 'index' แล้ว — Dashboard ของ parts ถูกแทนด้วย Dashboard รวม (index.php เป็น redirect)
+    // stock-in / stock-out / stock-out-item เป็น redirect แล้ว ไม่เคย render HTML จึงไม่ต้องมีที่นี่
+    // ?tab= ไม่นับ — ทุกแท็บของ history ยังเป็นหน้าเมนู ไม่ต้องมีปุ่มย้อนกลับ
     static $menus = [
-        'products', 'stock-in', 'stock-out', 'stock-out-item', 'sets', 'history', 'year-end-summary',
+        'products', 'history', 'sets', 'year-end-summary',
     ];
     return in_array($cur, $menus, true);
 }

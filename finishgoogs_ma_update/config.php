@@ -1962,9 +1962,35 @@ function product_code_format_label(array $p) {
  * @return int|null
  */
 function parse_running_from_asset_code(array $p, $assetCode) {
-    $digits = product_code_normalize($p)['running_digits'];
-    $assetCode = (string)$assetCode;
-    if ($digits <= 0 || strlen($assetCode) < $digits) {
+    $cfg = product_code_normalize($p);
+    $digits = (int)$cfg['running_digits'];
+    $assetCode = trim((string)$assetCode);
+    if ($digits <= 0 || $assetCode === '') {
+        return null;
+    }
+
+    // ต้องตรงรูปแบบปัจจุบันเป๊ะ ๆ ก่อนถึงจะอ่านหางเป็น running ได้
+    //
+    // รหัสรุ่นเก่าใช้ running สั้นกว่า เช่น CC6309680 = CC + 63(ปี) + 09(เดือน) + 680
+    // ถ้าตัด 4 ตัวท้ายตาม running_digits ปัจจุบัน จะได้ "9680" คือขโมยเลข 9 จากเดือนมาเป็นหลักพัน
+    // ทำให้เลขถัดไปพุ่งจาก 1477 ไปเป็น 9681 — เครื่องที่ผลิตเดือน 09 จะดันเลขสูงสุดเสมอ
+    //
+    // รหัสที่ไม่เข้ารูปแบบให้คืน null แล้วปล่อยให้ผู้เรียกไปใช้ running_no ในฐานข้อมูลแทน
+    // (ค่านั้นเก็บไว้ถูกต้องอยู่แล้ว)
+    $prefix = ($cfg['code_use_prefix'] && $cfg['code_prefix'] !== '') ? (string)$cfg['code_prefix'] : '';
+    $expectedLen = strlen($prefix)
+        + ($cfg['code_use_year'] ? 2 : 0)
+        + ($cfg['code_use_month'] ? 2 : 0)
+        + $digits;
+
+    if (strlen($assetCode) !== $expectedLen) {
+        return null;
+    }
+    if ($prefix !== '' && strncmp($assetCode, $prefix, strlen($prefix)) !== 0) {
+        return null;
+    }
+    $middle = substr($assetCode, strlen($prefix), $expectedLen - strlen($prefix) - $digits);
+    if ($middle !== '' && !ctype_digit($middle)) {
         return null;
     }
     $tail = substr($assetCode, -$digits);
@@ -1982,11 +2008,27 @@ function parse_running_from_asset_code(array $p, $assetCode) {
  * @return int
  */
 function max_running_no_for_product(array $p, int $productId): int {
+    return asset_running_scan_for_product($p, $productId)['max'];
+}
+
+/**
+ * สแกนเครื่องของรุ่น คืนเลข running สูงสุดพร้อมรหัสของเครื่องนั้น
+ *
+ * แยกออกมาเพื่อให้ "เลขถัดไป" กับ "เครื่องล่าสุดในระบบ" ที่โชว์ในฟอร์มมาจากการนับชุดเดียวกัน
+ * เดิม latest_asset_code_for_product() เรียงด้วยคอลัมน์ running_no ในฐานข้อมูล ส่วนการหาเลข
+ * ถัดไปอ่านจากตัวรหัส สองทางนี้ให้คำตอบคนละตัวเมื่อข้อมูลเก่ามี running_no ผิดรูป
+ *
+ * @param array<string, mixed> $p
+ * @param int                  $productId
+ * @return array{max:int, code:string}
+ */
+function asset_running_scan_for_product(array $p, int $productId): array {
     $productId = (int)$productId;
     if ($productId <= 0 || ($p['code_mode'] ?? '') !== 'generated') {
-        return 0;
+        return ['max' => 0, 'code' => ''];
     }
     $maxRun = 0;
+    $maxCode = '';
     $prefix = trim((string)($p['code_prefix'] ?? ''));
     if ($prefix !== '') {
         $res = qr(
@@ -2007,16 +2049,17 @@ function max_running_no_for_product(array $p, int $productId): int {
     $rnCap = (int)str_repeat('9', min(8, $cfgDigits + 1));
     while ($row = $res->fetch_assoc()) {
         $parsed = parse_running_from_asset_code($p, $row['asset_code']);
-        if ($parsed !== null) {
-            $maxRun = max($maxRun, $parsed);
-            continue;
+        if ($parsed === null) {
+            // รหัสรูปแบบเก่า/กรอกเอง — ใช้ running_no ในฐานข้อมูลแทน (ตัดค่าที่ผิดรูปทิ้งด้วย cap)
+            $rn = (int)($row['running_no'] ?? 0);
+            $parsed = ($rn > 0 && $rn <= $rnCap) ? $rn : null;
         }
-        $rn = (int)($row['running_no'] ?? 0);
-        if ($rn > 0 && $rn <= $rnCap) {
-            $maxRun = max($maxRun, $rn);
+        if ($parsed !== null && $parsed > $maxRun) {
+            $maxRun = $parsed;
+            $maxCode = (string)$row['asset_code'];
         }
     }
-    return $maxRun;
+    return ['max' => $maxRun, 'code' => $maxCode];
 }
 
 /**
@@ -2044,29 +2087,10 @@ function latest_asset_code_for_product(array $p, int $productId): string {
     }
 
     if (($p['code_mode'] ?? '') === 'generated') {
-        $prefix = trim((string)($p['code_prefix'] ?? ''));
-        if ($prefix !== '') {
-            $row = qr(
-                "SELECT a.asset_code FROM assets a
-                 INNER JOIN products pr ON pr.id = a.product_id
-                 WHERE pr.code_prefix = ? AND a.running_no IS NOT NULL
-                 ORDER BY a.running_no DESC, a.id DESC
-                 LIMIT 1",
-                's',
-                [$prefix]
-            )->fetch_assoc();
-        } else {
-            $row = qr(
-                "SELECT asset_code FROM assets
-                 WHERE product_id = ? AND running_no IS NOT NULL
-                 ORDER BY running_no DESC, id DESC
-                 LIMIT 1",
-                'i',
-                [$productId]
-            )->fetch_assoc();
-        }
-        if ($row) {
-            return (string)$row['asset_code'];
+        // ใช้ผลสแกนชุดเดียวกับที่คำนวณเลขถัดไป เพื่อให้ "เครื่องล่าสุด" กับ "เลขถัดไป" สอดคล้องกันเสมอ
+        $scan = asset_running_scan_for_product($p, $productId);
+        if ($scan['code'] !== '') {
+            return $scan['code'];
         }
     }
 

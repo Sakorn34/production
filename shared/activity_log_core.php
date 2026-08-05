@@ -333,6 +333,7 @@ function activity_log_script_label($script) {
         'sets.php'           => 'จัดการ Set',
         'product-detail.php' => 'รายละเอียดอะไหล่',
         'history.php'        => 'ประวัติสต็อก',
+        // เลิกใช้แล้ว 2026-08-05 (ลบไฟล์ทิ้ง) — คง label ไว้ให้ log เก่าที่บันทึกไปแล้วยังอ่านออก
         'vendor-import.php'  => 'นำเข้าจาก vendor',
         'year-end-summary.php' => 'สรุปปลายปี',
         'webhook-stockout.php' => 'Webhook เบิกอะไหล่',

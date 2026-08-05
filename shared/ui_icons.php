@@ -262,14 +262,14 @@ function ui_nav_items_parts(): array
 {
     // ไม่มีเมนู Dashboard ของ parts แล้ว — ใช้ Dashboard รวมของระบบทะเบียนเครื่องแทน
     // (parts/index.php redirect ไปที่นั่น)
+    // งานรับเข้า/เบิกออกทั้งหมดเป็น modal อยู่ที่ products.php แล้ว และประวัติทั้ง 4 ชุด
+    // ยุบเป็น history.php แบบแท็บ (?tab=sn|in|item|set) — stock-in.php, stock-out.php,
+    // stock-out-item.php เหลือเป็น redirect ไม่ต้องมีในเมนู
     return [
-        ['file' => 'pages/products.php',        'icon' => 'products',       'label' => 'อะไหล่'],
-        ['file' => 'pages/stock-in.php',        'icon' => 'stock-in',       'label' => 'รับเข้า'],
-        // เบิกออก Set + จัดการ Set รวมอยู่หน้าเดียวแล้ว (sets.php redirect มาที่ stock-out.php)
-        ['file' => 'pages/stock-out.php',       'icon' => 'stock-out-set',  'label' => 'เบิกออก / จัดการ Set'],
-        ['file' => 'pages/stock-out-item.php',  'icon' => 'stock-out-item', 'label' => 'เบิกรายชิ้น'],
-        ['file' => 'pages/history.php',         'icon' => 'history',        'label' => 'ประวัติเบิก'],
-        ['file' => 'pages/year-end-summary.php', 'icon' => 'chart',          'label' => 'สรุปยอดสิ้นปี'],
+        ['file' => 'pages/products.php',         'icon' => 'products', 'label' => 'อะไหล่'],
+        ['file' => 'pages/history.php',          'icon' => 'history',  'label' => 'ประวัติ'],
+        ['file' => 'pages/sets.php',             'icon' => 'sets',     'label' => 'จัดการ Set'],
+        ['file' => 'pages/year-end-summary.php', 'icon' => 'chart',    'label' => 'สรุปยอดสิ้นปี'],
     ];
 }
 
