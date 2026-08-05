@@ -144,3 +144,53 @@ function dt_date_only(?string $value): string
 
     return date('Y-m-d', $ts);
 }
+
+/**
+ * อายุสินค้าแบบอ่านง่าย นับจากวันผลิตถึงวันนี้
+ *
+ * แสดงหน่วยใหญ่สุด 2 ระดับ เช่น "1 ปี 3 เดือน", "5 เดือน 12 วัน", "18 วัน"
+ * ถ้าวันผลิตเป็นอนาคต (กรอกผิด) คืนค่าว่างเพื่อไม่ให้แสดงค่าติดลบ
+ *
+ * @param string|null $producedAt วันผลิต (Y-m-d หรือ Y-m-d H:i:s)
+ * @param string|null $now        เวลาอ้างอิง (ไว้เทสต์) ว่าง = ตอนนี้
+ * @return string ข้อความอายุ หรือค่าว่างถ้าคำนวณไม่ได้
+ */
+function dt_age_text(?string $producedAt, ?string $now = null): string
+{
+    $raw = trim((string) $producedAt);
+    if ($raw === '' || $raw === '0000-00-00' || strpos($raw, '0000-00-00') === 0) {
+        return '';
+    }
+
+    try {
+        $start = new DateTimeImmutable(str_replace('T', ' ', $raw));
+        $end = new DateTimeImmutable($now !== null && trim($now) !== '' ? $now : 'now');
+    } catch (Exception $e) {
+        return '';
+    }
+
+    if ($start > $end) {
+        return '';
+    }
+
+    $diff = $start->diff($end);
+    $years = (int) $diff->y;
+    $months = (int) $diff->m;
+    $days = (int) $diff->d;
+
+    if ($years > 0) {
+        return $months > 0
+            ? $years . ' ปี ' . $months . ' เดือน'
+            : $years . ' ปี';
+    }
+    if ($months > 0) {
+        return $days > 0
+            ? $months . ' เดือน ' . $days . ' วัน'
+            : $months . ' เดือน';
+    }
+    if ($days > 0) {
+        return $days . ' วัน';
+    }
+
+    return 'วันนี้';
+}

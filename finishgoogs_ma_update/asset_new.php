@@ -110,11 +110,14 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fields') {
             $codeKey = trim((string)($r['part_code'] ?? ''));
         }
         $out['all_parts'][] = [
-            'id'        => (int)$r['id'],
-            'name'      => (string)$r['name'],
-            'unit'      => (string)($r['unit'] ?? ''),
-            'icon'      => img_url($r['icon_path'] ?? '') ?: '',
-            'stock_qty' => ($codeKey !== '' && isset($qtyMap[$codeKey])) ? (int)$qtyMap[$codeKey] : null,
+            'id'         => (int)$r['id'],
+            'name'       => (string)$r['name'],
+            'unit'       => (string)($r['unit'] ?? ''),
+            'part_code'  => (string)($r['part_code'] ?? ''),
+            'stock_code' => (string)($r['stock_code'] ?? ''),
+            'search'     => part_search_key($r),
+            'icon'       => img_url($r['icon_path'] ?? '') ?: '',
+            'stock_qty'  => ($codeKey !== '' && isset($qtyMap[$codeKey])) ? (int)$qtyMap[$codeKey] : null,
         ];
     }
     $out['bom'] = [];
@@ -435,7 +438,7 @@ page_header('บันทึกเครื่องผลิตใหม่');
   </div>
 
   <div id="prod-snippet-bar" style="margin-bottom:12px; display:none">
-    <button type="button" class="btn btn-line btn-with-icon" id="prod-snippet-btn" onclick="openProdSnippetModal()"><?= ui_btn_label('clipboard', 'ข้อความประจำสินค้า') ?></button>
+    <button type="button" class="btn btn-line btn-with-icon" id="prod-snippet-btn" onclick="openProdSnippetModal()"><?= ui_btn_label('clipboard', ma_snippets_title(false)) ?></button>
     <span class="muted" style="margin-left:8px; font-size:13px">Serial / MAC จากรหัสเครื่องในฟอร์ม · กดคัดลอกทีละข้อ</span>
   </div>
 
@@ -496,12 +499,12 @@ page_header('บันทึกเครื่องผลิตใหม่');
   <div style="margin-top:16px"><button type="submit" id="save-btn" disabled><?= ui_btn_label('save', 'บันทึกทั้งชุด') ?></button></div>
 </form>
 
-<!-- popup ข้อความประจำสินค้า -->
+<!-- popup คำสั่งตั้งค่าหมายเลขสินค้า -->
 <div id="prod-snippet-overlay" class="notif-overlay ma-sn-overlay" hidden>
   <div class="notif-box ma-sn-modal" role="dialog" aria-modal="true" aria-labelledby="prod-snippet-title">
     <div class="ma-sn-modal-hd">
       <div>
-        <h2 id="prod-snippet-title" class="ma-snippets-title h-with-icon"><?= ui_icon_html('clipboard', 16, 'h-svg') ?><span>ข้อความประจำสินค้า</span></h2>
+        <h2 id="prod-snippet-title" class="ma-snippets-title h-with-icon"><?= ui_icon_html('clipboard', 16, 'h-svg') ?><span><?= h(ma_snippets_title(false)) ?></span></h2>
         <p class="muted ma-snippets-lead">อัปเดตตามรหัสเครื่องและฟอร์ม · กดคัดลอกทีละข้อ</p>
       </div>
       <button type="button" class="btn-sm btn-line" onclick="closeOverlay('prod-snippet-overlay')">✕ ปิด</button>
@@ -775,9 +778,7 @@ function bomPartOptsHtml(selId, filter){
   if (!bomAllParts.length) {
     return '<div class="ma-part-opt-empty muted">เลือกรุ่นสินค้าก่อน หรือกำลังโหลดรายการอะไหล่…</div>';
   }
-  var list = bomAllParts.filter(function(p){
-    return !filter || p.name.toLowerCase().indexOf(filter) !== -1;
-  });
+  var list = bomAllParts.filter(function(p){ return partMatchesQuery(p, filter); });
   if (!list.length) {
     return '<div class="ma-part-opt-empty muted">ไม่พบอะไหล่' + (filter ? ' ที่ตรงกับ "' + esc(filter) + '"' : '') + '</div>';
   }
@@ -787,6 +788,7 @@ function bomPartOptsHtml(selId, filter){
       + bomThumbHtml(p.id)
       + '<div class="ma-part-opt-body">'
       + '<span class="ma-part-opt-name">' + esc(p.name) + '</span>'
+      + partCodeLineHtml(p)
       + bomPartStockHtml(p)
       + '</div></div>';
   }).join('') + '</div>';
@@ -797,7 +799,7 @@ function bomPartChipHtml(partId){
     + '<input type="hidden" name="bom_part_id[]" value="' + (partId || '') + '">'
     + '<div class="chip-dd-box">'
     + '<div class="chip-dd-chips">' + (hasPart ? bomPartSelectedChipHtml(partId) : '') + '</div>'
-    + '<input type="text" class="chip-dd-filter bom-part-filter" placeholder="' + (hasPart ? '' : 'ค้นหาอะไหล่…') + '" autocomplete="off">'
+    + '<input type="text" class="chip-dd-filter bom-part-filter" placeholder="' + (hasPart ? '' : 'ค้นหา — ชื่อ / รหัสอะไหล่') + '" autocomplete="off">'
     + '<button type="button" class="chip-dd-btn" tabindex="-1">▾</button>'
     + '</div>'
     + '<div class="chip-dd-list" hidden><div class="chip-dd-opts">' + bomPartOptsHtml(partId, '') + '</div></div>'
@@ -812,7 +814,7 @@ function setBomPart(dd, partId){
   var filt = dd.querySelector('.bom-part-filter');
   if (filt) {
     filt.value = '';
-    filt.placeholder = partId ? '' : 'ค้นหาอะไหล่…';
+    filt.placeholder = partId ? '' : 'ค้นหา — ชื่อ / รหัสอะไหล่';
   }
   dd.querySelector('.chip-dd-opts').innerHTML = bomPartOptsHtml(partId, '');
 }

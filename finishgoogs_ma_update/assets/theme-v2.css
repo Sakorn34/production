@@ -259,6 +259,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .model-card:hover { box-shadow: var(--shadow-md); border-color: #d9c9f2; }
 .model-card-img { flex-shrink: 0; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: #f7f4fd; border-radius: 8px; overflow: hidden; }
 .model-thumb { width: 40px; height: 40px; object-fit: contain; }
+/* การ์ดอะไหล่ — รูปใหญ่กว่าการ์ดรุ่นเครื่อง เพราะอะไหล่หน้าตาใกล้เคียงกัน ต้องดูออกจากรูป */
+.dash-part-card .model-card-img { width: 64px; height: 64px; border-radius: 10px; padding: 3px; }
+.dash-part-card .model-thumb { width: 58px; height: 58px; }
+.dash-part-card .model-thumb-ph { width: 58px; height: 58px; }
 .model-card-body { min-width: 0; flex: 1; }
 .model-card-name { font-size: calc(13px * var(--font-scale, 1)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px; }
 .model-card-bar { height: 6px; background: #f1edfa; border-radius: 999px; overflow: hidden; margin-bottom: 4px; }
@@ -277,8 +281,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   margin-bottom: 12px; background: #f7f9fc; border: 1px solid #eceff4;
   border-radius: 8px; padding: 12px 14px;
 }
+/* รูปอะไหล่ในโปรไฟล์ — ใหญ่พอให้ดูออกว่าเป็นชิ้นไหน (เจาะจงเฉพาะที่นี่ ไม่กระทบ .thumb ทั่วระบบ) */
+.part-profile-head .thumb {
+  width: 96px; height: 96px; padding: 4px; flex-shrink: 0;
+}
 .part-profile-ph {
-  width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+  width: 96px; height: 96px; display: flex; align-items: center; justify-content: center;
   background: #f7f4fd; border-radius: 8px; color: #8b5cf6;
 }
 .part-profile-meta { flex: 1; min-width: 180px; }
@@ -473,8 +481,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .model-card-foot {
   display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px;
 }
-.dash-part-order-btn { flex-shrink: 0; padding: 3px 8px !important; font-size: calc(11px * var(--font-scale, 1)) !important; white-space: nowrap; }
-.dash-part-order-btn .btn-svg { width: 13px; height: 13px; }
+.dash-part-order-btn {
+  flex-shrink: 0; padding: 3px 10px !important;
+  font-size: calc(11px * var(--font-scale, 1)) !important; white-space: nowrap;
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+}
+.dash-part-order-btn .btn-svg { width: 13px; height: 13px; flex-shrink: 0; }
 .dash-parts-filter-btn {
   border: 0; background: transparent; color: #9a3412; font-family: inherit;
   font-size: calc(13px * var(--font-scale, 1)); font-weight: 600; padding: 7px 14px; border-radius: 999px;

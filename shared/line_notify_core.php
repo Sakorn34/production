@@ -937,10 +937,10 @@ function line_notify_parts_media_lookup(array $codes, array $names): array
     while ($row = $res->fetch_assoc()) {
         $iconUrl = line_notify_part_icon_public_url((string)($row['icon_path'] ?? ''));
         $linkUrl = line_notify_sanitize_https_uri(trim((string)($row['link'] ?? '')));
-        $entry = ['icon_url' => $iconUrl, 'link_url' => $linkUrl];
         $stockCode = trim((string)($row['stock_code'] ?? ''));
         $partCode = trim((string)($row['part_code'] ?? ''));
         $partName = trim((string)($row['name'] ?? ''));
+        $entry = ['icon_url' => $iconUrl, 'link_url' => $linkUrl, 'name' => $partName];
         if ($stockCode !== '') {
             $out['by_code'][$stockCode] = $entry;
         }
@@ -966,6 +966,7 @@ function line_notify_enrich_low_stock_items(array $items): array
         return [];
     }
 
+    // เก็บ code/name ของทุกแถว (ไม่ข้ามแถวที่มีไอคอนแล้ว) เพราะต้องใช้เทียบชื่อจากฝั่ง production ด้วย
     $codes = [];
     $names = [];
     foreach ($items as $i => $item) {
@@ -975,9 +976,6 @@ function line_notify_enrich_low_stock_items(array $items): array
         $iconPath = trim((string)($item['icon_path'] ?? ''));
         if ($iconPath !== '' && trim((string)($item['icon_url'] ?? '')) === '') {
             $items[$i]['icon_url'] = line_notify_part_icon_public_url($iconPath);
-        }
-        if (trim((string)($item['icon_url'] ?? '')) !== '') {
-            continue;
         }
         $code = trim((string)($item['code'] ?? ''));
         $name = trim((string)($item['name'] ?? $item['name_part'] ?? ''));
@@ -990,7 +988,7 @@ function line_notify_enrich_low_stock_items(array $items): array
 
     $map = line_notify_parts_media_lookup($codes, $names);
     foreach ($items as $i => $item) {
-        if (!is_array($item) || trim((string)($item['icon_url'] ?? '')) !== '') {
+        if (!is_array($item)) {
             continue;
         }
         $code = trim((string)($item['code'] ?? ''));
@@ -1004,7 +1002,16 @@ function line_notify_enrich_low_stock_items(array $items): array
         if ($media === null) {
             continue;
         }
-        if ($media['icon_url'] !== '') {
+        // ชื่อที่แจ้งเตือนต้องตรงกับที่แสดงในหน้ารายการอะไหล่ — ฝั่งนั้นใช้ชื่อจาก production ก่อน
+        // (part_product_display_name ใน parts/includes/helpers.php)
+        $prodName = trim((string)($media['name'] ?? ''));
+        if ($prodName !== '') {
+            $items[$i]['name'] = $prodName;
+            if (isset($items[$i]['name_part'])) {
+                $items[$i]['name_part'] = $prodName;
+            }
+        }
+        if ($media['icon_url'] !== '' && trim((string)($items[$i]['icon_url'] ?? '')) === '') {
             $items[$i]['icon_url'] = $media['icon_url'];
         }
         if ($media['link_url'] !== '' && trim((string)($item['link_url'] ?? '')) === '') {
@@ -1037,10 +1044,14 @@ function line_notify_check_low_stock_product(int $productId): void
     }
     /** @var PDO $pdo */
     $pdo = $GLOBALS['line_notify_stock_db'];
-    $stmt = $pdo->prepare('SELECT id, code, name, quantity, min_stock, unit FROM products WHERE id=?');
+    $stmt = $pdo->prepare('SELECT id, code, name, quantity, min_stock, unit, supplier, purchase_link, is_active FROM products WHERE id=?');
     $stmt->execute([$productId]);
     $p = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$p || (int)$p['quantity'] > (int)$p['min_stock']) {
+        return;
+    }
+    // อะไหล่ที่ปิดการใช้งานแล้วไม่ต้องแจ้งเตือน (คอลัมน์อาจไม่มีในสคีมาเก่า — ถือว่าเปิดใช้งาน)
+    if (array_key_exists('is_active', $p) && (int)$p['is_active'] !== 1) {
         return;
     }
     line_notify_dispatch('stock.low_threshold', [
@@ -1050,6 +1061,7 @@ function line_notify_check_low_stock_product(int $productId): void
         'quantity'     => (int)$p['quantity'],
         'min_stock'    => (int)$p['min_stock'],
         'unit'         => (string)$p['unit'],
+        'supplier'     => (string)($p['supplier'] ?? ''),
         'entity_id'    => (int)$p['id'],
         'timestamp'    => date('d/m/Y H:i'),
     ], [

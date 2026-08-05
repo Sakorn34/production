@@ -160,7 +160,7 @@ $products = parts_sort_products($products, $sortState['sort'], $sortState['dir']
 <div class="page-header products-page-header">
     <div>
         <?= ui_heading('products', 'อะไหล่', 'h1') ?>
-        <p>รายการอะไหล่และจำนวนคงเหลือ · <?= number_format(count($products)) ?> รายการ</p>
+        <p>รายการอะไหล่และจำนวนคงเหลือ · แสดง <span id="products-shown-count"><?= number_format(count($products)) ?></span> จาก <?= number_format(count($products)) ?> รายการ</p>
     </div>
     <div class="parts-page-actions">
         <a href="<?= url('/pages/vendor-import.php') ?>" class="btn btn-outline btn-sm">นำเข้าผู้จำหน่าย</a>
@@ -169,8 +169,37 @@ $products = parts_sort_products($products, $sortState['sort'], $sortState['dir']
 </div>
 
 <div class="card products-list-card">
+    <?php
+    $supplierList = [];
+    foreach ($products as $sp) {
+        $s = trim((string) ($sp['supplier'] ?? ''));
+        if ($s !== '') {
+            $supplierList[$s] = ($supplierList[$s] ?? 0) + 1;
+        }
+    }
+    ksort($supplierList, SORT_FLAG_CASE | SORT_NATURAL);
+    $noSupplierCount = count($products) - array_sum($supplierList);
+    ?>
+    <div class="products-search-bar">
+        <label for="products-search" class="sr-only">ค้นหาอะไหล่</label>
+        <input type="search" id="products-search" class="products-search-input"
+               data-table-filter="products-table"
+               data-filter-count="products-shown-count"
+               data-filter-empty="products-empty-row"
+               placeholder="ค้นหาอะไหล่ — ชื่อ / รหัส / ผู้จำหน่าย" autocomplete="off">
+        <label for="products-supplier" class="sr-only">กรองตามผู้จำหน่าย</label>
+        <select id="products-supplier" class="products-supplier-select" data-table-filter-select="products-table">
+            <option value="">ผู้จำหน่ายทั้งหมด</option>
+            <?php foreach ($supplierList as $sName => $sCount): ?>
+            <option value="<?= e($sName) ?>"><?= e($sName) ?> (<?= number_format($sCount) ?>)</option>
+            <?php endforeach; ?>
+            <?php if ($noSupplierCount > 0): ?>
+            <option value="__none__">ไม่ระบุผู้จำหน่าย (<?= number_format($noSupplierCount) ?>)</option>
+            <?php endif; ?>
+        </select>
+    </div>
     <div class="table-wrap">
-        <table class="products-table">
+        <table class="products-table" id="products-table">
             <thead>
                 <tr>
                     <th class="col-img">รูป</th>
@@ -178,7 +207,7 @@ $products = parts_sort_products($products, $sortState['sort'], $sortState['dir']
                     <?= parts_products_sort_th('ชื่อ', 'name', $sortState) ?>
                     <?= parts_products_sort_th('สถานะ', 'status', $sortState, 'col-status') ?>
                     <?= parts_products_sort_th('ราคา', 'price', $sortState) ?>
-                    <?= parts_products_sort_th('ลิงก์', 'link', $sortState) ?>
+                    <?= parts_products_sort_th('ผู้จำหน่าย', 'link', $sortState) ?>
                     <?= parts_products_sort_th('คงเหลือ', 'quantity', $sortState, 'text-right') ?>
                     <?= parts_products_sort_th('หน่วย', 'unit', $sortState) ?>
                     <?= parts_products_sort_th('ขั้นต่ำ', 'min_stock', $sortState, 'text-right') ?>
@@ -189,8 +218,16 @@ $products = parts_sort_products($products, $sortState['sort'], $sortState['dir']
                 <?php foreach ($products as $p):
                     $isActive = product_is_active($p);
                     $icon = $partIcons[$p['code']] ?? '';
+                    $searchKey = mb_strtolower(trim(implode(' ', array_filter([
+                        (string) ($p['code'] ?? ''),
+                        parts_display_name($p),
+                        (string) ($p['name'] ?? ''),
+                        (string) ($p['display_sub'] ?? ''),
+                        (string) ($p['supplier'] ?? ''),
+                        (string) ($p['unit'] ?? ''),
+                    ]))), 'UTF-8');
                 ?>
-                <tr class="<?= $isActive ? '' : 'row-inactive' ?>">
+                <tr class="<?= $isActive ? '' : 'row-inactive' ?>" data-search="<?= e($searchKey) ?>" data-supplier="<?= e(trim((string) ($p["supplier"] ?? ""))) ?>">
                     <td class="col-img"><?= parts_product_img_cell($icon, $p, $productsReturnTo) ?></td>
                     <td><?= e($p['code']) ?></td>
                     <td><a href="<?= url('/pages/product-detail.php?id=' . (int) $p['id']) ?>" class="detail-link"><?= parts_product_name_html($p) ?></a></td>
@@ -207,13 +244,13 @@ $products = parts_sort_products($products, $sortState['sort'], $sortState['dir']
                     </td>
                     <td class="col-price"><?= parts_product_price_cell($p, $productsReturnTo) ?></td>
                     <td>
-                        <?php if (!empty($p['purchase_link'])): ?>
-                            <a href="<?= e($p['purchase_link']) ?>" target="_blank" rel="noopener noreferrer" class="detail-link">สั่งซื้อ</a>
+                        <?php if (!empty($p['supplier'])): ?>
+                            <div class="product-supplier-name"><?= e($p['supplier']) ?></div>
                         <?php else: ?>
                             <span class="text-muted">-</span>
                         <?php endif; ?>
-                        <?php if (!empty($p['supplier'])): ?>
-                            <div class="muted" style="font-size:11px;margin-top:2px"><?= e($p['supplier']) ?></div>
+                        <?php if (!empty($p['purchase_link'])): ?>
+                            <a href="<?= e($p['purchase_link']) ?>" target="_blank" rel="noopener noreferrer" class="detail-link product-supplier-link">สั่งซื้อ</a>
                         <?php endif; ?>
                     </td>
                     <td class="text-right">
@@ -236,6 +273,9 @@ $products = parts_sort_products($products, $sortState['sort'], $sortState['dir']
                     </td>
                 </tr>
                 <?php endforeach; ?>
+                <tr id="products-empty-row" hidden>
+                    <td colspan="10" class="text-center text-muted" style="padding:20px">ไม่พบอะไหล่ที่ตรงกับคำค้นหา</td>
+                </tr>
             </tbody>
         </table>
     </div>

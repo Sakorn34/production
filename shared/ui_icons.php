@@ -62,6 +62,7 @@ function ui_icon_paths(string $name): ?string
         'book'           => '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
         'basket'         => '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0"/>',
         'menu'           => '<path d="M3 6h18M3 12h18M3 18h18"/>',
+        'plus'           => '<path d="M12 5v14M5 12h14"/>',
     ];
     return $icons[$name] ?? null;
 }
@@ -264,9 +265,9 @@ function ui_nav_items_parts(): array
     return [
         ['file' => 'pages/products.php',        'icon' => 'products',       'label' => 'อะไหล่'],
         ['file' => 'pages/stock-in.php',        'icon' => 'stock-in',       'label' => 'รับเข้า'],
-        ['file' => 'pages/stock-out.php',       'icon' => 'stock-out-set',  'label' => 'เบิกออกเป็นชุด (Set)'],
+        // เบิกออก Set + จัดการ Set รวมอยู่หน้าเดียวแล้ว (sets.php redirect มาที่ stock-out.php)
+        ['file' => 'pages/stock-out.php',       'icon' => 'stock-out-set',  'label' => 'เบิกออก / จัดการ Set'],
         ['file' => 'pages/stock-out-item.php',  'icon' => 'stock-out-item', 'label' => 'เบิกรายชิ้น'],
-        ['file' => 'pages/sets.php',            'icon' => 'sets',           'label' => 'จัดการ Set'],
         ['file' => 'pages/history.php',         'icon' => 'history',        'label' => 'ประวัติเบิก'],
         ['file' => 'pages/year-end-summary.php', 'icon' => 'chart',          'label' => 'สรุปยอดสิ้นปี'],
     ];
@@ -279,8 +280,10 @@ function ui_nav_items_parts(): array
  */
 function ui_nav_items_finishgoogs(): array
 {
+    // label ต้องตรงกับ nav_default() ใน finishgoogs_ma_update/config.php — ยกเว้น parts.php
+    // ที่จงใจใช้ "อะไหล่ใช้ผลิต" กันชนกับเมนู "อะไหล่" ของ parts เองใน sidebar เดียวกัน
     return [
-        ['file' => 'index.php',   'icon' => 'dashboard', 'label' => 'Dashboard'],
+        ['file' => 'index.php',   'icon' => 'dashboard', 'label' => 'หน้าหลัก'],
         ['file' => 'assets.php',  'icon' => 'assets',    'label' => 'ทะเบียนเครื่องผลิตใหม่'],
         ['file' => 'updates.php', 'icon' => 'updates',   'label' => 'อัปเดต FW/HW'],
         ['file' => 'ma.php',      'icon' => 'ma',        'label' => 'บันทึก MA'],

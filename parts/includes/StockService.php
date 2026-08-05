@@ -15,7 +15,7 @@ class StockService
 
         $stats['total_products'] = (int) $this->db->query('SELECT COUNT(*) FROM products')->fetchColumn();
         $stats['total_quantity'] = (int) $this->db->query('SELECT COALESCE(SUM(quantity), 0) FROM products')->fetchColumn();
-        $stats['low_stock'] = (int) $this->db->query('SELECT COUNT(*) FROM products WHERE quantity <= min_stock')->fetchColumn();
+        $stats['low_stock'] = (int) $this->db->query('SELECT COUNT(*) FROM products WHERE quantity <= min_stock AND is_active = 1')->fetchColumn();
         $stats['total_sets'] = (int) $this->db->query('SELECT COUNT(*) FROM sets')->fetchColumn();
         $stats['today_out'] = (int) $this->db->query(
             "SELECT COUNT(*) FROM stock_out WHERE DATE(created_at) = CURDATE()"
@@ -125,7 +125,7 @@ class StockService
     public function getLowStockProducts(): array
     {
         return $this->db->query(
-            'SELECT * FROM products WHERE quantity <= min_stock ORDER BY quantity ASC'
+            'SELECT * FROM products WHERE quantity <= min_stock AND is_active = 1 ORDER BY quantity ASC'
         )->fetchAll();
     }
 
@@ -280,15 +280,88 @@ class StockService
         return $set;
     }
 
+    /**
+     * ทุก Set พร้อมรายการอะไหล่ — โหลด items ครั้งเดียวแล้วจัดกลุ่ม (เดิมเป็น N+1 query ต่อ Set)
+     */
     public function getAllSetsWithItems(): array
     {
         $sets = $this->getAllSets();
+        if (!$sets) {
+            return [];
+        }
+
+        $rows = $this->db->query("
+            SELECT si.*, p.code, p.name, p.unit, p.quantity AS stock_qty
+            FROM set_items si
+            JOIN products p ON p.id = si.product_id
+            ORDER BY si.set_id, si.product_id
+        ")->fetchAll();
+
+        $bySet = [];
+        foreach ($rows as $row) {
+            $bySet[(int) $row['set_id']][] = $row;
+        }
+
         foreach ($sets as &$set) {
-            $full = $this->getSetWithItems((int) $set['id']);
-            $set['items'] = $full['items'] ?? [];
+            $set['items'] = $bySet[(int) $set['id']] ?? [];
             $set['can_issue'] = $this->canIssueSet($set['items']);
         }
+        unset($set);
+
         return $sets;
+    }
+
+    /**
+     * แก้ชื่อ/รายละเอียด Set
+     */
+    public function updateSet(int $setId, string $name, ?string $description): void
+    {
+        $name = trim($name);
+        if ($name === '') {
+            throw new InvalidArgumentException('กรุณากรอกชื่อ Set');
+        }
+        $stmt = $this->db->prepare('UPDATE sets SET name = ?, description = ? WHERE id = ?');
+        $stmt->execute([$name, $description !== null && trim($description) !== '' ? trim($description) : null, $setId]);
+    }
+
+    /**
+     * จำนวนครั้งที่ Set นี้ถูกใช้เบิกไปแล้ว (ใช้กันการลบที่จะทำให้ประวัติเสียหาย)
+     */
+    public function countSetUsage(int $setId): int
+    {
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM stock_out WHERE set_id = ?');
+        $stmt->execute([$setId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * ลบ Set — set_items ถูกลบตาม FK cascade
+     *
+     * ถ้าเคยถูกเบิกไปแล้วจะลบไม่ได้ เพราะ stock_out.set_id อ้างอิงอยู่ (ลบแล้วประวัติเบิกจะเสียหาย)
+     */
+    public function deleteSet(int $setId): void
+    {
+        $used = $this->countSetUsage($setId);
+        if ($used > 0) {
+            throw new RuntimeException(
+                'ลบ Set นี้ไม่ได้ เพราะเคยถูกเบิกไปแล้ว ' . number_format($used) . ' ครั้ง — '
+                . 'การลบจะทำให้ประวัติการเบิกเสียหาย'
+            );
+        }
+        $stmt = $this->db->prepare('DELETE FROM sets WHERE id = ?');
+        $stmt->execute([$setId]);
+    }
+
+    /**
+     * แก้จำนวนอะไหล่ต่อ 1 Set
+     */
+    public function updateSetItemQty(int $itemId, int $quantity): void
+    {
+        if ($quantity < 1) {
+            throw new InvalidArgumentException('จำนวนต่อ Set ต้องมากกว่า 0');
+        }
+        $stmt = $this->db->prepare('UPDATE set_items SET quantity = ? WHERE id = ?');
+        $stmt->execute([$quantity, $itemId]);
     }
 
     private function canIssueSet(array $items): bool

@@ -474,7 +474,7 @@ switch ($type) {
             $partsPdo = dbParts();
             $lowRows = $partsPdo->query(
                 'SELECT id, code, name, unit, quantity, min_stock FROM products
-                 WHERE quantity <= min_stock ORDER BY quantity ASC LIMIT ' . (int) $LIMIT
+                 WHERE quantity <= min_stock AND is_active = 1 ORDER BY quantity ASC LIMIT ' . (int) $LIMIT
             )->fetchAll();
         } catch (Throwable $e) {
             exit('<p class="muted">เชื่อมต่อระบบสต็อกไม่ได้</p>');

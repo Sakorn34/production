@@ -484,7 +484,11 @@ function line_notify_run_job(string $job, array $opts = []): array
                 $pdo = dbParts();
                 $GLOBALS['line_notify_stock_db'] = $pdo;
                 $items = $pdo->query(
-                    'SELECT id, code, name, quantity, min_stock, unit FROM products WHERE quantity <= min_stock ORDER BY quantity ASC'
+                    // ข้ามอะไหล่ที่ปิดการใช้งานแล้ว — ไม่ต้องเตือนให้สั่งซื้อของที่เลิกใช้
+                    // เรียงตามผู้จำหน่ายก่อน เพื่อให้การ์ดที่แยกตาม dealer เรียงรายการสวยงาม
+                    'SELECT id, code, name, quantity, min_stock, unit, supplier, purchase_link
+                     FROM products WHERE quantity <= min_stock AND is_active = 1
+                     ORDER BY supplier IS NULL, supplier, quantity ASC'
                 )->fetchAll(PDO::FETCH_ASSOC);
                 if ($items === []) {
                     $result['skipped'] = 'no low stock';

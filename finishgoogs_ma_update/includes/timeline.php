@@ -93,6 +93,25 @@ function timeline_production_body_html(array $r) {
 }
 
 /**
+ * ทำให้ค่าวันที่จาก DB อยู่ในรูป Y-m-d H:i:s เสมอ ก่อนเอาไปเรียง/แสดง
+ *
+ * คอลัมน์วันที่ในระบบมีทั้งชนิด DATE และ DATETIME (บางตัวถูก migrate ภายหลัง เช่น
+ * ma_records.visited_at) การต่อ ' 00:00:00' ตายตัวจึงทำให้ค่าที่มีเวลาอยู่แล้วกลายเป็น
+ * "Y-m-d H:i:s 00:00:00" ซึ่ง strtotime() อ่านไม่ออก → เรียงผิดและแสดงผลเป็นข้อความดิบ
+ *
+ * @param string|null $v ค่าจาก DB (Y-m-d หรือ Y-m-d H:i:s)
+ * @return string Y-m-d H:i:s ('' ถ้าค่าว่าง/ไม่ถูกต้อง)
+ */
+function timeline_dt($v) {
+    $v = trim((string)$v);
+    if ($v === '' || strpos($v, '0000-00-00') === 0) {
+        return '';
+    }
+    $ts = strtotime(str_replace('T', ' ', $v));
+    return $ts === false ? '' : date('Y-m-d H:i:s', $ts);
+}
+
+/**
  * รวมประวัติทุกประเภทของเครื่อง → ['tl' => รายการเรียงใหม่→เก่า, 'partsUsed' => สรุปอะไหล่ที่เบิก]
  * แต่ละรายการ: type_key สำหรับจัดกลุ่ม · type เป็น HTML SVG · html เป็นเนื้อหา (escape แล้ว)
  */
@@ -105,7 +124,7 @@ function asset_timeline_items($id) {
                FROM production_records WHERE asset_id=?", 'i', [$id]);
     while ($r = $res->fetch_assoc()) {
         $tl[] = [
-            'd' => $r['d'], 'type_key' => 'production', 'type' => ui_timeline_type_html('production'),
+            'd' => timeline_dt($r['d']), 'type_key' => 'production', 'type' => ui_timeline_type_html('production'),
             'html' => timeline_production_body_html($r), 'kind' => 'production', 'rid' => (int)$r['id'],
         ];
     }
@@ -125,7 +144,7 @@ function asset_timeline_items($id) {
         $typeKey = $r['update_type'] === 'firmware' ? 'update_fw' : ($r['update_type'] === 'hardware' ? 'update_hw' : 'update');
         $fw = ($r['update_type'] === 'firmware') ? trim((string)($r['new_value'] ?? '')) : '';
         $tl[] = [
-            'd' => $r['d'], 'type_key' => $typeKey, 'type' => ui_timeline_type_html($typeKey),
+            'd' => timeline_dt($r['d']), 'type_key' => $typeKey, 'type' => ui_timeline_type_html($typeKey),
             'html' => implode('<br>', $body), 'kind' => 'update', 'rid' => (int)$r['id'],
             'snippet' => [
                 'code' => $assetCode,
@@ -166,7 +185,7 @@ function asset_timeline_items($id) {
         if ($r['remark']) $body[] = h($r['remark']);
         if ($r['done_by']) $body[] = 'โดย: ' . h($r['done_by']);
         $tl[] = [
-            'd' => $r['d'] . ' 00:00:00', 'type_key' => 'ma', 'type' => ui_timeline_type_html('ma'),
+            'd' => timeline_dt($r['d']), 'type_key' => 'ma', 'type' => ui_timeline_type_html('ma'),
             'html' => implode('<br>', $body), 'kind' => 'ma', 'rid' => (int)$r['id'],
             'snippet' => [
                 'code' => $assetCode,
@@ -187,7 +206,7 @@ function asset_timeline_items($id) {
         if ($r['action_taken']) $body[] = 'การแก้ไข: ' . h($r['action_taken']);
         $stmap = ['received' => 'รับเครื่องแล้ว', 'in_progress' => 'กำลังซ่อม', 'done' => 'ซ่อมเสร็จ', 'returned' => 'ส่งคืนแล้ว'];
         $body[] = 'สถานะงาน: ' . $stmap[$r['status']] . ($r['closed_at'] ? ' (ปิดงาน ' . dthai($r['closed_at']) . ')' : '');
-        $tl[] = ['d' => $r['d'] . ' 00:00:00', 'type_key' => 'repair', 'type' => ui_timeline_type_html('repair'), 'html' => implode('<br>', $body)];
+        $tl[] = ['d' => timeline_dt($r['d']), 'type_key' => 'repair', 'type' => ui_timeline_type_html('repair'), 'html' => implode('<br>', $body)];
     }
     $res = qr("SELECT moved_at d, direction, reason, made_by, remark FROM stock_movements WHERE asset_id=?", 'i', [$id]);
     while ($r = $res->fetch_assoc()) {
@@ -196,7 +215,7 @@ function asset_timeline_items($id) {
         if ($r['made_by']) $body[] = 'โดย: ' . h($r['made_by']);
         if ($r['remark']) $body[] = h($r['remark']);
         $typeKey = $r['direction'] === 'in' ? 'stock_in' : 'stock_out';
-        $tl[] = ['d' => $r['d'], 'type_key' => $typeKey, 'type' => ui_timeline_type_html($typeKey), 'html' => implode('<br>', $body)];
+        $tl[] = ['d' => timeline_dt($r['d']), 'type_key' => $typeKey, 'type' => ui_timeline_type_html($typeKey), 'html' => implode('<br>', $body)];
     }
     $res = qr("SELECT s.out_at d, s.expected_return_at, s.returned_at, s.status, a2.asset_code replaces, c.name cust
                FROM spare_loans s LEFT JOIN assets a2 ON a2.id=s.replaces_asset_id LEFT JOIN customers c ON c.id=s.customer_id
@@ -207,7 +226,7 @@ function asset_timeline_items($id) {
         if ($r['cust']) $body[] = 'ที่ลูกค้า: ' . h($r['cust']);
         if ($r['expected_return_at']) $body[] = 'กำหนดคืน: ' . dthai($r['expected_return_at']);
         $body[] = $r['status'] === 'out' ? 'สถานะ: ยังไม่คืน' : 'คืนแล้ว ' . dthai($r['returned_at']);
-        $tl[] = ['d' => $r['d'] . ' 00:00:00', 'type_key' => 'spare_loan', 'type' => ui_timeline_type_html('spare_loan'), 'html' => implode('<br>', $body)];
+        $tl[] = ['d' => timeline_dt($r['d']), 'type_key' => 'spare_loan', 'type' => ui_timeline_type_html('spare_loan'), 'html' => implode('<br>', $body)];
     }
     $partsUsed = [];
     $res = qr("SELECT pm.id, pm.moved_at d, pm.direction, pm.qty, pm.mode, pm.made_by, pm.remark, p.name pname, p.unit
@@ -219,7 +238,7 @@ function asset_timeline_items($id) {
         if ($r['made_by']) $body[] = 'โดย: ' . h($r['made_by']);
         if ($r['remark'])  $body[] = h($r['remark']);
         $typeKey = $r['direction'] === 'out' ? 'part_out' : 'part_in';
-        $tl[] = ['d' => $r['d'], 'type_key' => $typeKey, 'type' => ui_timeline_type_html($typeKey), 'html' => implode('<br>', $body), 'kind' => 'part_move', 'rid' => (int)$r['id']];
+        $tl[] = ['d' => timeline_dt($r['d']), 'type_key' => $typeKey, 'type' => ui_timeline_type_html($typeKey), 'html' => implode('<br>', $body), 'kind' => 'part_move', 'rid' => (int)$r['id']];
         if ($r['direction'] === 'out') {
             $key = $r['pname'] . '|' . (string)$r['unit'];
             if (!isset($partsUsed[$key])) $partsUsed[$key] = ['name' => $r['pname'], 'unit' => $r['unit'], 'qty' => 0];
@@ -227,7 +246,15 @@ function asset_timeline_items($id) {
         }
     }
 
-    usort($tl, function ($x, $y) { return strcmp($y['d'], $x['d']); });
+    // เรียงใหม่→เก่า ด้วย timestamp จริง (ไม่ใช่ strcmp) — รายการที่ไม่มีวันที่ไปอยู่ท้ายสุด
+    usort($tl, function ($x, $y) {
+        $tx = $x['d'] !== '' ? strtotime($x['d']) : 0;
+        $ty = $y['d'] !== '' ? strtotime($y['d']) : 0;
+        if ($tx === $ty) {
+            return 0;
+        }
+        return $ty <=> $tx;
+    });
     return ['tl' => $tl, 'partsUsed' => $partsUsed];
 }
 

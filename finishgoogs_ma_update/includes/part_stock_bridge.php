@@ -99,6 +99,28 @@ function part_row_stock_code(array $row) {
 }
 
 /**
+ * คีย์ค้นหาอะไหล่ — รวมทุกชื่อ/รหัสที่ผู้ใช้อาจพิมพ์หา ให้ค้นได้จากคำเดียว
+ *
+ * ใช้ในตัวเลือกอะไหล่ของ asset_new.php และ ma.php (ฝั่ง client กรองจากค่านี้)
+ * ครอบคลุมชื่ออะไหล่, Code Part ฝั่ง production, รหัสสต็อก Pxxxxx และหน่วยนับ
+ *
+ * @param array<string,mixed> $row แถวจากตาราง parts
+ * @return string ตัวพิมพ์เล็กทั้งหมด คั่นด้วยช่องว่าง
+ */
+function part_search_key(array $row) {
+    $bits = [
+        (string)($row['name'] ?? ''),
+        (string)($row['part_code'] ?? ''),
+        (string)($row['stock_code'] ?? ''),
+        (string)($row['unit'] ?? ''),
+    ];
+    $bits = array_filter(array_map('trim', $bits), function ($x) {
+        return $x !== '';
+    });
+    return mb_strtolower(implode(' ', $bits), 'UTF-8');
+}
+
+/**
  * อ่านจำนวนคงเหลือจาก biton_tech_parts ตาม part_id
  *
  * @param int $partId

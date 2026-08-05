@@ -236,6 +236,34 @@ function page_footer() {
 
 <script>
 function closeOverlay(id){ document.getElementById(id).hidden = true; }
+
+/**
+ * ค้นหาอะไหล่จากหลายชื่อ/รหัสในคำเดียว — ใช้ร่วมกันในตัวเลือกอะไหล่ของ asset_new.php และ ma.php
+ *
+ * เทียบกับคีย์ search ที่ backend รวมไว้ให้แล้ว (ชื่อ + Code Part + รหัสสต็อก + หน่วย)
+ * พิมพ์หลายคำคั่นช่องว่างได้ ต้องเจอครบทุกคำ (AND) เช่น "hub 2 port"
+ */
+function partMatchesQuery(p, query){
+  query = (query || '').trim().toLowerCase();
+  if (!query) return true;
+  var hay = p.search || (p.name || '').toLowerCase();
+  var words = query.split(/\s+/);
+  for (var i = 0; i < words.length; i++) {
+    if (hay.indexOf(words[i]) === -1) return false;
+  }
+  return true;
+}
+
+/** บรรทัดรหัสอะไหล่ใต้ชื่อในตัวเลือก (Code Part / รหัสสต็อก) */
+function partCodeLineHtml(p){
+  var parts = [];
+  if (p.part_code) parts.push(p.part_code);
+  if (p.stock_code) parts.push(p.stock_code);
+  if (!parts.length) return '';
+  var d = document.createElement('div');
+  d.textContent = parts.join(' · ');
+  return '<span class="ma-part-opt-code">' + d.innerHTML + '</span>';
+}
 (function(){
   var app = document.querySelector('.app');
   var edge = document.getElementById('fg-sidebar-edge');
@@ -323,7 +351,11 @@ document.querySelectorAll('input.list-live-filter').forEach(function(input){
         if(input.dataset.product) url+='&product='+encodeURIComponent(input.dataset.product);
         fetch(url).then(function(r){return r.json();}).then(function(items){
           if(!items.length){ box.innerHTML='<div class="muted" style="padding:6px 10px">ไม่พบเครื่องที่ตรง</div>'; box.hidden=false; return; }
-          box.innerHTML=items.map(function(it){ return '<div data-code="'+esc(it.code)+'" data-id="'+it.id+'"><b>'+esc(it.code)+'</b> <span class="muted">'+esc(it.pname)+' · '+esc(it.status)+'</span></div>'; }).join('');
+          box.innerHTML=items.map(function(it){
+            var age = it.age ? ' · อายุ '+esc(it.age) : '';
+            return '<div data-code="'+esc(it.code)+'" data-id="'+it.id+'" data-age="'+esc(it.age||'')+'" data-produced="'+esc(it.produced||'')+'">'
+              + '<b>'+esc(it.code)+'</b> <span class="muted">'+esc(it.pname)+' · '+esc(it.status)+age+'</span></div>';
+          }).join('');
           box.hidden=false;
         }).catch(function(){ box.hidden=true; });
       },300);
@@ -332,7 +364,14 @@ document.querySelectorAll('input.list-live-filter').forEach(function(input){
       var d=e.target.closest('div[data-code]'); if(!d)return;
       if(input.dataset.nav==='1'){ location.href=B+'/asset.php?id='+d.dataset.id; return; }
       input.value=d.dataset.code; box.hidden=true;
+      // ส่งข้อมูลเครื่องที่เลือกไปให้หน้าที่ใช้งานต่อ (เช่น แสดงอายุเครื่องใต้ช่อง)
+      input.dataset.pickedAge = d.dataset.age || '';
+      input.dataset.pickedProduced = d.dataset.produced || '';
+      input.dataset.pickedId = d.dataset.id || '';
       input.dispatchEvent(new Event('change',{bubbles:true}));
+      input.dispatchEvent(new CustomEvent('asset-picked',{bubbles:true,detail:{
+        code: d.dataset.code, id: d.dataset.id, age: d.dataset.age || '', produced: d.dataset.produced || ''
+      }}));
       input.focus();
     });
     document.addEventListener('click',function(e){ if(!wrap.contains(e.target)) box.hidden=true; });

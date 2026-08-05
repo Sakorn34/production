@@ -158,7 +158,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $pid) {
                     $saved++;
                 }
             }
-            // แผงข้อความประจำสินค้า (Serial / MAC) ในหน้าบันทึกผลิตและ MA
+            // แผงคำสั่งตั้งค่าหมายเลขสินค้า (Serial / MAC) ในหน้าบันทึกผลิตและ MA
             if (!empty($_POST['show_product_snippets'])) {
                 q("INSERT INTO product_field_config (product_id,context,field_name,field_kind,options_text,input_mode,sort_order)
                    VALUES (?,'production','ข้อความประจำสินค้า','product_snippets','','',?)", 'ii', [$pid, $sort++]);
@@ -417,11 +417,11 @@ foreach ($prodEff as $f) if (!isset($KIND_LABELS[$f['kind']]) && $f['kind'] !== 
   </div>
 
   <div class="panel" style="margin-bottom:14px; padding:12px 14px">
-    <b>ข้อความประจำสินค้า (Serial / MAC)</b>
+    <b>คำสั่งตั้งค่าหมายเลขสินค้า (Serial / MAC)</b>
     <p class="muted" style="margin:4px 0 10px; font-size:13px">เปิดใช้สำหรับรุ่นที่ต้องคัดลอกคำสั่ง MobaXterm และ MAC จากรหัสเครื่อง · แสดงในหน้า "บันทึกผลิตใหม่" และ "บันทึก MA" (ข้อ 1–3 · ไม่รวมสรุปงานเช่า Office)</p>
     <label style="display:flex; align-items:center; gap:8px; font-weight:600">
       <input type="checkbox" name="show_product_snippets" value="1" <?= $snippetsChecked ? 'checked' : '' ?>>
-      เปิดใช้แผงข้อความประจำสินค้าสำหรับรุ่นนี้
+      เปิดใช้แผงคำสั่งตั้งค่าหมายเลขสินค้าสำหรับรุ่นนี้
     </label>
   </div>
 

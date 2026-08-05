@@ -18,7 +18,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'suggest') {
             $types .= 'i';
             $params[] = $productId;
         }
-        $res = qr("SELECT a.id, a.asset_code, a.factory_serial, a.status, p.name pname
+        $res = qr("SELECT a.id, a.asset_code, a.factory_serial, a.status, a.produced_at, p.name pname
                    FROM assets a JOIN products p ON p.id=a.product_id
                    WHERE $w
                    ORDER BY (a.asset_code LIKE ?) DESC, a.asset_code LIMIT 15",
@@ -26,7 +26,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'suggest') {
         while ($r = $res->fetch_assoc()) {
             $out[] = ['id' => (int)$r['id'], 'code' => $r['asset_code'],
                       'serial' => $r['factory_serial'], 'pname' => $r['pname'],
-                      'status' => status_th($r['status'])];
+                      'status' => status_th($r['status']),
+                      'produced' => dthai($r['produced_at'] ?? ''),
+                      'age' => dt_age_text($r['produced_at'] ?? '')];
         }
     }
     echo json_encode($out, JSON_UNESCAPED_UNICODE);

@@ -294,7 +294,7 @@ page_header('เครื่อง ' . $a['asset_code'], false);
     <a class="btn btn-sm btn-with-icon" href="<?= BASE_URL ?>/update_new.php?asset=<?= $id ?>"><?= ui_btn_label('updates', 'บันทึกอัปเดต FW/HW') ?></a>
     <a class="btn btn-sm btn-with-icon" href="<?= BASE_URL ?>/ma.php?record=<?= $id ?>"><?= ui_btn_label('ma', 'บันทึก MA') ?></a>
     <?php if ($assetShowSnippets) { ?>
-    <button type="button" class="btn btn-sm btn-with-icon asset-snippet-open"<?= ma_snippet_data_attrs($assetSnippetPayload) ?>><?= ui_btn_label('clipboard', 'ข้อความประจำสินค้า') ?></button>
+    <button type="button" class="btn btn-sm btn-with-icon asset-snippet-open"<?= ma_snippet_data_attrs($assetSnippetPayload) ?>><?= ui_btn_label('clipboard', ma_snippets_title(false)) ?></button>
     <?php } ?>
   </div>
 </div>
@@ -473,7 +473,7 @@ $addWithdrawModalUrl = BASE_URL . '/parts.php?ajax=add_move_form&asset_id=' . (i
   <div class="notif-box ma-sn-modal" role="dialog" aria-modal="true" aria-labelledby="asset-snippet-title">
     <div class="ma-sn-modal-hd">
       <div>
-        <h2 id="asset-snippet-title" class="ma-snippets-title h-with-icon"><?= ui_icon_html('clipboard', 16, 'h-svg') ?><span>ข้อความประจำสินค้า</span></h2>
+        <h2 id="asset-snippet-title" class="ma-snippets-title h-with-icon"><?= ui_icon_html('clipboard', 16, 'h-svg') ?><span><?= h(ma_snippets_title(false)) ?></span></h2>
         <p class="muted ma-snippets-lead">อัปเดตตามรหัสเครื่องและฟอร์ม · กดคัดลอกทีละข้อ</p>
       </div>
       <button type="button" class="btn-sm btn-line" onclick="closeOverlay('asset-snippet-overlay')">✕ ปิด</button>

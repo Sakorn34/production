@@ -221,6 +221,32 @@ function production_sync_part_code_by_code(string $stockCode, string $partCode):
 }
 
 /**
+ * อัปเดตชื่ออะไหล่ใน production.parts ตาม stock_code
+ *
+ * ฝั่งแสดงผลใช้ชื่อจาก production ก่อน (part_product_display_name) — ถ้าไม่ sync ตรงนี้
+ * ชื่อที่แก้ในระบบ Stock จะถูกบันทึกแต่ไม่มีวันแสดง
+ *
+ * @param string $stockCode รหัส products.code
+ * @param string $name      ชื่ออะไหล่ใหม่
+ * @return bool true ถ้ามีแถว parts ที่อัปเดต
+ */
+function production_sync_part_name_by_code(string $stockCode, string $name): bool
+{
+    $stockCode = trim($stockCode);
+    $name = trim($name);
+    if ($stockCode === '' || $name === '') {
+        return false;
+    }
+    if (!production_part_id_by_product_code($stockCode)) {
+        return false;
+    }
+    $prod = production_db();
+    $st = $prod->prepare('UPDATE parts SET name = ? WHERE stock_code = ?');
+    $st->execute([$name, $stockCode]);
+    return $st->rowCount() > 0;
+}
+
+/**
  *
  * @param string|null $assetCode
  * @return int|null

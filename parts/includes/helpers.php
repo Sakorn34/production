@@ -535,7 +535,8 @@ function parts_products_sort_columns(): array
         'name'      => 'ชื่อ',
         'status'    => 'สถานะ',
         'price'     => 'ราคา',
-        'link'      => 'ลิงก์',
+        // key 'link' คงไว้เพื่อไม่ให้ลิงก์/บุ๊กมาร์กเดิม (?sort=link) เสีย — เรียงตามผู้จำหน่ายเป็นหลักอยู่แล้ว
+        'link'      => 'ผู้จำหน่าย',
         'quantity'  => 'คงเหลือ',
         'unit'      => 'หน่วย',
         'min_stock' => 'ขั้นต่ำ',

@@ -138,6 +138,51 @@
             });
     }
 
+    /* ─ ค้นหา/กรองแถวในตาราง (หน้ารายการอะไหล่) ─ */
+    function initTableFilters(root) {
+        var scope = root || document;
+        scope.querySelectorAll('[data-table-filter]').forEach(function (input) {
+            if (input.dataset.bound === '1') return;
+            input.dataset.bound = '1';
+            var tableId = input.getAttribute('data-table-filter');
+            var target = document.getElementById(tableId);
+            if (!target) return;
+            var rows = Array.prototype.slice.call(target.querySelectorAll('tbody tr[data-search]'));
+            var countEl = input.getAttribute('data-filter-count')
+                ? document.getElementById(input.getAttribute('data-filter-count'))
+                : null;
+            var emptyEl = input.getAttribute('data-filter-empty')
+                ? document.getElementById(input.getAttribute('data-filter-empty'))
+                : null;
+            // dropdown กรองเพิ่ม (เช่น ผู้จำหน่าย) ที่ชี้มาที่ตารางเดียวกัน — ใช้ร่วมกับช่องค้นหา
+            var picker = document.querySelector('[data-table-filter-select="' + tableId + '"]');
+
+            function apply() {
+                var q = input.value.trim().toLowerCase();
+                var pick = picker ? picker.value : '';
+                var shown = 0;
+                rows.forEach(function (row) {
+                    var hit = !q || (row.getAttribute('data-search') || '').indexOf(q) !== -1;
+                    if (hit && pick) {
+                        var sup = (row.getAttribute('data-supplier') || '').trim();
+                        hit = pick === '__none__' ? sup === '' : sup === pick;
+                    }
+                    row.hidden = !hit;
+                    if (hit) shown++;
+                });
+                if (countEl) countEl.textContent = shown.toLocaleString();
+                if (emptyEl) emptyEl.hidden = shown !== 0;
+            }
+
+            input.addEventListener('input', apply);
+            if (picker && picker.dataset.bound !== '1') {
+                picker.dataset.bound = '1';
+                picker.addEventListener('change', apply);
+            }
+            apply();
+        });
+    }
+
     /* ─ ค้นหาอะไหล่ใน select (modal / หน้าเบิกรายชิ้น) ─ */
     function initProductSearchIn(root) {
         var scope = root || document;
@@ -482,6 +527,7 @@
 
     initProductSearchIn(document);
     initProductPickers(document);
+    initTableFilters(document);
 
     document.querySelectorAll('.product-active-switch').forEach(function (input) {
         input.addEventListener('change', function () {

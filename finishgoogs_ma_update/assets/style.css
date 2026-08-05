@@ -454,6 +454,7 @@ span.thumb-sm { display: inline-flex; align-items: center; justify-content: cent
 .ma-part-opt-thumb { width: 36px; height: 36px; border-radius: 6px; flex-shrink: 0; }
 .ma-part-opt-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; line-height: 1.3; }
 .ma-part-opt-name { font-size: calc(13.5px * var(--font-scale, 1)); font-weight: 500; color: #1f2937; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ma-part-opt-code { font-size: calc(11.5px * var(--font-scale, 1)); color: #94a3b8; font-family: ui-monospace, "Consolas", monospace; letter-spacing: .01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ma-part-opt-stock { font-size: calc(12px * var(--font-scale, 1)); color: #64748b; }
 .ma-part-opt-stock-low { color: #b45309; font-weight: 500; }
 .ma-part-opt-stock-out { color: #dc2626; font-weight: 600; }

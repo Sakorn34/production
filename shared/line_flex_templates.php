@@ -161,6 +161,59 @@ const LINE_FLEX_LOW_STOCK_SINGLE_CARD_MAX = 10;
  * @param array<int,array<string,mixed>> $items
  * @return array<int,array<int,array<string,mixed>>>
  */
+/** ป้ายกลุ่มสำหรับอะไหล่ที่ยังไม่ได้ระบุผู้จำหน่าย */
+const LINE_FLEX_LOW_STOCK_NO_SUPPLIER = 'ไม่ระบุผู้จำหน่าย';
+
+/** จำนวนการ์ดสูงสุดที่ยอมให้ส่งต่อรอบ — กันกรณีผู้จำหน่ายเยอะจนยิงข้อความรัว */
+const LINE_FLEX_LOW_STOCK_MAX_CARDS = 20;
+
+/**
+ * จัดกลุ่มอะไหล่ต่ำตามผู้จำหน่าย — ผู้จำหน่ายที่ระบุชื่อขึ้นก่อน (สั่งซื้อได้ทันที)
+ * กลุ่ม "ไม่ระบุผู้จำหน่าย" ไปท้ายสุดเสมอ
+ *
+ * @param array<int,array<string,mixed>> $items
+ * @return array<string,array<int,array<string,mixed>>> ชื่อผู้จำหน่าย => รายการ
+ */
+function line_flex_low_stock_group_by_supplier(array $items): array
+{
+    $groups = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $sup = trim((string)($item['supplier'] ?? ''));
+        if ($sup === '' || $sup === '-') {
+            $sup = LINE_FLEX_LOW_STOCK_NO_SUPPLIER;
+        }
+        $groups[$sup][] = $item;
+    }
+
+    // เรียงของน้อยสุดขึ้นก่อนในแต่ละกลุ่ม (เร่งด่วนสุดอยู่บน)
+    foreach ($groups as $sup => $rows) {
+        usort($rows, function ($a, $b) {
+            return ((int)($a['quantity'] ?? 0)) <=> ((int)($b['quantity'] ?? 0));
+        });
+        $groups[$sup] = $rows;
+    }
+
+    $noSup = null;
+    if (isset($groups[LINE_FLEX_LOW_STOCK_NO_SUPPLIER])) {
+        $noSup = $groups[LINE_FLEX_LOW_STOCK_NO_SUPPLIER];
+        unset($groups[LINE_FLEX_LOW_STOCK_NO_SUPPLIER]);
+    }
+
+    // ผู้จำหน่ายที่มีรายการมากสุดขึ้นก่อน
+    uasort($groups, function ($a, $b) {
+        return count($b) <=> count($a);
+    });
+
+    if ($noSup !== null) {
+        $groups[LINE_FLEX_LOW_STOCK_NO_SUPPLIER] = $noSup;
+    }
+
+    return $groups;
+}
+
 function line_flex_low_stock_card_chunks(array $items): array
 {
     $total = count($items);
@@ -604,7 +657,7 @@ function line_flex_low_stock_part_row(array $item): array
  * @param int                            $totalPages
  * @return array<string,mixed>
  */
-function line_flex_low_stock_alert_bubble(array $items, int $totalCount, string $timestamp, int $page = 1, int $totalPages = 1): array
+function line_flex_low_stock_alert_bubble(array $items, int $totalCount, string $timestamp, int $page = 1, int $totalPages = 1, string $supplier = ''): array
 {
     $partRows = [];
     foreach ($items as $item) {
@@ -614,9 +667,16 @@ function line_flex_low_stock_alert_bubble(array $items, int $totalCount, string 
         $partRows[] = line_flex_low_stock_part_row($item);
         $partRows[] = ['type' => 'separator', 'color' => '#f0f0f0', 'margin' => 'xs'];
     }
-    $cardTitle = $totalPages > 1
-        ? '📋 การ์ด ' . $page . '/' . $totalPages . ' (' . count($items) . ' รายการ)'
-        : '📦 ' . $totalCount . ' รายการ';
+    $supplier = trim($supplier);
+    if ($supplier !== '') {
+        // การ์ดแยกตามผู้จำหน่าย — บอกจำนวนของเจ้านั้น และหน้าที่เท่าไรถ้าเจ้าเดียวมีหลายการ์ด
+        $cardTitle = '📦 ' . count($items) . ' รายการ'
+            . ($totalPages > 1 ? ' (' . $page . '/' . $totalPages . ')' : '');
+    } else {
+        $cardTitle = $totalPages > 1
+            ? '📋 การ์ด ' . $page . '/' . $totalPages . ' (' . count($items) . ' รายการ)'
+            : '📦 ' . $totalCount . ' รายการ';
+    }
 
     return [
         'type'   => 'bubble',
@@ -625,7 +685,11 @@ function line_flex_low_stock_alert_bubble(array $items, int $totalCount, string 
             'type' => 'box', 'layout' => 'vertical', 'backgroundColor' => '#c0392b', 'paddingAll' => 'lg',
             'contents' => [
                 ['type' => 'text', 'text' => '⚠️ STOCK ALERT', 'size' => 'xxs', 'color' => '#ffcccc', 'weight' => 'bold'],
-                ['type' => 'text', 'text' => 'อะไหล่ต่ำกว่ากำหนด', 'size' => 'md', 'color' => '#ffffff', 'weight' => 'bold', 'margin' => 'xs'],
+                ['type' => 'text', 'text' => $supplier !== '' ? line_flex_required_text($supplier, 60) : 'อะไหล่ต่ำกว่ากำหนด',
+                 'size' => 'md', 'color' => '#ffffff', 'weight' => 'bold', 'margin' => 'xs', 'wrap' => true],
+                $supplier !== ''
+                    ? ['type' => 'text', 'text' => 'อะไหล่ต่ำกว่ากำหนด · ผู้จำหน่าย', 'size' => 'xxs', 'color' => '#ffcccc', 'margin' => 'xs']
+                    : ['type' => 'filler'],
                 ['type' => 'text', 'text' => $cardTitle . ' | 🕐 ' . $timestamp, 'size' => 'xs', 'color' => '#ffdddd', 'margin' => 'sm', 'wrap' => true],
                 ($totalPages > 1 && $page < $totalPages)
                     ? ['type' => 'text', 'text' => 'เลื่อนดูการ์ดถัดไป →', 'size' => 'xxs', 'color' => '#ffcccc', 'margin' => 'xs', 'align' => 'end']
@@ -667,10 +731,14 @@ function line_flex_low_stock_alert_single(array $p): array
     $timestamp = line_flex_required_text((string)($p['timestamp'] ?? date('d/m/Y H:i')), 30);
     $enriched = line_notify_enrich_low_stock_items([$p]);
     $p = $enriched[0] ?? $p;
+    $supplier = trim((string)($p['supplier'] ?? ''));
+    if ($supplier === '' || $supplier === '-') {
+        $supplier = LINE_FLEX_LOW_STOCK_NO_SUPPLIER;
+    }
     return [
         'type'    => 'flex',
         'altText' => '⚠️ อะไหล่ต่ำกว่ากำหนด: ' . line_flex_text((string)($p['name'] ?? ''), 40),
-        'contents' => line_flex_low_stock_alert_bubble([$p], 1, $timestamp),
+        'contents' => line_flex_low_stock_alert_bubble([$p], 1, $timestamp, 1, 1, $supplier),
     ];
 }
 
@@ -689,21 +757,40 @@ function line_flex_low_stock_alert_messages(array $payload): array
     $items = line_notify_enrich_low_stock_items($items);
     $timestamp = line_flex_required_text((string)($payload['timestamp'] ?? date('d/m/Y H:i')), 30);
     $total = count($items);
-    $altText = '⚠️ อะไหล่ต่ำกว่ากำหนด ' . $total . ' รายการ';
 
-    $chunks = line_flex_low_stock_card_chunks($items);
-    if (count($chunks) === 1) {
+    // แยกการ์ดตามผู้จำหน่าย — เจ้าละการ์ด สั่งซื้อทีเดียวจบต่อเจ้า
+    $groups = line_flex_low_stock_group_by_supplier($items);
+    $altText = '⚠️ อะไหล่ต่ำกว่ากำหนด ' . $total . ' รายการ · ' . count($groups) . ' ผู้จำหน่าย';
+
+    $bubbles = [];
+    $truncated = 0;
+    foreach ($groups as $supplier => $rows) {
+        // ผู้จำหน่ายเจ้าเดียวที่มีของเยอะ แบ่งเป็นหลายการ์ดของเจ้านั้น
+        $pages = array_chunk($rows, LINE_FLEX_LOW_STOCK_SINGLE_CARD_MAX);
+        $totalPages = count($pages);
+        foreach ($pages as $i => $page) {
+            if (count($bubbles) >= LINE_FLEX_LOW_STOCK_MAX_CARDS) {
+                $truncated += count($page);
+                continue;
+            }
+            $bubbles[] = line_flex_low_stock_alert_bubble(
+                $page, $total, $timestamp, $i + 1, $totalPages, (string)$supplier
+            );
+        }
+    }
+
+    if ($bubbles === []) {
+        return [];
+    }
+    if ($truncated > 0) {
+        $altText .= ' (แสดง ' . LINE_FLEX_LOW_STOCK_MAX_CARDS . ' การ์ดแรก · อีก ' . $truncated . ' รายการดูในระบบ)';
+    }
+    if (count($bubbles) === 1) {
         return [[
             'type'     => 'flex',
             'altText'  => $altText,
-            'contents' => line_flex_low_stock_alert_bubble($chunks[0], $total, $timestamp),
+            'contents' => $bubbles[0],
         ]];
-    }
-
-    $totalPages = count($chunks);
-    $bubbles = [];
-    foreach ($chunks as $i => $chunk) {
-        $bubbles[] = line_flex_low_stock_alert_bubble($chunk, $total, $timestamp, $i + 1, $totalPages);
     }
 
     return line_flex_carousel_messages($bubbles, $altText);

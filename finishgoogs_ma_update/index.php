@@ -18,7 +18,7 @@ try {
     $row = $pdo->query('SELECT COUNT(*) c, COALESCE(SUM(quantity),0) q FROM products')->fetch();
     $stock['items'] = (int)$row['c'];
     $stock['qty']   = (int)$row['q'];
-    $stock['low']   = (int)$pdo->query('SELECT COUNT(*) FROM products WHERE quantity <= min_stock')->fetchColumn();
+    $stock['low']   = (int)$pdo->query('SELECT COUNT(*) FROM products WHERE quantity <= min_stock AND is_active = 1')->fetchColumn();
     $stock['in_today']  = (int)$pdo->query('SELECT COALESCE(SUM(quantity),0) FROM stock_in WHERE DATE(created_at) = CURDATE()')->fetchColumn();
     $stock['out_today'] = (int)$pdo->query("SELECT COALESCE(SUM(soi.quantity),0) FROM stock_out_items soi JOIN stock_out so ON so.id = soi.stock_out_id WHERE DATE(so.created_at) = CURDATE()")->fetchColumn();
     $stock['ok'] = true;
@@ -58,8 +58,10 @@ if ($stock['ok']) {
     try {
         require_once dirname(__DIR__) . '/parts/includes/helpers.php';
         ensureProductColumns($pdo);
+        // อะไหล่ที่ปิดการใช้งานแล้วไม่ต้องแสดงบนแดชบอร์ด (ทั้งกราฟรายตัว, ตัวนับใกล้หมด/หมดแล้ว)
         $perPart = $pdo->query(
-            'SELECT id, code, name, quantity, unit, min_stock, purchase_link, supplier FROM products ORDER BY quantity DESC'
+            'SELECT id, code, name, quantity, unit, min_stock, purchase_link, supplier
+             FROM products WHERE is_active = 1 ORDER BY quantity DESC'
         )->fetchAll();
         foreach ($perPart as $p) {
             $maxPart = max($maxPart, (int) $p['quantity']);
@@ -298,8 +300,7 @@ $partsBase = ui_parts_base_url();
     <p class="muted" style="padding:12px 0">ไม่มีข้อมูลสต็อกอะไหล่</p>
   <?php } else { ?>
   <div class="model-card-grid" id="dash-parts-grid">
-    <?php $pi = 0; foreach ($perPart as $p) {
-        $col = $PALETTE[$pi++ % count($PALETTE)];
+    <?php foreach ($perPart as $p) {
         $qty = (int) $p['quantity'];
         $min = (int) $p['min_stock'];
         if ($qty <= 0) {
@@ -319,9 +320,11 @@ $partsBase = ui_parts_base_url();
         if ($displaySub !== '' && $displaySub !== $stockCode) {
             $cardTitle .= ' · ' . $displaySub;
         }
+        // แถบสีสื่อสถานะอย่างเดียว ใช้ชุดสีเดียวกันทุกรายการ (เดิม "ปกติ" สุ่มสีจาก PALETTE ทำให้อ่านสถานะไม่ได้)
+        // เขียว = ปกติ · เหลือง = ใกล้หมด (ถึง/ต่ำกว่าขั้นต่ำ) · แดง = หมดแล้ว
         $barColor = $stockStatus === 'out'
             ? 'var(--danger,#dc2626)'
-            : ($stockStatus === 'low' ? 'var(--warning,#f59e0b)' : h($col));
+            : ($stockStatus === 'low' ? 'var(--warning,#f59e0b)' : 'var(--success,#16a34a)');
     ?>
     <div class="model-card clickable dash-part-card" data-stock-status="<?= h($stockStatus) ?>" data-supplier="<?= h($supplier) ?>"
          onclick="showListModal(<?= h(json_encode('โปรไฟล์: ' . $displayName, JSON_UNESCAPED_UNICODE)) ?>, '<?= h("$B/dashboard_data.php?type=part_profile&v=" . (int) $p['id']) ?>', '<?= h("$partsBase/pages/product-detail.php?id=" . (int) $p['id']) ?>')"

@@ -408,11 +408,14 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'parts') {
             $codeKey = trim((string)($r['part_code'] ?? ''));
         }
         $out['all_parts'][] = [
-            'id'        => (int)$r['id'],
-            'name'      => (string)$r['name'],
-            'unit'      => (string)($r['unit'] ?? ''),
-            'icon'      => img_url($r['icon_path'] ?? '') ?: '',
-            'stock_qty' => ($codeKey !== '' && isset($qtyMap[$codeKey])) ? (int)$qtyMap[$codeKey] : null,
+            'id'         => (int)$r['id'],
+            'name'       => (string)$r['name'],
+            'unit'       => (string)($r['unit'] ?? ''),
+            'part_code'  => (string)($r['part_code'] ?? ''),
+            'stock_code' => (string)($r['stock_code'] ?? ''),
+            'search'     => part_search_key($r),
+            'icon'       => img_url($r['icon_path'] ?? '') ?: '',
+            'stock_qty'  => ($codeKey !== '' && isset($qtyMap[$codeKey])) ? (int)$qtyMap[$codeKey] : null,
         ];
     }
     echo json_encode($out, JSON_UNESCAPED_UNICODE);
@@ -583,9 +586,9 @@ require __DIR__ . '/includes/layout.php';
 
 $productId  = (int)(isset($_GET['product']) ? $_GET['product'] : 0);
 $recAssetId = (int)(isset($_GET['record']) ? $_GET['record'] : 0);
-$recAsset = $recAssetId ? qr("SELECT id, asset_code, status, product_id FROM assets WHERE id=?", 'i', [$recAssetId])->fetch_assoc() : null;
+$recAsset = $recAssetId ? qr("SELECT id, asset_code, status, product_id, produced_at FROM assets WHERE id=?", 'i', [$recAssetId])->fetch_assoc() : null;
 $editId = (int)(isset($_GET['edit']) ? $_GET['edit'] : 0);
-$editRec = $editId ? qr("SELECT m.*, a.asset_code, a.status ast_status, a.product_id
+$editRec = $editId ? qr("SELECT m.*, a.asset_code, a.status ast_status, a.product_id, a.produced_at
                          FROM ma_records m JOIN assets a ON a.id=m.asset_id WHERE m.id=?", 'i', [$editId])->fetch_assoc() : null;
 $formOpen = ($recAsset || $editRec) ? true : false;
 
@@ -804,7 +807,11 @@ require __DIR__ . '/includes/list_search.php';
       <label for="ma_code">รหัสเครื่อง</label>
       <div>
         <input type="text" name="asset_code" id="ma_code" class="asset-search" data-product="<?= (int)$productId ?>" value="<?= h($ea ? $ea['asset_code'] : ($recAsset ? $recAsset['asset_code'] : '')) ?>" <?= $ea ? 'readonly' : '' ?> required placeholder="พิมพ์เลือก S/N">
-        <div class="muted ma-field-hint">รุ่น <?= h($product['name']) ?> · พิมพ์แล้วเลือกจากรายการ</div>
+        <?php
+        $maKnownProduced = $ea ? ($ea['produced_at'] ?? '') : ($recAsset ? ($recAsset['produced_at'] ?? '') : '');
+        $maKnownAge = dt_age_text($maKnownProduced);
+        ?>
+        <div class="muted ma-field-hint">รุ่น <?= h($product['name']) ?> · พิมพ์แล้วเลือกจากรายการ<span id="ma-age-hint"><?= $maKnownAge !== '' ? ' · อายุเครื่อง <b>' . h($maKnownAge) . '</b>' : '' ?></span></div>
       </div>
 
       <label for="ma_visited_at">วันเวลาเข้า MA</label>
@@ -1042,9 +1049,7 @@ function maPartSelectedChipHtml(partId){
 }
 function maPartOptsHtml(selId, filter){
   filter = (filter || '').toLowerCase();
-  var list = maPartsAll.filter(function(p){
-    return !filter || p.name.toLowerCase().indexOf(filter) !== -1;
-  });
+  var list = maPartsAll.filter(function(p){ return partMatchesQuery(p, filter); });
   if (!list.length) {
     return '<div class="ma-part-opt-empty muted">ไม่พบอะไหล่' + (filter ? ' ที่ตรงกับ "' + esc(filter) + '"' : '') + '</div>';
   }
@@ -1054,6 +1059,7 @@ function maPartOptsHtml(selId, filter){
       + maPartThumbHtml(p.id)
       + '<div class="ma-part-opt-body">'
       + '<span class="ma-part-opt-name">' + esc(p.name) + '</span>'
+      + partCodeLineHtml(p)
       + maPartStockHtml(p)
       + '</div></div>';
   }).join('') + '</div>';
@@ -1064,7 +1070,7 @@ function maPartChipHtml(partId){
     + '<input type="hidden" name="ma_part_id[]" value="' + (partId || '') + '">'
     + '<div class="chip-dd-box">'
     + '<div class="chip-dd-chips">' + (label ? maPartSelectedChipHtml(partId) : '') + '</div>'
-    + '<input type="text" class="chip-dd-filter ma-part-filter" placeholder="' + (label ? '' : 'ค้นหาอะไหล่…') + '" autocomplete="off">'
+    + '<input type="text" class="chip-dd-filter ma-part-filter" placeholder="' + (label ? '' : 'ค้นหา — ชื่อ / รหัสอะไหล่') + '" autocomplete="off">'
     + '<button type="button" class="chip-dd-btn" tabindex="-1">▾</button>'
     + '</div>'
     + '<div class="chip-dd-list" hidden><div class="chip-dd-opts">' + maPartOptsHtml(partId, '') + '</div></div>'
@@ -1079,7 +1085,7 @@ function setMaPart(dd, partId){
   var filt = dd.querySelector('.ma-part-filter');
   if (filt) {
     filt.value = '';
-    filt.placeholder = partId ? '' : 'ค้นหาอะไหล่…';
+    filt.placeholder = partId ? '' : 'ค้นหา — ชื่อ / รหัสอะไหล่';
   }
   dd.querySelector('.chip-dd-opts').innerHTML = maPartOptsHtml(partId, '');
 }
@@ -1326,6 +1332,23 @@ window.addEventListener('pageshow', function(e) {
 
 document.getElementById('ma_remark').addEventListener('input', updateMaSnippets);
 
+// อายุเครื่องใต้ช่องรหัสเครื่อง — อัปเดตเมื่อเลือก S/N จากรายการค้นหา
+(function(){
+  var input = document.getElementById('ma_code');
+  var slot = document.getElementById('ma-age-hint');
+  if (!input || !slot) return;
+  var pickedCode = input.value.trim(); // ค่าที่ server render มา (โหมดแก้ไข/มาจากหน้าเครื่อง)
+  input.addEventListener('asset-picked', function(e){
+    var age = (e.detail && e.detail.age) ? e.detail.age : '';
+    pickedCode = (e.detail && e.detail.code) ? e.detail.code : input.value.trim();
+    slot.innerHTML = age ? ' · อายุเครื่อง <b>' + esc(age) + '</b>' : '';
+  });
+  input.addEventListener('input', function(){
+    // พิมพ์แก้เองจนไม่ตรงกับเครื่องที่เลือกไว้ — ซ่อนอายุ กันแสดงค่าของเครื่องอื่น
+    if (input.value.trim() !== pickedCode) slot.innerHTML = '';
+  });
+})();
+
 (function(){
   var input = document.getElementById('ma_code');
   var box = document.getElementById('ma-history');
@@ -1366,7 +1389,7 @@ if (document.readyState === 'loading') {
 <?php } ?>
 
 <h2>MA ของรุ่นนี้<?= $total ? ' (' . number_format($total) . ')' : '' ?></h2>
-<p class="muted ma-table-hint">คลิกแถวเพื่อดูรายละเอียด MA และข้อความประจำสินค้า · กดหัวคอลัมน์เพื่อจัดเรียง</p>
+<p class="muted ma-table-hint">คลิกแถวเพื่อดูรายละเอียด MA และคำสั่งตั้งค่าหมายเลขสินค้า · กดหัวคอลัมน์เพื่อจัดเรียง</p>
 <?php
 list_search_form([
     ['name' => 'mq', 'placeholder' => 'รหัสเครื่อง', 'value' => $mq, 'width' => '140px'],
@@ -1392,7 +1415,7 @@ list_search_form([
     <?= can('ma') ? '<th></th>' : '' ?>
   </tr>
   <?php while ($m = $recentMA->fetch_assoc()) { ?>
-  <tr class="ma-row-click" title="คลิกดูรายละเอียด MA และข้อความประจำสินค้า" <?= ma_row_data_attrs($m) ?>>
+  <tr class="ma-row-click" title="คลิกดูรายละเอียด MA และคำสั่งตั้งค่าหมายเลขสินค้า" <?= ma_row_data_attrs($m) ?>>
     <td style="white-space:nowrap"><?= dthai_full($m['visited_at']) ?></td>
     <td style="text-align:center"><?= $m['ma_round'] ? (int)$m['ma_round'] : '-' ?></td>
     <td><a href="<?= BASE_URL ?>/asset.php?id=<?= (int)$m['asset_id'] ?>"><?= h($m['asset_code']) ?></a></td>
@@ -1429,7 +1452,7 @@ list_search_form([
     <div class="ma-sn-modal-hd">
       <div>
         <h2 id="ma-detail-modal-title" class="ma-snippets-title">รายละเอียด MA</h2>
-        <p class="muted ma-snippets-lead">ข้อมูลการ MA และข้อความประจำสินค้า · กดคัดลอกทีละข้อ</p>
+        <p class="muted ma-snippets-lead">ข้อมูลการ MA และคำสั่งตั้งค่าหมายเลขสินค้า · กดคัดลอกทีละข้อ</p>
       </div>
       <button type="button" class="btn-sm btn-line" onclick="closeOverlay('ma-detail-overlay')">✕ ปิด</button>
     </div>
@@ -1438,7 +1461,7 @@ list_search_form([
       <dl class="ma-detail-dl" id="ma-detail-dl"></dl>
     </section>
     <section class="ma-detail-section">
-      <h3 class="ma-detail-sub h-with-icon"><?= ui_icon_html('clipboard', 14, 'h-svg') ?>ข้อความประจำสินค้า</h3>
+      <h3 class="ma-detail-sub h-with-icon"><?= ui_icon_html("clipboard", 14, "h-svg") ?><?= h(ma_snippets_title(true)) ?></h3>
       <p class="muted ma-snippets-lead">อัปเดตตามรหัสเครื่องและฟอร์ม · กดคัดลอกทีละข้อ</p>
       <?= ma_snippets_inner_html('ma-modal-sn', ['title' => false, 'lead' => false]) ?>
     </section>

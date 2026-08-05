@@ -1,12 +1,26 @@
 <?php
 /**
- * ma_snippets.php — ข้อความประจำสินค้า (คัดลอก Serial/MAC/สรุป MA)
+ * ma_snippets.php — คำสั่งตั้งค่าหมายเลขสินค้า (คัดลอก Serial/MAC/สรุป MA)
  *
  * ใช้ในหน้า ma.php และ asset.php (popup จาก timeline)
  */
 
 /**
- * HTML บล็อกข้อความประจำสินค้า (4 รายการคัดลอกได้)
+ * ชื่อแผงคำสั่ง — ต่อท้ายด้วยงานเช่าเมื่อหน้านั้นแสดงข้อ 4 (สรุปส่งงานเช่า Office)
+ *
+ * ใช้ร่วมกันทุกจุดที่มีปุ่ม/หัวข้อของแผงนี้ เพื่อไม่ให้ชื่อหลุดไม่ตรงกันระหว่างหน้า
+ *
+ * @param bool $withRental true = หน้าที่มีข้อ 4 สรุปส่งงานเช่า Office (หน้า MA)
+ * @return string
+ */
+function ma_snippets_title($withRental = false) {
+    return $withRental
+        ? 'คำสั่งตั้งค่าหมายเลขสินค้าและสรุปส่งงานเช่า Office'
+        : 'คำสั่งตั้งค่าหมายเลขสินค้า';
+}
+
+/**
+ * HTML บล็อกคำสั่งตั้งค่าหมายเลขสินค้า (คัดลอกได้ทีละข้อ)
  *
  * @param string $pfx คำนำหน้า id ของ element (เช่น ma-sn, asset-tl-sn)
  * @param array{title?:bool,lead?:bool,rental?:bool} $opts แสดงหัวข้อ/คำอธิบาย/สรุปงานเช่าหรือไม่
@@ -19,7 +33,7 @@ function ma_snippets_inner_html($pfx, array $opts = []) {
     $showRental = !isset($opts['rental']) || $opts['rental'];
     ob_start();
     if ($showTitle) { ?>
-    <h3 class="ma-snippets-title h-with-icon"><?= ui_icon_html('clipboard', 15, 'h-svg') ?><span>ข้อความประจำสินค้า</span></h3>
+    <h3 class="ma-snippets-title h-with-icon"><?= ui_icon_html('clipboard', 15, 'h-svg') ?><span><?= h(ma_snippets_title($showRental)) ?></span></h3>
     <?php }
     if ($showLead) { ?>
     <p class="muted ma-snippets-lead">อัปเดตตามรหัสเครื่องและฟอร์ม · กดคัดลอกทีละข้อ</p>
@@ -80,13 +94,14 @@ function ma_snippet_data_attrs(array $payload) {
 }
 
 /**
- * ปุ่มเปิด popup ข้อความประจำสินค้า
+ * ปุ่มเปิด popup คำสั่งตั้งค่าหมายเลขสินค้า
  *
  * @param array{code?:string,replace?:string,repair?:string,fw?:string,remark?:string} $payload
+ * @param bool $withRental true = popup นั้นมีข้อ 4 สรุปส่งงานเช่า Office ด้วย
  * @return string
  */
-function ma_snippet_open_button(array $payload) {
+function ma_snippet_open_button(array $payload, $withRental = false) {
     return '<button type="button" class="btn btn-sm btn-line btn-with-icon asset-snippet-open"'
         . ma_snippet_data_attrs($payload) . '>'
-        . ui_btn_label('clipboard', 'ข้อความประจำสินค้า') . '</button>';
+        . ui_btn_label('clipboard', ma_snippets_title($withRental)) . '</button>';
 }

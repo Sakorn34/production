@@ -108,6 +108,7 @@ function parts_product_forms_handle_post(PDO $db, StockService $stock, string $d
                     production_sync_create_part_from_product($stock->getProduct($productId) ?: $prod);
                 }
                 production_sync_part_code_by_code($stockCode, $partCode);
+                production_sync_part_name_by_code($stockCode, $name);
             }
         } catch (Throwable $syncEx) {
             error_log('[product_edit update_details part_code] ' . $syncEx->getMessage());
@@ -209,9 +210,9 @@ function parts_product_edit_modals(): void
             · <span id="edit-modal-product-display-name"></span>
         </p>
         <div class="form-group">
-            <label for="edit-modal-name">ชื่ออะไหล่ (ในระบบ Stock)</label>
+            <label for="edit-modal-name">ชื่ออะไหล่</label>
             <input type="text" name="name" id="edit-modal-name" required maxlength="255" data-autofocus>
-            <p class="form-hint">ถ้าอะไหล่นี้เชื่อมกับระบบทะเบียนเครื่องแล้ว ชื่อที่แสดงในตารางอาจใช้ชื่อจากฝั่งนั้นแทนชื่อนี้</p>
+            <p class="form-hint">บันทึกแล้วชื่อจะเปลี่ยนทั้งในระบบสต็อกและระบบทะเบียนเครื่องพร้อมกัน</p>
         </div>
         <div class="form-group">
             <label for="edit-modal-part-code">รหัสอะไหล่ (Production)</label>

@@ -582,10 +582,13 @@ function asset_head_dl_html(array $assetRow, array $ctx, array $componentRows): 
     $out .= asset_head_row_html('สถานะ', status_badge($assetRow['status']));
 
     $producedAt = trim((string)($assetRow['produced_at'] ?? ''));
+    $producedSrc = '';
     if (!empty($ctx['prod_rec']['recorded_at'])) {
-        $produced = dthai_full($ctx['prod_rec']['recorded_at']);
+        $producedSrc = (string)$ctx['prod_rec']['recorded_at'];
+        $produced = dthai_full($producedSrc);
     } elseif ($producedAt !== '') {
-        $produced = dthai_full($producedAt);
+        $producedSrc = $producedAt;
+        $produced = dthai_full($producedSrc);
     } else {
         $produced = '';
     }
@@ -597,6 +600,11 @@ function asset_head_dl_html(array $assetRow, array $ctx, array $componentRows): 
     }
 
     $out .= asset_head_row_html('ผลิตเมื่อ', $produced);
+
+    $ageText = dt_age_text($producedSrc);
+    if ($ageText !== '') {
+        $out .= asset_head_row_html('อายุสินค้า', h($ageText));
+    }
 
     $fw = trim((string)($assetRow['current_fw_version'] ?? ''));
 
