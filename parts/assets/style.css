@@ -1042,17 +1042,17 @@ table .col-img {
 }
 .set-item-short td { background: var(--danger-soft, #fee2e2); }
 
+/* ห้ามใส่ display:flex ให้ td โดยตรง — เซลล์จะหลุดจาก layout ของตาราง
+   ไม่ยืดตามความสูงแถว เส้นขอบล่างเลยไม่ตรงกับคอลัมน์อื่น (ยิ่งแถวมีรูปยิ่งเหลื่อม)
+   จัดแนวด้วย inline-flex ที่ลูกแทน แล้วปล่อยให้ td เป็น table-cell ตามเดิม */
 .set-qty-cell {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 6px;
-    flex-wrap: wrap;
+    white-space: nowrap;
 }
 .set-qty-form {
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    vertical-align: middle;
 }
 .set-qty-input {
     width: 68px;
@@ -1063,7 +1063,11 @@ table .col-img {
     border-radius: 6px;
     font-variant-numeric: tabular-nums;
 }
-.set-qty-unit { font-size: 0.82rem; }
+.set-qty-unit {
+    font-size: 0.82rem;
+    margin-left: 6px;
+    vertical-align: middle;
+}
 
 /* โซนจัดการ Set — แยกให้ต่างจากงานเบิกประจำวันอย่างชัดเจน */
 .set-manage-zone {
