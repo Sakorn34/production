@@ -53,12 +53,13 @@ ob_start();
             </li>
             <?php endforeach; ?>
         </ul>
+        <?php $ubUser = ui_userbox_identity(); // ใช้ตรรกะเดียวกับ sidebar ฝั่ง production ?>
         <div class="userbox">
             <div class="ub-row">
-                <div class="ub-avatar"><?= e(mb_substr(trim($line_name), 0, 1)) ?></div>
+                <div class="ub-avatar"><?= e(mb_substr(trim($ubUser['name']), 0, 1)) ?></div>
                 <div class="ub-info">
-                    <div class="ub-name"><?= e($line_name) ?></div>
-                    <div class="muted">SSO</div>
+                    <div class="ub-name"><?= e($ubUser['name']) ?></div>
+                    <div class="muted"><?= e($ubUser['sub']) ?></div>
                 </div>
                 <?= ui_userbox_settings_link() ?>
             </div>

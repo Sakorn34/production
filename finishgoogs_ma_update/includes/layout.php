@@ -170,14 +170,15 @@ $sideClass = $side === 'right' ? ' sidebar-right' : ($side === 'top' ? ' sidebar
     </nav>
     <div class="userbox">
       <?php
-        $actor = $u ? actor_name() : '';
-        $showName = $actor !== '' ? $actor : ($u ? $u['display_name'] : '-');
+        // ใช้ helper กลางร่วมกับ sidebar ฝั่ง parts เพื่อไม่ให้ชื่อ/คำบรรยายใต้ชื่อไม่ตรงกันอีก
+        $ubUser = ui_userbox_identity();
+        $showName = $ubUser['name'] !== 'ผู้ใช้งาน' ? $ubUser['name'] : ($u ? $u['display_name'] : '-');
       ?>
       <div class="ub-row">
         <div class="ub-avatar"><?= h(mb_substr(trim($showName), 0, 1)) ?></div>
         <div class="ub-info">
           <div class="ub-name"><?= h($showName) ?></div>
-          <div class="muted"><?= h($u && $u['display_name'] !== '' && $u['display_name'] !== $showName ? $u['display_name'] : 'SSO') ?></div>
+          <div class="muted"><?= h($ubUser['sub']) ?></div>
         </div>
         <?= ui_userbox_settings_link(in_array($cur, ['settings.php', 'appearance.php', 'server_config.php', 'line_notify_settings.php', 'activity_logs.php', 'share_admin.php', 'system_doc.php'], true) ? 'is-active' : '') ?>
       </div>

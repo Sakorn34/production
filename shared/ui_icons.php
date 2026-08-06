@@ -280,9 +280,10 @@ function ui_nav_items_parts(): array
  */
 function ui_nav_items_finishgoogs(): array
 {
-    // label ต้องตรงกับ nav_default() ใน finishgoogs_ma_update/config.php — ยกเว้น parts.php
-    // ที่จงใจใช้ "อะไหล่ใช้ผลิต" กันชนกับเมนู "อะไหล่" ของ parts เองใน sidebar เดียวกัน
-    return [
+    // ลำดับต้องตรงกับ nav_default() ใน finishgoogs_ma_update/config.php เพราะ index ของ array
+    // ถูกใช้เป็นลำดับเริ่มต้นเวลาไม่มีการตั้งค่า order — ยกเว้น label ของ parts.php ที่จงใจใช้
+    // "อะไหล่ใช้ผลิต" กันชนกับเมนู "อะไหล่" ของ parts เองที่อยู่ใน sidebar เดียวกัน
+    $base = [
         ['file' => 'index.php',   'icon' => 'dashboard', 'label' => 'หน้าหลัก'],
         ['file' => 'assets.php',  'icon' => 'assets',    'label' => 'ทะเบียนเครื่องผลิตใหม่'],
         ['file' => 'updates.php', 'icon' => 'updates',   'label' => 'อัปเดต FW/HW'],
@@ -290,6 +291,101 @@ function ui_nav_items_finishgoogs(): array
         ['file' => 'parts.php',   'icon' => 'parts',     'label' => 'อะไหล่ใช้ผลิต'],
         ['file' => 'repairs.php', 'icon' => 'repairs',   'label' => 'ประวัติซ่อม'],
         ['file' => 'scan.php',    'icon' => 'scan',      'label' => 'สแกน QR'],
+    ];
+
+    return ui_nav_apply_override($base);
+}
+
+/**
+ * ใช้การตั้งค่าเมนูจากหลังบ้าน (appearance.php) กับรายการเมนูที่ส่งเข้ามา
+ *
+ * เดิมเมนูระบบทะเบียนเครื่องถูกเขียนไว้สองที่ — nav_effective() ฝั่ง production ที่อ่านค่า
+ * nav_items จาก site_settings แล้วซ่อน/เรียงใหม่ได้ กับรายการตายตัวที่ฝั่ง parts ใช้
+ * ทำให้ sidebar ของสองแอปไม่ตรงกันทันทีที่มีใครไปซ่อนหรือสลับลำดับเมนูในหลังบ้าน
+ * ตอนนี้ทั้งสองฝั่งอ่านค่าเดียวกัน ตั้งที่ appearance.php ที่เดียวมีผลทั้งคู่
+ *
+ * @param array<int, array{file:string,icon:string,label:string}> $items
+ * @return array<int, array{file:string,icon:string,label:string}>
+ */
+function ui_nav_apply_override(array $items): array
+{
+    $raw = '';
+    if (function_exists('setting')) {
+        $raw = (string) setting('nav_items', '');       // ฝั่ง production
+    } elseif (function_exists('main_setting')) {
+        $raw = (string) main_setting('nav_items', '');  // ฝั่ง parts (อ่านตารางเดียวกัน)
+    }
+    if (trim($raw) === '') {
+        return $items;
+    }
+
+    $ovr = json_decode($raw, true);
+    if (!is_array($ovr)) {
+        return $items;
+    }
+    $byFile = [];
+    foreach ($ovr as $o) {
+        if (is_array($o) && isset($o['file'])) {
+            $byFile[(string) $o['file']] = $o;
+        }
+    }
+    if (!$byFile) {
+        return $items;
+    }
+
+    $out = [];
+    foreach ($items as $i => $item) {
+        $o = $byFile[$item['file']] ?? [];
+        if (!empty($o['hidden'])) {
+            continue;
+        }
+        $item['_order'] = isset($o['order']) ? (int) $o['order'] : $i;
+        $out[] = $item;
+    }
+    usort($out, function ($a, $b) {
+        return $a['_order'] <=> $b['_order'];
+    });
+    foreach ($out as &$item) {
+        unset($item['_order']);
+    }
+    unset($item);
+
+    return $out;
+}
+
+/**
+ * ชื่อที่ใช้แสดงในกล่องผู้ใช้ — อ่านจาก session profile ที่สองแอปใช้ร่วมกัน
+ *
+ * @return array{name:string, sub:string}
+ */
+function ui_userbox_identity(): array
+{
+    $p = $_SESSION['profile'] ?? null;
+    $pick = function ($keys) use ($p) {
+        foreach ($keys as $k) {
+            if (is_object($p) && isset($p->{$k})) {
+                $v = trim((string) $p->{$k});
+                if ($v !== '') {
+                    return $v;
+                }
+            }
+            if (is_array($p) && isset($p[$k])) {
+                $v = trim((string) $p[$k]);
+                if ($v !== '') {
+                    return $v;
+                }
+            }
+        }
+        return '';
+    };
+
+    $login = $pick(['login_name']);
+    $display = $pick(['display_name', 'name', 'full_name', 'emp_name', 'nickname', 'login_name']);
+    $name = $login !== '' ? $login : ($display !== '' ? $display : 'ผู้ใช้งาน');
+
+    return [
+        'name' => $name,
+        'sub'  => ($display !== '' && $display !== $name) ? $display : 'SSO',
     ];
 }
 
