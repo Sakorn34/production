@@ -47,6 +47,8 @@ table.list tr:hover td { background: #faf8fe; }
 .btn-line { color: var(--primary); border-color: var(--primary); }
 .btn-line:hover { background: #fce7f3; background: color-mix(in srgb, var(--primary) 10%, #fff); }
 .btn-danger { background: #b91c1c; }
+/* ไม่งั้นปุ่มลบจะเปลี่ยนจากแดงเป็นชมพูตอน hover เพราะโดนกฎกลาง button:hover ทับ */
+.btn-danger:hover { background: #991b1b; }
 .pager a:hover { background: #f1ecfe; }
 .pager .cur { background: var(--primary); border-color: var(--primary); }
 .pager a, .pager span { border-color: #e7e0f5; border-radius: 7px; }
@@ -478,7 +480,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.dash-parts-supplier-btn:hover:not(.active) { color: var(--primary-dark); border-color: #d9c9f2; }
+/* ต้องระบุ background ทุกครั้ง — กฎกลาง button:hover ใน style.css ทาพื้นหลังเป็น
+   var(--primary-dark) ให้ปุ่มทุกตัว ถ้าไม่ทับไว้ ตัวอักษรสีชมพูเข้มจะจมหายไปกับพื้น */
+.dash-parts-supplier-btn:hover:not(.active) { background: #faf8fe; color: var(--primary-dark); border-color: #d9c9f2; }
 .dash-parts-supplier-btn.active {
   background: #f6f3fd; color: var(--primary-dark); border-color: #d9c9f2;
   box-shadow: 0 1px 4px rgba(46, 26, 90, .08);
@@ -497,13 +501,13 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   font-size: calc(13px * var(--font-scale, 1)); font-weight: 600; padding: 7px 14px; border-radius: 999px;
   cursor: pointer; transition: background .15s, color .15s, box-shadow .15s;
 }
-.dash-parts-filter-btn:hover:not(.active) { color: #c2410c; }
+.dash-parts-filter-btn:hover:not(.active) { background: rgba(255, 255, 255, .55); color: #c2410c; }
 .dash-parts-filter-btn.active {
   background: #fff; color: #c2410c;
   box-shadow: 0 1px 4px rgba(154, 52, 18, .12);
 }
 .dash-parts-filter-btn[data-filter="out"]:not(:disabled) { color: #991b1b; }
-.dash-parts-filter-btn[data-filter="out"]:hover:not(.active):not(:disabled) { color: #b91c1c; }
+.dash-parts-filter-btn[data-filter="out"]:hover:not(.active):not(:disabled) { background: rgba(255, 255, 255, .55); color: #b91c1c; }
 .dash-parts-filter-btn[data-filter="out"].active {
   color: #b91c1c;
   box-shadow: 0 1px 4px rgba(185, 28, 28, .14);
@@ -526,7 +530,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   font-size: calc(13px * var(--font-scale, 1)); font-weight: 600; padding: 7px 14px; border-radius: 999px;
   cursor: pointer; transition: background .15s, color .15s, box-shadow .15s;
 }
-.dash-view-btn:hover:not(:disabled) { color: var(--primary-dark); }
+.dash-view-btn:hover:not(:disabled) { background: rgba(255, 255, 255, .55); color: var(--primary-dark); }
 .dash-view-btn.active {
   background: #fff; color: var(--primary-dark);
   box-shadow: 0 1px 4px rgba(46, 26, 90, .12);
