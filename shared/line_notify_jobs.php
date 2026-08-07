@@ -25,7 +25,7 @@ function line_notify_type_catalog(): array
             'job'           => null,
         ],
         'stock.low_threshold' => [
-            'label'           => 'อะไหล่ใกล้หมด',
+            'label'           => 'อะไหล่ควรสั่งเพิ่ม',
             'can_instant'     => true,
             'can_scheduled'   => true,
             'job'             => 'low_stock_scan',

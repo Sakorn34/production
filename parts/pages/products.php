@@ -346,10 +346,17 @@ foreach ($sets as $s) {
                             <a href="<?= e($p['purchase_link']) ?>" target="_blank" rel="noopener noreferrer" class="detail-link product-supplier-link">สั่งซื้อ</a>
                         <?php endif; ?>
                     </td>
+                    <?php
+                    // สถานะสต็อกจาก shared/stock_status.php — คอลัมน์ "สถานะ" ทางซ้ายเป็นสวิตช์
+                    // เปิด/ปิดการใช้งานอะไหล่ คนละเรื่องกัน จึงแสดงสถานะสต็อกไว้ที่ช่องคงเหลือ
+                    $stStatus = stock_status_key((int) $p['quantity'], (int) $p['min_stock']);
+                    $stMeta = stock_status_meta($stStatus);
+                    ?>
                     <td class="text-right">
-                        <span class="<?= $p['quantity'] <= $p['min_stock'] ? 'qty-low' : 'qty-ok' ?>">
+                        <span class="<?= stock_status_is_reorder($stStatus) ? 'qty-low' : 'qty-ok' ?>">
                             <?= formatNumber($p['quantity']) ?>
                         </span>
+                        <br><span class="stock-status-tag <?= e($stMeta['tone']) ?>"><?= e($stMeta['label']) ?></span>
                     </td>
                     <td><?= e($p['unit']) ?></td>
                     <td class="text-right"><?= formatNumber($p['min_stock']) ?></td>

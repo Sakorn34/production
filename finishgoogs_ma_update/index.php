@@ -58,7 +58,7 @@ if ($stock['ok']) {
     try {
         require_once dirname(__DIR__) . '/parts/includes/helpers.php';
         ensureProductColumns($pdo);
-        // อะไหล่ที่ปิดการใช้งานแล้วไม่ต้องแสดงบนแดชบอร์ด (ทั้งกราฟรายตัว, ตัวนับใกล้หมด/หมดแล้ว)
+        // อะไหล่ที่ปิดการใช้งานแล้วไม่ต้องแสดงบนแดชบอร์ด (ทั้งกราฟรายตัว, ตัวนับควรสั่งเพิ่ม/หมดแล้ว)
         $perPart = $pdo->query(
             'SELECT id, code, name, quantity, unit, min_stock, purchase_link, supplier
              FROM products WHERE is_active = 1 ORDER BY quantity DESC'
@@ -86,11 +86,12 @@ $perPartOutCount = 0;
 $partSuppliers = [];
 $partSupplierNoneCount = 0;
 foreach ($perPart as $p) {
-    $qty = (int) $p['quantity'];
-    $min = (int) $p['min_stock'];
-    if ($qty <= 0) {
+    // นับตามสถานะจาก shared/stock_status.php — แท็บ "ควรสั่งเพิ่ม" รวม critical ด้วย
+    // (ทั้งคู่อยู่ที่หรือต่ำกว่าขั้นต่ำ) ส่วน out แยกแท็บของตัวเอง สองแท็บจึงไม่ทับกัน
+    $status = stock_status_key((int) $p['quantity'], (int) $p['min_stock']);
+    if ($status === 'out') {
         $perPartOutCount++;
-    } elseif ($qty <= $min) {
+    } elseif ($status === 'critical' || $status === 'low') {
         $perPartLowCount++;
     }
     $sup = trim((string) ($p['supplier'] ?? ''));
@@ -104,6 +105,29 @@ ksort($partSuppliers, SORT_NATURAL | SORT_FLAG_CASE);
 
 $PALETTE = ['#ec4899','#8b5cf6','#3b82f6','#f59e0b','#10b981','#06b6d4','#f43f5e','#a855f7','#14b8a6','#eab308','#6366f1','#ef4444'];
 function pct($v, $t) { return $t > 0 ? round($v / $t * 100) : 0; }
+
+/**
+ * ความยาวแถบสต็อกอะไหล่ (%) — เทียบกับขั้นต่ำของอะไหล่ตัวเอง ไม่ใช่ตัวที่มีเยอะสุดในระบบ
+ *
+ * เดิมใช้ qty/maxPart ทำให้แถบตอบว่า "มีเยอะแค่ไหนเทียบกับอะไหล่ที่มีเยอะสุด" ซึ่งไม่เกี่ยว
+ * กับสถานะสต็อกเลย — ของ 2 ชิ้นที่ขั้นต่ำ 1 (ปกติดี) ได้แถบ 0.1% ขณะที่ตัวที่ใกล้ถึงขั้นต่ำ
+ * แต่จำนวนเยอะกลับได้แถบยาว อ่านแล้วเข้าใจผิด
+ *
+ * เต็มแถบเมื่อมีของ 3 เท่าของขั้นต่ำ · ที่ขั้นต่ำพอดีได้ราว 33% · หมดจริงเหลือแถบบางพอเห็นสี
+ * (ไม่ใช้ค่าต่ำสุดสูง ๆ เพราะจะทำให้ของที่หมดแล้วดูเหมือนยังมีเหลืออยู่)
+ *
+ * @param int $qty คงเหลือ
+ * @param int $min ขั้นต่ำ
+ * @return int 0-100
+ */
+function part_stock_bar_pct(int $qty, int $min): int {
+    if ($qty <= 0) {
+        return 0;
+    }
+    $full = $min > 0 ? $min * 3 : max($qty, 1);
+    $p = (int) round($qty / $full * 100);
+    return max(6, min(100, $p)); // 6% = แค่พอเห็นสี ไม่สื่อว่ามีของเหลือมาก
+}
 
 /** เปอร์เซ็นต์สำหรับแสดง KPI — ไม่ปัดเป็น 0% เมื่อยังมีค่า (เช่น 77 จาก 18,228) */
 function pct_label($v, $t) {
@@ -180,9 +204,9 @@ $partsBase = ui_parts_base_url();
   if ($stock['ok']) {
       kpi($stock['qty'], 'สต็อกคงเหลือรวม', 'parts', 'primary', number_format($stock['items']) . ' รายการ (ผลรวมดิบข้ามหน่วย ใช้อ้างอิงคร่าวๆ)',
           "location.href='" . h($partsBase) . "/pages/products.php'", 'อะไหล่');
-      kpi($stock['low'], 'อะไหล่ใกล้หมด', 'alert', $stock['low'] > 0 ? 'warning' : 'success', $stock['low'] > 0 ? '<span class="kpi-down">ต้องตรวจสอบ/สั่งซื้อ</span>' : 'ทุกรายการเพียงพอ',
+      kpi($stock['low'], 'อะไหล่ควรสั่งเพิ่ม', 'alert', $stock['low'] > 0 ? 'warning' : 'success', $stock['low'] > 0 ? '<span class="kpi-down">ต้องตรวจสอบ/สั่งซื้อ</span>' : 'ทุกรายการเพียงพอ',
           $stock['low'] > 0
-              ? modal_js('อะไหล่ใกล้หมด (' . number_format($stock['low']) . ' รายการ)', "$B/dashboard_data.php?type=low_stock", "$partsBase/pages/products.php")
+              ? modal_js('อะไหล่ที่ควรสั่งเพิ่ม (' . number_format($stock['low']) . ' รายการ)', "$B/dashboard_data.php?type=low_stock", "$partsBase/pages/products.php")
               : "location.href='" . h($partsBase) . "/pages/products.php'",
           'อะไหล่', '', true);
       kpi(0, 'รับเข้า / เบิกออก', 'history', 'info', 'ความเคลื่อนไหววันนี้',
@@ -256,7 +280,7 @@ $partsBase = ui_parts_base_url();
         <span class="dash-parts-filter-label">สถานะ</span>
         <div class="dash-parts-filter" id="dash-parts-filter" role="tablist" aria-label="ตัวกรองสต็อกอะไหล่">
           <button type="button" class="dash-parts-filter-btn active" data-filter="all" role="tab" aria-selected="true">อะไหล่ทั้งหมด</button>
-          <button type="button" class="dash-parts-filter-btn" data-filter="low" role="tab" aria-selected="false"<?= $perPartLowCount <= 0 ? ' disabled title="ไม่มีอะไหล่ใกล้หมด"' : '' ?>>ใกล้หมด<?= $perPartLowCount > 0 ? ' (' . number_format($perPartLowCount) . ')' : '' ?></button>
+          <button type="button" class="dash-parts-filter-btn" data-filter="low" role="tab" aria-selected="false"<?= $perPartLowCount <= 0 ? ' disabled title="ไม่มีอะไหล่ที่ควรสั่งเพิ่ม"' : '' ?>>ควรสั่งเพิ่ม<?= $perPartLowCount > 0 ? ' (' . number_format($perPartLowCount) . ')' : '' ?></button>
           <button type="button" class="dash-parts-filter-btn" data-filter="out" role="tab" aria-selected="false"<?= $perPartOutCount <= 0 ? ' disabled title="ไม่มีอะไหล่ที่หมดแล้ว"' : '' ?>>หมดแล้ว<?= $perPartOutCount > 0 ? ' (' . number_format($perPartOutCount) . ')' : '' ?></button>
         </div>
       </div>
@@ -303,13 +327,8 @@ $partsBase = ui_parts_base_url();
     <?php foreach ($perPart as $p) {
         $qty = (int) $p['quantity'];
         $min = (int) $p['min_stock'];
-        if ($qty <= 0) {
-            $stockStatus = 'out';
-        } elseif ($qty <= $min) {
-            $stockStatus = 'low';
-        } else {
-            $stockStatus = 'ok';
-        }
+        $stockStatus = stock_status_key($qty, $min);
+        $stockMeta = stock_status_meta($stockStatus);
         $icon = isset($partIcons[$p['code']]) ? $partIcons[$p['code']] : '';
         $supplier = trim((string) ($p['supplier'] ?? ''));
         $purchaseLink = trim((string) ($p['purchase_link'] ?? ''));
@@ -321,10 +340,8 @@ $partsBase = ui_parts_base_url();
             $cardTitle .= ' · ' . $displaySub;
         }
         // แถบสีสื่อสถานะอย่างเดียว ใช้ชุดสีเดียวกันทุกรายการ (เดิม "ปกติ" สุ่มสีจาก PALETTE ทำให้อ่านสถานะไม่ได้)
-        // เขียว = ปกติ · เหลือง = ใกล้หมด (ถึง/ต่ำกว่าขั้นต่ำ) · แดง = หมดแล้ว
-        $barColor = $stockStatus === 'out'
-            ? 'var(--danger,#dc2626)'
-            : ($stockStatus === 'low' ? 'var(--warning,#f59e0b)' : 'var(--success,#16a34a)');
+        $barColor = $stockMeta['color'];
+        $barPct = part_stock_bar_pct($qty, $min);
     ?>
     <div class="model-card clickable dash-part-card" data-stock-status="<?= h($stockStatus) ?>" data-supplier="<?= h($supplier) ?>"
          onclick="showListModal(<?= h(json_encode('โปรไฟล์: ' . $displayName, JSON_UNESCAPED_UNICODE)) ?>, '<?= h("$B/dashboard_data.php?type=part_profile&v=" . (int) $p['id']) ?>', '<?= h("$partsBase/pages/product-detail.php?id=" . (int) $p['id']) ?>')"
@@ -339,15 +356,10 @@ $partsBase = ui_parts_base_url();
       <div class="model-card-body">
         <div class="model-card-name" title="<?= h($displayName) ?>"><?= h($displayName) ?></div>
         <div class="model-card-sub muted"><?= h($displaySub) ?></div>
-        <div class="model-card-bar"><div class="model-card-fill" style="width:<?= pct($qty, $maxPart) ?>%; background:<?= $barColor ?>"></div></div>
+        <div class="model-card-bar" title="คงเหลือ <?= number_format($qty) ?> · ขั้นต่ำ <?= number_format($min) ?> <?= h($p['unit'] ?: 'ชิ้น') ?>"><div class="model-card-fill" style="width:<?= $barPct ?>%; background:<?= $barColor ?>"></div></div>
         <div class="model-card-foot">
-          <div class="model-card-num"><?= number_format($qty) ?> <?= h($p['unit'] ?: 'ชิ้น') ?><?php
-            if ($stockStatus === 'out') {
-                echo ' · <span class="text-danger">หมดแล้ว</span>';
-            } elseif ($stockStatus === 'low') {
-                echo ' · <span class="text-warn">ใกล้หมด</span>';
-            }
-          ?></div>
+          <?php // ป้ายสถานะมาจาก shared/stock_status.php ที่เดียว — ห้ามคำนวณเองที่นี่ ?>
+          <div class="model-card-num"><?= number_format($qty) ?> <?= h($p['unit'] ?: 'ชิ้น') ?> · <span class="<?= h($stockMeta['tone']) ?>"><?= h($stockMeta['label']) ?></span></div>
           <?php if ($purchaseLink !== '') { ?>
           <a href="<?= h($purchaseLink) ?>" class="btn btn-sm btn-line dash-part-order-btn" target="_blank" rel="noopener noreferrer"
              onclick="event.stopPropagation();" title="เปิดลิงก์สั่งซื้อ"><?= ui_btn_label('external-link', 'สั่งซื้อ', 13) ?></a>
@@ -389,7 +401,7 @@ $partsBase = ui_parts_base_url();
   };
   var emptyMsgs = {
     all: 'ไม่มีอะไหล่ตามตัวกรองที่เลือก',
-    low: 'ไม่มีอะไหล่ใกล้หมดตามตัวกรองที่เลือก',
+    low: 'ไม่มีอะไหล่ที่ควรสั่งเพิ่มตามตัวกรองที่เลือก',
     out: 'ไม่มีอะไหล่ที่หมดแล้วตามตัวกรองที่เลือก'
   };
 
@@ -420,8 +432,10 @@ $partsBase = ui_parts_base_url();
     partCards.forEach(function(card) {
       var status = card.getAttribute('data-stock-status') || 'ok';
       var supplier = card.getAttribute('data-supplier') || '';
+      // เทียบเป็นชุด ไม่ใช่ค่าเดียว — สถานะมี 5 แบบแต่แท็บมี 3 ถ้าเทียบตรง ๆ
+      // แท็บ "ควรสั่งเพิ่ม" จะกรอง critical ไม่เจอ แล้วตัวเลขในวงเล็บจะไม่ตรงกับแถวที่แสดง
       var stockOk = currentPartsFilter === 'all'
-        || (currentPartsFilter === 'low' && status === 'low')
+        || (currentPartsFilter === 'low' && (status === 'low' || status === 'critical'))
         || (currentPartsFilter === 'out' && status === 'out');
       var supplierOk = currentSupplierFilter === '' || (currentSupplierFilter === '__none__' ? supplier === '' : supplier === currentSupplierFilter);
       var show = stockOk && supplierOk;

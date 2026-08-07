@@ -2648,6 +2648,7 @@ require_once __DIR__ . '/includes/part_stock_bridge.php';
 require_once dirname(__DIR__) . '/shared/activity_log_core.php';
 require_once dirname(__DIR__) . '/shared/datetime_helpers.php';
 require_once dirname(__DIR__) . '/shared/error_messages.php';
+require_once dirname(__DIR__) . '/shared/stock_status.php';
 require_once dirname(__DIR__) . '/shared/line_notify_core.php';
 require_once dirname(__DIR__) . '/shared/line_flex_templates.php';
 require_once dirname(__DIR__) . '/shared/line_notify_jobs.php';

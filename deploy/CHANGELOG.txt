@@ -1257,3 +1257,52 @@ Files:
   parts/includes/header.php
   shared/ui_icons.php
 
+
+================================================================
+v2026-08-07_093229 | Patch | 2026-08-07 09:32:30
+From: 2026-08-05_174140  ->  To: c44c6c0  |  Files: 2
+----------------------------------------------------------------
+- แถบสีสต็อกอะไหล่บนแดชบอร์ด: เปลี่ยนจากเทียบกับอะไหล่ที่มีจำนวนเยอะสุดในระบบ มาเทียบกับขั้นต่ำของตัวเอง (เต็มแถบเมื่อมีของ 3 เท่าของขั้นต่ำ) เดิมของ 2 ชิ้นที่ขั้นต่ำ 1 ซึ่งปกติดีได้แถบ 0.1% | เพิ่มสถานะ ปกติ บนการ์ด เดิมแสดงเฉพาะ ใกล้หมด/หมดแล้ว ตัวที่ปกติจึงไม่มีสถานะให้อ่าน | เพิ่ม tooltip บอกคงเหลือกับขั้นต่ำที่แถบสี
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-08-07_094612 | Patch | 2026-08-07 09:46:15
+From: 2026-08-05_174140  ->  To: c44c6c0  |  Files: 9
+----------------------------------------------------------------
+- เปลี่ยนคำสถานะ ใกล้หมด เป็น ควรสั่งเพิ่ม ทุกจุด เพราะเงื่อนไขคือคงเหลือแตะขั้นต่ำแล้ว ไม่ได้แปลว่าเหลือน้อย (เช่น C 4700uF ขั้นต่ำ 200 เหลือ 160 ชิ้น) ครอบคลุมการ์ดแดชบอร์ด KPI แท็บกรอง แผงรายการ modal และข้อความแจ้งเตือน LINE | หน้าโปรไฟล์อะไหล่ฝั่ง parts แยกสถานะเป็น 3 แบบเหมือนแดชบอร์ด เดิมรวมหมดแล้วกับควรสั่งเพิ่มเป็นป้ายแดงอันเดียว
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/cron/plesk_line_job_low_stock.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/dash_low_stock.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/line_notify_settings.php
+  parts/pages/product-detail.php
+  shared/line_notify_core.php
+  shared/line_notify_jobs.php
+
+
+================================================================
+v2026-08-07_101919 | Patch | 2026-08-07 10:19:21
+From: 2026-08-07_094612  ->  To: c44c6c0  |  Files: 11
+----------------------------------------------------------------
+- สถานะสต็อกอะไหล่จาก 3 ระดับเป็น 5: หมดแล้ว / วิกฤต (ไม่เกินครึ่งของขั้นต่ำ) / ควรสั่งเพิ่ม / ใกล้ถึงขั้นต่ำ (เกินขั้นต่ำไม่เกิน 25%) / ปกติ | ย้ายตรรกะที่เคยเขียนซ้ำ 5 ที่มาไว้ที่ shared/stock_status.php ที่เดียว แก้ปัญหาอะไหล่ตัวเดียวกันขึ้นคนละสถานะระหว่างการ์ดกับแผงรายการล่างในหน้าเดียวกัน | ใกล้ถึงขั้นต่ำ ไม่นับเป็นของขาด ไม่เข้า KPI และไม่ยิงแจ้งเตือน LINE
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/dash_low_stock.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/index.php
+  parts/assets/style.css
+  parts/includes/parts_bootstrap.php
+  parts/pages/product-detail.php
+  parts/pages/products.php
+  shared/stock_status.php
+

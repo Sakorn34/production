@@ -35,7 +35,7 @@ const LINE_NOTIFY_DEDUP_TTL = [
 /** @var array<string,string> ป้าย event สำหรับ UI */
 const LINE_NOTIFY_EVENT_LABELS = [
     'production.problem_found'        => 'พบปัญหาตอนผลิต',
-    'stock.low_threshold'               => 'อะไหล่ใกล้หมด',
+    'stock.low_threshold'               => 'อะไหล่ควรสั่งเพิ่ม',
     'ma.repair_required'                => 'MA ต้องซ่อม',
     'stock.manual_withdraw'             => 'เบิกอะไหล่ (manual)',
     'production.summary.daily'          => 'สรุปผลิตรายวัน',

@@ -417,7 +417,7 @@ switch ($type) {
            . '<div class="part-profile-stats">'
            . '<span class="part-profile-stat">คงเหลือ <b>' . number_format($qty) . '</b> ' . h($unit) . '</span>'
            . '<span class="part-profile-stat">ขั้นต่ำ <b>' . number_format($minStock) . '</b></span>'
-           . '<span class="part-profile-stat">' . ($low ? '<span class="text-warn">ใกล้หมด</span>' : '<span style="color:#059669">ปกติ</span>') . '</span>'
+           . '<span class="part-profile-stat">' . stock_status_badge_html($qty, $minStock) . '</span>'
            . '</div></div></div>';
 
         echo '<p class="muted" style="font-size:12px;margin:0 0 10px">สรุปในตาราง: รับเข้า ' . number_format($totalIn)
@@ -468,7 +468,7 @@ switch ($type) {
         echo '<p class="muted" style="margin-top:8px;font-size:12px">กด「ดูทั้งหมดแบบเต็มหน้า」ด้านบน modal เพื่อเปิดหน้ารายละเอียดอะไหล่</p>';
         break;
 
-    case 'low_stock': // อะไหล่ใกล้หมดทั้งหมด
+    case 'low_stock': // อะไหล่ที่ถึงขั้นต่ำแล้วทั้งหมด (ควรสั่งเพิ่ม)
         require_once __DIR__ . '/includes/dash_low_stock.php';
         try {
             $partsPdo = dbParts();

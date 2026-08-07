@@ -12,6 +12,9 @@
     --success-soft: #f0fdf4;
     --warning: #d97706;
     --warning-soft: #fffbeb;
+    /* ใกล้ถึงขั้นต่ำ — เหลืองสว่างกว่า warning ให้อ่านออกว่าเบากว่าหนึ่งระดับ */
+    --near: #eab308;
+    --near-soft: #fefce8;
     --danger: #dc2626;
     --danger-soft: #fef2f2;
     --bg: #f4f1fb;
@@ -695,6 +698,19 @@ tbody td.col-actions {
 .badge-success, .badge-ok { background: var(--success-soft, #dcfce7); color: #15803d; }
 .badge-danger, .badge-error { background: var(--danger-soft, #fee2e2); color: #b91c1c; }
 .badge-warning { background: var(--warning-soft, #fef9c3); color: #a16207; }
+.badge-near { background: var(--near-soft, #fefce8); color: #a16207; }
+/* ป้ายสถานะสต็อกใต้จำนวนคงเหลือในตารางอะไหล่ — ตัวเล็ก ไม่แย่งสายตาจากตัวเลข */
+.stock-status-tag {
+    display: inline-block;
+    margin-top: 2px;
+    font-size: calc(11px * var(--font-scale, 1));
+    font-weight: 500;
+    white-space: nowrap;
+}
+.stock-status-tag.text-danger { color: var(--danger, #dc2626); }
+.stock-status-tag.text-warn { color: var(--warning, #d97706); }
+.stock-status-tag.text-near { color: var(--near, #eab308); }
+.stock-status-tag.text-success { color: var(--success, #16a34a); }
 .badge-active { background: var(--success-soft, #dcfce7); color: #15803d; }
 .badge-inactive { background: var(--warning-soft, #fef9c3); color: #a16207; }
 .row-inactive { opacity: .72; }

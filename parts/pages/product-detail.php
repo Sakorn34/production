@@ -57,11 +57,12 @@ parts_page_header('products', 'รายละเอียดอะไหล่'
                 <p class="text-muted" style="margin:0.15rem 0 0;font-size:12px">รหัสอะไหล่ (สต็อก): <?= e($product['code']) ?></p>
                 <p style="margin:0.5rem 0 0">
                     <strong><?= formatNumber($product['quantity']) ?></strong> <?= e($product['unit']) ?> คงเหลือ
-                    <?php if ($product['quantity'] <= $product['min_stock']): ?>
-                        <span class="badge badge-danger">ใกล้หมด</span>
-                    <?php else: ?>
-                        <span class="badge badge-success">ปกติ</span>
-                    <?php endif; ?>
+                    <?php
+                    // สถานะเดียวกับแดชบอร์ด มาจาก shared/stock_status.php
+                    $pdStatus = stock_status_key((int) $product['quantity'], (int) $product['min_stock']);
+                    $pdBadge = ['out' => 'badge-danger', 'critical' => 'badge-danger', 'low' => 'badge-warning', 'near' => 'badge-near', 'ok' => 'badge-success'];
+                    ?>
+                    <span class="badge <?= e($pdBadge[$pdStatus] ?? 'badge-success') ?>"><?= e(stock_status_meta($pdStatus)['label']) ?></span>
                 </p>
             </div>
         </div>

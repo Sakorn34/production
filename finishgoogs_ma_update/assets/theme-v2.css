@@ -270,6 +270,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .model-card-num { font-size: calc(12px * var(--font-scale, 1)); color: #6b6480; font-weight: 600; }
 .model-card-num .text-warn { color: var(--warning, #a16207); font-weight: 600; }
 .model-card-num .text-danger { color: var(--danger, #dc2626); font-weight: 600; }
+/* สถานะปกติ — ไม่เน้นหนาเท่าสองอันบน เพราะเป็นเคสส่วนใหญ่ ไม่ควรดึงสายตา */
+.model-card-num .text-success { color: var(--success, #16a34a); font-weight: 500; }
+/* ใกล้ถึงขั้นต่ำ — เตือนล่วงหน้า ยังไม่ใช่ของขาด ใช้เหลืองเข้มกว่าปกติแต่ไม่หนา
+   จะได้ไม่ไปแย่งสายตากับ "ควรสั่งเพิ่ม" ที่ต้องลงมือจริง */
+.model-card-num .text-near { color: var(--near, #ca8a04); font-weight: 500; }
 .model-card-sub { font-size: calc(11px * var(--font-scale, 1)); margin: -4px 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .model-card-link { text-decoration: none; color: inherit; }
 .model-card-link:hover { text-decoration: none; }

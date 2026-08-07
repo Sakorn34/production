@@ -139,6 +139,7 @@ function page_header($title, $showBack = true, $subtitle = '', $backUrl = '') {
   --success:#16a34a; --success-soft:#dcfce7;
   --info:#1d4ed8; --info-soft:#dbeafe;
   --warning:#a16207; --warning-soft:#fef9c3;
+  --near:#ca8a04; --near-soft:#fefce8;
   --danger:#b91c1c; --danger-soft:#fee2e2;
   --radius:12px; --radius-sm:8px;
   --shadow-sm:0 1px 2px rgba(15,23,42,.06);
