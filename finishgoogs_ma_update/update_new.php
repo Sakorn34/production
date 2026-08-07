@@ -53,42 +53,71 @@ foreach (effective_fields($a['product_id'], 'update') as $f) {
 }
 ?>
 <p>เครื่อง <b><?= h($a['asset_code']) ?></b> (<?= h($a['pname']) ?>) — FW ปัจจุบัน: <?= h($a['current_fw_version'] ?: '-') ?></p>
-<form method="post" class="formgrid form-narrow" enctype="multipart/form-data">
+<form method="post" class="upd-form" enctype="multipart/form-data">
   <?= csrf_field() ?>
   <input type="hidden" name="asset_id" value="<?= $aid ?>">
 
-  <label>ประเภทการอัปเดต</label>
-  <select name="update_type" id="utype" onchange="fillOld()">
-    <option value="firmware">Firmware</option>
-    <option value="hardware">Hardware (เปลี่ยนชิ้นส่วน)</option>
-    <option value="other">อื่นๆ</option>
-  </select>
+  <div class="upd-cols">
+    <div class="panel upd-card">
+      <h3 class="upd-card-title"><?= ui_icon_html('updates', 16, 'h-svg') ?><span>ข้อมูลการอัปเดต</span></h3>
 
-  <label>ชิ้นส่วน (ถ้าเป็น HW)</label>
-  <div>
-    <input type="text" name="component_name" id="comp" list="complist" placeholder="เช่น Display, Main Board" onchange="fillOld()">
-    <datalist id="complist">
-      <?php foreach ($compChoices as $k => $v) { ?><option value="<?= h($k) ?>"><?php } ?>
-    </datalist>
+      <div class="upd-field upd-field-half">
+        <label for="utype">ประเภทการอัปเดต</label>
+        <select name="update_type" id="utype" onchange="fillOld()">
+          <option value="firmware">Firmware</option>
+          <option value="hardware">Hardware (เปลี่ยนชิ้นส่วน)</option>
+          <option value="other">อื่นๆ</option>
+        </select>
+      </div>
+
+      <div class="upd-field" id="comp-field">
+        <label for="comp">ชิ้นส่วน <span class="muted">(เฉพาะประเภท Hardware)</span></label>
+        <input type="text" name="component_name" id="comp" list="complist" placeholder="เช่น Display, Main Board" onchange="fillOld()">
+        <datalist id="complist">
+          <?php foreach ($compChoices as $k => $v) { ?><option value="<?= h($k) ?>"><?php } ?>
+        </datalist>
+      </div>
+
+      <?php // ค่าเดิม → ค่าใหม่ คู่กันเหมือนหน้าแก้ไข · #newv-slot ถูก JS แทนที่ด้วย chip dropdown ?>
+      <div class="upd-change">
+        <div class="upd-field">
+          <label for="oldv">ค่าเดิม</label>
+          <input type="text" name="old_value" id="oldv" value="<?= h($a['current_fw_version']) ?>" placeholder="ค่าก่อนเปลี่ยน">
+        </div>
+        <div class="upd-arrow" aria-hidden="true">→</div>
+        <?php // label ต้องอยู่นอก #newv-slot เพราะ renderNewValue() เขียนทับ innerHTML ของ slot ทั้งก้อน ?>
+        <div class="upd-field">
+          <label for="newv">ค่าใหม่</label>
+          <div id="newv-slot">
+            <input type="text" name="new_value" id="newv" placeholder="เช่น 2.6.0 หรือ V3" required>
+          </div>
+        </div>
+      </div>
+
+      <div class="upd-field">
+        <label for="detail">รายละเอียด</label>
+        <textarea name="detail" id="detail" rows="3" placeholder="อธิบายสิ่งที่ทำ เช่น เปลี่ยนรุ่นกล้อง ตัดเสายาว 27cm."></textarea>
+      </div>
+    </div>
+
+    <div class="panel upd-card">
+      <h3 class="upd-card-title"><?= ui_icon_html('camera', 16, 'h-svg') ?><span>รูปประกอบ</span></h3>
+      <?php foreach ([1, 2] as $slot) { ?>
+      <div class="upd-img-slot">
+        <div class="upd-img-preview"><span class="upd-img-empty">ยังไม่มีรูป</span></div>
+        <div class="upd-img-input">
+          <label for="image<?= $slot ?>">รูปประกอบ <?= $slot ?></label>
+          <input type="file" id="image<?= $slot ?>" name="image<?= $slot ?>" accept="image/*">
+        </div>
+      </div>
+      <?php } ?>
+    </div>
   </div>
 
-  <label>ค่าเดิม</label>
-  <input type="text" name="old_value" id="oldv" value="<?= h($a['current_fw_version']) ?>">
-
-  <label>ค่าใหม่</label>
-  <div id="newv-slot">
-    <input type="text" name="new_value" id="newv" placeholder="เช่น 2.6.0 หรือ V3" required>
+  <div class="upd-actions">
+    <button type="submit" class="btn btn-primary"><?= ui_btn_label('save', 'บันทึกการอัปเดต') ?></button>
+    <a class="btn btn-line" href="<?= BASE_URL ?>/asset.php?id=<?= $aid ?>">ยกเลิก</a>
   </div>
-
-  <label class="full">รายละเอียด</label>
-  <textarea name="detail" class="full field-note" rows="2"></textarea>
-
-  <label>รูปประกอบ 1</label>
-  <input type="file" name="image1" accept="image/*">
-  <label>รูปประกอบ 2</label>
-  <input type="file" name="image2" accept="image/*">
-
-  <div class="full"><button type="submit"><?= ui_btn_label('save', 'บันทึกการอัปเดต') ?></button></div>
 </form>
 <script>
 var comps = <?= json_encode($compData, JSON_UNESCAPED_UNICODE) ?>;
@@ -97,9 +126,13 @@ var compInputModes = <?= json_encode($compInputModes, JSON_UNESCAPED_UNICODE) ?>
 var curFw = <?= json_encode($a['current_fw_version']) ?>;
 function esc(s){ var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
 function renderNewValue(){
+  var slot = document.getElementById('newv-slot');
+  // chipDdHtml ถูกนิยามในสคริปต์ของ page_footer() ซึ่งออกมาหลังบล็อกนี้
+  // ถ้าเรียกตอนยังไม่มีจะโยน ReferenceError แล้วขวางคำสั่งที่เหลือทั้งหมด
+  // (ใช้การ์ดแบบเดียวกับ ma.php) — ไม่มีก็ปล่อยเป็น input ธรรมดาไป
+  if (!slot || typeof chipDdHtml !== 'function') return;
   var t = document.getElementById('utype').value;
   var c = document.getElementById('comp').value;
-  var slot = document.getElementById('newv-slot');
   var mode = 'chip_single_free';
   var opts = [];
   if (t === 'firmware') {
@@ -122,6 +155,18 @@ function fillOld(){
 }
 document.getElementById('comp').addEventListener('input', fillOld);
 document.getElementById('utype').addEventListener('change', fillOld);
-renderNewValue();
+
+// ซ่อนช่องชิ้นส่วนเมื่อไม่ใช่ Hardware — ให้เหมือนหน้าแก้ไข
+function syncCompField(){
+  var el = document.getElementById('comp-field');
+  if (el) el.hidden = document.getElementById('utype').value !== 'hardware';
+}
+document.getElementById('utype').addEventListener('change', syncCompField);
+
+// รอให้สคริปต์ของ footer นิยาม chipDdHtml เสร็จก่อน ช่อง "ค่าใหม่" จึงจะเป็น dropdown ได้จริง
+document.addEventListener('DOMContentLoaded', function () {
+  renderNewValue();
+  syncCompField();
+});
 </script>
 <?php page_footer();

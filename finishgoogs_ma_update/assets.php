@@ -152,7 +152,10 @@ $rows = qr("SELECT a.id, a.asset_code, a.factory_serial, a.status, a.produced_at
                    (SELECT COUNT(*) FROM part_movements pm
                     WHERE pm.ref_asset_id=a.id AND pm.direction='out'
                       AND pm.tech_stock_out_id IS NOT NULL AND pm.tech_stock_out_id > 0) parts_linked_cnt,
-                   (SELECT COUNT(*) FROM bom_items b WHERE b.product_id=a.product_id) bom_cnt
+                   (SELECT COUNT(*) FROM bom_items b WHERE b.product_id=a.product_id) bom_cnt,
+                   -- ทิศทางการเคลื่อนไหวล่าสุดของเครื่อง: out = เบิกออกไปแล้ว, in/ไม่มี = ยังอยู่ในคลัง
+                   (SELECT sm.direction FROM stock_movements sm
+                    WHERE sm.asset_id=a.id ORDER BY sm.moved_at DESC, sm.id DESC LIMIT 1) last_move
             FROM assets a JOIN products p ON p.id=a.product_id
             $w ORDER BY {$sortSql[$sort]} LIMIT $per OFFSET $off", $types, $params);
 
@@ -166,7 +169,7 @@ $productList = qr("SELECT DISTINCT p.name FROM products p JOIN assets a ON a.pro
 
 page_header('ทะเบียนเครื่องผลิตใหม่ (' . number_format($totalRows) . ')');
 ?>
-<div class="filter" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+<div class="filter assets-filter">
 <form method="get" style="display:contents">
   <span class="livesearch-wrap">
     <input type="text" name="q" id="live-q" value="<?= h($search) ?>" placeholder="ค้นหา รหัสเครื่อง / รุ่น / ผู้ผลิต / FW" style="width:min(360px,100%)" autocomplete="off">
@@ -204,8 +207,41 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
     <button type="submit" class="btn btn-sm btn-line btn-with-icon"><?= ui_btn_label('refresh', 'Sync รายการเบิก (' . number_format($withdrawSyncPendingCount) . ')') ?></button>
   </form>
   <?php } ?>
-  <a class="btn" href="<?= BASE_URL ?>/asset_new.php" style="margin-left:auto">➕ ลงทะเบียนเครื่องผลิตใหม่</a>
+  <a class="btn assets-filter-cta" href="<?= BASE_URL ?>/asset_new.php"><?= ui_btn_label('assets', 'ลงทะเบียนเครื่องผลิตใหม่') ?></a>
 </div>
+
+<style>
+/* แถบตัวกรอง — จัดให้ช่องกรอกสูงเท่ากันและเว้นระยะกับตารางด้านล่างให้หายใจ */
+.assets-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.assets-filter > form { display: contents; }
+.assets-filter input[type=text],
+.assets-filter select,
+.assets-filter button,
+.assets-filter .btn { min-height: var(--input-h, 40px); }
+.assets-filter select { min-width: 150px; }
+/* ปุ่มลงทะเบียนดันไปชิดขวาสุด แยกจากกลุ่มค้นหาอย่างชัดเจน */
+.assets-filter-cta { margin-left: auto; }
+@media (max-width: 780px) {
+  .assets-filter-cta { margin-left: 0; width: 100%; justify-content: center; }
+}
+/* ป้ายสถานะการเบิกใช้งาน/ขาย */
+.sale-tag {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: calc(12px * var(--font-scale, 1));
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sale-in { background: var(--success-soft, #dcfce7); color: #15803d; }
+.sale-out { background: var(--warning-soft, #fef9c3); color: #a16207; }
+</style>
 <script>
 (function(){
   var input = document.getElementById('live-q');
@@ -235,9 +271,9 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
 
 <div class="table-wrap">
 <table class="list">
-  <tr><th></th><th>รหัสเครื่อง</th><th>รุ่น</th><th>สถานะ</th><th>เบิกอะไหล่</th><th>ผู้บันทึกรายการ</th><th>ผลิตเมื่อ</th><th>FW</th></tr>
+  <tr><th>ผลิตเมื่อ</th><th></th><th>รหัสเครื่อง</th><th>รุ่น</th><th>สถานะ</th><th>เบิกอะไหล่</th><th>ผู้บันทึกรายการ</th><th>FW</th><th>การเบิกใช้งาน/ขาย</th></tr>
   <?php if (!$assetRows) { ?>
-  <tr><td colspan="8" class="muted" style="text-align:center;padding:20px">ไม่พบเครื่องที่ตรงกับเงื่อนไข</td></tr>
+  <tr><td colspan="9" class="muted" style="text-align:center;padding:20px">ไม่พบเครื่องที่ตรงกับเงื่อนไข</td></tr>
   <?php } ?>
   <?php foreach ($assetRows as $r) {
       $sn = trim((string)$r['asset_code']);
@@ -256,6 +292,7 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
       $partsProdUrl = asset_parts_production_url($sn);
   ?>
   <tr>
+    <td style="white-space:nowrap"><?= dthai($r['produced_at']) ?></td>
     <td style="width:56px"><?= img_tag($r['icon_path'], $r['pname']) ?></td>
     <td><a href="<?= BASE_URL ?>/asset.php?id=<?= $r['id'] ?>"><b><?= h($r['asset_code']) ?></b></a></td>
     <td><?= h($r['pname']) ?></td>
@@ -271,8 +308,12 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
       <?php } ?>
     </td>
     <td><?= h($r['recorder'] ?: '-') ?></td>
-    <td><?= dthai($r['produced_at']) ?></td>
     <td><?= h($r['current_fw_version'] ?: '-') ?></td>
+    <?php // ไม่มีรายการเคลื่อนไหวเลย = ยังไม่เคยถูกเบิกออก จึงถือว่าอยู่ในคลัง ?>
+    <?php $isOut = ($r['last_move'] ?? '') === 'out'; ?>
+    <td style="white-space:nowrap">
+      <span class="sale-tag <?= $isOut ? 'sale-out' : 'sale-in' ?>"><?= $isOut ? 'เบิกออกแล้ว' : 'อยู่ในคลัง' ?></span>
+    </td>
   </tr>
   <?php } ?>
 </table>

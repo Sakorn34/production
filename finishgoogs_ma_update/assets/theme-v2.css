@@ -541,3 +541,67 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .tl-col-head .h-with-icon { display: inline-flex; }
 @media (max-width: 760px) { .dash-extra-cols { grid-template-columns: 1fr; } }
 .donut-wrap { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+/* ── ฟอร์มบันทึก/แก้ไขอัปเดต FW-HW (ใช้ร่วมกัน update_new.php + update_edit.php) ── */
+.upd-form { margin-top: 4px; }
+.upd-cols { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; align-items: start; }
+.upd-card { padding: 14px 16px; }
+.upd-card-title { margin: 0 0 12px; font-size: calc(14px * var(--font-scale, 1)); display: flex; align-items: center; gap: 7px; }
+.upd-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.upd-field > label { font-size: calc(13px * var(--font-scale, 1)); color: #45506a; font-weight: 600; }
+.upd-field > input, .upd-field > select, .upd-field > textarea { width: 100%; max-width: none; }
+.upd-field textarea { min-height: 68px; resize: vertical; }
+.upd-field-half { max-width: 280px; }
+.upd-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+/* ค่าเดิม → ค่าใหม่ อยู่บรรทัดเดียวกัน เห็นการเปลี่ยนแปลงทันที */
+.upd-change { display: grid; grid-template-columns: 1fr auto 1fr; gap: 0 10px; align-items: end; }
+.upd-arrow { padding-bottom: 10px; font-size: 18px; color: var(--primary); font-weight: 700; }
+.upd-same-warn { margin: -4px 0 12px; font-size: calc(12px * var(--font-scale, 1)); color: var(--warning, #a16207); }
+.upd-img-slot { display: flex; gap: 10px; align-items: flex-start; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--border, #e7e0f5); }
+.upd-img-slot:last-child { border-bottom: 0; padding-bottom: 0; margin-bottom: 0; }
+.upd-img-preview { flex: 0 0 auto; width: 74px; height: 74px; border: 1px solid var(--border, #e7e0f5); border-radius: 8px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.upd-img-preview img { width: 100%; height: 100%; object-fit: contain; }
+.upd-img-empty { font-size: 11px; color: #98a1b3; text-align: center; padding: 0 4px; }
+.upd-img-input { min-width: 0; flex: 1 1 auto; }
+.upd-img-input label { display: block; font-size: calc(13px * var(--font-scale, 1)); color: #45506a; font-weight: 600; margin-bottom: 5px; }
+.upd-img-input input[type=file] { max-width: 100%; }
+.upd-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+@media (max-width: 860px) {
+  .upd-cols { grid-template-columns: 1fr; }
+  .upd-grid2 { grid-template-columns: 1fr; }
+  .upd-change { grid-template-columns: 1fr; }
+  .upd-arrow { display: none; }
+}
+
+/* ── หัวหน้ารายการรายรุ่น (updates.php, ma.php) ──
+   .asset-head เดิมเป็น flex + .info{flex:1} จึงยืดเต็มความกว้างเสมอ
+   ทั้งที่เนื้อหามีแค่ไม่กี่บรรทัด กรอบเลยยาวเกินข้อความ */
+.asset-head-compact { width: fit-content; max-width: 100%; }
+.asset-head-compact .info { flex: 0 1 auto; }
+
+/* ── ปุ่มจัดการท้ายแถวตาราง ──
+   เดิมเป็น <a> ตามด้วย <form style="display:inline"> ซึ่ง baseline ของ inline-block
+   กับ form ไม่ตรงกัน ปุ่มสองอันเลยเหลื่อมกันในแนวตั้ง — ใช้ flex คุมให้อยู่ระดับเดียวกัน */
+.row-actions { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+.row-actions > form { display: flex; margin: 0; }
+.row-actions .btn, .row-actions button { margin: 0; }
+
+/* ── ช่องรายละเอียดการอัปเดต — แยกชั้นข้อมูลให้กวาดตาอ่านได้ ── */
+.upd-detail { display: flex; flex-direction: column; gap: 3px; line-height: 1.45; }
+.upd-detail-comp {
+  display: inline-block; align-self: flex-start;
+  padding: 1px 8px; border-radius: 999px;
+  background: var(--primary-soft, #fce7f3); color: var(--primary-dark, #c01862);
+  font-size: calc(11.5px * var(--font-scale, 1)); font-weight: 700;
+}
+.upd-detail-change { font-size: calc(13px * var(--font-scale, 1)); font-variant-numeric: tabular-nums; }
+.upd-detail-from { color: #8b83a5; text-decoration: line-through; text-decoration-color: #d6cfe6; }
+.upd-detail-arrow { color: var(--primary); font-weight: 700; margin: 0 4px; }
+.upd-detail-to { font-weight: 700; color: #211a2e; }
+.upd-detail-same { color: var(--warning, #a16207); font-weight: 600; font-size: calc(11.5px * var(--font-scale, 1)); }
+.upd-detail-note { color: #6b6480; font-size: calc(12.5px * var(--font-scale, 1)); }
+
+/* ── แถบเครื่องมือด้านบนรายการ (ปุ่มหลัก + ค้นหา) ── */
+.list-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+.list-toolbar form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0; }
+.list-toolbar input[type=text], .list-toolbar select, .list-toolbar button, .list-toolbar .btn { min-height: var(--input-h, 40px); }

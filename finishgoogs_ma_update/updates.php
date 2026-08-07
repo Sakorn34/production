@@ -133,31 +133,37 @@ $listUrl = BASE_URL . '/updates.php' . ($listQs ? '?' . $listQs : '');
 
 page_header('อัปเดต FW/HW — ' . $product['name'] . ' (' . number_format($total) . ')');
 ?>
-<div class="asset-head" style="align-items:center; margin-bottom:14px">
-  <?= img_tag($product['icon_path'], $product['name'], 'thumb-lg') ?>
+<?php // หัวหน้าแบบกระชับให้พอดีเนื้อหา (asset-head เดิมยืดเต็มจอเพราะ .info{flex:1}) ?>
+<div class="asset-head asset-head-compact" style="align-items:center; margin-bottom:14px">
+  <?= img_tag($product['icon_path'], $product['name'], 'thumb') ?>
   <div class="info">
     <h2 style="margin:0"><?= h($product['name']) ?></h2>
-    <div class="muted"><?= h($product['product_code']) ?> · <?= number_format($total) ?> รายการอัปเดต</div>
-    <div style="margin-top:8px">
-      <a class="btn btn-sm btn-line" href="<?= BASE_URL ?>/updates.php">← เลือกรุ่นอื่น</a>
+    <div class="muted">
+      <?= h($product['product_code']) ?> · <?= number_format($total) ?> รายการอัปเดต
+      · <a href="<?= BASE_URL ?>/updates.php">← เลือกรุ่นอื่น</a>
     </div>
   </div>
 </div>
 
-<form class="filter" method="get" action="<?= BASE_URL ?>/asset.php" style="margin-bottom:10px">
-  <input type="text" name="code" placeholder="รหัสเครื่องที่จะบันทึกอัปเดต" required style="width:260px">
-  <button type="submit">เปิดหน้าเครื่องเพื่อบันทึก</button>
-</form>
+<?php // แถบเครื่องมือรูปแบบเดียวกับหน้า MA — ปุ่มหลักซ้ายสุด ตามด้วยช่องค้นหาแถวเดียว ?>
+<div class="list-toolbar">
+  <form method="get" action="<?= BASE_URL ?>/asset.php">
+    <input type="text" name="code" placeholder="รหัสเครื่องที่จะบันทึกอัปเดต" required style="width:230px">
+    <button type="submit" class="btn btn-primary btn-with-icon"><?= ui_btn_label('updates', 'บันทึกอัปเดตเครื่องนี้', 15) ?></button>
+  </form>
+</div>
 
-<form class="filter" method="get" style="margin-bottom:14px">
-  <input type="hidden" name="product" value="<?= (int)$productId ?>">
-  <input type="text" name="sn" value="<?= h($searchSn) ?>" placeholder="ค้นหารหัสเครื่อง" style="width:200px">
-  <input type="text" name="d" value="<?= h($searchDetail) ?>" placeholder="ค้นหารายละเอียดการอัปเดต" style="min-width:240px">
-  <button type="submit">🔍 ค้นหา</button>
-  <?php if ($searchSn !== '' || $searchDetail !== '') { ?>
-    <a class="btn btn-line" href="<?= BASE_URL ?>/updates.php?product=<?= (int)$productId ?>">ล้าง</a>
-  <?php } ?>
-</form>
+<div class="list-toolbar">
+  <form method="get">
+    <input type="hidden" name="product" value="<?= (int)$productId ?>">
+    <input type="text" name="sn" value="<?= h($searchSn) ?>" placeholder="รหัสเครื่อง" style="width:180px">
+    <input type="text" name="d" value="<?= h($searchDetail) ?>" placeholder="รายละเอียดการอัปเดต" style="min-width:220px">
+    <button type="submit" class="btn btn-with-icon"><?= ui_btn_label('search', 'ค้นหา', 15) ?></button>
+    <?php if ($searchSn !== '' || $searchDetail !== '') { ?>
+      <a class="btn btn-line" href="<?= BASE_URL ?>/updates.php?product=<?= (int)$productId ?>">ล้าง</a>
+    <?php } ?>
+  </form>
+</div>
 
 <?php if ($searchSn !== '' || $searchDetail !== '') { ?>
   <p class="muted" style="margin-bottom:10px">พบ <b><?= number_format($total) ?></b> รายการจากการค้นหา</p>
@@ -173,10 +179,34 @@ page_header('อัปเดต FW/HW — ' . $product['name'] . ' (' . number_f
     <td><?= dthai_full($r['updated_at']) ?></td>
     <td><a href="<?= BASE_URL ?>/asset.php?id=<?= (int)$r['asset_id'] ?>"><?= h($r['asset_code']) ?></a></td>
     <td><?= isset($typeMap[$r['update_type']]) ? $typeMap[$r['update_type']] : h($r['update_type']) ?></td>
-    <td style="max-width:340px">
-      <?= $r['component_name'] ? h($r['component_name']) . ': ' : '' ?>
-      <?= ($r['old_value'] || $r['new_value']) ? h($r['old_value'] ?: '?') . ' → ' . h($r['new_value'] ?: '?') . '<br>' : '' ?>
-      <?= h(mb_strimwidth((string)$r['detail'], 0, 120, '…')) ?>
+    <?php
+    // แยกเป็น 3 ชั้น: ชื่อชิ้นส่วน (ป้าย) · ค่าเดิม→ค่าใหม่ (ขีดฆ่าของเก่า เน้นของใหม่) · รายละเอียด (สีจาง)
+    // เดิมทั้งสามส่วนต่อกันเป็นข้อความก้อนเดียว อ่านแล้วแยกไม่ออกว่าอะไรเป็นอะไร
+    $uOld = trim((string) $r['old_value']);
+    $uNew = trim((string) $r['new_value']);
+    $uDetail = trim((string) $r['detail']);
+    ?>
+    <td style="max-width:360px">
+      <div class="upd-detail">
+        <?php if (!empty($r['component_name'])) { ?>
+          <span class="upd-detail-comp"><?= h($r['component_name']) ?></span>
+        <?php } ?>
+        <?php if ($uOld !== '' || $uNew !== '') { ?>
+          <span class="upd-detail-change">
+            <?php if ($uOld !== '' && $uOld === $uNew) { ?>
+              <span class="upd-detail-to"><?= h($uNew) ?></span>
+              <span class="upd-detail-same" title="ค่าเดิมกับค่าใหม่เหมือนกัน">· ไม่เปลี่ยนค่า</span>
+            <?php } else { ?>
+              <span class="upd-detail-from"><?= h($uOld !== '' ? $uOld : '—') ?></span>
+              <span class="upd-detail-arrow">→</span>
+              <span class="upd-detail-to"><?= h($uNew !== '' ? $uNew : '—') ?></span>
+            <?php } ?>
+          </span>
+        <?php } ?>
+        <?php if ($uDetail !== '') { ?>
+          <span class="upd-detail-note"><?= h(mb_strimwidth($uDetail, 0, 120, '…')) ?></span>
+        <?php } ?>
+      </div>
     </td>
     <td>
       <?php foreach (['image1', 'image2'] as $f) if (!empty($r[$f])) { ?>
@@ -184,9 +214,9 @@ page_header('อัปเดต FW/HW — ' . $product['name'] . ' (' . number_f
       <?php } ?>
     </td>
     <td><?= h($r['made_by'] ?: '-') ?></td>
-    <td style="white-space:nowrap">
+    <td class="row-actions">
       <a class="btn btn-sm btn-line" href="<?= BASE_URL ?>/update_edit.php?id=<?= (int)$r['id'] ?>&back=<?= urlencode($listUrl) ?>">แก้ไข</a>
-      <form method="post" style="display:inline" onsubmit="return confirm('ลบรายการอัปเดตนี้?')">
+      <form method="post" onsubmit="return confirm('ลบรายการอัปเดตนี้?')">
         <?= csrf_field() ?>
         <input type="hidden" name="del_update" value="1">
         <input type="hidden" name="update_id" value="<?= (int)$r['id'] ?>">

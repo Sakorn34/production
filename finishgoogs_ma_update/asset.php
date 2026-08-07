@@ -256,12 +256,21 @@ foreach ($tl as $e) {
     }
 }
 
-/** ปุ่มแก้ไข/ลบ/ข้อความประจำสินค้า ในประวัติ timeline */
+/**
+ * ปุ่มแก้ไข/ลบ/คำสั่งตั้งค่าหมายเลขสินค้า ในประวัติ timeline
+ *
+ * ปุ่มคำสั่งต้องเคารพสวิตช์หลังบ้านของรุ่นนั้น — ฟังก์ชันนี้อยู่นอก scope จึงมองไม่เห็น
+ * $assetShowSnippets ที่คำนวณไว้ด้านบน ต้องอ่านผ่าน global ไม่งั้นปุ่มจะโผล่ทุกรุ่น
+ * แม้หลังบ้านจะไม่ได้ติ๊กเปิดไว้
+ */
 function asset_tl_actions($e, $assetId) {
+    global $assetShowSnippets;
     if (empty($e['kind']) || empty($e['rid'])) return '';
     $id = (int)$e['rid'];
     $out = '<div class="tl-actions" style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap">';
-    $snippetBtn = (!empty($e['snippet']) && is_array($e['snippet'])) ? ma_snippet_open_button($e['snippet']) : '';
+    $snippetBtn = (!empty($assetShowSnippets) && !empty($e['snippet']) && is_array($e['snippet']))
+        ? ma_snippet_open_button($e['snippet'])
+        : '';
     if ($e['kind'] === 'update') {
         $back = urlencode(BASE_URL . '/asset.php?id=' . $assetId);
         $out .= '<a class="btn btn-sm btn-line btn-with-icon" href="' . BASE_URL . '/update_edit.php?id=' . $id . '&back=' . $back . '">' . ui_btn_label('edit', 'แก้ไข') . '</a>';

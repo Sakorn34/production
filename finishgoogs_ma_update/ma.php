@@ -328,8 +328,8 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'history') {
                . '<td>' . h($m['fw_version'] ?: '-') . '</td>'
                . '<td style="max-width:420px">' . ma_items_html($m) . ma_parts_withdrawn_html((int)$m['id']) . '</td>'
                . '<td>' . h($m['done_by'] ?: '-') . '</td>'
-               . ($canMa ? '<td style="white-space:nowrap"><a class="btn btn-sm btn-line" href="' . BASE_URL . '/ma.php?edit=' . $m['id'] . '">แก้ไข</a> '
-                    . '<form method="post" style="display:inline" onsubmit="return confirm(\'ลบรายการ MA นี้?\')">' . csrf_field()
+               . ($canMa ? '<td class="row-actions"><a class="btn btn-sm btn-line" href="' . BASE_URL . '/ma.php?edit=' . $m['id'] . '">แก้ไข</a>'
+                    . '<form method="post" onsubmit="return confirm(\'ลบรายการ MA นี้?\')">' . csrf_field()
                     . '<input type="hidden" name="del_ma" value="1"><input type="hidden" name="ma_id" value="' . $m['id'] . '">'
                     . '<button class="btn-sm btn-danger" type="submit">ลบ</button></form></td>' : '')
                . '</tr>';
@@ -1425,9 +1425,9 @@ list_search_form([
     <td><?= h($m['fw_version'] ?: '-') ?></td>
     <td><?= h($m['done_by'] ?: '-') ?></td>
     <?php if (can('ma')) { ?>
-    <td class="ma-row-actions" style="white-space:nowrap">
+    <td class="ma-row-actions row-actions">
       <a class="btn btn-sm btn-line" href="<?= BASE_URL ?>/ma.php?product=<?= $productId ?>&edit=<?= (int)$m['id'] ?>">แก้ไข</a>
-      <form method="post" style="display:inline" onsubmit="return confirm('ลบรายการ MA นี้?')">
+      <form method="post" onsubmit="return confirm('ลบรายการ MA นี้?')">
         <?= csrf_field() ?><input type="hidden" name="del_ma" value="1"><input type="hidden" name="ma_id" value="<?= (int)$m['id'] ?>"><input type="hidden" name="back" value="<?= h($maListUrl) ?>">
         <button class="btn-sm btn-danger" type="submit">ลบ</button>
       </form>

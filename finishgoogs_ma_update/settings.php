@@ -27,6 +27,29 @@ function kind_save($raw) {
     return $raw !== '' ? mb_substr($raw, 0, 30) : 'text';
 }
 
+/**
+ * ท้าย INSERT ของสวิตช์มาตรฐาน — สวิตช์เป็นเจ้าของ field_name นั้น ค่าล่าสุดต้องชนะเสมอ
+ *
+ * ปกติแถวเก่าถูก DELETE ทิ้งก่อนบันทึกอยู่แล้ว บรรทัดนี้จึงเป็นตาข่ายรองรับ ไม่ให้
+ * ชื่อซ้ำกลายเป็น SQL error เต็มหน้าจอต่อหน้าผู้ใช้ (เคยเกิดมาแล้วกับ product_snippets)
+ */
+const PFC_UPSERT = 'ON DUPLICATE KEY UPDATE field_kind=VALUES(field_kind), options_text=VALUES(options_text), input_mode=VALUES(input_mode), sort_order=VALUES(sort_order), is_active=1';
+
+/**
+ * ชนิดฟิลด์ที่มีสวิตช์เปิด/ปิดของตัวเองในหน้านี้
+ *
+ * แต่ละคู่ (เปิด/ปิด) ใช้ field_name เดียวกัน และ unique key uq_pfc ไม่ได้รวม field_kind
+ * ไว้ด้วย ดังนั้นชนิดพวกนี้ห้ามปนเข้าตารางฟิลด์ปกติเด็ดขาด ไม่งั้นจะ INSERT ชื่อซ้ำ
+ * ในคำขอเดียวกัน — เพิ่มสวิตช์ใหม่เมื่อไหร่ ต้องเพิ่มชนิดของมันที่นี่ด้วยทุกครั้ง
+ */
+const STD_SWITCH_KINDS = [
+    'fw', 'fw_off',
+    'lot', 'lot_off',
+    'made_by', 'made_by_off',
+    'product_snippets', 'product_snippets_off',
+    'watch_alert', 'watch_alert_cfg',
+];
+
 $MA_KIND_LABELS = [
     'ma_ok' => 'รายการ ✅ ปกติ',
     'ma_replace' => 'รายการ 🔄 เปลี่ยน',
@@ -96,8 +119,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $pid) {
             if ($nm === '') continue;
             $kind = kind_save(isset($kinds[$i]) ? $kinds[$i] : '');
             if ($ctx === 'update') $kind = 'component';
-            // ไม่รับชนิด fw/lot จากตารางฟิลด์ปกติ — จัดการผ่านสวิตช์ด้านล่าง
-            if ($kind === 'fw' || $kind === 'lot') continue;
+            // ชนิดที่มีสวิตช์ของตัวเองต้องไม่รับจากตารางฟิลด์ปกติ — กันชื่อซ้ำกับ INSERT ของสวิตช์
+            if (in_array($kind, STD_SWITCH_KINDS, true)) continue;
             $optText = implode("\n", split_lines(isset($opts[$i]) ? $opts[$i] : ''));
             $mode = normalize_input_mode(isset($modes[$i]) ? $modes[$i] : '');
             q("INSERT INTO product_field_config (product_id,context,field_name,field_kind,options_text,input_mode,sort_order)
@@ -110,31 +133,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $pid) {
             $madeByMode = normalize_input_mode(isset($_POST['made_by_input_mode']) ? $_POST['made_by_input_mode'] : 'chip_single_free');
             if (!empty($_POST['show_made_by'])) {
                 q("INSERT INTO product_field_config (product_id,context,field_name,field_kind,options_text,input_mode,sort_order)
-                   VALUES (?,'production','ผู้ผลิต/ประกอบ','made_by','',?,?)", 'isi', [$pid, $madeByMode, $sort++]);
+                   VALUES (?,'production','ผู้ผลิต/ประกอบ','made_by','',?,?)
+                   " . PFC_UPSERT, 'isi', [$pid, $madeByMode, $sort++]);
                 $saved++;
             } else {
                 q("INSERT INTO product_field_config (product_id,context,field_name,field_kind,options_text,input_mode,sort_order)
-                   VALUES (?,'production','ผู้ผลิต/ประกอบ','made_by_off','','chip_single_free',?)", 'ii', [$pid, $sort++]);
+                   VALUES (?,'production','ผู้ผลิต/ประกอบ','made_by_off','','chip_single_free',?)
+                   " . PFC_UPSERT, 'ii', [$pid, $sort++]);
             }
             if (!empty($_POST['show_fw'])) {
                 $fwOpts = implode("\n", split_lines(isset($_POST['fw_options']) ? $_POST['fw_options'] : ''));
                 $fwMode = normalize_input_mode(isset($_POST['fw_input_mode']) ? $_POST['fw_input_mode'] : 'chip_single_free');
                 q("INSERT INTO product_field_config (product_id,context,field_name,field_kind,options_text,input_mode,sort_order)
-                   VALUES (?,'production','Firmware','fw',?,?,?)", 'isss', [$pid, $fwOpts, $fwMode, $sort++]);
+                   VALUES (?,'production','Firmware','fw',?,?,?)
+                   " . PFC_UPSERT, 'isss', [$pid, $fwOpts, $fwMode, $sort++]);
                 $saved++;
             } else {
                 q("INSERT INTO product_field_config (product_id,context,field_name,field_kind,options_text,input_mode,sort_order)
-                   VALUES (?,'production','Firmware','fw_off','','chip_single_free',?)", 'ii', [$pid, $sort++]);
+                   VALUES (?,'production','Firmware','fw_off','','chip_single_free',?)
+                   " . PFC_UPSERT, 'ii', [$pid, $sort++]);
             }
             if (!empty($_POST['show_lot'])) {
                 $lotOpts = implode("\n", split_lines(isset($_POST['lot_options']) ? $_POST['lot_options'] : ''));
                 $lotMode = normalize_input_mode(isset($_POST['lot_input_mode']) ? $_POST['lot_input_mode'] : 'chip_single_free');
                 q("INSERT INTO product_field_config (product_id,context,field_name,field_kind,options_text,input_mode,sort_order)
-                   VALUES (?,'production','Lot','lot',?,?,?)", 'isss', [$pid, $lotOpts, $lotMode, $sort++]);
+                   VALUES (?,'production','Lot','lot',?,?,?)
+                   " . PFC_UPSERT, 'isss', [$pid, $lotOpts, $lotMode, $sort++]);
                 $saved++;
             } else {
                 q("INSERT INTO product_field_config (product_id,context,field_name,field_kind,options_text,input_mode,sort_order)
-                   VALUES (?,'production','Lot','lot_off','','chip_single_free',?)", 'ii', [$pid, $sort++]);
+                   VALUES (?,'production','Lot','lot_off','','chip_single_free',?)
+                   " . PFC_UPSERT, 'ii', [$pid, $sort++]);
             }
             // Checklist ตรวจก่อนส่งมอบ (หน้าบันทึกผลิต)
             q("DELETE FROM product_field_config WHERE product_id=? AND context='production' AND field_kind='checklist'", 'i', [$pid]);
@@ -161,11 +190,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $pid) {
             // แผงคำสั่งตั้งค่าหมายเลขสินค้า (Serial / MAC) ในหน้าบันทึกผลิตและ MA
             if (!empty($_POST['show_product_snippets'])) {
                 q("INSERT INTO product_field_config (product_id,context,field_name,field_kind,options_text,input_mode,sort_order)
-                   VALUES (?,'production','ข้อความประจำสินค้า','product_snippets','','',?)", 'ii', [$pid, $sort++]);
+                   VALUES (?,'production','ข้อความประจำสินค้า','product_snippets','','',?)
+                   " . PFC_UPSERT, 'ii', [$pid, $sort++]);
                 $saved++;
             } else {
                 q("INSERT INTO product_field_config (product_id,context,field_name,field_kind,options_text,input_mode,sort_order)
-                   VALUES (?,'production','ข้อความประจำสินค้า','product_snippets_off','','',?)", 'ii', [$pid, $sort++]);
+                   VALUES (?,'production','ข้อความประจำสินค้า','product_snippets_off','','',?)
+                   " . PFC_UPSERT, 'ii', [$pid, $sort++]);
             }
         }
         flash_set('บันทึกฟิลด์ "' . ($ctx === 'production' ? 'บันทึกผลิต' : 'อัปเดต FW/HW') . '" แล้ว (' . $saved . ' ฟิลด์)');
@@ -226,6 +257,9 @@ page_header('ระบบหลังบ้าน — ตั้งค่าร�
 </p>
 
 <?= ui_heading('box', 'รุ่นสินค้า', 'h2') ?>
+<p style="margin:-4px 0 12px">
+  <a href="<?= BASE_URL ?>/settings_bulk.php" class="btn btn-line btn-sm"><?= ui_btn_label('check', 'ตั้งค่าแผงคำสั่ง + แจ้งเตือนอะไหล่ ทุกรุ่นในหน้าเดียว', 15) ?></a>
+</p>
 <form method="get" class="filter" style="margin-bottom:10px">
   <label style="align-self:center">เลือกรุ่นเพื่อตั้งค่า:</label>
   <select name="product" onchange="this.form.submit()" style="min-width:280px">
@@ -334,7 +368,13 @@ foreach ($prodEffAll as $f) {
         $checklistText = implode("\n", $f['options']);
         continue;
     }
-    if (in_array($f['kind'], ['fw', 'lot', 'fw_off', 'lot_off', 'made_by', 'made_by_off', 'watch_alert', 'watch_alert_cfg'], true)) continue;
+    // ชนิดที่จัดการผ่านสวิตช์ด้านบน ต้องไม่โผล่เป็นแถวแก้ไขได้ในตารางนี้
+    //
+    // ถ้าหลุดมา ฟอร์มจะส่งชื่อฟิลด์นั้นกลับมาด้วย แล้วตอนบันทึกจะ INSERT ชื่อเดียวกันสองครั้ง
+    // (รอบหนึ่งจากลูปฟิลด์ปกติ อีกรอบจากสวิตช์) ชนกับ unique key uq_pfc ที่เป็น
+    // (product_id, context, field_name) — ไม่มี field_kind อยู่ในคีย์ แถว "เปิด" กับ "ปิด"
+    // จึงถือเป็นแถวเดียวกัน  ← product_snippets เคยตกหล่นจากลิสต์นี้จนเกิด error จริง
+    if (in_array($f['kind'], STD_SWITCH_KINDS, true)) continue;
     $prodEff[] = $f;
 }
 if (!$prodEff && !$prodIsConfigured) $prodEff = derive_production_fields($pid); // แสดง preview จากประวัติถ้ายังไม่ตั้ง

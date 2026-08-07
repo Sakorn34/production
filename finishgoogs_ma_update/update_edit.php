@@ -121,69 +121,95 @@ foreach (effective_fields((int)$log['product_id'], 'update') as $f) {
   แก้ไขรายการของเครื่อง <b><?= h($log['asset_code']) ?></b> (<?= h($log['pname']) ?>)
   · <a href="<?= h(BASE_URL . '/asset.php?id=' . (int)$log['asset_id']) ?>">เปิดหน้าเครื่อง</a>
 </p>
-<form method="post" class="formgrid form-narrow" enctype="multipart/form-data">
+<form method="post" class="upd-form" enctype="multipart/form-data">
   <?= csrf_field() ?>
   <input type="hidden" name="save_update" value="1">
   <input type="hidden" name="update_id" value="<?= (int)$logId ?>">
   <input type="hidden" name="back" value="<?= h($backUrl) ?>">
 
-  <label>วันที่อัปเดต</label>
-  <input type="datetime-local" name="updated_at" value="<?= h($dtLocal) ?>" required>
+  <div class="upd-cols">
+    <div class="panel upd-card">
+      <h3 class="upd-card-title"><?= ui_icon_html('updates', 16, 'h-svg') ?><span>ข้อมูลการอัปเดต</span></h3>
 
-  <label>ประเภทการอัปเดต</label>
-  <select name="update_type" id="utype" onchange="fillOld()">
-    <option value="firmware" <?= $log['update_type'] === 'firmware' ? 'selected' : '' ?>>Firmware</option>
-    <option value="hardware" <?= $log['update_type'] === 'hardware' ? 'selected' : '' ?>>Hardware (เปลี่ยนชิ้นส่วน)</option>
-    <option value="other" <?= $log['update_type'] === 'other' ? 'selected' : '' ?>>อื่นๆ</option>
-  </select>
+      <div class="upd-grid2">
+        <div class="upd-field">
+          <label for="updated_at">วันที่อัปเดต</label>
+          <input type="datetime-local" id="updated_at" name="updated_at" value="<?= h($dtLocal) ?>" required>
+        </div>
+        <div class="upd-field">
+          <label for="utype">ประเภทการอัปเดต</label>
+          <select name="update_type" id="utype" onchange="fillOld()">
+            <option value="firmware" <?= $log['update_type'] === 'firmware' ? 'selected' : '' ?>>Firmware</option>
+            <option value="hardware" <?= $log['update_type'] === 'hardware' ? 'selected' : '' ?>>Hardware (เปลี่ยนชิ้นส่วน)</option>
+            <option value="other" <?= $log['update_type'] === 'other' ? 'selected' : '' ?>>อื่นๆ</option>
+          </select>
+        </div>
+      </div>
 
-  <label>ชิ้นส่วน (ถ้าเป็น HW)</label>
-  <div>
-    <input type="text" name="component_name" id="comp" list="complist"
-           value="<?= h($log['component_name'] ?? '') ?>" placeholder="เช่น Display, Main Board" onchange="fillOld()">
-    <datalist id="complist">
-      <?php foreach ($compChoices as $k => $v) { ?><option value="<?= h($k) ?>"><?php } ?>
-    </datalist>
+      <div class="upd-field" id="comp-field">
+        <label for="comp">ชิ้นส่วน <span class="muted">(เฉพาะประเภท Hardware)</span></label>
+        <input type="text" name="component_name" id="comp" list="complist"
+               value="<?= h($log['component_name'] ?? '') ?>" placeholder="เช่น Display, Main Board" onchange="fillOld()">
+        <datalist id="complist">
+          <?php foreach ($compChoices as $k => $v) { ?><option value="<?= h($k) ?>"><?php } ?>
+        </datalist>
+      </div>
+
+      <?php // วางค่าเดิม/ค่าใหม่คู่กันพร้อมลูกศร — อ่านการเปลี่ยนแปลงได้ในบรรทัดเดียว ?>
+      <div class="upd-change">
+        <div class="upd-field">
+          <label for="oldv">ค่าเดิม</label>
+          <input type="text" name="old_value" id="oldv" value="<?= h($log['old_value'] ?? '') ?>" placeholder="ค่าก่อนเปลี่ยน">
+        </div>
+        <div class="upd-arrow" aria-hidden="true">→</div>
+        <div class="upd-field">
+          <label for="newv">ค่าใหม่</label>
+          <input type="text" name="new_value" id="newv" list="newvlist" value="<?= h($log['new_value'] ?? '') ?>" placeholder="ค่าหลังเปลี่ยน">
+          <datalist id="newvlist"></datalist>
+        </div>
+      </div>
+      <p class="upd-same-warn" id="upd-same-warn" hidden>ค่าเดิมกับค่าใหม่เหมือนกัน — ตรวจอีกครั้งว่าใช่ที่ต้องการหรือไม่</p>
+
+      <div class="upd-field">
+        <label for="detail">รายละเอียด</label>
+        <textarea name="detail" id="detail" rows="3" placeholder="อธิบายสิ่งที่ทำ เช่น เปลี่ยนรุ่นกล้อง ตัดเสายาว 27cm."><?= h($log['detail'] ?? '') ?></textarea>
+      </div>
+
+      <div class="upd-field upd-field-half">
+        <label for="made_by">ผู้บันทึก</label>
+        <input type="text" id="made_by" name="made_by" value="<?= h($log['made_by'] ?: actor_name()) ?>">
+      </div>
+    </div>
+
+    <div class="panel upd-card">
+      <h3 class="upd-card-title"><?= ui_icon_html('camera', 16, 'h-svg') ?><span>รูปประกอบ</span></h3>
+      <?php foreach ([1, 2] as $slot) {
+          $img = $log['image' . $slot] ?? '';
+      ?>
+      <div class="upd-img-slot">
+        <div class="upd-img-preview">
+          <?php if (!empty($img)) { ?>
+            <a href="<?= h(img_url($img)) ?>" target="_blank" rel="noopener"><img src="<?= h(img_url($img)) ?>" loading="lazy" alt="รูปประกอบ <?= $slot ?>"></a>
+          <?php } else { ?>
+            <span class="upd-img-empty">ยังไม่มีรูป</span>
+          <?php } ?>
+        </div>
+        <div class="upd-img-input">
+          <label for="image<?= $slot ?>">รูปประกอบ <?= $slot ?></label>
+          <input type="file" id="image<?= $slot ?>" name="image<?= $slot ?>" accept="image/*">
+          <div class="muted" style="font-size:12px">ไม่เลือก = ใช้รูปเดิม</div>
+        </div>
+      </div>
+      <?php } ?>
+    </div>
   </div>
 
-  <label>ค่าเดิม</label>
-  <input type="text" name="old_value" id="oldv" value="<?= h($log['old_value'] ?? '') ?>">
-
-  <label>ค่าใหม่</label>
-  <div>
-    <input type="text" name="new_value" id="newv" list="newvlist" value="<?= h($log['new_value'] ?? '') ?>">
-    <datalist id="newvlist"></datalist>
-  </div>
-
-  <label class="full">รายละเอียด</label>
-  <textarea name="detail" class="full field-note" rows="2"><?= h($log['detail'] ?? '') ?></textarea>
-
-  <label>ผู้บันทึก</label>
-  <input type="text" name="made_by" value="<?= h($log['made_by'] ?: actor_name()) ?>">
-
-  <label>รูปประกอบ 1</label>
-  <div>
-    <?php if (!empty($log['image1'])) { ?>
-      <a href="<?= h(img_url($log['image1'])) ?>" target="_blank" rel="noopener"><img src="<?= h(img_url($log['image1'])) ?>" class="thumb" loading="lazy"></a><br>
-    <?php } ?>
-    <input type="file" name="image1" accept="image/*">
-    <div class="muted" style="font-size:12px">ว่าง = ใช้รูปเดิม</div>
-  </div>
-
-  <label>รูปประกอบ 2</label>
-  <div>
-    <?php if (!empty($log['image2'])) { ?>
-      <a href="<?= h(img_url($log['image2'])) ?>" target="_blank" rel="noopener"><img src="<?= h(img_url($log['image2'])) ?>" class="thumb" loading="lazy"></a><br>
-    <?php } ?>
-    <input type="file" name="image2" accept="image/*">
-    <div class="muted" style="font-size:12px">ว่าง = ใช้รูปเดิม</div>
-  </div>
-
-  <div class="full" style="display:flex; gap:8px; flex-wrap:wrap">
-    <button type="submit"><?= ui_btn_label('save', 'บันทึกการแก้ไข') ?></button>
+  <div class="upd-actions">
+    <button type="submit" class="btn btn-primary"><?= ui_btn_label('save', 'บันทึกการแก้ไข') ?></button>
     <a class="btn btn-line" href="<?= h($backUrl) ?>">ยกเลิก</a>
   </div>
 </form>
+
 <script>
 var comps = <?= json_encode($compData, JSON_UNESCAPED_UNICODE) ?>;
 var compOptions = <?= json_encode($compOptions, JSON_UNESCAPED_UNICODE) ?>;
@@ -193,14 +219,39 @@ function fillOld(){
   var t = document.getElementById('utype').value;
   var c = document.getElementById('comp').value;
   var o = document.getElementById('oldv');
-  if (t === 'firmware' && !o.value) o.value = curFw || '';
-  else if (t !== 'firmware' && comps[c] && !o.dataset.touched) o.value = comps[c];
+  // เติมให้เฉพาะตอนช่องว่างเท่านั้น
+  //
+  // ตรรกะเติมอัตโนมัติยกมาจากฟอร์มบันทึกใหม่ ซึ่งที่นั่นถูกต้อง (ค่าเดิม = ค่าปัจจุบันของเครื่อง)
+  // แต่ในฟอร์มแก้ไข ค่าปัจจุบันคือ "ค่าใหม่" ที่อัปเดตไปแล้ว การเติมทับจึงลบประวัติของจริงทิ้ง
+  // — เปิดหน้าแก้ไขเฉย ๆ ก็เห็นค่าเดิมกลายเป็นค่าใหม่ และถ้ากดบันทึกจะทับข้อมูลถาวร
+  if (!o.value) {
+    if (t === 'firmware') o.value = curFw || '';
+    else if (comps[c]) o.value = comps[c];
+  }
   var dl = document.getElementById('newvlist');
   var opts = compOptions[c] || [];
   dl.innerHTML = opts.map(function(v){ return '<option value="' + esc(v) + '">'; }).join('');
 }
 document.getElementById('comp').addEventListener('input', fillOld);
 document.getElementById('oldv').addEventListener('input', function(){ this.dataset.touched = '1'; });
+
+// ซ่อนช่องชิ้นส่วนเมื่อไม่ใช่ Hardware — ลดสิ่งที่ไม่เกี่ยวออกจากสายตา
+function syncCompField(){
+  var el = document.getElementById('comp-field');
+  if (el) el.hidden = document.getElementById('utype').value !== 'hardware';
+}
+// เตือนเมื่อค่าเดิมกับค่าใหม่ตรงกัน (อาการของบั๊กเดิมที่เติมค่าทับ)
+function syncSameWarn(){
+  var o = document.getElementById('oldv').value.trim();
+  var n = document.getElementById('newv').value.trim();
+  document.getElementById('upd-same-warn').hidden = !(o !== '' && o === n);
+}
+document.getElementById('utype').addEventListener('change', syncCompField);
+document.getElementById('oldv').addEventListener('input', syncSameWarn);
+document.getElementById('newv').addEventListener('input', syncSameWarn);
+
 fillOld();
+syncCompField();
+syncSameWarn();
 </script>
 <?php page_footer();
