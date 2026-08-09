@@ -1693,3 +1693,16 @@ a:focus-visible {
     font-size: 0.95rem;
     font-weight: 500;
 }
+
+/* ป้ายชนิดความเคลื่อนไหวในแท็บ "ทั้งหมด" ของหน้าประวัติ */
+.move-tag {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: calc(11.5px * var(--font-scale, 1));
+    font-weight: 600;
+    white-space: nowrap;
+}
+.move-in { background: var(--success-soft, #f0fdf4); color: #15803d; }
+.move-item { background: var(--danger-soft, #fef2f2); color: #b91c1c; }
+.move-set { background: var(--primary-soft, #fce7f3); color: var(--primary-dark, #c01862); }

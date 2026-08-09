@@ -112,15 +112,16 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'sn_basket') {
 require_once __DIR__ . '/../includes/parts_bootstrap.php';
 
 $historyTabs = [
+    'all'  => ['label' => 'ทั้งหมด',       'icon' => 'history',         'sub' => 'รับเข้าและเบิกออกรวมกัน เรียงตามเวลาบันทึกล่าสุด'],
     'sn'   => ['label' => 'ตาม S/N',      'icon' => 'history',         'sub' => 'รายการเบิกออกทั้งหมด — 1 แถวต่อ S/N (คลิกแถวเพื่อดูรายละเอียด)'],
     'in'   => ['label' => 'รับเข้า',       'icon' => 'stock-in',        'sub' => 'ประวัติการรับอะไหล่เข้าคลัง'],
     'item' => ['label' => 'เบิกรายชิ้น',   'icon' => 'stock-out-item',  'sub' => 'ประวัติการเบิกอะไหล่ออกทีละรายการ'],
     'set'  => ['label' => 'เบิก Set',      'icon' => 'stock-out-set',   'sub' => 'ประวัติการเบิกอะไหล่ออกเป็นชุด'],
 ];
 
-$tab = (string) ($_GET['tab'] ?? 'sn');
+$tab = (string) ($_GET['tab'] ?? 'all');
 if (!isset($historyTabs[$tab])) {
-    $tab = 'sn';
+    $tab = 'all';
 }
 
 $editIn = isset($_GET['edit_in']) ? (int) $_GET['edit_in'] : 0;
@@ -199,8 +200,19 @@ $partIcons = parts_product_icon_map($allProducts);
 $grouped = [];
 $history = [];
 $noteOptions = [];
+$allFull = false;
+$allTotal = 0;
 if ($detail) {
     // หน้ารายละเอียดไม่ต้องใช้ตารางไหนเลย
+} elseif ($tab === 'all') {
+    // ค่าเริ่มต้นตัดที่ 100 เพื่อให้หน้าแรกเปิดไว · กด "แสดงทั้งหมด" เพื่อดูย้อนหลังครบ
+    $allFull = !empty($_GET['full']);
+    $history = $stock->getAllMovementHistory($allFull ? null : 100);
+    $allTotal = $allFull ? count($history) : (int) $db->query(
+        "SELECT (SELECT COUNT(*) FROM stock_in)
+              + (SELECT COUNT(*) FROM stock_out_items soi JOIN stock_out so ON so.id = soi.stock_out_id WHERE so.set_id IS NULL)
+              + (SELECT COUNT(*) FROM stock_out WHERE set_id IS NOT NULL)"
+    )->fetchColumn();
 } elseif ($tab === 'sn') {
     $grouped = $stock->getStockOutHistoryGroupedBySn();
 } elseif ($tab === 'in') {
@@ -506,6 +518,79 @@ function history_sn_row_thumb(array $g, array $partIcons): string
         </form>
     </div>
 </div>
+<?php elseif ($tab === 'all'): ?>
+
+<div class="card parts-list-card">
+    <?php if (empty($history)): ?>
+        <p class="empty-state">ยังไม่มีความเคลื่อนไหวของสต็อก</p>
+    <?php else: ?>
+    <div class="table-wrap">
+        <table class="parts-table">
+            <thead>
+                <tr>
+                    <th>วันเวลา</th>
+                    <th>ประเภท</th>
+                    <th class="col-img">รูป</th>
+                    <th>รายการ</th>
+                    <th class="text-right">จำนวน</th>
+                    <th>S/N</th>
+                    <th>หมายเหตุ</th>
+                    <th>ผู้ทำรายการ</th>
+                    <th class="col-actions">จัดการ</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($history as $h):
+                    $kind = (string) $h['kind'];
+                    $isIn = $kind === 'in';
+                    $code = (string) ($h['code'] ?? '');
+                    $icon = $code !== '' ? ($partIcons[$code] ?? '') : '';
+                    // เบิก Set แสดงเป็นชื่อชุด ส่วนอีกสองชนิดแสดงชื่ออะไหล่
+                    $label = $kind === 'set'
+                        ? '[' . (string) $h['set_code'] . '] ' . (string) $h['set_name']
+                        : parts_format_product_line($code, (string) ($h['name'] ?? ''), $partProdLabels);
+                    $editUrl = $isIn
+                        ? url('/pages/history.php?tab=in&edit_in=' . (int) $h['row_id'])
+                        : url('/pages/history.php?tab=' . ($kind === 'set' ? 'set' : 'item') . '&edit_out=' . (int) $h['stock_out_id']);
+                ?>
+                <tr>
+                    <td class="text-muted" style="white-space:nowrap"><?= formatDate($h['created_at']) ?></td>
+                    <td><span class="move-tag move-<?= e($kind) ?>"><?= $isIn ? 'รับเข้า' : ($kind === 'set' ? 'เบิก Set' : 'เบิกรายชิ้น') ?></span></td>
+                    <td class="col-img"><?= $kind === 'set' ? '' : parts_img_tag($icon, $label) ?></td>
+                    <td><?= e($label) ?><?= !empty($h['doc_no']) ? '<br><span class="text-muted" style="font-size:11px">' . e($h['doc_no']) . '</span>' : '' ?></td>
+                    <td class="text-right <?= $isIn ? 'text-success' : 'text-danger' ?>" style="white-space:nowrap">
+                        <?= $isIn ? '+' : '-' ?><?= formatNumber($h['qty']) ?> <?= e($h['unit'] ?: 'ชิ้น') ?>
+                    </td>
+                    <td><?= e($h['asset_code'] ?: '-') ?></td>
+                    <td class="text-muted"><?= e($h['note'] ?: '-') ?></td>
+                    <td><?= e($h['actor'] ?: '-') ?></td>
+                    <td class="col-actions">
+                        <div class="table-actions">
+                            <?= actionIcon('edit', $editUrl, 'แก้ไข') ?>
+                            <form method="POST" onsubmit="return confirm(<?= $isIn ? "'ลบรายการรับเข้านี้?'" : "'ลบรายการเบิกนี้? ข้อมูลในระบบทะเบียนเครื่องที่เกี่ยวข้องจะถูกปรับตามด้วย'" ?>)">
+                                <input type="hidden" name="<?= $isIn ? 'delete_stock_in' : 'delete_stock_out' ?>" value="1">
+                                <input type="hidden" name="id" value="<?= (int) ($isIn ? $h['row_id'] : $h['stock_out_id']) ?>">
+                                <?= actionIcon('delete', '', 'ลบ') ?>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <p class="text-muted" style="margin:10px 0 0;font-size:12px">
+        แสดง <?= number_format(count($history)) ?> จาก <?= number_format($allTotal) ?> รายการ
+        <?php if (!$allFull && count($history) < $allTotal): ?>
+            · <a href="<?= url('/pages/history.php?tab=all&full=1') ?>">แสดงทั้งหมด</a>
+        <?php elseif ($allFull): ?>
+            · <a href="<?= url('/pages/history.php?tab=all') ?>">แสดงแค่ 100 รายการล่าสุด</a>
+        <?php endif; ?>
+        · ดูแยกประเภทได้ที่แท็บด้านบน
+    </p>
+    <?php endif; ?>
+</div>
+
 <?php elseif ($tab === 'sn'): ?>
 
 <div class="card parts-list-card">

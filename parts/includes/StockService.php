@@ -583,6 +583,52 @@ class StockService
         return $out;
     }
 
+    /**
+     * ประวัติรับเข้า + เบิกออก รวมกัน เรียงตามเวลาบันทึก
+     *
+     * รวมสามแหล่งด้วย UNION ให้ฐานข้อมูลเรียงและตัด LIMIT เอง — ถ้าดึงแยกแล้วมารวมใน PHP
+     * จะต้องดึงเกินจากทุกแหล่งก่อนตัดทิ้ง และหน้าแรกจะเพี้ยนเมื่อแหล่งใดแหล่งหนึ่งมีรายการถี่กว่า
+     *
+     * เบิก Set นับเป็นหนึ่งแถว (รวมจำนวนทุกชิ้นในชุด) ไม่กระจายเป็นรายชิ้น
+     * เพราะเป็นการเบิกครั้งเดียวในสายตาผู้ใช้
+     *
+     * @param int|null $limit
+     * @return array<int,array<string,mixed>>
+     */
+    public function getAllMovementHistory(?int $limit = 100): array
+    {
+        $sql = "
+            (SELECT 'in' AS kind, si.id AS row_id, NULL AS stock_out_id, NULL AS doc_no,
+                    si.created_at, p.code, p.name, p.unit, si.quantity AS qty,
+                    NULL AS asset_code, si.note, si.received_by AS actor,
+                    NULL AS set_code, NULL AS set_name, NULL AS part_movement_id
+             FROM stock_in si
+             JOIN products p ON p.id = si.product_id)
+            UNION ALL
+            (SELECT 'item', soi.id, so.id, so.doc_no,
+                    so.created_at, p.code, p.name, p.unit, soi.quantity,
+                    so.asset_code, so.note, so.issued_by,
+                    NULL, NULL, so.part_movement_id
+             FROM stock_out so
+             JOIN stock_out_items soi ON soi.stock_out_id = so.id
+             JOIN products p ON p.id = soi.product_id
+             WHERE so.set_id IS NULL)
+            UNION ALL
+            (SELECT 'set', so.id, so.id, so.doc_no,
+                    so.created_at, NULL, NULL, NULL,
+                    (SELECT SUM(quantity) FROM stock_out_items WHERE stock_out_id = so.id),
+                    so.asset_code, so.note, so.issued_by,
+                    s.code, s.name, so.part_movement_id
+             FROM stock_out so
+             JOIN sets s ON s.id = so.set_id)
+            ORDER BY created_at DESC, row_id DESC
+        ";
+        if ($limit) {
+            $sql .= ' LIMIT ' . (int) $limit;
+        }
+        return $this->db->query($sql)->fetchAll();
+    }
+
     public function getStockInHistory(?int $limit = null): array
     {
         $sql = "
