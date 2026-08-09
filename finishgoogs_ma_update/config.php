@@ -601,8 +601,13 @@ function actor_name() {
     return (string)$u['display_name'];
 }
 
+/** @var int อายุการปลดล็อกหน้าหลังบ้าน (วินาที) — ครบแล้วต้องใส่ PIN ใหม่ */
+if (!defined('SETTINGS_UNLOCK_TTL')) {
+    define('SETTINGS_UNLOCK_TTL', 1800);
+}
+
 /**
- * ตรวจว่าเข้าหน้าหลังบ้านได้แล้วหรือยัง (PIN 9981)
+ * ตรวจว่าเข้าหน้าหลังบ้านได้แล้วหรือยัง (PIN 9981 · หมดอายุตาม SETTINGS_UNLOCK_TTL)
  *
  * @return bool
  */
@@ -613,7 +618,16 @@ function settings_admin_unlocked() {
     if (is_localhost_request() && strcasecmp(maintenance_new_profile_login_name() ?: '', 'Tom') === 0) {
         return true;
     }
-    return !empty($_SESSION['settings_unlocked']);
+    $since = (int)($_SESSION['settings_unlocked'] ?? 0);
+    if ($since <= 0) {
+        return false;
+    }
+    // หมดอายุใน 30 นาที — กันเคสเดินจากเครื่องโดยไม่ปิดเบราว์เซอร์แล้วคนถัดไปเข้าหลังบ้านต่อ
+    if (time() - $since > SETTINGS_UNLOCK_TTL) {
+        unset($_SESSION['settings_unlocked']);
+        return false;
+    }
+    return true;
 }
 
 /**
@@ -712,7 +726,11 @@ function save_upload($field, $subdir, $exts = null) {
     $ext = strtolower(pathinfo($_FILES[$field]['name'], PATHINFO_EXTENSION));
     if (!in_array($ext, $exts, true)) return null;
     if ($ext === 'svg') {
-        if (stripos((string)@file_get_contents($_FILES[$field]['tmp_name'], false, null, 0, 4096), '<svg') === false) return null;
+        // อ่านทั้งไฟล์ ไม่ใช่แค่ 4096 ไบต์แรก — สคริปต์ซ่อนท้ายไฟล์ได้
+        $svg = (string)@file_get_contents($_FILES[$field]['tmp_name']);
+        if (stripos($svg, '<svg') === false) return null;
+        // SVG รัน JavaScript ได้ใต้โดเมนของระบบ → ปฏิเสธไฟล์ที่มีสคริปต์/event handler/ลิงก์ภายนอก
+        if (preg_match('/<\s*script|<\s*foreignObject|javascript\s*:|\son\w+\s*=|<\s*!ENTITY/i', $svg)) return null;
     } elseif ($ext === 'ico') {
         if (@file_get_contents($_FILES[$field]['tmp_name'], false, null, 0, 4) !== "\x00\x00\x01\x00") return null;
     } else {

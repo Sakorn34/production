@@ -200,31 +200,6 @@ class StockService
         ]);
     }
 
-    public function getRecentMovements(int $limit = 10): array
-    {
-        $sql = "
-            (SELECT 'in' AS type, si.id, p.name AS product_name, si.quantity,
-                    si.note, si.created_at
-             FROM stock_in si JOIN products p ON p.id = si.product_id)
-            UNION ALL
-            (SELECT 'out' AS type, so.id,
-                    COALESCE(
-                        s.name,
-                        (SELECT p.name FROM stock_out_items soi
-                         JOIN products p ON p.id = soi.product_id
-                         WHERE soi.stock_out_id = so.id LIMIT 1)
-                    ) AS product_name,
-                    (SELECT SUM(quantity) FROM stock_out_items WHERE stock_out_id = so.id) AS quantity,
-                    so.note, so.created_at
-             FROM stock_out so LEFT JOIN sets s ON s.id = so.set_id)
-            ORDER BY created_at DESC
-            LIMIT ?
-        ";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([$limit]);
-        return $stmt->fetchAll();
-    }
-
     public function stockIn(int $productId, int $quantity, ?string $note = null, ?string $receivedBy = null): void
     {
         if ($quantity <= 0) {
@@ -708,63 +683,6 @@ class StockService
     }
 
     /**
-     * เบิกผ่าน webhook (legacy — endpoint คืน 410 แล้ว, ไม่ sync production)
-     *
-     * @deprecated dead code — รายงานไว้ ยังไม่ลบเพื่ออ้างอิงประวัติ
-     */
-    public function stockOutByWebhook(string $productCode, int $quantity, string $purpose): string
-    {
-        if ($quantity <= 0) {
-            throw new InvalidArgumentException('จำนวนเบิกต้องมากกว่า 0');
-        }
-
-        // Find product by code
-        $stmt = $this->db->prepare('SELECT * FROM products WHERE code = ?');
-        $stmt->execute([$productCode]);
-        $product = $stmt->fetch();
-
-        if (!$product) {
-            throw new InvalidArgumentException("ไม่พบอะไหล่ รหัส: {$productCode}");
-        }
-
-        if ((int) $product['quantity'] < $quantity) {
-            throw new InvalidArgumentException(
-                "อะไหล่ {$product['name']} คงเหลือไม่พอ (ต้องการ {$quantity} {$product['unit']}, มี {$product['quantity']})"
-            );
-        }
-
-        $docNo = 'WEBHOOK-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(4)));
-
-        $this->db->beginTransaction();
-        try {
-            // Create stock_out record
-            $stmt = $this->db->prepare(
-                'INSERT INTO stock_out (doc_no, set_id, note, issued_by) VALUES (?, NULL, ?, ?)'
-            );
-            $stmt->execute([$docNo, $purpose, 'webhook']);
-            $outId = (int) $this->db->lastInsertId();
-
-            // Create stock_out_item
-            $stmt = $this->db->prepare(
-                'INSERT INTO stock_out_items (stock_out_id, product_id, quantity) VALUES (?, ?, ?)'
-            );
-            $stmt->execute([$outId, $product['id'], $quantity]);
-
-            // Update product quantity
-            $stmt = $this->db->prepare(
-                'UPDATE products SET quantity = quantity - ? WHERE id = ?'
-            );
-            $stmt->execute([$quantity, $product['id']]);
-
-            $this->db->commit();
-            return $docNo;
-        } catch (Exception $e) {
-            $this->db->rollBack();
-            throw $e;
-        }
-    }
-
-    /**
      * แก้ไขรายการรับเข้า
      *
      * @param int         $id
@@ -903,22 +821,48 @@ class StockService
         $diff = $quantity - $oldQty;
         $productId = (int) $item['product_id'];
 
-        if ($diff > 0) {
-            $product = $this->getProduct($productId);
-            if (!$product || (int) $product['quantity'] < $diff) {
-                throw new InvalidArgumentException('สต็อกไม่พอสำหรับเพิ่มจำนวนเบิก');
-            }
-        }
-
         $movementId = (int) ($detail['part_movement_id'] ?? 0);
+
+        // ใบที่ stock_deducted=0 ไม่เคยหักสต็อก — แก้จำนวนจึงต้องไม่ไปขยับยอดคงเหลือ (เกณฑ์เดียวกับ deleteStockOut)
+        if (!function_exists('production_stock_out_was_deducted_row')) {
+            require_once __DIR__ . '/production_sync.php';
+        }
+        $touchesStock = production_stock_out_was_deducted_row($detail);
 
         $this->db->beginTransaction();
         try {
             if ($diff !== 0) {
                 $this->db->prepare('UPDATE stock_out_items SET quantity = ? WHERE id = ?')
                     ->execute([$quantity, (int) $item['id']]);
-                $this->db->prepare('UPDATE products SET quantity = quantity - ? WHERE id = ?')
-                    ->execute([$diff, $productId]);
+            }
+            if ($diff !== 0 && $touchesStock) {
+                // ล็อกแถวก่อนแล้วหักแบบมี guard — กันสองคนแก้พร้อมกันจนสต็อกติดลบ
+                // (รูปแบบเดียวกับ stockOutItem / stockOutBySet / deleteStockIn)
+                $lockStmt = $this->db->prepare('SELECT quantity FROM products WHERE id = ? FOR UPDATE');
+                $lockStmt->execute([$productId]);
+                $locked = $lockStmt->fetch(PDO::FETCH_ASSOC);
+                if (!$locked) {
+                    throw new InvalidArgumentException('ไม่พบอะไหล่');
+                }
+                if ($diff > 0) {
+                    if ((int) $locked['quantity'] < $diff) {
+                        throw new InvalidArgumentException(
+                            'สต็อกไม่พอสำหรับเพิ่มจำนวนเบิก (คงเหลือ ' . (int) $locked['quantity']
+                            . ' ต้องการเพิ่ม ' . $diff . ')'
+                        );
+                    }
+                    $upd = $this->db->prepare(
+                        'UPDATE products SET quantity = quantity - ? WHERE id = ? AND quantity >= ?'
+                    );
+                    $upd->execute([$diff, $productId, $diff]);
+                } else {
+                    // $diff ติดลบ = ลดจำนวนเบิก → คืนของเข้าคลัง ไม่ต้องมี guard
+                    $upd = $this->db->prepare('UPDATE products SET quantity = quantity - ? WHERE id = ?');
+                    $upd->execute([$diff, $productId]);
+                }
+                if ($upd->rowCount() === 0) {
+                    throw new InvalidArgumentException('จำนวนอะไหล่ไม่พอ กรุณาตรวจสอบยอดคงเหลือใหม่');
+                }
             }
             $this->db->prepare('UPDATE stock_out SET note = ?, asset_code = ? WHERE id = ?')
                 ->execute([$note, trim((string) $assetCode) ?: null, $stockOutId]);
@@ -995,11 +939,20 @@ class StockService
         }
         $movementIds = array_values(array_unique(array_filter($movementIds)));
 
+        // ใบที่ stock_deducted=0 คือใบ sync ย้อนหลังที่ไม่เคยหักสต็อก — คืนสต็อกให้จะกลายเป็นของผี
+        // (ใช้เกณฑ์เดียวกับ production_sync_delete_stock_out_by_id / _from_movement)
+        if (!function_exists('production_stock_out_was_deducted_row')) {
+            require_once __DIR__ . '/production_sync.php';
+        }
+        $returnStock = production_stock_out_was_deducted_row($detail);
+
         $this->db->beginTransaction();
         try {
-            foreach ($detail['items'] as $item) {
-                $this->db->prepare('UPDATE products SET quantity = quantity + ? WHERE id = ?')
-                    ->execute([(int) $item['quantity'], (int) $item['product_id']]);
+            if ($returnStock) {
+                foreach ($detail['items'] as $item) {
+                    $this->db->prepare('UPDATE products SET quantity = quantity + ? WHERE id = ?')
+                        ->execute([(int) $item['quantity'], (int) $item['product_id']]);
+                }
             }
             $this->db->prepare('DELETE FROM stock_out_items WHERE stock_out_id = ?')->execute([$stockOutId]);
             $this->db->prepare('DELETE FROM stock_out WHERE id = ?')->execute([$stockOutId]);

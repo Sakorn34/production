@@ -1,8 +1,9 @@
 <?php
 /** appearance.php — ปรับแต่งหน้าตาระบบ (admin): ข้อความ · โลโก้ · สีธีม · เมนู(icon/ตำแหน่ง) */
 require __DIR__ . '/config.php';
+require __DIR__ . '/includes/settings_gate.php';
+require_settings_access();
 require __DIR__ . '/includes/layout.php';
-require_login();
 
 $COLORS = [
     'color_primary'        => ['สีหลัก (ปุ่ม/ลิงก์)', '#e11d74'],
@@ -44,8 +45,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $upErrors[] = "$label: อัปโหลดไม่สำเร็จ (รหัส $err) ลองใหม่อีกครั้ง";
             return null;
         }
-        $p = save_upload($field, 'brand', ['jpg', 'jpeg', 'png', 'gif', 'webp', 'ico', 'svg']);
-        if (!$p) $upErrors[] = "$label: ไฟล์ไม่ใช่รูปที่รองรับ (PNG / JPG / GIF / WebP / ICO / SVG)";
+        // ไม่รับ SVG — ไฟล์ SVG ฝัง <script> ได้ และเบราว์เซอร์จะรันมันใต้โดเมนของระบบ (stored XSS)
+        $p = save_upload($field, 'brand', ['jpg', 'jpeg', 'png', 'gif', 'webp', 'ico']);
+        if (!$p) $upErrors[] = "$label: ไฟล์ไม่ใช่รูปที่รองรับ (PNG / JPG / GIF / WebP / ICO)";
         return $p;
     };
     $logo = $brandUpload('brand_logo', 'โลโก้');
@@ -127,7 +129,7 @@ page_header('ปรับแต่งหน้าตาระบบ');
       <div class="field"><label>โลโก้ (แทนชื่อระบบบนแถบเมนู)</label>
         <?php if ($logo) { ?><div style="margin-bottom:6px; background:var(--sidebar-bg); padding:8px; border-radius:8px; display:inline-block"><img src="<?= h(img_url($logo)) ?>" class="brand-logo"></div>
           <label style="display:block; font-weight:400"><input type="checkbox" name="remove_logo" value="1"> ลบโลโก้ (กลับไปใช้ชื่อระบบ)</label><?php } ?>
-        <input type="file" name="brand_logo" accept="image/*,.svg">
+        <input type="file" name="brand_logo" accept="image/*">
         <div style="display:flex; align-items:center; gap:8px; margin-top:8px">
           <label for="ap-logo-h" style="font-weight:400; font-size:<?= theme_fs_css(13) ?>; margin:0">ความสูงโลโก้:</label>
           <input id="ap-logo-h" type="range" name="brand_logo_h" min="20" max="160" step="2" value="<?= (int)setting('brand_logo_h', 56) ?>" oninput="document.getElementById('logo-h-val').textContent=this.value" style="flex:1">
@@ -140,8 +142,8 @@ page_header('ปรับแต่งหน้าตาระบบ');
             <label style="font-weight:400"><input type="checkbox" name="remove_favicon" value="1"> ลบไอคอน</label>
           </div>
         <?php } ?>
-        <input type="file" name="favicon" accept="image/*,.ico,.svg">
-        <div class="muted" style="font-size:<?= theme_fs_css(12) ?>; margin-top:3px">แนะนำรูปสี่เหลี่ยมจัตุรัส PNG ขนาด 64×64 ขึ้นไป · รองรับ PNG / JPG / GIF / WebP / ICO / SVG · ขนาดไม่เกิน <?= h(ini_get('upload_max_filesize')) ?></div>      </div>
+        <input type="file" name="favicon" accept="image/*,.ico">
+        <div class="muted" style="font-size:<?= theme_fs_css(12) ?>; margin-top:3px">แนะนำรูปสี่เหลี่ยมจัตุรัส PNG ขนาด 64×64 ขึ้นไป · รองรับ PNG / JPG / GIF / WebP / ICO · ขนาดไม่เกิน <?= h(ini_get('upload_max_filesize')) ?></div>      </div>
 
       <h3 class="h-with-icon" style="margin:18px 0 10px"><?= ui_icon_html('clipboard', 18, 'h-svg') ?><span>ขนาดตัวอักษร</span></h3>
       <?php $fontScaleCur = theme_font_scale_percent(); ?>

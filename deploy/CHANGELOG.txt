@@ -1435,3 +1435,18 @@ Files:
   finishgoogs_ma_update/share.php
   parts/assets/style.css
 
+
+================================================================
+v2026-08-09_210308 | Patch | 2026-08-09 21:03:12
+From: 2026-08-09_201638  ->  To: d073faf  |  Files: 6
+----------------------------------------------------------------
+- QA fixes: stock_deducted guard, negative-stock guard, cron CLI-only, appearance PIN gate, SVG upload block, PIN TTL, schema.sql sync, remove dead code
+
+Files:
+  finishgoogs_ma_update/appearance.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/cron/.htaccess
+  finishgoogs_ma_update/cron/_bootstrap.php
+  finishgoogs_ma_update/includes/settings_gate.php
+  parts/includes/StockService.php
+

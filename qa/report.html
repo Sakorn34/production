@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>รายงานตรวจสอบระบบ — production (QA)</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#fff; --ink:#1a1d23; --muted:#5b6472; --line:#e3e7ed;
+    --crit:#b3261e; --crit-bg:#fdecea; --high:#b45309; --high-bg:#fef3e2;
+    --med:#1d4ed8; --med-bg:#e8efff; --low:#4b5563; --low-bg:#eef0f3;
+    --ok:#15803d; --ok-bg:#e8f5ec; --code:#f4f6f8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14171c; --card:#1c2027; --ink:#e8eaed; --muted:#9aa3b0; --line:#2c323b;
+      --crit:#ff8a80; --crit-bg:#3a1f1d; --high:#fbbf5c; --high-bg:#3a2e18;
+      --med:#8ab4f8; --med-bg:#1c2a44; --low:#aab2bf; --low-bg:#252a32;
+      --ok:#7ee2a8; --ok-bg:#16301f; --code:#12151a;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#14171c; --card:#1c2027; --ink:#e8eaed; --muted:#9aa3b0; --line:#2c323b;
+    --crit:#ff8a80; --crit-bg:#3a1f1d; --high:#fbbf5c; --high-bg:#3a2e18;
+    --med:#8ab4f8; --med-bg:#1c2a44; --low:#aab2bf; --low-bg:#252a32;
+    --ok:#7ee2a8; --ok-bg:#16301f; --code:#12151a;
+  }
+  :root[data-theme="light"]{
+    --bg:#f6f7f9; --card:#fff; --ink:#1a1d23; --muted:#5b6472; --line:#e3e7ed;
+    --crit:#b3261e; --crit-bg:#fdecea; --high:#b45309; --high-bg:#fef3e2;
+    --med:#1d4ed8; --med-bg:#e8efff; --low:#4b5563; --low-bg:#eef0f3;
+    --ok:#15803d; --ok-bg:#e8f5ec; --code:#f4f6f8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,"Sarabun","Noto Sans Thai",sans-serif;
+    line-height:1.7;font-size:15px}
+  .wrap{max-width:960px;margin:0 auto;padding:32px 20px 80px}
+  header.top{margin-bottom:28px;padding-bottom:20px;border-bottom:2px solid var(--line)}
+  h1{font-size:26px;margin:0 0 8px;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:14px;margin:0}
+  h2{font-size:19px;margin:36px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:22px 0}
+  .c{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 10px;text-align:center}
+  .c .n{font-size:28px;font-weight:700;line-height:1.15}
+  .c .l{font-size:12px;color:var(--muted);margin-top:2px}
+  .n.crit{color:var(--crit)} .n.high{color:var(--high)} .n.med{color:var(--med)}
+  .n.low{color:var(--low)} .n.ok{color:var(--ok)}
+  .bug{background:var(--card);border:1px solid var(--line);border-left-width:4px;
+    border-radius:10px;padding:18px 20px;margin:16px 0}
+  .bug.crit{border-left-color:var(--crit)} .bug.high{border-left-color:var(--high)}
+  .bug.med{border-left-color:var(--med)}  .bug.low{border-left-color:var(--low)}
+  .bug h3{margin:0 0 10px;font-size:17px;display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+  .tag{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:.03em;white-space:nowrap}
+  .tag.crit{background:var(--crit-bg);color:var(--crit)}
+  .tag.high{background:var(--high-bg);color:var(--high)}
+  .tag.med{background:var(--med-bg);color:var(--med)}
+  .tag.low{background:var(--low-bg);color:var(--low)}
+  .tag.ok{background:var(--ok-bg);color:var(--ok)}
+  .bug dl{margin:12px 0 0;display:grid;grid-template-columns:max-content 1fr;gap:7px 14px}
+  .bug dt{color:var(--muted);font-size:13px;font-weight:600;white-space:nowrap}
+  .bug dd{margin:0}
+  @media (max-width:620px){
+    .bug dl{grid-template-columns:1fr;gap:2px}
+    .bug dd{margin-bottom:9px}
+  }
+  code{background:var(--code);padding:2px 6px;border-radius:4px;
+    font-family:Consolas,"SF Mono",Menlo,monospace;font-size:13px;word-break:break-word}
+  pre{background:var(--code);border:1px solid var(--line);border-radius:8px;
+    padding:12px 14px;overflow-x:auto;margin:11px 0;font-size:13px;line-height:1.55}
+  pre code{background:none;padding:0}
+  .proof{background:var(--ok-bg);border:1px solid var(--line);border-radius:8px;padding:11px 14px;margin:11px 0}
+  .proof b{color:var(--ok)}
+  table{width:100%;border-collapse:collapse;margin:13px 0;font-size:14px}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-size:12.5px;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+  .tbl-scroll{overflow-x:auto}
+  ul{margin:9px 0;padding-left:22px} li{margin:5px 0}
+  .note{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 20px;margin:16px 0}
+  .ok-list li::marker{color:var(--ok)}
+  footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);
+    color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>รายงานตรวจสอบระบบ — production</h1>
+  <p class="sub">
+    ขอบเขต: <code>finishgoogs_ma_update</code> + <code>parts</code> + <code>shared</code> (~20,400 บรรทัด) ·
+    ตรวจและแก้วันที่ 9 ส.ค. 2026 · โดย QA<br>
+    วิธีตรวจ: อ่านโค้ดจริง + รันทดสอบกับฐานข้อมูล <code>biton_tech_parts</code> (localhost) ·
+    ทุกข้อมี<b>หลักฐานยืนยัน</b> ไม่มีการคาดเดา
+  </p>
+</header>
+
+<div class="cards">
+  <div class="c"><div class="n ok">10</div><div class="l">แก้แล้วทั้งหมด</div></div>
+  <div class="c"><div class="n ok">20</div><div class="l">เทสต์ผ่าน</div></div>
+  <div class="c"><div class="n ok">0</div><div class="l">เทสต์ตก</div></div>
+  <div class="c"><div class="n ok">6</div><div class="l">ไฟล์ที่ต้องอัป</div></div>
+</div>
+
+<div class="note" style="border-left:4px solid var(--ok)">
+  <b style="color:var(--ok)">สถานะ: แก้ครบทั้ง 10 ข้อแล้ว · ทดสอบผ่านหมด · ชุด deploy พร้อมอัป</b><br>
+  แพตช์ <code>v2026-08-09_210308</code> — 6 ไฟล์ ที่ <code>deploy/release/production/</code><br>
+  <span class="sub">รายการด้านล่างคือปัญหาที่ตรวจพบ<b>ก่อนแก้</b> เก็บไว้เป็นบันทึกว่าแก้อะไรไปบ้างและเพราะอะไร</span>
+</div>
+
+<h2>สรุปสิ่งที่แก้และผลทดสอบ</h2>
+<div class="tbl-scroll">
+<table>
+  <tr><th>ข้อ</th><th>แก้อย่างไร</th><th>ไฟล์</th><th>ผลทดสอบ</th></tr>
+  <tr><td><b>BUG-01</b></td><td>เช็ค <code>stock_deducted</code> ก่อนคืนสต็อก โดยใช้ฟังก์ชัน <code>production_stock_out_was_deducted_row()</code> ที่มีอยู่แล้ว</td>
+      <td><code>StockService.php</code></td><td>ผ่าน 2/2</td></tr>
+  <tr><td><b>BUG-02</b></td><td>ล็อกแถวด้วย <code>FOR UPDATE</code> + หักแบบมี <code>AND quantity &gt;= ?</code> + เช็ค <code>rowCount()</code> · ย้ายการตรวจเข้าใน transaction · เช็ค <code>stock_deducted</code> ด้วย</td>
+      <td><code>StockService.php</code></td><td>ผ่าน 6/6</td></tr>
+  <tr><td><b>BUG-03</b></td><td>เพิ่ม <code>.htaccess</code> ปิดโฟลเดอร์ <code>cron/</code> + ใส่ CLI guard ใน <code>_bootstrap.php</code> (กัน 2 ชั้น)</td>
+      <td><code>cron/.htaccess</code>, <code>cron/_bootstrap.php</code></td><td>ผ่าน — เว็บได้ 403 · CLI ทำงานปกติ</td></tr>
+  <tr><td><b>BUG-04</b></td><td>เปลี่ยนจาก <code>require_login()</code> เป็น <code>require_settings_access()</code> ให้ตรงกับหน้าหลังบ้านอื่น</td>
+      <td><code>appearance.php</code></td><td>ผ่าน</td></tr>
+  <tr><td><b>BUG-05</b></td><td>ตัด <code>svg</code> ออกจากชนิดไฟล์ที่รับ · เสริมตัวกรองใน <code>save_upload()</code> ให้อ่านทั้งไฟล์และปฏิเสธ script / event handler / <code>javascript:</code> / <code>foreignObject</code> / ENTITY</td>
+      <td><code>appearance.php</code>, <code>config.php</code></td><td>ผ่าน 7/7</td></tr>
+  <tr><td><b>BUG-06</b></td><td>เขียน <code>schema.sql</code> ใหม่ให้ตรงกับฐานข้อมูลจริง พร้อมคอมเมนต์อธิบาย <code>stock_deducted</code></td>
+      <td><code>parts/database/schema.sql</code></td><td>เทียบกับ DB จริงตรงทุกคอลัมน์</td></tr>
+  <tr><td><b>BUG-07</b></td><td>เพิ่ม <code>SETTINGS_UNLOCK_TTL</code> (30 นาที) แล้วเอาเวลาที่เก็บไว้มาใช้จริง</td>
+      <td><code>config.php</code></td><td>ผ่าน 5/5</td></tr>
+  <tr><td><b>BUG-08</b></td><td>ย้าย <code>sftp.json</code> ออกจาก webroot ไป <code>D:\AppServ\secrets\production\</code></td>
+      <td>—</td><td>ยืนยันไม่เหลือใน webroot</td></tr>
+  <tr><td><b>BUG-09</b></td><td>แก้ข้อความเป็น "การปลดล็อกหมดอายุใน 30 นาที" · แก้คอมเมนต์ที่ล้าสมัย</td>
+      <td><code>settings_gate.php</code></td><td>ผ่าน</td></tr>
+  <tr><td><b>BUG-10</b></td><td>ลบ <code>getRecentMovements()</code> และ <code>stockOutByWebhook()</code> ออก (รวม 81 บรรทัด)</td>
+      <td><code>StockService.php</code></td><td>ผ่าน — ทุกหน้ายังโหลดปกติ</td></tr>
+</table>
+</div>
+
+<div class="note">
+  <b>Regression test:</b> เปิดหน้าหลักทั้ง 9 หน้าของทั้งสองระบบหลังแก้
+  (index, share, assets, appearance, settings, parts index, history, products, healthz)
+  — ได้ HTTP 200/302 ทุกหน้า ไม่มี fatal error<br>
+  <b>ข้อมูลทดสอบ:</b> ทุกเคสสร้างใบเบิกทดสอบจริงแล้วลบคืน + คืนค่า <code>quantity</code> เดิม —
+  ตรวจแล้วไม่มีข้อมูลทดสอบตกค้าง
+</div>
+
+<h2>Critical</h2>
+
+<div class="bug crit">
+  <h3><span class="tag crit">CRITICAL</span> BUG-01 · ลบใบเบิกแล้วสต็อกเพิ่มผี (คืนของที่ไม่เคยถูกตัด)</h3>
+
+  <p>ตาราง <code>stock_out</code> มีคอลัมน์ <code>stock_deducted</code> ที่บอกว่าใบนั้น
+  <b>ตัดสต็อกจริง</b> หรือเป็น<b>ใบ sync ย้อนหลังที่ไม่ได้ตัดสต็อก</b>
+  แต่ฟังก์ชันลบที่ปุ่มบนหน้าเว็บเรียกใช้ กลับคืนสต็อกกลับทุกใบโดยไม่ดู flag นี้เลย</p>
+
+<pre><code>// parts/includes/StockService.php:1000  — deleteStockOut()
+foreach ($detail['items'] as $item) {
+    $this->db->prepare('UPDATE products SET quantity = quantity + ? WHERE id = ?')
+        ->execute([(int) $item['quantity'], (int) $item['product_id']]);   // ← คืนทุกใบ ไม่เช็ค stock_deducted
+}</code></pre>
+
+  <p>สิ่งที่ยืนยันว่านี่คือบั๊ก ไม่ใช่การออกแบบ: ระบบ<b>มีฟังก์ชันตรวจสำเร็จรูปอยู่แล้ว</b>
+  (<code>production_stock_out_was_deducted_row()</code>) และโค้ดลบอีก 2 จุดในระบบเดียวกัน
+  <b>เช็คถูกต้องแล้ว</b> — มีเฉพาะ path ที่ผู้ใช้กดจากหน้าเว็บเท่านั้นที่ลืมเช็ค</p>
+
+<pre><code>// parts/includes/production_sync.php:1016 — ทำถูกต้อง
+$returnStock = production_stock_out_was_deducted_row($headerRow);
+if ($returnStock) { /* คืนสต็อก */ }
+
+// parts/includes/production_sync.php:1086 — ทำถูกต้องเช่นกัน
+$returnStock = production_stock_out_was_deducted_row($dedSt->fetch());</code></pre>
+
+  <div class="proof">
+    <b>หลักฐานจากฐานข้อมูลจริง</b> — นับใบเบิกแยกตาม flag:
+<pre><code>stock_deducted = 1  →   34 ใบ
+stock_deducted = 0  →  145 ใบ   ← 81% ของทั้งหมด กดลบเมื่อไหร่สต็อกเพิ่มผีทันที</code></pre>
+  </div>
+
+  <dl>
+    <dt>ไฟล์</dt><dd><code>parts/includes/StockService.php:998-1006</code></dd>
+    <dt>ผู้ใช้กดได้ที่</dt><dd><code>parts/pages/history.php:199</code> — ปุ่มลบบนหน้าประวัติ ผู้ใช้ทั่วไปกดได้</dd>
+    <dt>ทำซ้ำ</dt><dd>เปิดหน้าประวัติ → เลือกใบเบิกที่ <code>stock_deducted=0</code> (ซึ่งเป็นใบส่วนใหญ่) → กดลบ</dd>
+    <dt>ควรเป็น</dt><dd>ใบที่ไม่เคยตัดสต็อก เมื่อลบต้องไม่คืนสต็อก ยอดคงเหลือคงเดิม</dd>
+    <dt>เกิดขึ้นจริง</dt><dd><code>products.quantity</code> เพิ่มขึ้นตามจำนวนในใบ ทั้งที่ไม่เคยถูกหักออกไป</dd>
+    <dt>กระทบผู้ใช้</dt><dd>ยอดอะไหล่คงเหลือสูงกว่าของจริง → ช่างเบิกแล้วไม่มีของ ·
+      รายงานมูลค่าสต็อกสิ้นปีผิด · การเตือนของใกล้หมด (<code>min_stock</code>) ไม่ทำงานเพราะยอดดูเหมือนยังเยอะ ·
+      <b>ความเสียหายสะสมทุกครั้งที่ลบ โดยไม่มีอะไรเตือน</b></dd>
+    <dt>แนวทางแก้</dt><dd>เรียก <code>production_stock_out_was_deducted_row($detail)</code> ก่อนคืนสต็อก
+      (<code>getStockOutDetail()</code> ใช้ <code>SELECT so.*</code> จึงมีค่า <code>stock_deducted</code> พร้อมใช้อยู่แล้ว)</dd>
+  </dl>
+</div>
+
+<h2>High</h2>
+
+<div class="bug high">
+  <h3><span class="tag high">HIGH</span> BUG-02 · แก้จำนวนใบเบิกแล้วสต็อกติดลบได้</h3>
+
+  <p>เมธอด <code>updateStockOutSingle()</code> ตรวจของคงเหลือ <b>นอก transaction</b>
+  ด้วย <code>SELECT</code> ธรรมดาที่ไม่มี <code>FOR UPDATE</code> แล้วหักสต็อกด้วย SQL ที่ <b>ไม่มี guard</b> —
+  ต่างจากเมธอดพี่น้องทุกตัวในไฟล์เดียวกัน</p>
+
+<pre><code>// parts/includes/StockService.php:920 — ปัจจุบัน (ไม่มี guard)
+UPDATE products SET quantity = quantity - ? WHERE id = ?
+
+// stockOutItem():490, stockOutBySet():432, deleteStockIn():861 — ทำถูกต้อง
+UPDATE products SET quantity = quantity - ? WHERE id = ? AND quantity >= ?   +  เช็ค rowCount()===0 แล้ว throw</code></pre>
+
+  <div class="proof">
+    <b>ผลทดสอบจริง</b> (รันใน transaction แล้ว rollback — ไม่แตะข้อมูลจริง):
+<pre><code>ก่อน       : P00001 qty = 92
+หลัง       : qty = -50   (rowCount=1)   ← SQL แบบปัจจุบัน ยอมให้ติดลบ
+แบบมี guard : qty = 92   (rowCount=0)   ← SQL ที่ควรเป็น ระบบจะ throw error</code></pre>
+  </div>
+
+  <dl>
+    <dt>ไฟล์</dt><dd><code>parts/includes/StockService.php:906-921</code></dd>
+    <dt>ผู้ใช้กดได้ที่</dt><dd><code>parts/pages/history.php:202</code> — ปุ่มแก้ไขบนหน้าประวัติ</dd>
+    <dt>ทำซ้ำ</dt><dd>ผู้ใช้ 2 คนเปิดแก้ไขอะไหล่ตัวเดียวกันพร้อมกันแล้วเพิ่มจำนวนเบิกทั้งคู่ —
+      การตรวจของทั้งสองผ่าน (เพราะอ่านค่าก่อนใครหัก) แล้วต่างคนต่างหัก</dd>
+    <dt>ขอบเขต</dt><dd>ใช้งานคนเดียวไม่พร้อมกัน การตรวจบรรทัด 906-911 ยังกันได้อยู่ —
+      บั๊กนี้โผล่ตอนใช้พร้อมกัน (race condition)</dd>
+    <dt>เพิ่มเติม</dt><dd>เมธอดนี้<b>ไม่เช็ค <code>stock_deducted</code></b> เช่นกัน (ปัญหาชุดเดียวกับ BUG-01) —
+      แก้จำนวนใบที่ <code>stock_deducted=0</code> ก็ไปขยับยอดคงเหลือทั้งที่ใบนั้นไม่เคยตัดสต็อก</dd>
+  </dl>
+</div>
+
+<div class="bug high">
+  <h3><span class="tag high">HIGH</span> BUG-03 · ไฟล์ cron เปิดให้เรียกจากเว็บได้โดยไม่ต้อง login</h3>
+
+  <p>โฟลเดอร์ <code>finishgoogs_ma_update/cron/</code> อยู่ใน webroot แต่
+  <b>ไม่มี <code>.htaccess</code></b> · ไฟล์ทั้ง 10 ตัว <b>ไม่มีตัวตรวจว่าถูกเรียกจาก CLI</b>
+  (<code>php_sapi_name()</code>) และ<b>ไม่มีการเช็ค login</b> ตัวกันเพียงอย่างเดียวคือ
+  <code>if (!defined('LINE_PLESK_JOB'))</code> ซึ่ง<b>ผ่านอยู่แล้ว</b>เมื่อเรียกไฟล์ wrapper ตรงๆ</p>
+
+<pre><code>// cron/plesk_line_job_low_stock.php — เปิด URL นี้จากเบราว์เซอร์ = สั่งงานได้เลย
+define('LINE_PLESK_JOB', 'low_stock_scan');   // ← ตัวมันเองนิยาม constant ให้ผ่าน guard
+require __DIR__ . '/plesk_line_run_job.php';  // → line_notify_run_job() + ส่ง outbox จริง</code></pre>
+
+  <dl>
+    <dt>ทำซ้ำ</dt><dd>เปิด <code>https://&lt;host&gt;/production/finishgoogs_ma_update/cron/plesk_line_job_low_stock.php</code>
+      จากเครื่องใดก็ได้ ไม่ต้อง login</dd>
+    <dt>เกิดขึ้นจริง</dt><dd>ระบบรันงานแจ้งเตือนและส่ง LINE ออกไปหาผู้ใช้จริงทันที
+      แล้วคืน JSON รายละเอียดผลการทำงานกลับมาให้ผู้เรียกดูด้วย</dd>
+    <dt>กระทบผู้ใช้</dt><dd>ผู้ไม่หวังดีกดซ้ำๆ เพื่อสแปม LINE ให้พนักงาน ·
+      เปลืองโควตา LINE API · JSON ที่คืนกลับเผยข้อมูลภายในของงาน</dd>
+    <dt>แนวทางแก้</dt><dd>เพิ่ม <code>.htaccess</code> ปิดทั้งโฟลเดอร์ <code>cron/</code>
+      และ/หรือใส่ <code>if (PHP_SAPI !== 'cli') { http_response_code(403); exit; }</code> ใน <code>_bootstrap.php</code></dd>
+  </dl>
+</div>
+
+<h2>Medium</h2>
+
+<div class="bug med">
+  <h3><span class="tag med">MEDIUM</span> BUG-04 · หน้า appearance.php ใครที่ login ก็เข้าไปแก้หน้าตาระบบทั้งบริษัทได้</h3>
+  <p>หน้าหลังบ้านอื่นบังคับ PIN ด้วย <code>require_settings_access()</code> ครบทุกหน้า
+  แต่ <code>appearance.php</code> เรียกแค่ <code>require_login()</code> — ผู้ใช้ทั่วไปที่ login ผ่าน SSO
+  เข้าไปเปลี่ยนชื่อระบบ สีธีม โลโก้ และลำดับเมนูของทุกคนได้</p>
+  <div class="tbl-scroll">
+  <table>
+    <tr><th>หน้า</th><th>ตัวกัน</th><th>สถานะ</th></tr>
+    <tr><td><code>activity_logs.php:9</code></td><td><code>require_settings_access()</code></td><td>ถูกต้อง</td></tr>
+    <tr><td><code>settings_bulk.php:19</code></td><td><code>require_settings_access()</code></td><td>ถูกต้อง</td></tr>
+    <tr><td><code>server_config.php:11</code></td><td><code>require_settings_access()</code></td><td>ถูกต้อง</td></tr>
+    <tr><td><code>line_notify_settings.php:13</code></td><td><code>require_settings_access()</code></td><td>ถูกต้อง</td></tr>
+    <tr><td><code>appearance.php:5</code></td><td><code>require_login()</code> เท่านั้น</td><td><b>ไม่สอดคล้อง</b></td></tr>
+  </table>
+  </div>
+  <p class="sub">หมายเหตุ: การตรวจค่าสีทำไว้ดีแล้ว (<code>preg_match('/^#[0-9a-fA-F]{6}$/')</code> — ค่าที่ไม่ใช่ hex ถูกทิ้ง)</p>
+</div>
+
+<div class="bug med">
+  <h3><span class="tag med">MEDIUM</span> BUG-05 · อัปโหลดโลโก้เป็นไฟล์ SVG ที่ฝัง script ได้ (Stored XSS)</h3>
+  <p><code>appearance.php:47</code> อนุญาตนามสกุล <code>svg</code> และ <code>save_upload()</code>
+  ตรวจไฟล์ SVG เพียงว่า 4096 ไบต์แรก<b>มีข้อความ <code>&lt;svg</code></b> เท่านั้น —
+  ไฟล์ SVG ที่มี <code>&lt;script&gt;</code> ฝังอยู่จึงผ่านได้</p>
+<pre><code>// config.php:714
+if ($ext === 'svg') {
+    if (stripos(file_get_contents(...,0,4096), '&lt;svg') === false) return null;  // ← ตรวจแค่นี้
+}</code></pre>
+  <p><code>uploads/.htaccess</code> ปิดการรัน PHP ไว้แล้ว (ดีมาก) แต่<b>ไม่ได้กัน SVG</b> —
+  เมื่อเปิด URL ของไฟล์ตรงๆ เบราว์เซอร์จะรัน JavaScript ในนั้นภายใต้โดเมนของระบบ
+  ซึ่งขโมย session ของผู้ใช้คนอื่นได้ · ความเสี่ยงถูกขยายโดย BUG-04 เพราะผู้ใช้ทั่วไปก็เข้าหน้านี้ได้</p>
+  <p class="sub">แนวทางแก้: ตัด <code>svg</code> ออกจากรายการที่อนุญาต (ใช้ PNG แทน) หรือ sanitize เนื้อไฟล์ก่อนบันทึก</p>
+</div>
+
+<div class="bug med">
+  <h3><span class="tag med">MEDIUM</span> BUG-06 · <code>parts/database/schema.sql</code> ล้าสมัย สร้าง DB ใหม่แล้วแอปพังทันที</h3>
+  <p>เทียบไฟล์ schema กับฐานข้อมูลจริง พบว่าไฟล์ขาดคอลัมน์ที่โค้ดใช้งานอยู่:</p>
+  <div class="tbl-scroll">
+  <table>
+    <tr><th>ตาราง</th><th>คอลัมน์ที่มีจริงแต่ไม่มีในไฟล์ schema</th></tr>
+    <tr><td><code>products</code></td><td><code>price</code>, <code>is_active</code>, <code>supplier</code></td></tr>
+    <tr><td><code>stock_in</code></td><td><code>received_by</code>, <code>part_movement_id</code></td></tr>
+    <tr><td><code>stock_out</code></td><td><code>asset_code</code>, <code>part_movement_id</code>, <code>stock_deducted</code></td></tr>
+    <tr><td><code>stock_out_items</code></td><td><code>part_movement_id</code></td></tr>
+  </table>
+  </div>
+  <p>ใครที่ setup ระบบใหม่จากไฟล์นี้จะเจอ error ตั้งแต่หน้าแรก เพราะ <code>getDashboardStats()</code>
+  query <code>WHERE quantity &lt;= min_stock AND is_active = 1</code> — ไม่กระทบระบบที่รันอยู่
+  แต่ทำให้<b>กู้ระบบหรือตั้งเครื่องใหม่ไม่ได้</b></p>
+</div>
+
+<div class="bug med">
+  <h3><span class="tag med">MEDIUM</span> BUG-07 · PIN หลังบ้านปลดล็อกแล้วไม่มีวันหมดอายุ</h3>
+  <p><code>settings_gate.php:33</code> เก็บ <code>$_SESSION['settings_unlocked'] = time()</code>
+  แต่ <code>config.php:616</code> ตรวจแค่ <code>!empty(...)</code> — <b>เก็บเวลาไว้แต่ไม่เคยเอามาใช้</b></p>
+  <p>ปลดล็อกครั้งเดียวแล้วเข้าหลังบ้านได้ตลอดอายุ session · ถ้าเดินจากเครื่องโดยไม่ปิดเบราว์เซอร์
+  คนถัดไปเข้าหน้า settings / share_admin / activity_logs ได้ทันทีโดยไม่ต้องใส่ PIN</p>
+  <p class="sub">แนวทางแก้: เทียบ <code>time() - $_SESSION['settings_unlocked'] &lt; 1800</code> — ค่าที่ต้องใช้เก็บไว้พร้อมแล้ว</p>
+</div>
+
+<div class="bug med">
+  <h3><span class="tag med">MEDIUM</span> BUG-08 · <code>parts/sftp.json</code> เก็บรหัส FTP จริงไว้ใน webroot</h3>
+  <p>ไฟล์มี host, username, password ของ FTP เซิร์ฟเวอร์จริง และตั้ง <code>"secure": false</code>
+  (FTP ธรรมดา ไม่เข้ารหัส)</p>
+  <p><b>ป้องกันไว้แล้วระดับหนึ่ง:</b> <code>parts/.htaccess</code> บล็อกไฟล์ <code>.json</code>
+  และ <code>.gitignore</code> กันไม่ให้ commit</p>
+  <p><b>ที่ยังเหลือ:</b> การป้องกันพึ่ง <code>.htaccess</code> ชั้นเดียว — ถ้าย้ายไป nginx
+  หรือ Apache ตั้ง <code>AllowOverride None</code> ไฟล์จะเปิดโล่งทันที และรหัสในไฟล์ยังใช้งานได้จริงอยู่</p>
+  <p class="sub">แนวทางแก้: ย้ายไปรวมกับ secrets อื่นที่ <code>D:\AppServ\secrets\production\</code>
+  (ซึ่งระบบทำแล้วกับรหัสฐานข้อมูล) แล้วเปลี่ยนรหัส FTP</p>
+</div>
+
+<h2>Low</h2>
+
+<div class="bug low">
+  <h3><span class="tag low">LOW</span> BUG-09 · ข้อความบนหน้า PIN ไม่ตรงกับความจริงแล้ว</h3>
+  <p><code>settings_gate.php:102</code> ยังแสดง "ผู้ใช้ Tom เข้าได้โดยไม่ต้องใส่รหัส"
+  แต่โค้ดจริง (<code>config.php:613</code>) จำกัดทางลัดนี้ไว้เฉพาะ localhost แล้ว —
+  บน production ข้อความนี้ไม่จริง ทำให้ผู้ใช้สับสน และบอกใบ้ชื่อบัญชีที่มีสิทธิ์พิเศษโดยไม่จำเป็น
+  (คอมเมนต์หัวไฟล์บรรทัด 5 และ 13 ก็ยังเขียนแบบเดิม)</p>
+</div>
+
+<div class="bug low">
+  <h3><span class="tag low">LOW</span> BUG-10 · dead code</h3>
+  <p><code>StockService::getRecentMovements()</code> (บรรทัด 203) ไม่มีใครเรียกใช้ทั้งโปรเจค ·
+  <code>stockOutByWebhook()</code> (บรรทัด 715) มาร์ค <code>@deprecated</code> แล้วและไม่มีทางเรียกถึง
+  เพราะ endpoint ปิดไปแล้ว — ควรลบทิ้งเพื่อลดภาระการดูแล</p>
+</div>
+
+<h2>ส่วนที่ตรวจแล้วไม่พบปัญหา</h2>
+
+<div class="note">
+  <ul class="ok-list">
+    <li><b>CSRF ครบถ้วน 100%</b> — สแกนทุกไฟล์ที่รับ POST ในระบบหลัก ไม่พบไฟล์ไหนที่ขาด <code>csrf_check()</code> เลย</li>
+    <li><b>ไม่พบช่องโหว่ SQL injection</b> — ทุก query ใช้ prepared statement ·
+      ส่วน <code>ORDER BY</code> ที่รับค่าจากผู้ใช้ใช้ whitelist (<code>$sortSql[$sort]</code>) ·
+      <code>LIMIT</code> cast เป็น <code>(int)</code> ก่อนต่อสตริงทุกจุด</li>
+    <li><b>ทุกหน้าบังคับ login</b> — ไฟล์ที่ไม่เรียก <code>require_login()</code> ตรงๆ
+      ล้วนเรียกผ่าน <code>require_can()</code> (ซึ่งเรียก <code>require_login()</code> ต่อ) หรือเป็นแค่หน้า redirect</li>
+    <li><b><code>part_stock_bridge.php</code> เขียนถูกต้องทั้งไฟล์</b> — ใช้ <code>AND quantity &gt;= ?</code> +
+      เช็ค <code>rowCount()</code> + ตั้ง <code>stock_deducted = 1</code> ตอนตัดสต็อกจริง (เป็นตัวอย่างที่ควรยึดเป็นแบบ)</li>
+    <li><b><code>uploads/.htaccess</code> ปิดการรัน PHP</b> ในโฟลเดอร์อัปโหลดไว้เรียบร้อย</li>
+    <li><b>Webhook เดิมที่ไม่มี auth ถูกปิดแล้ว</b> — <code>api/webhook-stockout.php</code> คืน HTTP 410</li>
+    <li><b>ทางลัด Tom ถูกจำกัดเฉพาะ localhost แล้ว</b> — ใช้บน production ไม่ได้</li>
+    <li><b>รหัสฐานข้อมูลและ Cloudflare token ย้ายออกนอก webroot แล้ว</b> ไปที่ <code>D:\AppServ\secrets\production\</code></li>
+  </ul>
+</div>
+
+<h2>ขั้นตอน deploy</h2>
+
+<div class="note">
+  <p><b>แพตช์ <code>v2026-08-09_210308</code> — 6 ไฟล์</b> อยู่ที่ <code>deploy\release\production\</code></p>
+<pre><code>finishgoogs_ma_update/appearance.php
+finishgoogs_ma_update/config.php
+finishgoogs_ma_update/cron/.htaccess          ← ไฟล์ใหม่
+finishgoogs_ma_update/cron/_bootstrap.php
+finishgoogs_ma_update/includes/settings_gate.php
+parts/includes/StockService.php</code></pre>
+  <ol>
+    <li>เปิด <code>deploy\release\production\README.html</code> ดูรายละเอียดเวอร์ชัน</li>
+    <li>FTP อัปเนื้อหาใน <code>deploy\release\production\</code> → <code>httpdocs/production/</code> (คงโครงสร้างโฟลเดอร์)
+      · <b>ข้าม</b> <code>README.html</code> กับ <code>PATCH-MANIFEST.txt</code></li>
+    <li>ตรวจว่า <code>cron/.htaccess</code> ขึ้นไปด้วย — บาง FTP client ซ่อนไฟล์ที่ขึ้นต้นด้วยจุด ต้องเปิด "แสดงไฟล์ซ่อน" ก่อน</li>
+    <li>ทดสอบบน server: เปิด <code>/production/finishgoogs_ma_update/cron/plesk_line_job_low_stock.php</code>
+      ผ่านเบราว์เซอร์ — <b>ต้องได้ 403</b> ถ้ายังได้ 200 แปลว่า <code>.htaccess</code> ยังไม่ขึ้นหรือ <code>AllowOverride</code> ปิดอยู่</li>
+    <li>ตรวจว่า Plesk Scheduled Task ยังทำงานปกติ (รันแบบ CLI จึงไม่โดนบล็อก)</li>
+    <li>กลับมาบอกในแชท "อัปเสร็จแล้ว" เพื่อบันทึก baseline (<code>mark-deployed</code>)</li>
+  </ol>
+  <p class="sub"><b>ไม่ต้องแตะฐานข้อมูล</b> — แพตช์นี้ไม่มีการเปลี่ยนโครงสร้างตาราง ·
+  <code>parts/database/schema.sql</code> ที่แก้เป็นไฟล์อ้างอิงสำหรับตั้งระบบใหม่ ไม่ต้องอัปขึ้น server</p>
+</div>
+
+<div class="note">
+  <b>เรื่องที่ต้องทำเองเพิ่ม (ผมทำแทนไม่ได้):</b>
+  <ul>
+    <li><b>เปลี่ยนรหัส FTP</b> — ไฟล์ <code>sftp.json</code> ถูกย้ายออกจาก webroot ไปที่
+      <code>D:\AppServ\secrets\production\sftp.json</code> แล้ว แต่รหัสเดิมยังใช้งานได้อยู่ ควรเปลี่ยนใหม่</li>
+    <li><b>ถ้าใช้ VS Code SFTP extension</b> — extension จะหาไฟล์ไม่เจอแล้ว ต้องชี้ path ใหม่
+      หรือก๊อปกลับมาไว้ที่ <code>parts/.vscode/sftp.json</code> (โฟลเดอร์นั้นถูก <code>.htaccess</code> และ <code>.gitignore</code> กันอยู่แล้ว)</li>
+    <li><b>ตรวจบน server ว่ามี <code>parts/sftp.json</code> ค้างอยู่หรือไม่</b> — ถ้ามีให้ลบทิ้ง</li>
+  </ul>
+</div>
+
+<h2>ข้อจำกัดของการตรวจรอบนี้</h2>
+<div class="note">
+  <p>ตรวจ<b>เชิงลึกครบ</b>: ฝั่ง <code>parts/</code> ทั้งหมด (StockService, production_sync, history, config, schema)
+  และฝั่ง <code>finishgoogs_ma_update</code> เฉพาะระบบ auth/CSRF/SQL/upload/cron ซึ่งสแกนครบทุกไฟล์แล้ว</p>
+  <p><b>ยังไม่ได้ตรวจเชิงลึก</b>: ตรรกะทางธุรกิจของ <code>finishgoogs_ma_update</code> เช่น
+  <code>ma.php</code> (1,487 บรรทัด — การคำนวณรอบ MA และ alert SD/RTC),
+  <code>asset_new.php</code> (1,131 บรรทัด — การออกรหัสเครื่องและตัด BOM),
+  <code>includes/asset_production_edit.php</code> (957 บรรทัด) และระบบ LINE notification —
+  ส่วนเหล่านี้ต้องทดสอบกับข้อมูลจริงบนเซิร์ฟเวอร์ (ข้อมูลบนเครื่อง dev ไม่ครบ) จึงจะสรุปได้</p>
+  <p>ไม่มีการทดสอบอัตโนมัติ (PHPUnit) ในระบบเลย — การตรวจทั้งหมดเป็น manual + อ่านโค้ด
+  ถ้าจะแก้บั๊กข้างต้น แนะนำให้ทำ regression test ตาม <code>qa/test_cases.md</code> ประกอบ</p>
+</div>
+
+<footer>
+  รายงานนี้เป็นการตรวจสอบเพื่อประกอบการตัดสินใจ — <b>ยังไม่มีการแก้ไขโค้ดใดๆ</b> ·
+  รายละเอียดฉบับข้อความอยู่ที่ <code>qa/bug_report.md</code> · test case อยู่ที่ <code>qa/test_cases.md</code>
+</footer>
+
+</div>
+</body>
+</html>

@@ -2,7 +2,8 @@
 /**
  * includes/settings_gate.php — ประตูรหัสผ่านหน้า settings.php
  *
- * ทุกคนต้องใส่ PIN 9981 ก่อนเข้า ยกเว้น login_name = Tom
+ * ทุกคนต้องใส่ PIN ก่อนเข้า (บน localhost dev ผู้ใช้ Tom ข้ามให้อัตโนมัติ)
+ * การปลดล็อกหมดอายุตาม SETTINGS_UNLOCK_TTL — ดู settings_admin_unlocked() ใน config.php
  * รองรับปุ่มตัวเลขบนหน้าจอและพิมพ์จากคีย์บอร์ด
  */
 
@@ -10,7 +11,7 @@
 const SETTINGS_ACCESS_PIN = '9981';
 
 /**
- * ตรวจว่าเข้าหน้าตั้งค่าได้แล้วหรือยัง (Tom ข้าม PIN อัตโนมัติ)
+ * ตรวจว่าเข้าหน้าตั้งค่าได้แล้วหรือยัง (บน localhost dev ผู้ใช้ Tom ข้าม PIN อัตโนมัติ)
  *
  * @return bool
  */
@@ -99,7 +100,7 @@ function settings_gate_render($wrong = false) {
       <button type="submit" class="pin-wide" style="background:var(--primary); color:#fff; border-color:var(--primary)">เข้าใช้งาน</button>
     </div>
   </form>
-  <p class="muted" style="margin-top: 14px; font-size: 12px">ผู้ใช้ Tom เข้าได้โดยไม่ต้องใส่รหัส</p>
+  <p class="muted" style="margin-top: 14px; font-size: 12px">การปลดล็อกหมดอายุใน <?= (int)(SETTINGS_UNLOCK_TTL / 60) ?> นาที</p>
 </div>
 <script>
 (function(){
