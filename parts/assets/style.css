@@ -1706,3 +1706,45 @@ a:focus-visible {
 .move-in { background: var(--success-soft, #f0fdf4); color: #15803d; }
 .move-item { background: var(--danger-soft, #fef2f2); color: #b91c1c; }
 .move-set { background: var(--primary-soft, #fce7f3); color: var(--primary-dark, #c01862); }
+
+/* สองแถวนี้ใช้ .history-kind-filter ร่วมกันจึงหน้าตาเหมือนกันโดยปริยาย
+   ต้องแยกน้ำหนักให้เห็นว่าแถวบนคือแท็บ แถวล่างคือตัวกรองที่อยู่ในแท็บนั้น */
+/* ต้องมี :not(.badge) ต่อท้ายเหมือนกฎกลาง ไม่งั้น .history-kind-filter:not(.badge)
+   ซึ่ง specificity สูงกว่าจะทับ padding/font-size/background ที่ตั้งตรงนี้ทั้งหมด */
+.history-tabs { gap: 0.35rem; margin-bottom: 0.5rem; }
+.history-tabs a.history-kind-filter:not(.badge) {
+    text-decoration: none;
+    padding: 0.42rem 1.15rem;
+    font-size: calc(13.5px * var(--font-scale, 1));
+    font-weight: 700;
+}
+.history-tabs a.history-kind-filter.is-active:not(.badge) {
+    background: var(--sidebar, #4e2985);
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 2px 6px rgba(78, 41, 133, 0.25);
+}
+
+/* แถวรอง — เล็กและจางกว่า พร้อมเส้นซ้ายบอกว่าอยู่ใต้แท็บที่เลือก */
+.move-kinds {
+    gap: 0.3rem;
+    margin: 0 0 0.9rem;
+    padding-left: 0.7rem;
+    border-left: 3px solid var(--border, #e7e0f5);
+}
+.move-kinds a.history-kind-filter:not(.badge) {
+    text-decoration: none;
+    padding: 0.16rem 0.6rem;
+    font-size: calc(11.5px * var(--font-scale, 1));
+    font-weight: 500;
+    background: transparent;
+    border: 1px solid var(--border, #e7e0f5);
+    color: #6b6480;
+}
+.move-kinds a.history-kind-filter.is-active:not(.badge) {
+    background: #ebe6f5;
+    border-color: #c4b5e8;
+    color: #4e2985;
+    font-weight: 700;
+    box-shadow: none;
+}

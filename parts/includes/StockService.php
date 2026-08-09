@@ -593,9 +593,10 @@ class StockService
      * เพราะเป็นการเบิกครั้งเดียวในสายตาผู้ใช้
      *
      * @param int|null $limit
+     * @param string   $kind  all|in|item|set — กรองชนิดก่อนเรียง เพื่อให้ LIMIT นับเฉพาะชนิดที่ขอ
      * @return array<int,array<string,mixed>>
      */
-    public function getAllMovementHistory(?int $limit = 100): array
+    public function getAllMovementHistory(?int $limit = 100, string $kind = 'all'): array
     {
         $sql = "
             (SELECT 'in' AS kind, si.id AS row_id, NULL AS stock_out_id, NULL AS doc_no,
@@ -621,12 +622,38 @@ class StockService
                     s.code, s.name, so.part_movement_id
              FROM stock_out so
              JOIN sets s ON s.id = so.set_id)
-            ORDER BY created_at DESC, row_id DESC
         ";
+        // ห่อ UNION ไว้แล้วค่อยกรอง — กรองใน subquery แต่ละก้อนจะต้องเขียน WHERE ซ้ำสามที่
+        if (in_array($kind, ['in', 'item', 'set'], true)) {
+            $sql = 'SELECT * FROM (' . $sql . ') m WHERE m.kind = ' . $this->db->quote($kind);
+        } else {
+            $sql = 'SELECT * FROM (' . $sql . ') m';
+        }
+        $sql .= ' ORDER BY m.created_at DESC, m.row_id DESC';
         if ($limit) {
             $sql .= ' LIMIT ' . (int) $limit;
         }
         return $this->db->query($sql)->fetchAll();
+    }
+
+    /**
+     * จำนวนรายการเคลื่อนไหวทั้งหมด แยกตามชนิด (ใช้โชว์ตัวเลขบนปุ่มกรอง)
+     *
+     * @return array{all:int, in:int, item:int, set:int}
+     */
+    public function getMovementCounts(): array
+    {
+        $row = $this->db->query(
+            "SELECT (SELECT COUNT(*) FROM stock_in) AS c_in,
+                    (SELECT COUNT(*) FROM stock_out_items soi
+                       JOIN stock_out so ON so.id = soi.stock_out_id
+                      WHERE so.set_id IS NULL) AS c_item,
+                    (SELECT COUNT(*) FROM stock_out WHERE set_id IS NOT NULL) AS c_set"
+        )->fetch();
+        $in = (int) $row['c_in'];
+        $item = (int) $row['c_item'];
+        $set = (int) $row['c_set'];
+        return ['all' => $in + $item + $set, 'in' => $in, 'item' => $item, 'set' => $set];
     }
 
     public function getStockInHistory(?int $limit = null): array

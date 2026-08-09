@@ -263,7 +263,7 @@ function ui_nav_items_parts(): array
     // ไม่มีเมนู Dashboard ของ parts แล้ว — ใช้ Dashboard รวมของระบบทะเบียนเครื่องแทน
     // (parts/index.php redirect ไปที่นั่น)
     // งานรับเข้า/เบิกออกทั้งหมดเป็น modal อยู่ที่ products.php แล้ว และประวัติทั้ง 4 ชุด
-    // ยุบเป็น history.php แบบแท็บ (?tab=sn|in|item|set) — stock-in.php, stock-out.php,
+    // ยุบเป็น history.php แบบแท็บ (?tab=move|sn) — stock-in.php, stock-out.php,
     // stock-out-item.php เหลือเป็น redirect ไม่ต้องมีในเมนู
     return [
         ['file' => 'pages/products.php',         'icon' => 'products', 'label' => 'อะไหล่'],

@@ -3,7 +3,7 @@
  * pages/stock-out.php — ย้ายไปรวมที่อื่นแล้ว (2026-08-05)
  *
  * ฟอร์มเบิกออก Set → modal ที่ products.php
- * ประวัติเบิก Set   → history.php?tab=set
+ * ประวัติเบิก Set   → history.php?tab=move&kind=set
  * จัดการ Set        → sets.php (กลับไปใช้ชื่อเดิมของตัวเอง)
  *
  * ไฟล์นี้เคยรวม "เบิกออก Set + จัดการ Set" ไว้ด้วยกันเมื่อ 2026-07-31 เพราะตอนนั้น
@@ -17,6 +17,6 @@ require_once __DIR__ . '/../includes/parts_bootstrap.php';
 
 $editOut = isset($_GET['edit_out']) ? (int) $_GET['edit_out'] : 0;
 if ($editOut > 0) {
-    redirect(url('/pages/history.php?tab=set&edit_out=' . $editOut));
+    redirect(url('/pages/history.php?tab=move&kind=set&edit_out=' . $editOut));
 }
 redirect(url('/pages/sets.php'));
