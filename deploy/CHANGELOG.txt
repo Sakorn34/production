@@ -1450,3 +1450,13 @@ Files:
   finishgoogs_ma_update/includes/settings_gate.php
   parts/includes/StockService.php
 
+
+================================================================
+v2026-08-09_213100 | Patch | 2026-08-09 21:31:01
+From: 2026-08-09_210308  ->  To: 053db78  |  Files: 1
+----------------------------------------------------------------
+- Fix stale content in system_doc.php (DB name, parts pages, running-no calc, cron lockdown, add stock-status + LINE notify sections)
+
+Files:
+  finishgoogs_ma_update/system_doc.php
+

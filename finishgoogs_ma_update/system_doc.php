@@ -78,6 +78,8 @@ $B = BASE_URL;
     <a href="#helpers">⑧ ฟังก์ชันหลัก</a>
     <a href="#permissions">⑨ สิทธิ์ / Login</a>
     <a href="#import">⑩ การนำเข้าข้อมูล</a>
+    <a href="#stockstatus">⑪ สถานะสต็อกอะไหล่</a>
+    <a href="#linenotify">⑫ LINE Notify</a>
   </div>
 </div>
 
@@ -91,7 +93,8 @@ $B = BASE_URL;
     <b>2 ระบบงานใน monorepo นี้</b><br>
     • <span class="inline-code">finishgoogs_ma_update/</span> — ทะเบียนเครื่อง, บันทึกผลิต, MA, อัปเดต FW/HW, เบิกอะไหล่ต่อเครื่อง<br>
     • <span class="inline-code">parts/</span> — สต็อกอะไหล่ช่าง (รับเข้า / เบิก Set / เบิกรายชิ้น) ใช้ DB <b>biton_tech_parts</b> โดยตรง<br>
-    สต็อกจริง single source of truth = <span class="inline-code">biton_tech_parts.products.quantity</span> · Production map ผ่าน <span class="inline-code">parts.stock_code</span>
+    สต็อกจริง single source of truth = <span class="inline-code">biton_tech_parts.products.quantity</span> · Production map ผ่าน <span class="inline-code">parts.stock_code</span><br>
+    <b>เมนู/sidebar ของทั้ง 2 แอปตอนนี้ใช้แหล่งเดียวกัน</b>: อ่าน/เขียนลำดับและการซ่อนเมนูจาก <span class="inline-code">site_settings.nav_items</span> ร่วมกัน ผ่าน <span class="inline-code">shared/ui_icons.php::ui_nav_apply_override()</span> (ปรับที่ appearance.php ฝั่งเดียว มีผลทั้ง 2 แอป)
   </div>
   <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px">
     <div class="page-card" style="border-left:3px solid #3b82f6">
@@ -162,11 +165,11 @@ $B = BASE_URL;
 <!-- ③ ฐานข้อมูล -->
 <div class="panel doc-section" id="databases">
   <h2>③ ฐานข้อมูล</h2>
-  <p class="section-note">ระบบใช้ <b>3 database</b>: <b>bit_production</b> (ฐานหลัก), <b>biton_stockparts</b> (ทะเบียน S/N ทีม stock), <b>biton_tech_parts</b> (สต็อกอะไหล่ช่าง — single source of truth)</p>
+  <p class="section-note">ระบบใช้ <b>3 database</b>: <b>biton_production</b> (ฐานหลัก), <b>biton_stockparts</b> (ทะเบียน S/N ทีม stock), <b>biton_tech_parts</b> (สต็อกอะไหล่ช่าง — single source of truth)</p>
   <div class="db-grid">
-    <!-- bit_production -->
+    <!-- biton_production -->
     <div class="db-box">
-      <div class="db-box-head primary">🗄️ bit_production &nbsp;<span style="font-weight:400; font-size:11px; opacity:.85">(ฐานหลัก — ระบบผลิต)</span></div>
+      <div class="db-box-head primary">🗄️ biton_production &nbsp;<span style="font-weight:400; font-size:11px; opacity:.85">(ฐานหลัก — ระบบผลิต)</span></div>
       <div class="db-box-body">
         <div class="tbl-item"><span class="tbl-name">assets</span><div><div class="tbl-desc">ตารางกลาง: 1 แถว = เครื่อง 1 เครื่อง — รหัส, รุ่น, <b>status</b> (new/rental/spare), FW ล่าสุด, วันผลิต</div></div></div>
         <div class="tbl-item"><span class="tbl-name">products</span><div><div class="tbl-desc">รุ่นสินค้า: รหัส, prefix, โหมดสร้างรหัส (generated/factory_serial), รูปสินค้า</div></div></div>
@@ -275,8 +278,18 @@ $B = BASE_URL;
     </div>
     <div class="page-card" style="border-top:3px solid #047857">
       <div class="pfile">/production/parts/</div>
-      <div class="pdesc">แอปสต็อกอะไหล่ช่างแยก: รับเข้า, เบิก Set, เบิกรายชิ้น, ประวัติ — ใช้ DB biton_tech_parts โดยตรง</div>
+      <div class="pdesc">แอปสต็อกอะไหล่ช่างแยก — ใช้ DB biton_tech_parts โดยตรง มี 6 หน้า: products (รายการ+เพิ่มอะไหล่), product-detail (รายอะไหล่), stock-in (รับเข้า), stock-out (เบิก Set), stock-out-item (เบิกรายชิ้น), sets (จัดการ Set)</div>
       <div class="pread">อ่าน+เขียน: biton_tech_parts (products, stock_in, stock_out, sets)</div>
+    </div>
+    <div class="page-card" style="border-top:3px solid #047857">
+      <div class="pfile">parts/pages/history.php</div>
+      <div class="pdesc">ประวัติเคลื่อนไหวอะไหล่ — ยุบรวมหน้าที่เคยแยกกัน (รับเข้า/เบิก Set/เบิกรายชิ้น/ประวัติ) เหลือ 2 แท็บ: <span class="inline-code">tab=move</span> (ความเคลื่อนไหวรวม เข้า+ออก) และ <span class="inline-code">tab=sn</span> (ค้นตามเลขอะไหล่/S/N)</div>
+      <div class="pread">อ่าน: biton_tech_parts (stock_in, stock_out, stock_out_items)</div>
+    </div>
+    <div class="page-card" style="border-top:3px solid #047857">
+      <div class="pfile">parts/pages/year-end-summary.php</div>
+      <div class="pdesc">สรุปยอดสต็อกอะไหล่ปิดปี</div>
+      <div class="pread">อ่าน: biton_tech_parts</div>
     </div>
     <div class="page-card" style="border-top:3px solid #6366f1">
       <div class="pfile">products.php</div>
@@ -301,7 +314,7 @@ $B = BASE_URL;
     <div class="page-card" style="border-top:3px solid #14b8a6">
       <div class="pfile">activity_logs.php</div>
       <div class="pdesc">Activity Log ร่วม Production + Parts: filter ผู้ใช้/ระบบ/วันที่, Export CSV (PIN 9981)</div>
-      <div class="pread">อ่าน: activity_logs (bit_production)</div>
+      <div class="pread">อ่าน: activity_logs (biton_production)</div>
     </div>
     <div class="page-card" style="border-top:3px solid #64748b">
       <div class="pfile">scan.php</div>
@@ -319,9 +332,14 @@ $B = BASE_URL;
       <div class="pread">ไม่อ่าน DB</div>
     </div>
     <div class="page-card" style="border-top:3px solid #9ca3af; opacity:.75">
-      <div class="pfile">customers.php / users.php</div>
-      <div class="pdesc"><s>legacy</s> — ไม่อยู่ในเมนูแล้ว · login ใช้ SSO profile · ลูกค้าไม่มี UI จัดการ</div>
-      <div class="pread">(ไฟล์อาจยังอยู่ใน repo แต่ไม่ใช้งานหลัก)</div>
+      <div class="pfile">users.php</div>
+      <div class="pdesc"><s>legacy</s> — เหลือเป็น stub redirect กลับ index.php พร้อมข้อความ "ระบบผู้ใช้งานภายในถูกปิดแล้ว" ไม่มีลิงก์จากเมนูใดๆ · login ใช้ SSO profile ทั้งหมด</div>
+      <div class="pread">(ไม่มี query DB)</div>
+    </div>
+    <div class="page-card" style="border-top:3px solid #9ca3af; opacity:.75">
+      <div class="pfile"><s>customers.php</s></div>
+      <div class="pdesc">ลบออกจาก repo แล้ว — ตาราง customers ยังมีใน DB (FK legacy จาก assets/repairs) แต่ไม่มีหน้า UI จัดการอีกต่อไป</div>
+      <div class="pread">—</div>
     </div>
   </div>
 </div>
@@ -333,7 +351,7 @@ $B = BASE_URL;
   <h3>🏭 การสร้างเครื่องใหม่ (asset_new.php → create_produced_asset)</h3>
   <div class="section-note" style="margin-bottom:10px">
     <b>โหมดสร้างรหัส 2 แบบ:</b><br>
-    • <b>generated</b>: ระบบสร้างรหัสอัตโนมัติ <span class="inline-code">{prefix}{YY}{MM}{NNNN}</span> — ใช้ MySQL <span class="inline-code">GET_LOCK()</span> ล็อกก่อน query MAX(running_no) เพื่อป้องกัน race condition (รองรับ batch หลายเครื่องพร้อมกัน)<br>
+    • <b>generated</b>: ระบบสร้างรหัสอัตโนมัติ <span class="inline-code">{prefix}{YY}{MM}{NNNN}</span> — ใช้ MySQL <span class="inline-code">GET_LOCK()</span> ล็อกก่อนคำนวณเลขวิ่งถัดไป (ป้องกัน race condition, รองรับ batch หลายเครื่องพร้อมกัน) เลขวิ่งคำนวณโดย<b>อ่านจากท้าย asset_code ของแถวที่มีอยู่จริงเป็นหลัก</b> (<span class="inline-code">asset_running_scan_for_product()</span>) ไม่ใช่ query MAX(running_no) ตรงๆ — กันเคสคอลัมน์ running_no ในฐานข้อมูลผิดรูปหรือไม่ตรงกับรหัสจริง แล้วค่อย fallback ไปคอลัมน์ running_no ถ้า parse ไม่ได้<br>
     • <b>factory_serial</b>: ใช้ S/N จากโรงงานเป็นรหัสเครื่อง (ต้อง unique), 1 form = 1 เครื่อง
   </div>
   <div class="flow-steps">
@@ -467,7 +485,7 @@ $B = BASE_URL;
     <tr><td class="col-fk col-key">product_id</td><td>BIGINT UNSIGNED</td><td>FK → products(id)</td></tr>
     <tr><td>context</td><td>ENUM('production','ma','update')</td><td>ฟิลด์นี้ใช้ในฟอร์มไหน</td></tr>
     <tr><td>field_name</td><td>VARCHAR(150)</td><td>ชื่อฟิลด์ เช่น "Display", "Battery By"</td></tr>
-    <tr><td>field_kind</td><td>VARCHAR(30)</td><td>component / extra / text / ma_item / <b>checklist</b> / <b>watch_alert</b> / <b>watch_alert_cfg</b> / fw / lot / made_by</td></tr>
+    <tr><td>field_kind</td><td>VARCHAR(30)</td><td>component / extra / text / ma_item / <b>checklist</b> / <b>watch_alert</b> / <b>watch_alert_cfg</b> / fw / lot / made_by · เพิ่มเมื่อปิดสวิตช์: fw_off / lot_off / made_by_off / product_snippets / product_snippets_off · ชุด MA เพิ่มเติม: ma_ok / ma_replace / ma_repair / ma_fw / ma_status / ma_remark</td></tr>
     <tr><td>input_mode</td><td>VARCHAR(40) NULL</td><td>chip_single_free, chip_multi, text, … — ควบคุม UI ฟิลด์ (settings.php)</td></tr>
     <tr><td>options_text</td><td>TEXT NULL</td><td>ตัวเลือก dropdown (1 ตัวเลือก/บรรทัด) หรือรายการ checklist / รหัส watch alert</td></tr>
     <tr><td>sort_order</td><td>INT</td><td>ลำดับแสดง (drag-reorder ได้)</td></tr>
@@ -584,7 +602,7 @@ $B = BASE_URL;
   <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:10px">
     <?php
     $fns = [
-      ['db()', 'Singleton: คืน mysqli connection ไปยัง bit_production (lazy init)'],
+      ['db()', 'Singleton: คืน mysqli connection ไปยัง biton_production (lazy init)'],
       ['q($sql, $types, $params)', 'Prepared statement: execute แล้วคืน mysqli_stmt. Die ถ้า prepare ล้มเหลว'],
       ['qr($sql, $types, $params)', 'เหมือน q() แต่คืน result set (mysqli_result) ใช้ fetch_assoc/fetch_row'],
       ['h($s)', 'htmlspecialchars() ป้องกัน XSS ใช้ทุกที่ที่ echo ข้อมูลจาก DB หรือ User'],
@@ -596,7 +614,7 @@ $B = BASE_URL;
       ['create_produced_asset($pid,$date,$serial,$note,$uid)', 'สร้างเครื่องใหม่ status=new; GET_LOCK สำหรับ generated code; share_upsert_asset()'],
       ['share_upsert_asset($assetId, $oldCode)', 'Sync → biton_stockparts.stock (fail-soft)'],
       ['share_delete_asset($code)', 'DELETE จาก biton_stockparts.stock (fail-soft)'],
-      ['tech_parts_stock_out_by_part_id(...)', 'เบิกอะไหล่ผ่าน part_stock_bridge.php → biton_tech_parts'],
+      ['tech_parts_stock_out_by_part_id(...)', 'เบิกอะไหล่ผ่าน includes/part_stock_bridge.php — เขียนตรงเข้า biton_tech_parts.quantity ด้วย PDO transaction + row lock (เดิมเคยยิงผ่าน webhook แยกระบบ ปัจจุบันเป็น direct DB write)'],
       ['effective_fields($pid, $ctx)', 'config ฟิลด์ฟอร์ม หรือ auto-derive จากประวัติ'],
       ['effective_production_checklist($pid)', 'รายการ checklist จาก product_field_config field_kind=checklist'],
       ['product_watch_alerts_enabled($pid)', 'เปิด/ปิด watch alert SD Card / Battery RTC ต่อรุ่น'],
@@ -606,7 +624,7 @@ $B = BASE_URL;
       ['save_upload($field,$subdir,$exts)', 'รับ upload ภาพ → uploads/{subdir}/'],
       ['dthai($d)', 'วันที่ d/m/Y'],
       ['setting($key) / set_setting($key,$val)', 'อ่าน/เขียน site_settings'],
-      ['nav_effective()', 'Build sidebar จาก site_settings.nav_items'],
+      ['nav_effective()', 'Build sidebar ฝั่ง production จาก site_settings.nav_items (parts ใช้ shared/ui_icons.php::ui_nav_apply_override() อ่าน settings ชุดเดียวกัน — ทั้ง 2 แอปจึงเห็นเมนูตรงกัน)'],
     ];
     foreach ($fns as $f) {
         echo '<div class="rel-box"><b style="color:#92400e">' . h($f[0]) . '</b><ul><li style="list-style:none; margin-left:0; color:#374151">' . h($f[1]) . '</li></ul></div>';
@@ -622,7 +640,8 @@ $B = BASE_URL;
     <b>Login:</b> SSO bit-online → session <span class="inline-code">$_SESSION['profile']</span> (display name, employee id ฯลฯ)<br>
     <b>Localhost dev:</b> bootstrap เป็น Tom อัตโนมัติถ้ายังไม่มี profile<br>
     <b>Role เก่า (admin/qc/technician):</b> ตาราง users ยังมีใน DB แต่<strong>ไม่ใช้ตัดสินใจสิทธิ์แล้ว</strong> — ทุกคนที่ login ได้ใช้ฟีเจอร์หลักได้<br>
-    <b>หลังบ้าน (settings, share_admin, activity_logs):</b> ต้องปลดล็อก PIN <span class="inline-code">9981</span> หรือชื่อ Tom (ดู <span class="inline-code">includes/settings_gate.php</span>)
+    <b>หลังบ้าน (settings, appearance, share_admin, activity_logs):</b> ต้องปลดล็อก PIN <span class="inline-code">9981</span> หรือชื่อ Tom (ดู <span class="inline-code">includes/settings_gate.php</span>) — <b>appearance.php ย้ายมาอยู่กลุ่มนี้แล้ว</b> (เดิมแค่ require_login) และการปลดล็อกจะ<b>หมดอายุใน 30 นาที</b> (<span class="inline-code">SETTINGS_UNLOCK_TTL</span>, config.php) ต้องใส่ PIN ใหม่หลังจากนั้น<br>
+    <b>Cron jobs:</b> ไฟล์ใน <span class="inline-code">cron/</span> ถูกล็อกเป็น CLI-only 2 ชั้น — <span class="inline-code">cron/.htaccess</span> บล็อก HTTP access ทั้งหมด และ <span class="inline-code">cron/_bootstrap.php</span> เช็ค <span class="inline-code">PHP_SAPI !== 'cli'</span> → ตอบ 403 ถ้าพยายามเรียกผ่านเว็บ
   </div>
   <div class="perm-grid">
     <div class="perm-box">
@@ -690,6 +709,47 @@ $B = BASE_URL;
     <li><b>Source 3</b>: เพื่อนบ้านรุ่นเดียวกัน หมายเลขใกล้เคียง — เทียบตัวเลขที่ฝังใน serial (91 แถว)</li>
     <li><b>Source 4</b>: ชื่อยอดนิยม fallback (3 แถว)</li>
     <li><b>Timestamp</b>: เพื่อนบ้านรุ่นเดียวกัน serial ใกล้เคียง เช่น B0904001 → 2009-04 (20 แถว)</li>
+  </ul>
+</div>
+
+<!-- ⑪ สถานะสต็อกอะไหล่ -->
+<div class="panel doc-section" id="stockstatus">
+  <h2>⑪ สถานะสต็อกอะไหล่ (5 ระดับ)</h2>
+  <div class="section-note">
+    คนละเรื่องกับสถานะ<b>เครื่อง</b> ใน <a href="#status">หัวข้อ ②</a> (new/rental/spare) — นี่คือสถานะของ<b>ยอดคงเหลืออะไหล่</b> คำนวณจากฟังก์ชันกลาง <span class="inline-code">shared/stock_status.php::stock_status_key()</span> ใช้ร่วมกันทั้งฝั่ง production และ parts (แทนที่โค้ดคำนวณซ้ำที่เคยกระจายอยู่ 5 จุด)
+  </div>
+  <table class="schema-table" style="max-width:640px">
+    <tr><th>ระดับ</th><th>ความหมาย</th></tr>
+    <tr><td class="col-key">out</td><td>หมด (0 ชิ้น)</td></tr>
+    <tr><td class="col-key">critical</td><td>วิกฤต — เหลือน้อยมาก</td></tr>
+    <tr><td class="col-key">low</td><td>ต่ำกว่าขั้นต่ำที่ตั้งไว้</td></tr>
+    <tr><td class="col-key">near</td><td>ใกล้ขั้นต่ำ</td></tr>
+    <tr><td class="col-key">ok</td><td>ปกติ</td></tr>
+  </table>
+</div>
+
+<!-- ⑫ LINE Notify -->
+<div class="panel doc-section" id="linenotify">
+  <h2>⑫ ระบบแจ้งเตือนผ่าน LINE</h2>
+  <div class="section-note">
+    อยู่ใน <span class="inline-code">shared/</span> ใช้ร่วมกันทั้ง 2 แอป — ไม่ใช่ระบบแยกต่างหาก
+  </div>
+  <ul style="font-size:13px; color:#4b5563; margin:0 0 12px 18px; line-height:1.8">
+    <li><span class="inline-code">shared/line_notify_core.php</span> — คิว/ส่งข้อความผ่าน LINE Messaging API</li>
+    <li><span class="inline-code">shared/line_flex_templates.php</span> — สร้าง Flex Message ตามประเภทเหตุการณ์ (พบปัญหาตอนผลิต, ต้องซ่อมตอน MA, สต็อกอะไหล่ต่ำ)</li>
+    <li><span class="inline-code">shared/line_notify_jobs.php</span> — ตัว runner ที่ cron เรียกเพื่อประมวลผลคิว</li>
+  </ul>
+  <h3>จุดที่ยิงแจ้งเตือนจริง</h3>
+  <ul style="font-size:13px; color:#4b5563; margin:0 0 12px 18px; line-height:1.8">
+    <li><span class="inline-code">asset_new.php</span> — เมื่อพบปัญหาตอนผลิต (<span class="inline-code">production.problem_found</span>)</li>
+    <li><span class="inline-code">ma.php</span> — เมื่อผลตรวจ MA ต้องซ่อม (<span class="inline-code">ma.repair_required</span>)</li>
+    <li><span class="inline-code">parts/includes/StockService.php</span> — เมื่อสต็อกอะไหล่ต่ำกว่าขั้นต่ำ</li>
+  </ul>
+  <h3>Cron ที่เกี่ยวข้อง (CLI-only — ดูหัวข้อ ⑨)</h3>
+  <ul style="font-size:13px; color:#4b5563; margin:0 0 0 18px; line-height:1.8">
+    <li><span class="inline-code">cron/line_notify_worker.php</span> — ส่งคิวที่ค้างอยู่</li>
+    <li><span class="inline-code">cron/line_notify_scheduled.php</span> — งานแจ้งเตือนตามรอบเวลา</li>
+    <li><span class="inline-code">cron/plesk_line_run_job.php</span>, <span class="inline-code">cron/plesk_line_worker.php</span> — ตัวเรียกสำหรับ Plesk scheduled task</li>
   </ul>
 </div>
 
