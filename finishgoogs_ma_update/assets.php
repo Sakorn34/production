@@ -152,10 +152,7 @@ $rows = qr("SELECT a.id, a.asset_code, a.factory_serial, a.status, a.produced_at
                    (SELECT COUNT(*) FROM part_movements pm
                     WHERE pm.ref_asset_id=a.id AND pm.direction='out'
                       AND pm.tech_stock_out_id IS NOT NULL AND pm.tech_stock_out_id > 0) parts_linked_cnt,
-                   (SELECT COUNT(*) FROM bom_items b WHERE b.product_id=a.product_id) bom_cnt,
-                   -- ทิศทางการเคลื่อนไหวล่าสุดของเครื่อง: out = เบิกออกไปแล้ว, in/ไม่มี = ยังอยู่ในคลัง
-                   (SELECT sm.direction FROM stock_movements sm
-                    WHERE sm.asset_id=a.id ORDER BY sm.moved_at DESC, sm.id DESC LIMIT 1) last_move
+                   (SELECT COUNT(*) FROM bom_items b WHERE b.product_id=a.product_id) bom_cnt
             FROM assets a JOIN products p ON p.id=a.product_id
             $w ORDER BY {$sortSql[$sort]} LIMIT $per OFFSET $off", $types, $params);
 
@@ -164,6 +161,11 @@ while ($r = $rows->fetch_assoc()) {
     $assetRows[] = $r;
 }
 $partsSnCounts = parts_stock_out_counts_by_sn(array_column($assetRows, 'asset_code'));
+
+// สถานะการเบิกขาย — อ่านจากระบบ stock ที่เดียวกับการ์ดในหน้าโปรไฟล์เครื่อง
+// เดิมคอลัมน์นี้อ่าน stock_movements ซึ่งนับ "เบิกผลิต" เป็นเบิกออกด้วย จึงไม่ใช่การขาย
+require_once __DIR__ . '/includes/stockparts_withdraw.php';
+$saleStatus = asset_stockparts_sale_status_by_sn(array_column($assetRows, 'asset_code'));
 
 $productList = qr("SELECT DISTINCT p.name FROM products p JOIN assets a ON a.product_id=p.id ORDER BY p.name");
 
@@ -230,7 +232,7 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
 @media (max-width: 780px) {
   .assets-filter-cta { margin-left: 0; width: 100%; justify-content: center; }
 }
-/* ป้ายสถานะการเบิกใช้งาน/ขาย */
+/* ป้ายสถานะการเบิกขาย */
 .sale-tag {
   display: inline-block;
   padding: 2px 10px;
@@ -241,6 +243,8 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
 }
 .sale-in { background: var(--success-soft, #dcfce7); color: #15803d; }
 .sale-out { background: var(--warning-soft, #fef9c3); color: #a16207; }
+/* ไม่พบ S/N ในทะเบียน stock — ต่างจาก "อยู่ในคลัง" เพราะเราไม่รู้ ไม่ใช่รู้ว่ายังไม่ขาย */
+.sale-unknown { background: transparent; color: var(--text-muted, #6b6480); font-weight: 500; }
 </style>
 <script>
 (function(){
@@ -271,7 +275,7 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
 
 <div class="table-wrap">
 <table class="list">
-  <tr><th>ผลิตเมื่อ</th><th></th><th>รหัสเครื่อง</th><th>รุ่น</th><th>สถานะ</th><th>เบิกอะไหล่</th><th>ผู้บันทึกรายการ</th><th>FW</th><th>การเบิกใช้งาน/ขาย</th></tr>
+  <tr><th>ผลิตเมื่อ</th><th></th><th>รหัสเครื่อง</th><th>รุ่น</th><th>สถานะ</th><th>เบิกอะไหล่</th><th>ผู้บันทึกรายการ</th><th>FW</th><th>การเบิกใช้งานขาย</th></tr>
   <?php if (!$assetRows) { ?>
   <tr><td colspan="9" class="muted" style="text-align:center;padding:20px">ไม่พบเครื่องที่ตรงกับเงื่อนไข</td></tr>
   <?php } ?>
@@ -309,10 +313,18 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
     </td>
     <td><?= h($r['recorder'] ?: '-') ?></td>
     <td><?= h($r['current_fw_version'] ?: '-') ?></td>
-    <?php // ไม่มีรายการเคลื่อนไหวเลย = ยังไม่เคยถูกเบิกออก จึงถือว่าอยู่ในคลัง ?>
-    <?php $isOut = ($r['last_move'] ?? '') === 'out'; ?>
+    <?php
+      // ผูกกับ setup_id ในระบบ stock = ถูกเบิกขายไปแล้ว · ไม่มี key = ไม่พบ S/N ในทะเบียน stock
+      $sale = $saleStatus[$r['asset_code']] ?? null;
+    ?>
     <td style="white-space:nowrap">
-      <span class="sale-tag <?= $isOut ? 'sale-out' : 'sale-in' ?>"><?= $isOut ? 'เบิกออกแล้ว' : 'อยู่ในคลัง' ?></span>
+      <?php if ($sale === null) { ?>
+        <span class="sale-tag sale-unknown" title="ไม่พบ S/N นี้ในทะเบียน stock">—</span>
+      <?php } elseif ($sale['sold']) { ?>
+        <span class="sale-tag sale-out" title="Setup ID #<?= h($sale['setup_id']) ?>">เบิกขายแล้ว</span>
+      <?php } else { ?>
+        <span class="sale-tag sale-in">อยู่ในคลัง</span>
+      <?php } ?>
     </td>
   </tr>
   <?php } ?>

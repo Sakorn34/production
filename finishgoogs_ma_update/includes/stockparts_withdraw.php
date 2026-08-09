@@ -124,6 +124,52 @@ function asset_stockparts_withdraw_info(string $serial): array
 }
 
 /**
+ * สถานะการเบิกขายของหลาย S/N พร้อมกัน — สำหรับตารางที่ต้องแสดงทั้งหน้า
+ *
+ * ใช้แหล่งเดียวกับ asset_stockparts_withdraw_info() (stock.setup_id) เพื่อให้คอลัมน์
+ * ในหน้ารายการกับการ์ดในหน้าโปรไฟล์เครื่องพูดตรงกัน แต่ยิง query เดียวต่อหน้า
+ * ไม่ใช่ต่อแถว และไม่ join po_order_parts เพราะหน้ารายการต้องการแค่ ขาย/ไม่ขาย
+ *
+ * @param string[] $serials
+ * @return array<string,array{sold:bool,setup_id:string}> map S/N -> สถานะ (ไม่มี key = ไม่พบใน stock)
+ */
+function asset_stockparts_sale_status_by_sn(array $serials): array
+{
+    $serials = array_values(array_unique(array_filter(array_map('trim', $serials), 'strlen')));
+    if (!$serials) {
+        return [];
+    }
+
+    // หมายเหตุ: บน PHP 7.3 dbStock() ใช้ die() เมื่อต่อไม่ติด จึงไปไม่ถึง catch นี้
+    // (พฤติกรรมเดียวกับการ์ดในหน้าโปรไฟล์เครื่องที่ต่อ stock ไม่ได้ก็ตายทั้งหน้าเหมือนกัน)
+    // catch ไว้เผื่อ PHP 8 ที่ mysqli throw — คืน array ว่างให้คอลัมน์แสดง "—" ว่าไม่ทราบ
+    try {
+        $db = dbStock();
+    } catch (Throwable $e) {
+        return [];
+    }
+
+    $ph = implode(',', array_fill(0, count($serials), '?'));
+    $st = $db->prepare("SELECT serial_number, setup_id FROM stock WHERE serial_number IN ($ph)");
+    if (!$st) {
+        return [];
+    }
+    $st->bind_param(str_repeat('s', count($serials)), ...$serials);
+    $st->execute();
+
+    $out = [];
+    $res = $st->get_result();
+    while ($row = $res->fetch_assoc()) {
+        $sid = trim((string) ($row['setup_id'] ?? ''));
+        $out[$row['serial_number']] = [
+            'sold' => stockparts_setup_id_is_withdraw($sid),
+            'setup_id' => $sid,
+        ];
+    }
+    return $out;
+}
+
+/**
  * สร้าง HTML card แสดงการเบิกใช้งานขายบนโปรไฟล์เครื่อง
  *
  * @param array<string,mixed> $info จาก asset_stockparts_withdraw_info()
