@@ -302,7 +302,7 @@ page_header('ระบบหลังบ้าน — ตั้งค่าร�
   <label>หมวด</label><input type="text" name="category" placeholder="PRD / ACC / STK" maxlength="50">
   <?php product_admin_code_fields(null, 'new'); ?>
   <label>รูปสินค้า</label><input type="file" name="icon" accept="image/*">
-  <div class="full"><button type="submit">➕ เพิ่มรุ่นสินค้า</button></div>
+  <div class="full"><button type="submit" class="btn-with-icon"><?= ui_btn_label('plus', 'เพิ่มรุ่นสินค้า') ?></button></div>
 </form>
 <?php product_admin_code_script(); ?>
 <script>
@@ -481,7 +481,7 @@ foreach ($prodEff as $f) if (!isset($KIND_LABELS[$f['kind']]) && $f['kind'] !== 
   </table>
   </div>
   <div style="margin:8px 0; display:flex; gap:8px">
-    <button type="button" class="btn btn-line" onclick="addRow('tbl-production','production')">➕ เพิ่มฟิลด์</button>
+    <button type="button" class="btn btn-line btn-with-icon" onclick="addRow('tbl-production','production')"><?= ui_btn_label('plus', 'เพิ่มฟิลด์') ?></button>
     <button type="submit" class="btn-with-icon"><?= ui_btn_label('save', 'บันทึกฟิลด์ผลิต') ?></button>
     <?php if ($prodIsConfigured) { ?>
     <button type="submit" form="reset-production" class="btn-line" onclick="return confirm('ล้าง config แล้วกลับไปใช้ฟิลด์อัตโนมัติ?')">↺ ใช้ค่าอัตโนมัติ</button>
@@ -526,7 +526,7 @@ if (!$maEff) $maEff = derive_ma_form_fields($pid);
   </table>
   </div>
   <div style="margin:8px 0; display:flex; gap:8px; flex-wrap:wrap">
-    <button type="button" class="btn btn-line" onclick="addRow('tbl-ma','ma')">➕ เพิ่มฟิลด์</button>
+    <button type="button" class="btn btn-line btn-with-icon" onclick="addRow('tbl-ma','ma')"><?= ui_btn_label('plus', 'เพิ่มฟิลด์') ?></button>
     <button type="submit" class="btn-with-icon"><?= ui_btn_label('save', 'บันทึกฟิลด์ MA') ?></button>
     <?php if ($maConfigured) { ?>
     <button type="submit" form="reset-ma" class="btn-line" onclick="return confirm('ล้าง config แล้วกลับไปใช้ฟิลด์อัตโนมัติ?')">↺ ใช้ค่าอัตโนมัติ</button>
@@ -565,7 +565,7 @@ if (!$updEff) $updEff = derive_update_fields($pid);
   </table>
   </div>
   <div style="margin:8px 0; display:flex; gap:8px">
-    <button type="button" class="btn btn-line" onclick="addRow('tbl-update','update')">➕ เพิ่มชิ้นส่วน</button>
+    <button type="button" class="btn btn-line btn-with-icon" onclick="addRow('tbl-update','update')"><?= ui_btn_label('plus', 'เพิ่มชิ้นส่วน') ?></button>
     <button type="submit" class="btn-with-icon"><?= ui_btn_label('save', 'บันทึกฟิลด์อัปเดต') ?></button>
     <?php if ($updConfigured) { ?>
     <button type="submit" form="reset-update" class="btn-line" onclick="return confirm('ล้าง config แล้วกลับไปใช้อัตโนมัติ?')">↺ ใช้ค่าอัตโนมัติ</button>

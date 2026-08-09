@@ -347,13 +347,13 @@ page_header('ทะเบียนสินค้า (stock)');
   </div>
   <div class="stock-stat-card">
     <div class="stock-stat-num" style="color:<?= (int)$stat['inc'] ? '#c0392b' : '#2a7c4a' ?>"><?= number_format($stat['inc']) ?></div>
-    <div class="muted stock-stat-lbl">ข้อมูลไม่ครบ<?= (int)$stat['inc'] === 0 ? ' ✅' : '' ?></div>
+    <div class="muted stock-stat-lbl">ข้อมูลไม่ครบ<?= (int)$stat['inc'] === 0 ? ' ' . ui_icon_html('check', 13) : '' ?></div>
   </div>
 </div>
 
 <div class="stock-actions">
   <details class="panel stock-add-panel">
-    <summary>➕ เพิ่มรายการ</summary>
+    <summary><?= ui_icon_html('plus', 14, 'h-svg') ?> เพิ่มรายการ</summary>
     <form method="post" class="stock-add-form">
       <?= csrf_field() ?><input type="hidden" name="act" value="add"><input type="hidden" name="back" value="<?= h($qs) ?>">
       <div><label>Serial Number *</label><input type="text" name="serial_number" required></div>
@@ -397,7 +397,7 @@ page_header('ทะเบียนสินค้า (stock)');
   <?= stflink('',           'ทั้งหมด (' . number_format($stat['c']) . ')', $flt, $qsKeep) ?>
   <?= stflink('active1',    'active 1 (' . number_format($stat['a1']) . ')', $flt, $qsKeep) ?>
   <?= stflink('active0',    'active 0 (' . number_format($stat['a0']) . ')', $flt, $qsKeep) ?>
-  <?= stflink('incomplete', '⚠ ข้อมูลไม่ครบ (' . number_format($stat['inc']) . ')', $flt, $qsKeep) ?>
+  <?= stflink('incomplete', ui_icon_html('alert', 13, 'h-svg') . ' ข้อมูลไม่ครบ (' . number_format($stat['inc']) . ')', $flt, $qsKeep) ?>
   <?= stflink('no_name',    'ไม่มีชื่อผู้บันทึก (' . number_format($stat['nn']) . ')', $flt, $qsKeep) ?>
   <?= stflink('no_ts',      'ไม่มีเวลา (' . number_format($stat['nt']) . ')', $flt, $qsKeep) ?>
 </div>
@@ -421,7 +421,7 @@ page_header('ทะเบียนสินค้า (stock)');
     <button type="button" class="btn btn-sm btn-line" id="stock-bulk-tsset" disabled>ตั้งตามที่เลือก</button>
   </span>
   <span class="stock-bulk-group">
-    <button type="button" class="btn btn-sm btn-danger" id="stock-bulk-delete" disabled>🗑 ลบที่เลือก</button>
+    <button type="button" class="btn btn-sm btn-danger btn-with-icon" id="stock-bulk-delete" disabled><?= ui_btn_label('trash', 'ลบที่เลือก') ?></button>
     <button type="button" class="btn btn-sm btn-line" id="stock-bulk-clear">ยกเลิกการเลือก</button>
   </span>
 </div>

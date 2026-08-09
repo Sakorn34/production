@@ -120,17 +120,17 @@ page_header('ปรับแต่งหน้าตาระบบ');
     <!-- ซ้าย: ข้อความ + โลโก้ + สี -->
     <div class="panel">
       <?= ui_heading('edit', 'ข้อความ & โลโก้', 'h3') ?>
-      <div class="field"><label>ชื่อระบบ (แสดงบนแถบเมนู/แท็บ)</label>
-        <input type="text" name="app_name" value="<?= h(setting('app_name', APP_NAME)) ?>" style="width:100%"></div>
-      <div class="field"><label>ข้อความรองหน้า Login</label>
-        <input type="text" name="login_subtitle" value="<?= h(setting('login_subtitle', 'บันทึกผลิตใหม่ · อัปเดต FW/HW · ซ่อมบำรุง · MA เครื่องเช่า/สำรอง')) ?>" style="width:100%"></div>
+      <div class="field"><label for="ap-app-name">ชื่อระบบ (แสดงบนแถบเมนู/แท็บ)</label>
+        <input id="ap-app-name" type="text" name="app_name" value="<?= h(setting('app_name', APP_NAME)) ?>" style="width:100%"></div>
+      <div class="field"><label for="ap-login-sub">ข้อความรองหน้า Login</label>
+        <input id="ap-login-sub" type="text" name="login_subtitle" value="<?= h(setting('login_subtitle', 'บันทึกผลิตใหม่ · อัปเดต FW/HW · ซ่อมบำรุง · MA เครื่องเช่า/สำรอง')) ?>" style="width:100%"></div>
       <div class="field"><label>โลโก้ (แทนชื่อระบบบนแถบเมนู)</label>
         <?php if ($logo) { ?><div style="margin-bottom:6px; background:var(--sidebar-bg); padding:8px; border-radius:8px; display:inline-block"><img src="<?= h(img_url($logo)) ?>" class="brand-logo"></div>
           <label style="display:block; font-weight:400"><input type="checkbox" name="remove_logo" value="1"> ลบโลโก้ (กลับไปใช้ชื่อระบบ)</label><?php } ?>
         <input type="file" name="brand_logo" accept="image/*,.svg">
         <div style="display:flex; align-items:center; gap:8px; margin-top:8px">
-          <label style="font-weight:400; font-size:<?= theme_fs_css(13) ?>; margin:0">ความสูงโลโก้:</label>
-          <input type="range" name="brand_logo_h" min="20" max="160" step="2" value="<?= (int)setting('brand_logo_h', 56) ?>" oninput="document.getElementById('logo-h-val').textContent=this.value" style="flex:1">
+          <label for="ap-logo-h" style="font-weight:400; font-size:<?= theme_fs_css(13) ?>; margin:0">ความสูงโลโก้:</label>
+          <input id="ap-logo-h" type="range" name="brand_logo_h" min="20" max="160" step="2" value="<?= (int)setting('brand_logo_h', 56) ?>" oninput="document.getElementById('logo-h-val').textContent=this.value" style="flex:1">
           <span style="font-size:<?= theme_fs_css(13) ?>; min-width:44px"><b id="logo-h-val"><?= (int)setting('brand_logo_h', 56) ?></b> px</span>
         </div></div>
       <div class="field"><label>ไอคอนบนแท็บเบราว์เซอร์ (Favicon)</label>
@@ -148,7 +148,7 @@ page_header('ปรับแต่งหน้าตาระบบ');
       <div class="field">
         <label>ขยายขนาดข้อความทั้งระบบ</label>
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
-          <input type="range" name="font_scale_percent" min="90" max="140" step="5"
+          <input id="ap-font-scale" type="range" name="font_scale_percent" min="90" max="140" step="5"
             value="<?= (int) $fontScaleCur ?>"
             oninput="document.getElementById('font-scale-val').textContent=this.value + '%'"
             style="flex:1; min-width:160px">
@@ -162,8 +162,8 @@ page_header('ปรับแต่งหน้าตาระบบ');
       $fontPreset = setting('font_preset', 'system');
       $fontFile = setting('font_file', '');
       ?>
-      <div class="field"><label>ชุดฟอนต์</label>
-        <select name="font_preset" style="width:100%">
+      <div class="field"><label for="ap-font-preset">ชุดฟอนต์</label>
+        <select id="ap-font-preset" name="font_preset" style="width:100%">
           <option value="system" <?= $fontPreset === 'system' ? 'selected' : '' ?>>Noto Sans Thai / ระบบ (ค่าเริ่มต้น)</option>
           <option value="saraban" <?= $fontPreset === 'saraban' ? 'selected' : '' ?>>Sarabun (Google Fonts)</option>
           <option value="prompt" <?= $fontPreset === 'prompt' ? 'selected' : '' ?>>Prompt (Google Fonts)</option>

@@ -32,8 +32,8 @@ page_header('สแกน QR / Barcode');
       <span class="scan-dot" id="scan-dot"></span>
       <h3>กล้องสแกน</h3>
       <div class="scan-cam-tools">
-        <button type="button" class="scan-tool" id="btn-torch" hidden title="ไฟฉาย">🔦</button>
-        <button type="button" class="scan-tool" id="btn-flip" hidden title="สลับกล้อง">🔄</button>
+        <button type="button" class="scan-tool" id="btn-torch" hidden title="ไฟฉาย"><?= ui_icon_html('updates', 18) ?></button>
+        <button type="button" class="scan-tool" id="btn-flip" hidden title="สลับกล้อง"><?= ui_icon_html('refresh', 18) ?></button>
       </div>
     </div>
 
@@ -57,7 +57,7 @@ page_header('สแกน QR / Barcode');
 
   <aside class="scan-side">
     <section class="scan-panel">
-      <div class="scan-card-head"><h3>⌨️ พิมพ์รหัสเอง</h3></div>
+      <div class="scan-card-head"><h3><?= ui_icon_html('edit', 14, 'h-svg') ?> พิมพ์รหัสเอง</h3></div>
       <form method="get" action="<?= BASE_URL ?>/asset.php" class="scan-manual">
         <input type="text" name="code" id="manual-code" class="asset-search" data-nav="1"
                placeholder="เช่น BP23021294" autocomplete="off" autofocus>
@@ -68,19 +68,19 @@ page_header('สแกน QR / Barcode');
 
     <section class="scan-panel" id="recent-panel" hidden>
       <div class="scan-card-head">
-        <h3>🕘 เพิ่งสแกนไป</h3>
+        <h3><?= ui_icon_html('history', 14, 'h-svg') ?> เพิ่งสแกนไป</h3>
         <button type="button" class="scan-clear" id="btn-clear-recent">ล้าง</button>
       </div>
       <div class="scan-recent" id="recent-list"></div>
     </section>
 
     <section class="scan-panel scan-tips">
-      <div class="scan-card-head"><h3>💡 สแกนไม่ติด?</h3></div>
+      <div class="scan-card-head"><h3><?= ui_icon_html('alert', 14, 'h-svg') ?> สแกนไม่ติด?</h3></div>
       <ul>
-        <li>📏 ถือห่างประมาณ <b>10–20 ซม.</b> ให้รหัสเต็มกรอบ</li>
-        <li>🔦 ที่มืดกดปุ่มไฟฉายมุมขวาบน</li>
-        <li>🧽 เช็ดฝุ่นบนสติกเกอร์ก่อน</li>
-        <li>⌨️ สุดท้ายพิมพ์รหัสเองได้เสมอ</li>
+        <li>ถือห่างประมาณ <b>10–20 ซม.</b> ให้รหัสเต็มกรอบ</li>
+        <li>ที่มืดกดปุ่มไฟฉายมุมขวาบน</li>
+        <li>เช็ดฝุ่นบนสติกเกอร์ก่อน</li>
+        <li>สุดท้ายพิมพ์รหัสเองได้เสมอ</li>
       </ul>
     </section>
   </aside>
@@ -260,7 +260,7 @@ page_header('สแกน QR / Barcode');
     box.innerHTML = list.map(function (r) {
       var code = String(r.c).replace(/[<>&"]/g, '');
       return '<a href="' + BASE + '/asset.php?code=' + encodeURIComponent(r.c) + '">'
-           + '<span>📟</span><b>' + code + '</b><span class="t">' + ago(r.t) + '</span></a>';
+           + '<b>' + code + '</b><span class="t">' + ago(r.t) + '</span></a>';
     }).join('');
   }
   document.getElementById('btn-clear-recent').addEventListener('click', function () {
@@ -283,7 +283,7 @@ page_header('สแกน QR / Barcode');
   }
 
   if (typeof Html5Qrcode === 'undefined') {
-    setStatus('📴 โหลดตัวสแกนไม่ได้ (ไม่มีอินเทอร์เน็ต) — พิมพ์รหัสในช่องด้านขวาแทนได้', 'err');
+    setStatus('โหลดตัวสแกนไม่ได้ (ไม่มีอินเทอร์เน็ต) — พิมพ์รหัสในช่องด้านขวาแทนได้', 'err');
     return;
   }
 
@@ -311,7 +311,7 @@ page_header('สแกน QR / Barcode');
   function start(camConfig) {
     return scanner.start(camConfig, { fps: 10, qrbox: 240 }, onScan, function () {})
       .then(function () {
-        setStatus('🎯 เล็งกล้องไปที่ QR หรือบาร์โค้ดบนตัวเครื่อง', 'live');
+        setStatus('เล็งกล้องไปที่ QR หรือบาร์โค้ดบนตัวเครื่อง', 'live');
         // ไฟฉายรองรับเฉพาะบางกล้อง/บางเบราว์เซอร์ — ซ่อนปุ่มถ้าใช้ไม่ได้จริง
         try {
           var caps = scanner.getRunningTrackCapabilities();
@@ -326,7 +326,7 @@ page_header('สแกน QR / Barcode');
   }).catch(function () {}).then(function () {
     return start({ facingMode: 'environment' });
   }).catch(function (e) {
-    setStatus('🚫 เปิดกล้องไม่ได้ (' + e + ') — พิมพ์รหัสในช่องด้านขวาแทนได้', 'err');
+    setStatus('เปิดกล้องไม่ได้ (' + e + ') — พิมพ์รหัสในช่องด้านขวาแทนได้', 'err');
   });
 
   btnFlip.addEventListener('click', function () {
@@ -335,7 +335,7 @@ page_header('สแกน QR / Barcode');
     btnTorch.hidden = true; btnTorch.classList.remove('on'); torchOn = false;
     setStatus('<span class="scan-spin"></span> กำลังสลับกล้อง…');
     scanner.stop().then(function () { return start({ deviceId: { exact: cameras[camIndex].id } }); })
-      .catch(function (e) { setStatus('🚫 สลับกล้องไม่ได้: ' + e, 'err'); });
+      .catch(function (e) { setStatus('สลับกล้องไม่ได้: ' + e, 'err'); });
   });
 
   btnTorch.addEventListener('click', function () {
