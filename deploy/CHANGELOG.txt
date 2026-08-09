@@ -1406,3 +1406,19 @@ Files:
   parts/includes/StockService.php
   parts/pages/history.php
 
+
+================================================================
+v2026-08-09_142054 | Patch | 2026-08-09 14:20:57
+From: 2026-08-09_134654  ->  To: 59d2425  |  Files: 8
+----------------------------------------------------------------
+
+Files:
+  parts/assets/style.css
+  parts/includes/StockService.php
+  parts/pages/history.php
+  parts/pages/sets.php
+  parts/pages/stock-in.php
+  parts/pages/stock-out.php
+  parts/pages/stock-out-item.php
+  shared/ui_icons.php
+
