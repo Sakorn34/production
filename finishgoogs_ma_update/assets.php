@@ -54,6 +54,8 @@ $sortSql = [
 ];
 if (!isset($sortSql[$sort])) $sort = 'time_code';
 
+$hasActiveFilter = ($search !== '' || $product !== '' || $status !== '' || $sort !== 'time_code');
+
 /**
  * สร้าง WHERE สำหรับ filter หน้า assets.php
  *
@@ -177,13 +179,13 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
     <input type="text" name="q" id="live-q" value="<?= h($search) ?>" placeholder="ค้นหา รหัสเครื่อง / รุ่น / ผู้ผลิต / FW" style="width:min(360px,100%)" autocomplete="off">
     <div id="live-results" class="combo-list" hidden></div>
   </span>
-  <select name="product">
+  <select name="product" onchange="this.form.submit()">
     <option value="">— ทุกรุ่น —</option>
     <?php while ($p = $productList->fetch_assoc()) { ?>
       <option value="<?= h($p['name']) ?>" <?= $product === $p['name'] ? 'selected' : '' ?>><?= h($p['name']) ?></option>
     <?php } ?>
   </select>
-  <select name="status">
+  <select name="status" onchange="this.form.submit()">
     <option value="">— ทุกสถานะ —</option>
     <?php foreach (status_list() as $s) { ?>
       <option value="<?= $s ?>" <?= $status === $s ? 'selected' : '' ?>><?= h(status_th($s)) ?></option>
@@ -197,6 +199,9 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
     <option value="recent" <?= $sort === 'recent' ? 'selected' : '' ?>>เพิ่มเข้าระบบล่าสุด</option>
   </select>
   <button type="submit">ค้นหา</button>
+  <?php if ($hasActiveFilter) { ?>
+  <a href="<?= BASE_URL ?>/assets.php" class="btn btn-line btn-sm">ล้างการค้นหา</a>
+  <?php } ?>
 </form>
   <?php if ($withdrawSyncPendingCount > 0) { ?>
   <form method="post" style="display:inline-flex" onsubmit="return confirm('จับคู่ยอดเบิกกับสต็อกให้ตรงกัน สำหรับ <?= (int)$withdrawSyncPendingCount ?> เครื่อง (ตามตัวกรองที่เลือกอยู่)?\n\nระบบจะจับคู่ยอดเบิกกับสต็อก และลบใบเบิกที่ซ้ำ/เกินออก (คืนสต็อกให้)')">
@@ -209,7 +214,7 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
     <button type="submit" class="btn btn-sm btn-line btn-with-icon"><?= ui_btn_label('refresh', 'Sync รายการเบิก (' . number_format($withdrawSyncPendingCount) . ')') ?></button>
   </form>
   <?php } ?>
-  <a class="btn assets-filter-cta" href="<?= BASE_URL ?>/asset_new.php"><?= ui_btn_label('assets', 'ลงทะเบียนเครื่องผลิตใหม่') ?></a>
+  <a class="btn assets-filter-cta" href="<?= BASE_URL ?>/asset_new.php"><?= ui_btn_label('assets', ' ลงทะเบียนเครื่องผลิตใหม่') ?></a>
 </div>
 
 <style>
@@ -320,8 +325,15 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
     <td style="white-space:nowrap">
       <?php if ($sale === null) { ?>
         <span class="sale-tag sale-unknown" title="ไม่พบ S/N นี้ในทะเบียน stock">—</span>
-      <?php } elseif ($sale['sold']) { ?>
-        <span class="sale-tag sale-out" title="Setup ID #<?= h($sale['setup_id']) ?>">เบิกขายแล้ว</span>
+      <?php } elseif ($sale['sold']) {
+          $saleSrc = (string) ($sale['resolve_source'] ?? '');
+          if ($saleSrc === 'stock_old') {
+              $saleTitle = 'ส่งมอบแล้ว · ' . (string) ($sale['setup_id'] ?? '');
+          } else {
+              $saleTitle = 'Setup ID #' . (string) ($sale['setup_id'] ?? '');
+          }
+      ?>
+        <span class="sale-tag sale-out" title="<?= h($saleTitle) ?>">เบิกขายแล้ว</span>
       <?php } else { ?>
         <span class="sale-tag sale-in">อยู่ในคลัง</span>
       <?php } ?>

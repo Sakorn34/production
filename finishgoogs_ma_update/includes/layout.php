@@ -50,7 +50,7 @@ function page_is_menu_page($cur = null) {
 }
 
 /**
- * คำนวณ URL ปลายทางเมื่อกดย้อนกลับ — ไปหน้าเมนูงานของโมดูลนั้นเสมอ
+ * คำนวณ URL ปลายทางเมื่อกดย้อนกลับ — ใช้ referer ในแอปก่อน แล้วค่อย fallback หน้าเมนู
  *
  * @param string $override URL ที่หน้าเรียกส่งมา (เช่น รายการอัปเดตของรุ่น)
  * @return string
@@ -59,7 +59,49 @@ function page_back_url($override = '') {
     if ($override !== '' && page_back_url_is_allowed($override)) {
         return $override;
     }
+    $fromRef = page_back_url_from_referer();
+    if ($fromRef !== null) {
+        return $fromRef;
+    }
     return page_back_url_default();
+}
+
+/**
+ * อ่าน HTTP Referer ถ้าชี้ไปหน้าอื่นในแอป (ไม่ใช่หน้าเดิม)
+ *
+ * @return string|null
+ */
+function page_back_url_from_referer(): ?string
+{
+    $ref = trim((string) ($_SERVER['HTTP_REFERER'] ?? ''));
+    if ($ref === '' || !page_back_url_is_allowed($ref)) {
+        return null;
+    }
+
+    $refPath = (string) (parse_url($ref, PHP_URL_PATH) ?: '');
+    $refQuery = (string) (parse_url($ref, PHP_URL_QUERY) ?: '');
+    $curUri = (string) ($_SERVER['REQUEST_URI'] ?? '');
+    $curPath = (string) (parse_url($curUri, PHP_URL_PATH) ?: '');
+    $curQuery = (string) (parse_url($curUri, PHP_URL_QUERY) ?: '');
+
+    if ($refPath === $curPath && $refQuery === $curQuery) {
+        return null;
+    }
+
+    return $ref;
+}
+
+/**
+ * HTML ปุ่มย้อนกลับ — กดแล้ว history.back() เหมือนเบราว์เซอร์ ถ้าไม่มีประวัติใช้ fallback
+ *
+ * @param string $fallbackHref จาก page_back_url()
+ * @return string
+ */
+function page_back_button_html(string $fallbackHref): string
+{
+    $href = h($fallbackHref);
+    $jsFallback = json_encode($fallbackHref, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+    return '<a href="' . $href . '" class="btn btn-line btn-sm backbtn" onclick="return fgPageBack(event, ' . $jsFallback . ')">← ย้อนกลับ</a>';
 }
 
 /**
@@ -193,7 +235,7 @@ $sideClass = $side === 'right' ? ' sidebar-right' : ($side === 'top' ? ' sidebar
   <main class="content">
     <div class="pagehead">
       <?php if ($showBack && !page_is_menu_page($cur)) { ?>
-        <a href="<?= h($backHref) ?>" class="btn btn-line btn-sm backbtn">← ย้อนกลับ</a>
+        <?= page_back_button_html($backHref) ?>
       <?php } ?>
       <div class="pagehead-titles">
         <h1><?= h($title) ?></h1>
@@ -238,6 +280,20 @@ function page_footer() {
 
 <script>
 function closeOverlay(id){ document.getElementById(id).hidden = true; }
+
+/** ปุ่มย้อนกลับ — ใช้ประวัติเบราว์เซอร์ก่อน ไม่มีประวัติค่อยไป fallback */
+function fgPageBack(e, fallbackHref) {
+  if (e && typeof e.preventDefault === 'function' && window.history.length > 1) {
+    e.preventDefault();
+    window.history.back();
+    return false;
+  }
+  if (fallbackHref) {
+    window.location.href = fallbackHref;
+    return false;
+  }
+  return true;
+}
 
 /**
  * ค้นหาอะไหล่จากหลายชื่อ/รหัสในคำเดียว — ใช้ร่วมกันในตัวเลือกอะไหล่ของ asset_new.php และ ma.php

@@ -1460,3 +1460,150 @@ From: 2026-08-09_210308  ->  To: 053db78  |  Files: 1
 Files:
   finishgoogs_ma_update/system_doc.php
 
+
+================================================================
+v2026-08-09_215529 | Patch | 2026-08-09 21:55:32
+From: 2026-08-09_210308  ->  To: ee64646  |  Files: 2
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+
+
+================================================================
+v2026-08-14_160529 | Patch | 2026-08-14 16:05:31
+From: 2026-08-09_210308  ->  To: ee64646  |  Files: 4
+----------------------------------------------------------------
+- Sales withdraw card: fallback setup_id lookup, full order display, inline dl layout, responsive asset-head grid; backfill_stock_setup_id CLI tool (dev only, stripped from upload)
+
+Files:
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+  shared/datetime_helpers.php
+
+
+================================================================
+v2026-08-14_171747 | Patch | 2026-08-14 17:17:48
+From: 2026-08-14_160529  ->  To: ee64646  |  Files: 3
+----------------------------------------------------------------
+- Back button uses history.back(); assets filter auto-submit on product/status/sort + clear search button
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/includes/layout.php
+
+
+================================================================
+v2026-08-14_173312 | Patch | 2026-08-14 17:33:12
+From: 2026-08-14_171747  ->  To: ee64646  |  Files: 2
+----------------------------------------------------------------
+- Claim info on asset sales card: read from stock_movements notes + stock_old (old serial, customer hint, movement date)
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+
+
+================================================================
+v2026-08-14_173840 | Patch | 2026-08-14 17:38:40
+From: 2026-08-14_173312  ->  To: ee64646  |  Files: 2
+----------------------------------------------------------------
+- Individual sale section on asset card: PO, customer, date from stock_movements when no po_order_parts
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+
+
+================================================================
+v2026-08-14_180430 | Patch | 2026-08-14 18:04:30
+From: 2026-08-14_173840  ->  To: ee64646  |  Files: 2
+----------------------------------------------------------------
+- stock_old section on asset card when S/N not in current stock (site, security company, ship date)
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+
+
+================================================================
+v2026-08-14_180812 | Patch | 2026-08-14 18:08:13
+From: 2026-08-14_173840  ->  To: ee64646  |  Files: 2
+----------------------------------------------------------------
+- Assets list: show เบิกขายแล้ว for S/N in stock_old or stock_movements when not in current stock
+
+Files:
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+
+
+================================================================
+v2026-08-14_180827 | Patch | 2026-08-14 18:08:28
+From: 2026-08-14_173840  ->  To: ee64646  |  Files: 3
+----------------------------------------------------------------
+- stock_old card + assets sale status: เบิกขายแล้ว when deployed via stock_old/movements
+
+Files:
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+
+
+================================================================
+v2026-08-14_181948 | Patch | 2026-08-14 18:19:49
+From: 2026-08-14_180827  ->  To: ee64646  |  Files: 2
+----------------------------------------------------------------
+- Profile card: show order/registration from stock_movements when S/N not in current stock (fixes BP26061992 mismatch)
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+
+
+================================================================
+v2026-08-14_182326 | Patch | 2026-08-14 18:23:26
+From: 2026-08-14_180827  ->  To: ee64646  |  Files: 3
+----------------------------------------------------------------
+- stock_old = delivery history; profile card for movement-only S/N; UI labels ส่งมอบแล้ว
+
+Files:
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+
+
+================================================================
+v2026-08-14_182938 | Patch | 2026-08-14 18:29:39
+From: 2026-08-14_180827  ->  To: ee64646  |  Files: 2
+----------------------------------------------------------------
+- Delivery status: show ส่งแล้ว for matched S/N when stock_old/movement proves delivery despite po_order_parts.is_delivered=0
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+
+
+================================================================
+v2026-08-14_183357 | Patch | 2026-08-14 18:33:58
+From: 2026-08-14_180827  ->  To: ee64646  |  Files: 2
+----------------------------------------------------------------
+- Per-line delivery: map po_order_parts rows to registered S/N from stock_movements for ORDER-xxx sets
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+
+
+================================================================
+v2026-08-14_183757 | Patch | 2026-08-14 18:37:58
+From: 2026-08-14_183357  ->  To: ee64646  |  Files: 2
+----------------------------------------------------------------
+- Order set table: Serial column from po_order_part_serials or registration movements (ORDER-360 style)
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+

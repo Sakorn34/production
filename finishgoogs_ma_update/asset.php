@@ -298,7 +298,7 @@ function asset_tl_actions($e, $assetId) {
 page_header('เครื่อง ' . $a['asset_code'], false);
 ?>
 <div class="asset-toolbar">
-  <a href="<?= h($assetBackHref) ?>" class="btn btn-line btn-sm backbtn">← ย้อนกลับ</a>
+  <?= page_back_button_html($assetBackHref) ?>
   <h1 class="asset-toolbar-title">เครื่อง <?= h($a['asset_code']) ?></h1>
   <div class="asset-toolbar-actions">
     <a class="btn btn-sm btn-with-icon" href="<?= BASE_URL ?>/update_new.php?asset=<?= $id ?>"><?= ui_btn_label('updates', 'บันทึกอัปเดต FW/HW') ?></a>
