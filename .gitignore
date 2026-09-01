@@ -7,6 +7,12 @@
 .env
 Appscript*.txt
 
+# cache ของเครื่องมือภายนอก — wrangler-account.json มี Cloudflare account id + อีเมล
+.wrangler/
+
+# ไฟล์ร่าง/โน้ตงานออกแบบ ไม่ใช่โค้ดของโปรเจ็ค
+ai_studio_code/
+
 # ไฟล์ที่ generate/runtime ไม่ควร commit
 **/uploads/*
 !**/uploads/.htaccess
