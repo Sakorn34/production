@@ -225,8 +225,8 @@ $settingsActive = in_array($cur, ['settings.php', 'appearance.php', 'server_conf
         <?php } ?>
       </div>
       <button type="button" class="sidebar-pin-btn" aria-label="ขยายเมนู" aria-expanded="false">
-        <span class="pin-icon-expand" aria-hidden="true">›</span>
-        <span class="pin-icon-collapse" aria-hidden="true">‹</span>
+        <?php // ไอคอนเดียวหมุน 180 องศาเมื่อขยาย — เดิมเป็นตัวอักษร › ‹ สองอันสลับ display กัน ?>
+        <?= ui_icon_html('chevron-right', 16, 'pin-chevron') ?>
       </button>
     </div>
     <div class="sidebar-search" data-smart-search="<?= BASE_URL ?>/smart_search.php">

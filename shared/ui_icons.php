@@ -65,6 +65,8 @@ function ui_icon_paths(string $name): ?string
         'basket'         => '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0"/>',
         'menu'           => '<path d="M3 6h18M3 12h18M3 18h18"/>',
         'plus'           => '<path d="M12 5v14M5 12h14"/>',
+        // ลูกศรของปุ่มขยาย/หุบเมนู — ชี้ขวาเป็นค่าตั้งต้น หมุน 180 องศาเมื่อขยายแล้ว
+        'chevron-right'  => '<path d="m9 18 6-6-6-6"/>',
     ];
     return $icons[$name] ?? null;
 }

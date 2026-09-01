@@ -42,8 +42,7 @@ $settingsActive = false;
                 <?php endif; ?>
             </div>
             <button type="button" class="sidebar-pin-btn" aria-label="ขยายเมนู" aria-expanded="false">
-                <span class="pin-icon-expand" aria-hidden="true">›</span>
-                <span class="pin-icon-collapse" aria-hidden="true">‹</span>
+                <?= ui_icon_html('chevron-right', 16, 'pin-chevron') ?>
             </button>
         </div>
         <div class="sidebar-search" data-smart-search="<?= e($fgBase) ?>/smart_search.php">

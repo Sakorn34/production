@@ -117,10 +117,15 @@
   outline: 2px solid rgba(255, 255, 255, .45);
   outline-offset: 2px;
 }
-.app.nav-expanded .sidebar-pin-btn .pin-icon-expand { display: none; }
-.app.nav-collapsed .sidebar-pin-btn .pin-icon-collapse { display: none; }
-.app.sidebar-right .sidebar-pin-btn .pin-icon-expand { transform: scaleX(-1); }
-.app.sidebar-right .sidebar-pin-btn .pin-icon-collapse { transform: scaleX(-1); }
+/* ไอคอนเดียวหมุน 180 องศา แทนการสลับ display ของสองไอคอน
+   สลับ display กระโดดทันที ไม่มีช่วงกลางให้ตาไล่ตาม */
+.sidebar-pin-btn .pin-chevron {
+  transition: transform .26s cubic-bezier(.4, 0, .2, 1);
+  transform: rotate(0deg);
+}
+.app.nav-expanded .sidebar-pin-btn .pin-chevron { transform: rotate(180deg); }
+.app.sidebar-right .sidebar-pin-btn .pin-chevron { transform: rotate(180deg); }
+.app.sidebar-right.nav-expanded .sidebar-pin-btn .pin-chevron { transform: rotate(0deg); }
 
 /* ── Search ── */
 .sidebar-search {
@@ -324,14 +329,62 @@
 .nav-group-label.is-filter-hidden { display: none; }
 
 /* ── Collapsed: icon rail + tooltip ── */
+/* ── ป้ายข้อความตอนหุบ/ขยาย ──────────────────────────────────────────────────
+   เดิมทุกอันเป็น display:none ซึ่งเปลี่ยนทันทีไม่มีช่วงกลาง ผลคือตอนกดขยาย
+   ตัวหนังสือโผล่ครบตั้งแต่เฟรมแรกขณะกล่องยังกว้าง 56px แล้วถูก overflow ตัดทิ้ง
+   จนกว่ากล่องจะโตตาม — ตาเห็นเป็นการกระตุก ตอนหุบก็กลับกัน คือหายวับแล้วเหลือ
+   พื้นสีม่วงว่างอีก 260ms
+
+   แก้เป็นย่อความกว้างพร้อมจางหาย ซึ่งเคลื่อนไหวได้จริง และตั้งจังหวะไม่เท่ากัน
+   สองทาง: ขยาย = กล่องโตก่อน ตัวหนังสือค่อยจางเข้า (หน่วง .1s)
+           หุบ  = ตัวหนังสือจางออกก่อนเร็ว ๆ แล้วกล่องค่อยหด                    */
+.brand-text,
+.nav-text,
+.ub-info,
+.userbox-chevron {
+  white-space: nowrap;
+  overflow: hidden;
+  opacity: 1;
+  max-width: 220px;
+  transition: opacity .18s ease .1s, max-width .26s cubic-bezier(.4, 0, .2, 1);
+}
 .app.nav-collapsed:not(.sidebar-top) .brand-text,
 .app.nav-collapsed:not(.sidebar-top) .sidebar-brand > span:not(.brand-icon):not(.nav-ico):not(.brand-logo),
-.app.nav-collapsed:not(.sidebar-top) .sidebar-search,
 .app.nav-collapsed:not(.sidebar-top) .nav-text,
-.app.nav-collapsed:not(.sidebar-top) .nav-group-label,
 .app.nav-collapsed:not(.sidebar-top) .ub-info,
 .app.nav-collapsed:not(.sidebar-top) .userbox-chevron {
-  display: none;
+  opacity: 0;
+  max-width: 0;
+  transition: opacity .1s ease, max-width .26s cubic-bezier(.4, 0, .2, 1);
+}
+
+/* ช่องค้นหาและหัวข้อกลุ่มเป็นบล็อกเต็มความกว้าง ย่อด้วยความสูงแทน */
+.sidebar-search,
+.nav-group-label {
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity .18s ease .1s, max-height .26s cubic-bezier(.4, 0, .2, 1),
+              padding .26s cubic-bezier(.4, 0, .2, 1);
+  max-height: 90px;
+}
+.app.nav-collapsed:not(.sidebar-top) .sidebar-search,
+.app.nav-collapsed:not(.sidebar-top) .nav-group-label {
+  opacity: 0;
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  transition: opacity .1s ease, max-height .26s cubic-bezier(.4, 0, .2, 1),
+              padding .26s cubic-bezier(.4, 0, .2, 1);
+}
+
+/* เคารพการตั้งค่าลดการเคลื่อนไหวของระบบ */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .sidebar-pin-btn .pin-chevron,
+  .brand-text, .nav-text, .ub-info, .userbox-chevron,
+  .sidebar-search, .nav-group-label {
+    transition-duration: .01ms !important;
+  }
 }
 .app.nav-collapsed:not(.sidebar-top) .sidebar-head {
   flex-direction: column;
