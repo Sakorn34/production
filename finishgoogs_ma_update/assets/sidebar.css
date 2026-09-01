@@ -64,11 +64,11 @@
   padding: 14px 10px 10px;
   flex-shrink: 0;
   border-bottom: 1px solid rgba(255, 255, 255, .1);
-  /* สูงเท่ากันทั้งสองสถานะ ตอนหุบเรียงแนวตั้งจึงสูงกว่าราว 7px
-     ถ้าไม่ล็อกไว้ เมนูทั้งแถบจะขยับทุกครั้งที่สลับ */
+  /* สูงคงที่ทั้งสองสถานะ เมนูข้างล่างจะได้ไม่ขยับตอนสลับ */
   min-height: 80px;
-  justify-content: center;
+  justify-content: flex-start;
 }
+.sidebar-head .sidebar-pin-btn { margin-left: auto; }
 .sidebar .brand,
 .sidebar .sidebar-brand {
   flex: 1;
@@ -111,7 +111,8 @@
   border-radius: var(--radius-sm, 8px);
   color: rgba(255, 255, 255, .75);
   cursor: pointer;
-  transition: background .15s, color .15s, transform .2s;
+  transition: background .15s, color .15s, transform .2s,
+              width .26s cubic-bezier(.4, 0, .2, 1), height .26s cubic-bezier(.4, 0, .2, 1);
 }
 .sidebar-pin-btn:hover {
   background: rgba(255, 255, 255, .12);
@@ -268,6 +269,12 @@
   list-style: none;
 }
 .sidebar .nav-links li { margin: 0; padding: 0; }
+
+/* ชื่อแอปย่อความกว้างพร้อมจาง เหมือนป้ายเมนู เพื่อไม่ให้หัวแถบต้องจัดเรียงใหม่ */
+.sidebar-head .brand-text {
+  white-space: nowrap;
+  overflow: hidden;
+}
 
 .nav-group-label {
   font-size: calc(10px * var(--font-scale, 1));
@@ -442,19 +449,33 @@
     transition-duration: .01ms !important;
   }
 }
+/* ── ตอนหุบ: ยังเป็นแถวเหมือนเดิม ไม่สลับเป็น column ──────────────────────────
+   เดิมสลับเป็น flex-direction: column ทำให้โลโก้กับปุ่มซ้อนกันเป็นสองบรรทัด
+   flex-direction เปลี่ยนค่าแบบทันที ไม่มีสถานะกลางให้เคลื่อนไหว ทั้งสองชิ้นจึง
+   กระโดดเข้าที่ใหม่ในเฟรมเดียว แม้ความสูงรวมจะเท่ากันแล้วก็ยังเห็นสะดุด
+
+   คงแถวไว้แล้วให้ชื่อย่อความกว้างหายไปแทน (เหมือนป้ายเมนู) เหลือแต่ปุ่มในราง
+   ซึ่งเคลื่อนที่ต่อเนื่องไปตามความกว้างที่กำลังเปลี่ยน                        */
 .app.nav-collapsed:not(.sidebar-top) .sidebar-head {
-  flex-direction: column;
-  /* padding แนวตั้งเท่าตอนขยาย (14/10) หัวแถบจะได้สูงเท่ากันทั้งสองสถานะ
-     ไม่งั้นเมนูทั้งแถบขยับ 3px ทุกครั้งที่สลับ */
-  padding: 12px 6px 8px;
-  /* gap แคบลง เนื้อหาแนวตั้งจะได้ต่ำกว่า min-height 80px
-     ไม่งั้นกล่องดันสูงเกินแล้ว min-height ก็ไม่มีผล */
-  gap: 4px;
+  /* ราง 56px: 4 + 20(โลโก้) + 2 + 24(ปุ่ม) + 4 = 54 เหลือช่องว่าง 2px */
+  padding: 12px 4px 8px;
+  gap: 2px;
+  justify-content: flex-start;
 }
+/* .brand มี gap ของตัวเองระหว่างไอคอนกับข้อความ ข้อความยุบไปแล้วแต่ gap ยังกินที่ */
+.app.nav-collapsed:not(.sidebar-top) .sidebar-head .brand { gap: 0; }
+/* โลโก้ต้องไม่ยืด/ไม่หด ไม่งั้น flex บีบไอคอน 20px ให้เหลือ 10px แล้วล้นกรอบ */
+.app.nav-collapsed:not(.sidebar-top) .sidebar-head .brand { flex: 0 0 auto; }
+.app.nav-collapsed:not(.sidebar-top) .sidebar-head .sidebar-pin-btn { width: 24px; height: 24px; }
+.app.nav-collapsed:not(.sidebar-top) .sidebar-head .sidebar-pin-btn {
+  margin-left: 0;
+}
+/* เดิม width:100% มาจากตอนที่หัวแถบเป็น column แล้วโลโก้อยู่บรรทัดของตัวเอง
+   ตอนนี้เป็นแถวเดียวกับปุ่ม ถ้ากางเต็มความกว้างจะดันปุ่มล้นราง */
 .app.nav-collapsed:not(.sidebar-top) .sidebar .brand,
 .app.nav-collapsed:not(.sidebar-top) .sidebar .sidebar-brand {
   justify-content: center;
-  width: 100%;
+  width: auto;
 }
 .app.nav-collapsed:not(.sidebar-top) .brand-logo {
   height: 28px;
@@ -469,9 +490,7 @@
      แล้วรายการล่าง ๆ เลื่อนสะสมได้ถึง 17px ทุกครั้งที่สลับ */
   padding: 9px 8px;
 }
-.app.nav-collapsed:not(.sidebar-top) .sidebar-pin-btn {
-  width: 100%;
-}
+/* ปุ่มคงขนาด 28px เท่าเดิม เดิมกางเต็มความกว้างเพราะหัวแถบเคยเป็น column */
 
 /* ── ป้ายชื่อเมนูตอนหุบ ──────────────────────────────────────────────────────
    เดิมเป็น ::after ของตัวลิงก์ วางที่ left: calc(100% + 10px) ซึ่งอยู่นอกกล่อง
