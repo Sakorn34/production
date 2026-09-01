@@ -2038,3 +2038,16 @@ Files:
   finishgoogs_ma_update/assets/sidebar.css
   finishgoogs_ma_update/config.php
 
+
+================================================================
+v2026-09-01_193053 | Patch | 2026-09-01 19:30:55
+From: 2026-09-01_190855  ->  To: 376d08b  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/sidebar.css
+  finishgoogs_ma_update/assets/sidebar.js
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/layout.php
+  parts/includes/header.php
+
