@@ -1,0 +1,149 @@
+/**
+ * ma-prom-instrument.css
+ * ────────────────────────────────────────────────────────────────────────────────
+ * ปรับหน้าเลือกรุ่น MA ตามหลัก prom-design (Instrument) แต่ใช้ token สีเดิมจาก theme
+ * ────────────────────────────────────────────────────────────────────────────────
+ */
+
+.ma-instrument {
+  font-variant-numeric: tabular-nums;
+}
+
+.ma-instrument .ma-proof-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+
+.ma-instrument .ma-proof-item {
+  flex: 1 1 140px;
+  min-width: 120px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  box-shadow: var(--shadow-sm);
+}
+
+.ma-instrument .ma-proof-num {
+  display: block;
+  font-size: calc(22px * var(--font-scale, 1));
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--primary-dark);
+  line-height: 1.15;
+}
+
+.ma-instrument .ma-proof-lbl {
+  display: block;
+  margin-top: 4px;
+  font-size: calc(13px * var(--font-scale, 1));
+  color: #667085;
+  line-height: 1.35;
+}
+
+.ma-instrument .ma-section-lede {
+  margin: 0 0 14px;
+  max-width: 62ch;
+  font-size: calc(15px * var(--font-scale, 1));
+  color: #45506a;
+  line-height: 1.5;
+}
+
+.ma-instrument .ma-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.ma-instrument #prod-filter {
+  flex: 1 1 220px;
+  max-width: 360px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: #2a2440;
+  font-size: calc(15px * var(--font-scale, 1));
+}
+
+.ma-instrument #prod-filter:focus {
+  outline: 2px solid var(--focus-ring);
+  border-color: var(--primary);
+}
+
+.ma-instrument .btn-retire {
+  min-height: 44px;
+}
+
+.ma-instrument #retire-bulk-wrap .panel {
+  border-color: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.ma-instrument #retire-bulk-wrap h3 {
+  font-size: calc(15px * var(--font-scale, 1));
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.ma-instrument .bulk-retire-fail-tbl th {
+  background: var(--surface-muted);
+  color: #6b6480;
+  font-weight: 600;
+  font-size: calc(13px * var(--font-scale, 1));
+}
+
+.ma-instrument #bulk_serials,
+.ma-instrument #bulk_remark {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.ma-instrument #retire-bulk-wrap label {
+  font-size: calc(13px * var(--font-scale, 1));
+  font-weight: 600;
+  color: #45506a;
+}
+
+.ma-instrument .grid-products {
+  gap: 12px;
+}
+
+.ma-instrument .pcard {
+  border-color: var(--border);
+  border-radius: var(--radius);
+}
+
+.ma-instrument .pcard:hover {
+  border-color: var(--border-strong);
+}
+
+.ma-instrument .pcard .pname {
+  color: #2a2440;
+}
+
+.ma-instrument .pcard .pmeta {
+  color: #667085;
+}
+
+.ma-instrument .pcard .ma-wait-badge {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-size: calc(12px * var(--font-scale, 1));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ma-instrument .flash.flash-err[style*="margin:0 0 14px"] {
+  border-radius: var(--radius);
+}

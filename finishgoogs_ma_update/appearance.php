@@ -183,14 +183,12 @@ page_header('ปรับแต่งหน้าตาระบบ');
         <input type="file" name="font_file" accept=".woff,.woff2,.ttf,.otf,font/woff,font/woff2,font/ttf,font/otf">
       </div>
 
-      <?= ui_heading('palette', 'สีธีม', 'h3') ?>
+      <?= ui_heading('palette', 'เลือกธีม', 'h3') ?>
+      <p class="muted" style="font-size:<?= theme_fs_css(12) ?>; margin:-4px 0 10px">คลิกการ์ดเพื่อเลือกธีม · สีสถานะในกราฟ (ใหม่/เช่า/ขายแล้ว/สำรอง) คงเดิมทุกแบบ · กดบันทึกด้านล่างเพื่อใช้งานจริง</p>
+      <div id="theme-preview-gallery" class="theme-preview-grid" role="group" aria-label="เลือกธีมระบบ"></div>
+
+      <?= ui_heading('palette', 'ปรับสีเอง (ขั้นสูง)', 'h3') ?>
       <div class="field">
-        <div style="display:flex; gap:8px; margin-bottom:10px">
-          <button type="button" class="btn btn-line btn-sm" onclick="applyPreset('v2')">v2 ชมพู–ม่วง (ค่าเริ่มต้น)</button>
-          <button type="button" class="btn btn-line btn-sm" onclick="applyPreset('navy')">โทนน้ำเงิน</button>
-          <button type="button" class="btn btn-line btn-sm" onclick="applyPreset('teal')">โทนเขียวเทา</button>
-          <button type="button" class="btn btn-line btn-sm" onclick="applyPreset('vibrant')">โทนสดใส (ชมพู/ม่วง)</button>
-        </div>
         <?php foreach ($COLORS as $k => $meta) { ?>
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:7px" class="color-row" data-color-key="<?= h($k) ?>">
           <input type="color" id="c_<?= $k ?>" name="<?= $k ?>" value="<?= h(theme_color($k, $meta[1])) ?>" style="width:46px; height:32px; padding:2px; border:1px solid #c9d2e0; border-radius:6px; cursor:pointer">
@@ -237,17 +235,93 @@ page_header('ปรับแต่งหน้าตาระบบ');
 </form>
 
 <script>
+var CHART_COLORS = { new:'#6ee7b7', rental:'#93c5fd', sold:'#fdba74', spare:'#fde68a' };
+var CHART_SEG_FLEX = { new:3, rental:2, sold:1, spare:1 };
 var PRESETS = {
+  slate: { color_primary:'#64748b', color_primary_dark:'#475569', color_sidebar:'#334155', color_sidebar_active:'#64748b', color_page_bg:'#f8fafc' },
+  sky: { color_primary:'#38bdf8', color_primary_dark:'#0ea5e9', color_sidebar:'#1e40af', color_sidebar_active:'#38bdf8', color_page_bg:'#f8fafc' },
+  mint: { color_primary:'#2dd4bf', color_primary_dark:'#14b8a6', color_sidebar:'#115e59', color_sidebar_active:'#2dd4bf', color_page_bg:'#f0fdfa' },
   v2: { color_primary:'#e11d74', color_primary_dark:'#c01862', color_sidebar:'#4e2985', color_sidebar_active:'#e11d74', color_page_bg:'#f4f1fb' },
   navy: { color_primary:'#2c4a7c', color_primary_dark:'#1d3a68', color_sidebar:'#17233a', color_sidebar_active:'#2c4a7c', color_page_bg:'#f2f4f8' },
   teal: { color_primary:'#0f766e', color_primary_dark:'#115e59', color_sidebar:'#12312e', color_sidebar_active:'#0f766e', color_page_bg:'#f1f5f4' },
   vibrant: { color_primary:'#e11d74', color_primary_dark:'#c01862', color_sidebar:'#4e2985', color_sidebar_active:'#e11d74', color_page_bg:'#f4f1fb' }
 };
+var THEME_GALLERY = [
+  { id:'slate', label:'Slate กลาง', desc:'เงียบ ให้กราฟเด่น', badge:'แนะนำ',
+    surface:{ border:'#e2e8f0', borderStrong:'#cbd5e1', surfaceSoft:'#f1f5f9', surfaceMuted:'#f8fafc' } },
+  { id:'sky', label:'Sky Blue', desc:'เข้ากับแถบเช่าในกราฟ', badge:'',
+    surface:{ border:'#dbeafe', borderStrong:'#bfdbfe', surfaceSoft:'#eff6ff', surfaceMuted:'#f8fafc' } },
+  { id:'mint', label:'Mint Teal', desc:'เข้ากับแถบใหม่ในกราฟ', badge:'',
+    surface:{ border:'#ccfbf1', borderStrong:'#99f6e4', surfaceSoft:'#ecfdf5', surfaceMuted:'#f0fdfa' } },
+  { id:'v2', label:'ชมพู–ม่วง', desc:'ธีมเดิมของระบบ', badge:'',
+    surface:{ border:'#e7e0f5', borderStrong:'#d9c9f2', surfaceSoft:'#f6f3fd', surfaceMuted:'#f7f4fd' } }
+];
 function applyPreset(name){
   var p = PRESETS[name]; if (!p) return;
   for (var k in p) { var el = document.getElementById('c_' + k); if (el) el.value = p[k]; }
   updateContrastChecks();
+  syncThemeCardSelection();
 }
+function detectCurrentPreset(){
+  var keys = ['color_primary','color_primary_dark','color_sidebar','color_sidebar_active','color_page_bg'];
+  for (var id in PRESETS) {
+    var p = PRESETS[id], ok = true;
+    for (var i = 0; i < keys.length; i++) {
+      var el = document.getElementById('c_' + keys[i]);
+      if (!el || el.value.toLowerCase() !== p[keys[i]].toLowerCase()) { ok = false; break; }
+    }
+    if (ok) return id;
+  }
+  return '';
+}
+function syncThemeCardSelection(){
+  var cur = detectCurrentPreset();
+  document.querySelectorAll('.theme-preview-card').forEach(function(c){
+    c.classList.toggle('is-selected', c.dataset.preset === cur);
+    c.setAttribute('aria-pressed', c.dataset.preset === cur ? 'true' : 'false');
+  });
+}
+function buildThemePreviewCard(theme){
+  var p = PRESETS[theme.id], s = theme.surface, c = p;
+  var segs = ['new','rental','sold','spare'].map(function(st){
+    return '<span class="tp-bar-seg" style="flex:' + CHART_SEG_FLEX[st] + ';background:' + CHART_COLORS[st] + '"></span>';
+  }).join('');
+  var primarySoft = 'color-mix(in srgb, ' + c.color_primary + ' 12%, #fff)';
+  return '<div class="tp-mock" style="background:' + c.color_page_bg + '">'
+    + '<div class="tp-sidebar" style="background:' + c.color_sidebar + '">'
+    + '<span class="tp-nav-item tp-nav-active" style="background:' + c.color_sidebar_active + '"></span>'
+    + '<span class="tp-nav-item"></span><span class="tp-nav-item"></span></div>'
+    + '<div class="tp-main">'
+    + '<div class="tp-card" style="border-color:' + s.border + ';background:#fff">'
+    + '<div class="tp-btns"><span class="tp-btn" style="background:' + c.color_primary + '">บันทึก</span>'
+    + '<span class="tp-btn-line" style="color:' + c.color_primary + ';border-color:' + c.color_primary + ';background:' + primarySoft + '">ดูรายการ</span></div>'
+    + '<div class="tp-chips"><span class="tp-chip" style="background:#d1fae5;color:#065f46;border-color:#6ee7b7">ใหม่</span>'
+    + '<span class="tp-chip" style="background:#dbeafe;color:#1e40af;border-color:#93c5fd">เช่า</span></div>'
+    + '<div class="tp-chart" style="border-color:' + s.border + '">'
+    + '<div class="tp-chart-total">502</div>'
+    + '<div class="tp-bar">' + segs + '</div></div></div></div>'
+    + (theme.badge ? '<span class="tp-badge">' + theme.badge + '</span>' : '')
+    + '<div class="tp-label">' + theme.label + '</div>'
+    + '<div class="tp-desc">' + theme.desc + '</div>';
+}
+function renderThemeGallery(){
+  var gal = document.getElementById('theme-preview-gallery');
+  if (!gal) return;
+  gal.innerHTML = '';
+  THEME_GALLERY.forEach(function(t){
+    if (!PRESETS[t.id]) return;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'theme-preview-card';
+    btn.dataset.preset = t.id;
+    btn.setAttribute('aria-pressed', 'false');
+    btn.innerHTML = buildThemePreviewCard(t);
+    btn.addEventListener('click', function(){ applyPreset(t.id); });
+    gal.appendChild(btn);
+  });
+  syncThemeCardSelection();
+}
+renderThemeGallery();
 
 function hexToRgb(hex){
   hex = (hex || '').replace('#','');
@@ -315,7 +389,7 @@ function updateContrastChecks(){
   }
 }
 document.querySelectorAll('input[type=color]').forEach(function(el){
-  el.addEventListener('input', updateContrastChecks);
+  el.addEventListener('input', function(){ updateContrastChecks(); syncThemeCardSelection(); });
 });
 updateContrastChecks();
 

@@ -8,6 +8,7 @@
 require __DIR__ . '/config.php';
 require_login();
 require __DIR__ . '/includes/ma_snippets.php';
+require __DIR__ . '/includes/rent_ma_bridge.php';
 
 /** แปลงข้อความรายการ (คั่นด้วย ,) เป็น array */
 function ma_items($s) {
@@ -169,7 +170,7 @@ function ma_sanitize_item_sets($okRaw, $repRaw, $fixRaw) {
 }
 
 /**
- * สร้างข้อความสรุป MA สำหรับส่งงานเช่า Office (จากสูตร AppSheet เดิม)
+ * สร้างข้อความสรุป MA สำหรับบันทึกไประบบเช่า — ส่งเฉพาะหัวข้อที่มีข้อมูล (ไม่ใส่ FW/Note ว่าง)
  *
  * @param string|null $replace รายการเปลี่ยนอะไหล่
  * @param string|null $repair  รายการซ่อม
@@ -178,20 +179,24 @@ function ma_sanitize_item_sets($okRaw, $repRaw, $fixRaw) {
  * @return string
  */
 function ma_rental_office_summary($replace, $repair, $fw, $remark) {
-    $lines = [
-        '✅ ใช้งานได้ปกติ เช็ดทำความสะอาด',
-    ];
+    $parts = ['ใช้งานได้ปกติ เช็ดทำความสะอาด'];
     $rep = trim((string)$replace);
     $fix = trim((string)$repair);
+    $fw = trim((string)$fw);
+    $remark = trim((string)$remark);
     if ($rep !== '') {
-        $lines[] = '✨ เปลี่ยน : ' . $rep;
+        $parts[] = 'เปลี่ยน: ' . $rep;
     }
     if ($fix !== '') {
-        $lines[] = '🛠️ แก้ไข : ' . $fix;
+        $parts[] = 'แก้ไข: ' . $fix;
     }
-    $lines[] = '🛜 FW : ' . trim((string)$fw);
-    $lines[] = '📝 Note : ' . trim((string)$remark);
-    return implode("\n", $lines);
+    if ($fw !== '') {
+        $parts[] = 'FW: ' . $fw;
+    }
+    if ($remark !== '') {
+        $parts[] = 'Note: ' . $remark;
+    }
+    return implode(' · ', $parts);
 }
 
 /**
@@ -309,23 +314,29 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'history') {
 
     echo '<div style="background:#eef4fb; border:1px solid #c9d9ef; border-radius:8px; padding:12px 14px; margin-bottom:10px">';
     echo '<b><a href="' . BASE_URL . '/asset.php?id=' . $a['id'] . '" target="_blank">' . h($a['asset_code']) . '</a></b> — ' . h($a['pname'])
-       . ' · ' . status_badge($a['status'])
-       . ' · FW: ' . h($a['current_fw_version'] ?: '-')
-       . ' · ผลิต ' . dthai($a['produced_at']);
+       . ' · ' . status_badge($a['status']);
+    if (product_show_fw((int) $a['product_id'])) {
+        $fwCur = trim((string) ($a['current_fw_version'] ?? ''));
+        echo ' · FW: ' . h($fwCur !== '' ? $fwCur : '-');
+    }
+    echo ' · ผลิต ' . dthai($a['produced_at']);
     echo '</div>';
 
     // แจ้งเตือนอะไหล่ครบกำหนดเปลี่ยน (SD Card / Battery Backup RTC) ให้เห็นก่อนบันทึก MA
     echo part_alerts_html($a['id'], $a['produced_at']);
 
     $canMa = can('ma');
+    $histShowFw = product_show_fw((int) $a['product_id']);
     $res = qr("SELECT * FROM ma_records WHERE asset_id=? ORDER BY visited_at DESC, id DESC LIMIT 15", 'i', [$a['id']]);
     echo '<b>📅 ประวัติ MA (' . $res->num_rows . ' ครั้งล่าสุด)</b>';
     if ($res->num_rows) {
         echo '<div class="table-wrap">';
-        echo '<table class="list" style="margin:6px 0 12px"><tr><th>วันเวลา</th><th>FW</th><th>รายละเอียด</th><th>โดย</th>' . ($canMa ? '<th></th>' : '') . '</tr>';
+        echo '<table class="list" style="margin:6px 0 12px"><tr><th>วันเวลา</th>'
+           . ($histShowFw ? '<th>FW</th>' : '')
+           . '<th>รายละเอียด</th><th>โดย</th>' . ($canMa ? '<th></th>' : '') . '</tr>';
         while ($m = $res->fetch_assoc()) {
             echo '<tr><td style="white-space:nowrap">' . dthai_full($m['visited_at']) . '</td>'
-               . '<td>' . h($m['fw_version'] ?: '-') . '</td>'
+               . ($histShowFw ? '<td>' . h($m['fw_version'] ?: '-') . '</td>' : '')
                . '<td style="max-width:420px">' . ma_items_html($m) . ma_parts_withdrawn_html((int)$m['id']) . '</td>'
                . '<td>' . h($m['done_by'] ?: '-') . '</td>'
                . ($canMa ? '<td class="row-actions"><a class="btn btn-sm btn-line" href="' . BASE_URL . '/ma.php?edit=' . $m['id'] . '">แก้ไข</a>'
@@ -384,7 +395,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'items') {
         'pool_ok' => $poolOk,
         'pool_replace' => $poolReplace,
         'pool_repair' => $poolRepair,
-        'fw_options' => effective_ma_fw_options($a['product_id']),
+        'fw_options' => product_show_fw($a['product_id']) ? effective_fw_options($a['product_id']) : [],
         'prefill_ok' => $lastMa ? ma_record_items($lastMa, 'ok_items', 'OK') : [],
     ], JSON_UNESCAPED_UNICODE);
     exit;
@@ -423,12 +434,113 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'parts') {
 }
 
 // ---------------------------------------------------------------
+// ลงทะเบียน S/N เก่าจากคิวเช่าเข้าระบบผลิต
+// ---------------------------------------------------------------
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_rent_assets'])) {
+    csrf_check();
+    require_can('ma');
+    $regProductId = (int)($_POST['product_id'] ?? 0);
+    $regSerials = [];
+    foreach ((array)($_POST['register_sns'] ?? []) as $sn) {
+        $sn = rent_normalize_sn($sn);
+        if ($sn !== '') {
+            $regSerials[] = $sn;
+        }
+    }
+    if ($regProductId <= 0 || !$regSerials) {
+        flash_set('กรุณาเลือก S/N อย่างน้อย 1 รายการ', 'err');
+        header('Location: ' . BASE_URL . '/ma.php' . ($regProductId > 0 ? '?product=' . $regProductId : ''));
+        exit;
+    }
+    $reg = rent_register_assets_to_product($regProductId, $regSerials, (string)($_POST['register_note'] ?? ''));
+    $summary = 'ลงทะเบียนผลิต: สำเร็จ ' . (int)$reg['success'] . ' · ไม่สำเร็จ ' . (int)$reg['fail'];
+    if ($reg['messages']) {
+        $summary .= ' — ' . implode(' | ', array_slice($reg['messages'], 0, 10));
+        if (count($reg['messages']) > 10) {
+            $summary .= ' …';
+        }
+    }
+    flash_set($summary, $reg['ok'] ? 'ok' : 'err', $summary);
+    header('Location: ' . BASE_URL . '/ma.php?product=' . $regProductId);
+    exit;
+}
+
+// ---------------------------------------------------------------
+// เคลียร์รายการเสื่อมสภาพหลาย S/N ที่ค้าง
+// ---------------------------------------------------------------
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_retire_clear_ma'])) {
+    csrf_check();
+    require_can('ma');
+    rent_bulk_retire_pending_clear();
+    $clearProductId = (int)($_POST['bulk_retire_product'] ?? 0);
+    flash_set('ล้างรายการเสื่อมสภาพที่ค้างแล้ว', 'ok');
+    $clearUrl = BASE_URL . '/ma.php';
+    if ($clearProductId > 0) {
+        $clearUrl .= '?product=' . $clearProductId;
+    }
+    header('Location: ' . $clearUrl);
+    exit;
+}
+
+// ---------------------------------------------------------------
+// เสื่อมสภาพหลาย S/N ในครั้งเดียว
+// ---------------------------------------------------------------
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_retire_ma'])) {
+    csrf_check();
+    require_can('ma');
+    $bulkProductId = (int)($_POST['bulk_retire_product'] ?? 0);
+    $bulkReturnUrl = BASE_URL . '/ma.php';
+    if ($bulkProductId > 0) {
+        $bulkReturnUrl .= '?product=' . $bulkProductId;
+    }
+    $serials = rent_parse_serial_list((string)($_POST['bulk_serials'] ?? ''));
+    if (!$serials) {
+        flash_set('กรุณากรอกหมายเลขสินค้าอย่างน้อย 1 รายการ', 'err');
+        header('Location: ' . $bulkReturnUrl);
+        exit;
+    }
+    $bulk = rent_bulk_retire($serials, (string)($_POST['bulk_remark'] ?? ''));
+    $successN = (int)$bulk['success'];
+    $failN = (int)$bulk['fail'];
+    if ($failN > 0 && !empty($bulk['failed_serials'])) {
+        rent_bulk_retire_pending_save([
+            'serials'      => implode("\n", $bulk['failed_serials']),
+            'remark'       => trim((string)($_POST['bulk_remark'] ?? '')),
+            'errors'       => $bulk['failed_messages'] ?? [],
+            'failed_items' => $bulk['failed_items'] ?? [],
+            'success'      => $successN,
+            'fail'         => $failN,
+        ]);
+        $firstReasons = array_slice($bulk['failed_items'] ?? [], 0, 3);
+        $reasonHint = '';
+        foreach ($firstReasons as $row) {
+            if (!is_array($row) || empty($row['sn'])) {
+                continue;
+            }
+            $reasonHint .= ' · ' . $row['sn'] . ': ' . ($row['reason'] ?? '');
+        }
+        $summary = 'เสื่อมสภาพ: สำเร็จ ' . $successN . ' · ไม่สำเร็จ ' . $failN
+            . ' — ดูสาเหตุในตารางด้านล่าง' . $reasonHint;
+        if ($failN > 3) {
+            $summary .= ' …';
+        }
+        flash_set($summary, 'err', $summary);
+    } else {
+        rent_bulk_retire_pending_clear();
+        $summary = 'เสื่อมสภาพ: สำเร็จ ' . $successN . ' รายการ';
+        flash_set($summary, 'ok', $summary);
+    }
+    header('Location: ' . $bulkReturnUrl);
+    exit;
+}
+
+// ---------------------------------------------------------------
 // บันทึกการเข้า MA — เปลี่ยนสถานะเครื่อง (เครื่องเช่า/เครื่องสำรอง)
 // ---------------------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_ma'])) {
     csrf_check(); require_can('ma');
     $code = trim($_POST['asset_code']);
-    $a = qr("SELECT id, asset_code, product_id FROM assets WHERE asset_code=? OR factory_serial=?", 'ss', [$code, $code])->fetch_assoc();
+    $a = qr("SELECT id, asset_code, factory_serial, product_id FROM assets WHERE asset_code=? OR factory_serial=?", 'ss', [$code, $code])->fetch_assoc();
     if (!$a) { flash_set("ไม่พบเครื่องรหัส $code", 'err'); header('Location: ' . BASE_URL . '/ma.php'); exit; }
     $maProductId = (int)$a['product_id'];
 
@@ -444,8 +556,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_ma'])) {
     $fixItems = $san['repair'];
     // ผลรวมของรอบนี้: มีซ่อม > มีเปลี่ยน > ปกติ
     $result = $fixItems ? 'repair' : ($repItems ? 'replace' : ($okItems ? 'ok' : null));
-    $fw      = trim($_POST['fw_version']);
+    $fw      = resolve_fw_post_value($maProductId);
     $newStatus = in_array($_POST['machine_status'], ['rental','spare'], true) ? $_POST['machine_status'] : 'rental';
+    $remark = trim((string)($_POST['remark'] ?? ''));
+    $rentAction = isset($_POST['rent_close_action']) ? (string)$_POST['rent_close_action'] : '';
+    if (!in_array($rentAction, ['close_fg', 'retire'], true)) {
+        $rentAction = 'close_fg';
+    }
+    if ($rentAction === 'retire') {
+        $newStatus = 'rental';
+        $remark = rent_ensure_retire_remark($remark);
+    }
     $roundAlloc = ma_round_lock_acquire((int) $a['id']);
     if (!$roundAlloc['ok']) {
         flash_set($roundAlloc['error'], 'err');
@@ -459,7 +580,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_ma'])) {
     q("INSERT INTO ma_records (asset_id,ma_round,visited_at,result,ok_items,replace_items,repair_items,fw_version,machine_status,remark,done_by)
        VALUES (?,?,?,?,?,?,?,?,?,?,?)", 'iisssssssss',
       [$a['id'], $round, $visited, $result, $okItems ?: null, $repItems ?: null, $fixItems ?: null,
-       $fw ?: null, $newStatus, trim($_POST['remark']) ?: null, actor_name()]);
+       $fw ?: null, $newStatus, $remark !== '' ? $remark : null, actor_name()]);
 
     $maRecordId = (int)db()->insert_id;
     $withdrawLines = ma_parse_withdraw_lines(
@@ -491,14 +612,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_ma'])) {
             'ma_round'     => (int)$round,
             'visited_at'   => $visited,
             'repair_items' => (string)$fixItems,
-            'remark'       => trim((string)($_POST['remark'] ?? '')),
+            'remark'       => $remark,
             'done_by'      => actor_name(),
             'entity_id'    => $maRecordId,
         ], [
             'dedup_key' => 'ma.repair_required:' . $maRecordId,
         ]);
     }
-    flash_set($flashMsg);
+    $rentRes = rent_apply_after_ma_save_for_asset($a, $rentAction, $repItems, $fixItems, $fw, $remark);
+    $flashMsg .= ' · ' . $rentRes['message'];
+    flash_set($flashMsg, $rentRes['ok'] ? 'ok' : 'err', $flashMsg);
     header('Location: ' . BASE_URL . '/ma.php?product=' . $maProductId); exit;
     } finally {
         ma_round_lock_release($maRoundLock);
@@ -511,7 +634,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_ma'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_ma'])) {
     csrf_check(); require_can('ma');
     $mid = (int)$_POST['edit_id'];
-    $rec = qr("SELECT m.asset_id, a.product_id FROM ma_records m JOIN assets a ON a.id=m.asset_id WHERE m.id=?", 'i', [$mid])->fetch_assoc();
+    $rec = qr("SELECT m.asset_id, m.fw_version, a.product_id FROM ma_records m JOIN assets a ON a.id=m.asset_id WHERE m.id=?", 'i', [$mid])->fetch_assoc();
     if (!$rec) { flash_set('ไม่พบรายการ MA ที่จะแก้ไข', 'err'); header('Location: ' . BASE_URL . '/ma.php'); exit; }
     $maProductId = (int)$rec['product_id'];
     $visited = dt_from_input($_POST['visited_at'] ?? '');
@@ -525,15 +648,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_ma'])) {
     $repItems = $san['replace'];
     $fixItems = $san['repair'];
     $result = $fixItems ? 'repair' : ($repItems ? 'replace' : ($okItems ? 'ok' : null));
-    $fw = trim($_POST['fw_version']);
+    $fw = resolve_fw_post_value((int) $rec['product_id'], (string) ($rec['fw_version'] ?? ''));
+    $remark = trim((string)($_POST['remark'] ?? ''));
+    $rentAction = isset($_POST['rent_close_action']) ? (string)$_POST['rent_close_action'] : '';
+    if (!in_array($rentAction, ['close_fg', 'retire'], true)) {
+        $rentAction = 'close_fg';
+    }
+    $newStatus = in_array($_POST['machine_status'] ?? '', ['rental', 'spare'], true) ? $_POST['machine_status'] : null;
+    if ($rentAction === 'retire') {
+        $newStatus = 'rental';
+        $remark = rent_ensure_retire_remark($remark);
+    }
     q("UPDATE ma_records SET visited_at=?, result=?, ok_items=?, replace_items=?, repair_items=?, fw_version=?, machine_status=?, remark=?, versions_json=NULL WHERE id=?",
       'ssssssssi', [$visited, $result, $okItems ?: null, $repItems ?: null, $fixItems ?: null, $fw ?: null,
-       in_array($_POST['machine_status'] ?? '', ['rental', 'spare'], true) ? $_POST['machine_status'] : null,
-       trim($_POST['remark']) ?: null, $mid]);
-    $newStatus = in_array($_POST['machine_status'], ['rental', 'spare'], true) ? $_POST['machine_status'] : null;
+       $newStatus, $remark !== '' ? $remark : null, $mid]);
     if ($newStatus) q("UPDATE assets SET status=? WHERE id=?", 'si', [$newStatus, $rec['asset_id']]);
     if ($fw !== '') q("UPDATE assets SET current_fw_version=? WHERE id=?", 'si', [$fw, $rec['asset_id']]);
-    $assetRow = qr('SELECT asset_code FROM assets WHERE id=?', 'i', [(int)$rec['asset_id']])->fetch_assoc();
+    $assetRow = qr('SELECT asset_code, factory_serial FROM assets WHERE id=?', 'i', [(int)$rec['asset_id']])->fetch_assoc();
     $withdrawLines = ma_parse_withdraw_edit_lines(
         (array)($_POST['ma_w_movement_id'] ?? []),
         (array)($_POST['ma_part_id'] ?? []),
@@ -551,7 +682,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_ma'])) {
         header('Location: ' . BASE_URL . '/ma.php?edit=' . $mid);
         exit;
     }
-    flash_set('แก้ไขรายการ MA เรียบร้อยแล้ว');
+    $rentRes = rent_apply_after_ma_save_for_asset($assetRow ?: [], $rentAction, $repItems, $fixItems, $fw, $remark);
+    $flashMsg = 'แก้ไขรายการ MA เรียบร้อยแล้ว · ' . $rentRes['message'];
+    flash_set($flashMsg, $rentRes['ok'] ? 'ok' : 'err', $flashMsg);
     header('Location: ' . BASE_URL . '/ma.php?product=' . $maProductId); exit;
 }
 // ---------------------------------------------------------------
@@ -618,13 +751,27 @@ if ($productId <= 0) {
                     ORDER BY ma_n DESC, p.name ASC");
 
     page_header('บันทึก MA — เลือกรุ่นสินค้า');
+    echo rent_bulk_retire_pending_alert_html();
+    $rentMaCounts = rent_wait_ma_counts_by_product();
+    if ($rentMaCounts['ok'] && $rentMaCounts['total_matched'] > 0) {
+        echo '<p class="muted" style="margin:0 0 12px">มี ' . number_format($rentMaCounts['total_matched'])
+            . ' เครื่องรอ MA จากระบบเช่า — เลือกรุ่นสินค้าเพื่อดูคิวและบันทึก</p>';
+    } elseif (!$rentMaCounts['ok']) {
+        echo '<p class="muted" style="margin:0 0 12px">เชื่อมระบบเช่าไม่ได้ — คิวรอ MA จะไม่แสดง (' . h($rentMaCounts['error']) . ')</p>';
+    }
+    echo '<div style="margin-bottom:14px">' . rent_bulk_retire_btn_html() . '</div>';
+    echo rent_bulk_retire_panel_html();
     ?>
-    <p class="muted" style="margin-bottom:12px">เลือกรุ่นสินค้าเพื่อดูประวัติ MA และบันทึกรายการของรุ่นนั้น</p>
+    <p class="muted" style="margin:0 0 12px">เลือกรุ่นสินค้าเพื่อดูประวัติ MA และบันทึกรายการของรุ่นนั้น</p>
     <div style="margin-bottom:12px">
       <input type="text" id="prod-filter" placeholder="พิมพ์กรองชื่อรุ่น…" style="width:min(320px,100%)">
     </div>
     <div class="grid-products" id="prod-grid">
-      <?php while ($p = $products->fetch_assoc()) { ?>
+      <?php while ($p = $products->fetch_assoc()) {
+          $waitN = ($rentMaCounts['ok'] && isset($rentMaCounts['counts'][(int)$p['id']]))
+              ? (int)$rentMaCounts['counts'][(int)$p['id']]
+              : 0;
+          ?>
         <a class="pcard" href="<?= BASE_URL ?>/ma.php?product=<?= (int)$p['id'] ?>"
            data-name="<?= h(mb_strtolower($p['name'] . ' ' . $p['product_code'])) ?>"
            style="text-decoration:none; color:inherit">
@@ -634,6 +781,7 @@ if ($productId <= 0) {
             <?= h($p['product_code']) ?><br>
             <?= number_format((int)$p['assets_n']) ?> เครื่อง ·
             <b><?= number_format((int)$p['ma_n']) ?></b> รายการ MA
+            <?php if ($waitN > 0) { ?><br><b style="color:var(--primary)">รอ MA <?= number_format($waitN) ?></b><?php } ?>
           </div>
         </a>
       <?php } ?>
@@ -719,8 +867,11 @@ $recentMA = qr("SELECT m.*, a.asset_code, a.id asset_id FROM ma_records m
 
 $maListUrl = BASE_URL . '/ma.php?product=' . $productId;
 $maClearUrl = $maListUrl;
+$maListShowFw = product_show_fw($productId);
 
 page_header('บันทึก MA — ' . $product['name'] . ' (' . number_format($total) . ')');
+echo rent_bulk_retire_pending_alert_html();
+echo rent_wait_ma_panel_html($productId);
 require __DIR__ . '/includes/list_search.php';
 ?>
 <?php if (can('ma')) { $ea = $editRec; $maProductPrefill = $ea ? ['fw_version' => '', 'remark' => ''] : ma_last_product_prefill($productId); ?>
@@ -760,10 +911,12 @@ require __DIR__ . '/includes/list_search.php';
         ['🔄 เปลี่ยนอะไหล่', d.replaceDisp || '-', true],
         ['🔩 อะไหล่ที่เบิก (MA)', d.partsWithdraw || '-', true],
         ['🔧 ซ่อม', d.repairDisp || '-', true],
-        ['Firmware หลังตรวจ', d.fw || '-', false],
-        ['ผู้บันทึก', d.by || '-', false],
-        ['หมายเหตุ', d.remark || '-', false]
       ];
+      if (MA_SHOW_FW) {
+        rows.push(['Firmware หลังตรวจ', d.fw || '-', false]);
+      }
+      rows.push(['ผู้บันทึก', d.by || '-', false]);
+      rows.push(['หมายเหตุ', d.remark || '-', false]);
       dl.innerHTML = rows.map(function(r){
         var val = r[1];
         var dd = r[2] && val && val !== '-' && val.indexOf('\n') >= 0
@@ -791,10 +944,18 @@ require __DIR__ . '/includes/list_search.php';
 
 <?php if (can('ma')) { ?>
 <p class="muted" style="margin-bottom:10px">การบันทึก MA จะเปลี่ยนสถานะเครื่องเป็น "เครื่องเช่า" หรือ "เครื่องสำรอง" ตามที่เลือก</p>
+<div class="ma-action-btns" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px">
 <button type="button" class="btn" id="ma-add-btn" onclick="document.getElementById('ma-form-wrap').hidden=false; this.hidden=true;" <?= $formOpen ? 'hidden' : '' ?>>➕ เพิ่มรายการ MA</button>
+<?= rent_bulk_retire_btn_html() ?>
+</div>
+<?= rent_bulk_retire_panel_html($productId) ?>
 <div id="ma-form-wrap" <?= $formOpen ? '' : 'hidden' ?>>
 <h3 style="margin:4px 0 10px" class="h-with-icon"><?= ui_icon_html('edit', 15, 'h-svg') ?><span><?= $ea ? 'แก้ไขรายการ MA' : 'เพิ่มรายการ MA ใหม่' ?></span></h3>
-<?php $maFwOpts = effective_ma_fw_options($productId); ?>
+<?php
+$maShowFw = product_show_fw($productId);
+$maFwOpts = $maShowFw ? effective_fw_options($productId) : [];
+$maFwMode = effective_fw_input_mode($productId);
+?>
 <div class="<?= $maShowSnippets ? 'ma-page-grid' : '' ?>">
   <div class="ma-form-col">
     <form method="post" class="formgrid form-wide ma-formgrid" id="ma-form">
@@ -817,6 +978,38 @@ require __DIR__ . '/includes/list_search.php';
       <label for="ma_visited_at">วันเวลาเข้า MA</label>
       <input type="datetime-local" name="visited_at" id="ma_visited_at" value="<?= h(dt_for_input($ea ? $ea['visited_at'] : dt_now())) ?>">
 
+      <?php
+      $maMachineStatus = 'rental';
+      if ($ea) {
+          $maMachineStatus = in_array($ea['machine_status'] ?? '', ['rental', 'spare'], true)
+              ? (string) $ea['machine_status']
+              : (in_array($ea['ast_status'] ?? '', ['rental', 'spare'], true) ? (string) $ea['ast_status'] : 'rental');
+      }
+      $maRentAction = 'close_fg';
+      ?>
+      <label id="machine_status_label">สถานะเครื่อง</label>
+      <div class="ma-field-stack">
+        <div class="ma-choice-group" id="machine_status_group" role="group" aria-labelledby="machine_status_label">
+          <input type="hidden" name="machine_status" id="machine_status" value="<?= h($maMachineStatus) ?>">
+          <button type="button" class="ma-choice-btn ma-choice-btn-rental<?= $maMachineStatus === 'rental' ? ' is-active' : '' ?>" data-value="rental">เครื่องเช่า</button>
+          <button type="button" class="ma-choice-btn ma-choice-btn-spare<?= $maMachineStatus === 'spare' ? ' is-active' : '' ?>" data-value="spare">เครื่องสำรอง</button>
+        </div>
+      </div>
+
+      <label id="rent_close_action_label" class="ma-lbl-top">ผลต่อระบบเช่า</label>
+      <div class="ma-field-stack">
+        <div class="ma-choice-group" id="rent_close_action_group" role="group" aria-labelledby="rent_close_action_label">
+          <input type="hidden" name="rent_close_action" id="rent_close_action" value="<?= h($maRentAction) ?>">
+          <button type="button" class="ma-choice-btn<?= $maRentAction === 'close_fg' ? ' is-active' : '' ?>" data-value="close_fg">ซ่อมแล้ว</button>
+          <button type="button" class="ma-choice-btn ma-choice-btn-retire<?= $maRentAction === 'retire' ? ' is-active' : '' ?>" data-value="retire">เสื่อมสภาพ</button>
+        </div>
+        <ul class="ma-rent-hint muted">
+          <li><strong>ซ่อมแล้ว</strong> — ปิดคิวรอ MA ในระบบเช่า · สรุปใน「สรุปส่งงานเช่า Office」= รายการซ่อมในเช่า</li>
+          <li><strong>เสื่อมสภาพ</strong> — ปิดคิว Asset Retirement · กรอกแค่หมายเหตุ · ข้ามรายการตรวจ</li>
+        </ul>
+      </div>
+
+      <div id="ma-detail-fields" class="ma-detail-fields">
       <label class="ma-lbl-top">✅ ใช้งานได้ปกติ</label>
       <div class="ma-field" id="mf-ok"></div>
 
@@ -842,36 +1035,28 @@ require __DIR__ . '/includes/list_search.php';
       </div>
       <?php } ?>
 
-      <?php
-      $maMachineStatus = 'rental';
-      if ($ea) {
-          $maMachineStatus = in_array($ea['machine_status'] ?? '', ['rental', 'spare'], true)
-              ? (string) $ea['machine_status']
-              : (in_array($ea['ast_status'] ?? '', ['rental', 'spare'], true) ? (string) $ea['ast_status'] : 'rental');
-      }
-      ?>
-      <label for="machine_status">สถานะเครื่อง</label>
-      <select name="machine_status" id="machine_status" required>
-        <option value="rental" <?= $maMachineStatus === 'rental' ? 'selected' : '' ?>>เครื่องเช่า</option>
-        <option value="spare" <?= $maMachineStatus === 'spare' ? 'selected' : '' ?>>เครื่องสำรอง</option>
-      </select>
-
-      <label for="ma_fw_input">Firmware หลังตรวจ</label>
-      <div id="ma-fw-slot" class="ma-fw-wrap">
-        <?php $maFwVal = $ea ? (string)$ea['fw_version'] : (string)($maProductPrefill['fw_version'] ?? ''); ?>
-        <input type="text" name="fw_version" id="ma_fw_input" class="ma-fw-fallback"
-          value="<?= h($maFwVal) ?>"
-          placeholder="พิมพ์หรือเลือกเวอร์ชัน Firmware"
-          <?= $maFwOpts ? 'list="ma-fw-list"' : '' ?>>
-        <?php if ($maFwOpts) { ?>
-        <datalist id="ma-fw-list">
-          <?php foreach ($maFwOpts as $fv) { ?><option value="<?= h($fv) ?>"><?php } ?>
-        </datalist>
-        <?php } ?>
+      <?php if ($maShowFw) { ?>
+      <label for="ma_fw_input" class="ma-lbl-top">Firmware หลังตรวจ</label>
+      <div class="ma-field-stack">
+        <div id="ma-fw-slot" class="ma-fw-wrap">
+          <?php $maFwVal = $ea ? (string)$ea['fw_version'] : (string)($maProductPrefill['fw_version'] ?? ''); ?>
+          <input type="text" name="fw_version" id="ma_fw_input" class="ma-fw-fallback"
+            value="<?= h($maFwVal) ?>"
+            placeholder="พิมพ์หรือเลือกเวอร์ชัน Firmware"
+            <?= $maFwOpts ? 'list="ma-fw-list"' : '' ?>>
+          <?php if ($maFwOpts) { ?>
+          <datalist id="ma-fw-list">
+            <?php foreach ($maFwOpts as $fv) { ?><option value="<?= h($fv) ?>"><?php } ?>
+          </datalist>
+          <?php } ?>
+        </div>
+        <p class="muted ma-field-hint">ไม่บังคับ — บันทึกเวอร์ชัน FW หลังตรวจ/ซ่อม (แสดงในประวัติ MA)</p>
       </div>
+      <?php } ?>
+      </div><!-- /ma-detail-fields -->
 
-      <label for="ma_remark" class="full">หมายเหตุ</label>
-      <textarea name="remark" id="ma_remark" class="full field-note ma-remark" rows="2" placeholder="บันทึกเพิ่มเติม…"><?= h($ea ? $ea['remark'] : ($maProductPrefill['remark'] ?? '')) ?></textarea>
+      <label for="ma_remark" class="ma-lbl-top">หมายเหตุ</label>
+      <textarea name="remark" id="ma_remark" class="field-note ma-remark" rows="2" placeholder="บันทึกเพิ่มเติม…"><?= h($ea ? $ea['remark'] : ($maProductPrefill['remark'] ?? '')) ?></textarea>
 
       <div class="full ma-form-actions">
         <button type="submit" id="ma-submit-btn"><?= $ea ? '💾 บันทึกการแก้ไข' : '💾 บันทึก MA' ?></button>
@@ -896,6 +1081,8 @@ var maShowSnippets = <?= $maShowSnippets ? 'true' : 'false' ?>;
 var maEditWithdrawLines = <?= json_encode($maEditWithdrawLines, JSON_UNESCAPED_UNICODE) ?>;
 var BASE = '<?= BASE_URL ?>';
 var MA_FW_OPTS = <?= json_encode(array_values($maFwOpts), JSON_UNESCAPED_UNICODE) ?>;
+var MA_FW_MODE = <?= json_encode($maFwMode, JSON_UNESCAPED_UNICODE) ?>;
+var MA_SHOW_FW = <?= $maShowFw ? 'true' : 'false' ?>;
 var itemPools = { ok: [], replace: [], repair: [] };
 function esc(s){ var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
 function normItem(s){ return (s == null ? '' : String(s)).trim(); }
@@ -1174,7 +1361,7 @@ function initMaFwField(){
   var cur = '';
   var inp = document.getElementById('ma_fw_input');
   if (inp) cur = inp.value;
-  slot.innerHTML = chipDdHtml('fw_version', cur, MA_FW_OPTS, '', 'chip_single_free');
+  slot.innerHTML = chipDdHtml('fw_version', cur, MA_FW_OPTS, '', MA_FW_MODE || 'chip_single_free');
   initChipDd(slot);
   slot.addEventListener('click', function(){ setTimeout(updateMaSnippets, 0); });
   slot.addEventListener('keyup', updateMaSnippets, true);
@@ -1369,7 +1556,7 @@ document.getElementById('ma_remark').addEventListener('input', updateMaSnippets)
         itemPools.repair = d.pool_repair || d.pool || [];
         // โหมดแก้ไข — ใช้ข้อมูลจากรายการ MA ที่เลือกเท่านั้น ห้าม prefill จาก MA ล่าสุดของเครื่อง
         if (maEditMode) return;
-        if (d.status === 'spare' || d.status === 'rental') document.getElementById('machine_status').value = d.status;
+        if (d.status === 'spare' || d.status === 'rental') setMaChoiceValue('machine_status_group', d.status);
         if (document.getElementById('chips-ok').children.length === 0) {
           (d.prefill_ok || []).forEach(function(it){ addChip('ok', it, true); });
         }
@@ -1379,6 +1566,56 @@ document.getElementById('ma_remark').addEventListener('input', updateMaSnippets)
   input.addEventListener('change', loadAll);
   if (input.value.trim() !== '') loadAll();
   else updateMaSnippets();
+})();
+
+function syncMaRetireMode(){
+  var form = document.getElementById('ma-form');
+  var rent = document.getElementById('rent_close_action');
+  if (!form || !rent) return;
+  var isRetire = rent.value === 'retire';
+  form.classList.toggle('ma-retire-mode', isRetire);
+  var remark = document.getElementById('ma_remark');
+  if (remark) {
+    remark.placeholder = isRetire ? 'ระบุรายละเอียดการเสื่อมสภาพ…' : 'บันทึกเพิ่มเติม…';
+  }
+  var spareBtn = document.querySelector('#machine_status_group .ma-choice-btn-spare');
+  if (spareBtn) spareBtn.disabled = isRetire;
+}
+
+function setMaChoiceValue(groupId, value){
+  var group = document.getElementById(groupId);
+  if (!group) return;
+  var hidden = group.querySelector('input[type=hidden]');
+  if (hidden) hidden.value = value;
+  group.querySelectorAll('.ma-choice-btn').forEach(function(btn){
+    btn.classList.toggle('is-active', btn.getAttribute('data-value') === value);
+  });
+}
+
+function initMaChoiceGroup(groupId, onChange){
+  var group = document.getElementById(groupId);
+  if (!group) return;
+  var hidden = group.querySelector('input[type=hidden]');
+  if (!hidden) return;
+  group.querySelectorAll('.ma-choice-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var v = btn.getAttribute('data-value') || '';
+      hidden.value = v;
+      group.querySelectorAll('.ma-choice-btn').forEach(function(b){
+        b.classList.toggle('is-active', b === btn);
+      });
+      if (typeof onChange === 'function') onChange(v, hidden);
+    });
+  });
+}
+
+(function(){
+  initMaChoiceGroup('machine_status_group');
+  initMaChoiceGroup('rent_close_action_group', function(v){
+    if (v === 'retire') setMaChoiceValue('machine_status_group', 'rental');
+    syncMaRetireMode();
+  });
+  syncMaRetireMode();
 })();
 
 populateMaEditChips();
@@ -1410,7 +1647,7 @@ list_search_form([
     <th><?= ma_sort_th('✅ ปกติ', 'ok_asc', 'ok_desc', $msort, $productId) ?></th>
     <th><?= ma_sort_th('🔄 เปลี่ยน', 'replace_asc', 'replace_desc', $msort, $productId) ?></th>
     <th><?= ma_sort_th('🔧 ซ่อม', 'repair_asc', 'repair_desc', $msort, $productId) ?></th>
-    <th><?= ma_sort_th('FW', 'fw_asc', 'fw_desc', $msort, $productId) ?></th>
+    <?php if ($maListShowFw) { ?><th><?= ma_sort_th('FW', 'fw_asc', 'fw_desc', $msort, $productId) ?></th><?php } ?>
     <th><?= ma_sort_th('โดย', 'by_asc', 'by_desc', $msort, $productId) ?></th>
     <?= can('ma') ? '<th></th>' : '' ?>
   </tr>
@@ -1422,7 +1659,7 @@ list_search_form([
     <td style="max-width:200px; font-size:12.5px"><?= ma_items_cell($m, 'ok_items', 'OK') ?></td>
     <td style="max-width:180px; font-size:12.5px"><?= ma_items_cell($m, 'replace_items', 'Replace') ?></td>
     <td style="max-width:160px; font-size:12.5px"><?= ma_items_cell($m, 'repair_items', 'Repair') ?></td>
-    <td><?= h($m['fw_version'] ?: '-') ?></td>
+    <?php if ($maListShowFw) { ?><td><?= h($m['fw_version'] ?: '-') ?></td><?php } ?>
     <td><?= h($m['done_by'] ?: '-') ?></td>
     <?php if (can('ma')) { ?>
     <td class="ma-row-actions row-actions">

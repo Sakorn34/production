@@ -32,6 +32,8 @@ function app_base_url() {
 
 define('BASE_URL', app_base_url());
 define('APP_NAME', 'ระบบทะเบียนเครื่องและซ่อมบำรุง');
+/** รหัสชุด deploy — อัปเมื่อ build patch แล้วเทียบกับ server ว่าอัปครบหรือยัง */
+define('APP_RELEASE_VERSION', '2026-08-31_210436');
 
 /**
  * โหลด secrets แบบ cache ต่อ request
@@ -120,6 +122,69 @@ function dbParts() {
         $pdo->exec('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci');
     }
     return $pdo;
+}
+
+/**
+ * เชื่อมต่อฐานระบบเช่า (biton_leasing) — fail-soft ไม่ die
+ *
+ * @return mysqli|null
+ */
+function dbLeasing()
+{
+    static $db = false;
+    static $error = '';
+    if ($db !== false) {
+        $GLOBALS['_dbLeasingError'] = $error;
+        return $db;
+    }
+    $db = null;
+    $c = db_secrets();
+    if (empty($c['leasing']) || !is_array($c['leasing'])) {
+        $error = 'ยังไม่ได้ตั้งค่า leasing ใน finishgoogs.secrets.php';
+        $GLOBALS['_dbLeasingError'] = $error;
+        return null;
+    }
+    $cfg = $c['leasing'];
+    $host = trim((string)($cfg['host'] ?? ''));
+    $user = trim((string)($cfg['user'] ?? ''));
+    $pass = (string)($cfg['pass'] ?? '');
+    $name = trim((string)($cfg['db'] ?? ''));
+    if ($host === '' || $name === '' || $user === '') {
+        $error = 'ค่าเชื่อมต่อระบบเช่าไม่ครบ (host / db / user)';
+        $GLOBALS['_dbLeasingError'] = $error;
+        return null;
+    }
+    $mysqli = mysqli_init();
+    if (!$mysqli) {
+        $error = 'สร้างการเชื่อมต่อระบบเช่าไม่สำเร็จ';
+        $GLOBALS['_dbLeasingError'] = $error;
+        return null;
+    }
+    $mysqli->options(MYSQLI_OPT_CONNECT_TIMEOUT, 3);
+    if (!@$mysqli->real_connect($host, $user, $pass, $name)) {
+        $error = 'เชื่อมต่อฐานระบบเช่าไม่ได้';
+        $GLOBALS['_dbLeasingError'] = $error;
+        return null;
+    }
+    $mysqli->set_charset('utf8mb4');
+    $mysqli->autocommit(true);
+    $db = $mysqli;
+    $error = '';
+    $GLOBALS['_dbLeasingError'] = '';
+    return $db;
+}
+
+/**
+ * ข้อความ error ล่าสุดของ dbLeasing()
+ *
+ * @return string
+ */
+function dbLeasingError()
+{
+    if (dbLeasing() !== null) {
+        return '';
+    }
+    return (string)($GLOBALS['_dbLeasingError'] ?? 'เชื่อมต่อฐานระบบเช่าไม่ได้');
 }
 
 function db() {
@@ -217,6 +282,7 @@ function recompute_asset_status_from_ma(int $assetId): void
     $any = qr('SELECT id FROM ma_records WHERE asset_id=? LIMIT 1', 'i', [$assetId])->fetch_assoc();
     if (!$any) {
         q("UPDATE assets SET status='new' WHERE id=?", 'i', [$assetId]);
+        asset_status_sync_one($assetId, false);
         return;
     }
     $row = qr(
@@ -230,6 +296,52 @@ function recompute_asset_status_from_ma(int $assetId): void
         return; // ยังมี MA อยู่แต่ไม่มีรอบไหนระบุสถานะ — ไม่แตะสถานะเดิม
     }
     q('UPDATE assets SET status=? WHERE id=?', 'si', [(string) $row['machine_status'], $assetId]);
+    asset_status_sync_one($assetId, false);
+}
+
+/**
+ * เพิ่มค่า sold ใน ENUM assets.status (ครั้งเดียว)
+ *
+ * @return void
+ */
+function ensure_asset_status_sold_schema()
+{
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+    try {
+        $res = db()->query("SHOW COLUMNS FROM assets LIKE 'status'");
+        if ($res && ($row = $res->fetch_assoc())) {
+            $type = (string) ($row['Type'] ?? '');
+            if (stripos($type, 'sold') === false) {
+                db()->query(
+                    "ALTER TABLE assets MODIFY status ENUM('new','rental','spare','sold') NOT NULL DEFAULT 'new'"
+                );
+            }
+        }
+    } catch (\mysqli_sql_exception $e) {
+        error_log('[ensure_asset_status_sold_schema] ' . $e->getMessage());
+    }
+}
+
+/**
+ * sync สถานะเครื่องเดียวจากระบบเช่า/stock (โหลด helper อัตโนมัติ)
+ *
+ * @param int  $assetId
+ * @param bool $write   false = dry-run
+ * @return array{changed:bool,from:string,to:string,reason:string}
+ */
+function asset_status_sync_one(int $assetId, bool $write = true): array
+{
+    ensure_asset_status_sold_schema();
+    $assetId = (int) $assetId;
+    if ($assetId <= 0) {
+        return ['changed' => false, 'from' => '', 'to' => '', 'reason' => 'invalid id'];
+    }
+    require_once __DIR__ . '/includes/asset_status_sync.php';
+    return asset_status_sync_by_id($assetId, $write);
 }
 
 /**
@@ -797,10 +909,10 @@ function theme_font_config() {
 
 // ---------- สถานะ ----------
 function status_th($s) {
-    $m = ['new' => 'เครื่องใหม่', 'rental' => 'เครื่องเช่า', 'spare' => 'เครื่องสำรอง'];
+    $m = ['new' => 'เครื่องใหม่', 'rental' => 'เครื่องเช่า', 'spare' => 'เครื่องสำรอง', 'sold' => 'ขายแล้ว'];
     return isset($m[$s]) ? $m[$s] : $s;
 }
-function status_list() { return ['new', 'rental', 'spare']; }
+function status_list() { return ['new', 'rental', 'spare', 'sold']; }
 function status_badge($s) {
     return '<span class="badge st-' . h($s) . '">' . h(status_th($s)) . '</span>';
 }
@@ -2623,30 +2735,98 @@ function effective_ma_pool($productId, $group = null) {
     }));
 }
 
-/** ตัวเลือก Firmware ในฟอร์ม MA — จาก config หลังบ้านเท่านั้น */
-function effective_ma_fw_options($productId) {
+/**
+ * รุ่นนี้เปิดใช้ฟิลด์ Firmware หรือไม่ — ยึดสวิตช์หน้า "บันทึกผลิต" (fw / fw_off)
+ *
+ * @param int $productId
+ * @return bool
+ */
+function product_show_fw($productId) {
+    $std = product_std_fields($productId);
+    return $std['decided'] ? ($std['fw'] !== null) : true;
+}
+
+/**
+ * รูปแบบช่อง Firmware — จาก config หลังบ้านส่วนผลิต
+ *
+ * @param int $productId
+ * @return string
+ */
+function effective_fw_input_mode($productId) {
+    $std = product_std_fields($productId);
+    return $std['fw']
+        ? normalize_input_mode($std['fw']['input_mode'])
+        : 'chip_single_free';
+}
+
+/**
+ * ตัวเลือก Firmware ร่วมกันทุกหน้า (ผลิต / MA / อัปเดต)
+ *
+ * รวม config หลังบ้าน + ประวัติ fw_version จาก production / update / MA ของรุ่น
+ *
+ * @param int $productId
+ * @return array<int, string>
+ */
+function effective_fw_options($productId) {
     $opts = [];
-    if (has_product_config($productId, 'ma')) {
-        foreach (product_config_fields($productId, 'ma') as $c) {
-            if ($c['kind'] === 'ma_fw') {
-                $opts = array_merge($opts, $c['options']);
+    $std = product_std_fields($productId);
+    if (!empty($std['fw']['options'])) {
+        foreach ($std['fw']['options'] as $o) {
+            $o = trim((string) $o);
+            if ($o !== '' && !in_array($o, $opts, true)) {
+                $opts[] = $o;
             }
         }
     }
-    return array_values(array_filter(array_unique($opts), function ($x) {
-        return trim($x) !== '';
-    }));
+    $pid = (int) $productId;
+    $queries = [
+        "SELECT pr.fw_version v FROM production_records pr JOIN assets a ON a.id=pr.asset_id
+         WHERE a.product_id=? AND pr.fw_version IS NOT NULL AND TRIM(pr.fw_version)<>'' AND pr.fw_version<>'-'
+         GROUP BY pr.fw_version ORDER BY MAX(pr.id) DESC LIMIT 12",
+        "SELECT u.new_value v FROM update_logs u JOIN assets ax ON ax.id=u.asset_id
+         WHERE ax.product_id=? AND u.update_type='firmware' AND u.new_value IS NOT NULL AND TRIM(u.new_value)<>''
+         GROUP BY u.new_value ORDER BY MAX(u.id) DESC LIMIT 12",
+        "SELECT m.fw_version v FROM ma_records m JOIN assets a ON a.id=m.asset_id
+         WHERE a.product_id=? AND m.fw_version IS NOT NULL AND TRIM(m.fw_version)<>''
+         GROUP BY m.fw_version ORDER BY MAX(m.id) DESC LIMIT 12",
+    ];
+    foreach ($queries as $sql) {
+        $res = qr($sql, 'i', [$pid]);
+        while ($r = $res->fetch_assoc()) {
+            $v = trim((string) ($r['v'] ?? ''));
+            if ($v !== '' && !in_array($v, $opts, true)) {
+                $opts[] = $v;
+            }
+        }
+    }
+    return $opts;
+}
+
+function effective_ma_fw_options($productId) {
+    return product_show_fw($productId) ? effective_fw_options($productId) : [];
+}
+
+/**
+ * อ่านค่า FW จาก POST — ถ้าปิดฟิลด์ใน config ให้คงค่าเดิม (ตอนแก้ไข) หรือว่าง (ตอนใหม่)
+ *
+ * @param int $productId
+ * @param string $preserveExisting ค่า fw เดิมจาก record (ตอนแก้ไข)
+ * @return string
+ */
+function resolve_fw_post_value($productId, $preserveExisting = '') {
+    if (product_show_fw($productId)) {
+        return trim((string) ($_POST['fw_version'] ?? ''));
+    }
+    return trim((string) $preserveExisting);
 }
 
 /** ฟิลด์ฟอร์ม MA สำหรับแสดงในหลังบ้าน (preview / default) */
 function derive_ma_form_fields($productId) {
     $pool = derive_ma_pool($productId);
-    $fw = effective_ma_fw_options($productId);
     return [
         ['name' => 'รายการ ✅ ปกติ', 'kind' => 'ma_ok', 'options' => $pool, 'input_mode' => 'chip_multi_free'],
         ['name' => 'รายการ 🔄 เปลี่ยนอะไหล่', 'kind' => 'ma_replace', 'options' => $pool, 'input_mode' => 'chip_multi_free'],
         ['name' => 'รายการ 🔧 ซ่อม', 'kind' => 'ma_repair', 'options' => $pool, 'input_mode' => 'chip_multi_free'],
-        ['name' => 'Firmware หลังตรวจ', 'kind' => 'ma_fw', 'options' => $fw, 'input_mode' => 'chip_single_free'],
         ['name' => 'สถานะเครื่อง', 'kind' => 'ma_status', 'options' => ['เครื่องเช่า', 'เครื่องสำรอง'], 'input_mode' => 'chip_single'],
         ['name' => 'หมายเหตุ', 'kind' => 'ma_remark', 'options' => [], 'input_mode' => 'text'],
     ];
@@ -2672,6 +2852,7 @@ require_once dirname(__DIR__) . '/shared/line_flex_templates.php';
 require_once dirname(__DIR__) . '/shared/line_notify_jobs.php';
 ensure_ma_datetime_schema();
 ensure_ma_status_schema();
+ensure_asset_status_sold_schema();
 activity_log_ensure_schema();
 line_notify_ensure_schema();
 if (PHP_SAPI !== 'cli' && session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION['profile'])) {

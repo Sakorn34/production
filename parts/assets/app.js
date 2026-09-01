@@ -1,61 +1,10 @@
 /**
- * app.js — sidebar overlay + modal ร่วมทุกหน้า Parts
+ * app.js — modal ร่วมทุกหน้า Parts (+ sidebar ผ่าน sidebar.js)
  */
 (function () {
     'use strict';
 
     var body = document.body;
-    var sidebar = document.getElementById('app-sidebar');
-    var edge = document.querySelector('.sidebar-edge');
-    var toggle = document.getElementById('sidebar-toggle');
-    var backdrop = document.getElementById('sidebar-backdrop');
-    var hideTimer = null;
-
-    function showSidebar() {
-        clearTimeout(hideTimer);
-        body.classList.add('sidebar-hover');
-    }
-
-    function hideSidebar() {
-        clearTimeout(hideTimer);
-        body.classList.remove('sidebar-hover');
-    }
-
-    function scheduleHide() {
-        clearTimeout(hideTimer);
-        hideTimer = setTimeout(hideSidebar, 280);
-    }
-
-    if (edge) {
-        edge.addEventListener('mouseenter', showSidebar);
-        edge.addEventListener('mouseleave', function (e) {
-            if (sidebar && sidebar.contains(e.relatedTarget)) return;
-            scheduleHide();
-        });
-        edge.addEventListener('click', showSidebar);
-    }
-
-    if (sidebar) {
-        sidebar.addEventListener('mouseenter', function () {
-            clearTimeout(hideTimer);
-            showSidebar();
-        });
-        sidebar.addEventListener('mouseleave', scheduleHide);
-    }
-    if (toggle) {
-        toggle.addEventListener('click', function () {
-            if (body.classList.contains('sidebar-hover')) hideSidebar();
-            else showSidebar();
-        });
-    }
-
-    if (backdrop) {
-        backdrop.addEventListener('click', hideSidebar);
-    }
-
-    document.querySelectorAll('.sidebar .nav-links a, .sidebar .nav-cross').forEach(function (a) {
-        a.addEventListener('click', hideSidebar);
-    });
 
     /* ─ Modal ร่วม ─ */
     var basePath = document.querySelector('link[href*="style.css"]');
@@ -514,10 +463,6 @@
 
     document.addEventListener('keydown', function (e) {
         if (e.key !== 'Escape') return;
-        if (body.classList.contains('sidebar-hover')) {
-            hideSidebar();
-            return;
-        }
         if (anyModalOpen()) closeAllModals();
     });
 
@@ -595,4 +540,12 @@
             if (form) form.submit();
         });
     });
+
+    if (typeof initAppSidebar === 'function') {
+        initAppSidebar({
+            appEl: document.querySelector('.app'),
+            sidebarEl: document.getElementById('app-sidebar'),
+            backdropEl: document.getElementById('sidebar-backdrop')
+        });
+    }
 })();

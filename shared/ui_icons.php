@@ -54,6 +54,8 @@ function ui_icon_paths(string $name): ?string
         'close'          => '<path d="M18 6 6 18M6 6l12 12"/>',
         'search'         => '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
         'logout'         => '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
+        'user'           => '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+        'technicians'    => '<path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M17 18h1"/><path d="M12 18h1"/><path d="M7 18h1"/>',
         'save'           => '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/>',
         'palette'        => '<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>',
         'switch'         => '<path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/>',
@@ -77,7 +79,7 @@ function ui_icon_key_from_emoji(string $emoji): ?string
 {
     static $map = [
         '📊' => 'chart', '🖥️' => 'assets', '⚙️' => 'updates', '⚙' => 'updates',
-        '📅' => 'ma', '🔩' => 'parts', '🏢' => 'customers', '🔧' => 'repairs',
+        '📅' => 'ma', '🔩' => 'parts', '🏢' => 'customers', '🔧' => 'repairs', '👷' => 'technicians',
         '📷' => 'scan', '📸' => 'scan', '🛠️' => 'settings', '🛠' => 'settings',
         '📋' => 'clipboard', '📥' => 'stock-in', '📤' => 'stock-out-set',
         '🧩' => 'sets', '📜' => 'history', '📦' => 'box', '🔔' => 'bell',
@@ -414,8 +416,8 @@ function ui_sidebar_cross_group(string $label, array $items, string $baseUrl): s
     foreach ($items as $it) {
         $href = rtrim($baseUrl, '/') . '/' . $it['file'];
         $html .= '<a class="nav-cross" href="' . htmlspecialchars($href, ENT_QUOTES, 'UTF-8') . '">'
-            . '<span class="nav-ico">' . ui_nav_icon_html($it['icon']) . '</span> '
-            . htmlspecialchars($it['label'], ENT_QUOTES, 'UTF-8')
+            . '<span class="nav-ico">' . ui_nav_icon_html($it['icon']) . '</span>'
+            . '<span class="nav-text">' . htmlspecialchars($it['label'], ENT_QUOTES, 'UTF-8') . '</span>'
             . '</a>';
     }
     return $html;

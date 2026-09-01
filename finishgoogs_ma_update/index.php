@@ -3,10 +3,14 @@
 require __DIR__ . '/config.php';
 require __DIR__ . '/includes/layout.php';
 require_once __DIR__ . '/includes/part_stock_bridge.php';
+require_once __DIR__ . '/includes/dashboard_chart.php';
 require_login();
 
+// สถานะ sync จาก cron/sync_asset_status.php หรือ database/tools/sync_asset_status.php
+// ไม่รัน full sync บนหน้า dashboard — 18k+ เครื่องใช้เวลานานและเสี่ยง timeout
+
 // ---- สรุปสถานะ ----
-$byStatus = ['new' => 0, 'rental' => 0, 'spare' => 0];
+$byStatus = ['new' => 0, 'rental' => 0, 'spare' => 0, 'sold' => 0];
 $res = qr("SELECT status, COUNT(*) c FROM assets GROUP BY status");
 while ($r = $res->fetch_assoc()) $byStatus[$r['status']] = (int)$r['c'];
 $total = array_sum($byStatus);
@@ -26,21 +30,69 @@ try {
     // แสดง dashboard ฝั่งเครื่องต่อได้แม้ต่อ DB สต็อกไม่ได้
 }
 
-// ---- ผลิตราย 12 เดือน ----
-$prod12 = [];
-$res = qr("SELECT DATE_FORMAT(produced_at,'%Y-%m') ym, COUNT(*) c FROM assets
-           WHERE produced_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) GROUP BY ym");
-while ($r = $res->fetch_assoc()) $prod12[$r['ym']] = (int)$r['c'];
-$months = [];
-for ($i = 11; $i >= 0; $i--) { $ym = date('Y-m', strtotime("-$i months")); $months[$ym] = isset($prod12[$ym]) ? $prod12[$ym] : 0; }
-$maxM = max(1, max($months));
+// ---- ผลิตรายปี (6 ปีล่าสุด) + รายเดือนต่อปี (drill จากกรaph stacked) ----
+$dashProdYears = [];
+$res = qr(
+    'SELECT YEAR(a.produced_at) y, ' . asset_status_count_select_sql('a') .
+    ' FROM assets a WHERE a.produced_at IS NOT NULL GROUP BY y ORDER BY y DESC LIMIT 6'
+);
+while ($r = $res->fetch_assoc()) {
+    $dashProdYears[(int) $r['y']] = asset_status_counts_from_row($r);
+}
+$dashProdYears = array_reverse($dashProdYears, true);
 
-// ---- ผลิตรายปี (6 ปีล่าสุด) ----
-$years = [];
-$res = qr("SELECT YEAR(produced_at) y, COUNT(*) c FROM assets WHERE produced_at IS NOT NULL GROUP BY y ORDER BY y DESC LIMIT 6");
-while ($r = $res->fetch_assoc()) $years[$r['y']] = (int)$r['c'];
-$years = array_reverse($years, true);
-$maxY = max(1, $years ? max($years) : 1);
+$dashProdYearPoints = [];
+$dashProdMonthPointsByYear = [];
+if ($dashProdYears) {
+    $minY = (int) min(array_keys($dashProdYears));
+    $maxY = (int) max(array_keys($dashProdYears));
+    foreach (array_keys($dashProdYears) as $y) {
+        $dashProdMonthPointsByYear[$y] = [];
+        for ($m = 1; $m <= 12; $m++) {
+            $dashProdMonthPointsByYear[$y][$m] = asset_status_empty_counts();
+        }
+    }
+    $rangeStart = sprintf('%04d-01-01', $minY);
+    $rangeEnd = sprintf('%04d-01-01', $maxY + 1);
+    $res = qr(
+        'SELECT YEAR(a.produced_at) y, MONTH(a.produced_at) m, ' . asset_status_count_select_sql('a') .
+        ' FROM assets a WHERE a.produced_at>=? AND a.produced_at<? GROUP BY y, m',
+        'ss',
+        [$rangeStart, $rangeEnd]
+    );
+    while ($r = $res->fetch_assoc()) {
+        $yKey = (int) $r['y'];
+        if (isset($dashProdMonthPointsByYear[$yKey])) {
+            $dashProdMonthPointsByYear[$yKey][(int) $r['m']] = asset_status_counts_from_row($r);
+        }
+    }
+
+    foreach ($dashProdYears as $y => $counts) {
+        $y = (int) $y;
+        $label = (string) thai_buddhist_year($y);
+        $titlePrefix = '📊 การผลิตปี ' . $label;
+        $baseUrl = BASE_URL . '/dashboard_data.php?type=year&v=' . $y;
+        $pt = dash_chart_point($label, 'ปี ' . $label, $counts, $titlePrefix, $baseUrl);
+        $pt['inline_year'] = $y;
+        $dashProdYearPoints[] = $pt;
+
+        $monthPoints = [];
+        for ($m = 1; $m <= 12; $m++) {
+            $ym = sprintf('%04d-%02d', $y, $m);
+            $mCounts = $dashProdMonthPointsByYear[$y][$m];
+            $mTitlePrefix = '🏷️ รุ่นที่ผลิตเดือน ' . thai_month_period_label($ym);
+            $mBaseUrl = BASE_URL . '/dashboard_data.php?type=month_models&v=' . rawurlencode($ym);
+            $monthPoints[] = dash_chart_point(
+                thai_month_short($ym),
+                thai_month_period_label($ym),
+                $mCounts,
+                $mTitlePrefix,
+                $mBaseUrl
+            );
+        }
+        $dashProdMonthPointsByYear[$y] = $monthPoints;
+    }
+}
 
 // ---- จำนวนเครื่องรายรุ่น ----
 $perModel = [];
@@ -197,6 +249,8 @@ $partsBase = ui_parts_base_url();
       modal_js('เครื่องใหม่ — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=new", "$B/assets.php?status=new"), 'เครื่อง');
   kpi($byStatus['rental'], 'เครื่องเช่า', 'updates', 'info', pct_label($byStatus['rental'], $total) . ' ของทั้งหมด',
       modal_js('เครื่องเช่า — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=rental", "$B/assets.php?status=rental"), 'เครื่อง');
+  kpi($byStatus['sold'], 'ขายแล้ว', 'stock-out-set', 'primary', pct_label($byStatus['sold'], $total) . ' ของทั้งหมด',
+      modal_js('ขายแล้ว — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=sold", "$B/assets.php?status=sold"), 'เครื่อง');
   kpi($byStatus['spare'], 'เครื่องสำรอง', 'box', 'warning',
       pct_label($byStatus['spare'], $total) . ' ของทั้งหมด<br>คลังเครื่องสำรอง — ทดแทนเครื่องเช่า',
       modal_js('เครื่องสำรอง — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=spare", "$B/assets.php?status=spare"), 'เครื่อง',
@@ -219,44 +273,42 @@ $partsBase = ui_parts_base_url();
   ?>
 </div>
 
-<div class="dash-charts-2col">
-  <div class="panel">
-    <h3>จำนวนเครื่องที่ผลิต — 12 เดือนล่าสุด</h3>
-    <div class="barchart dash-barchart">
-      <?php foreach ($months as $ym => $c) { ?>
-      <div class="bar" style="height:<?= round($c / $maxM * 100) ?>%" title="<?= h("$ym : $c เครื่อง") ?>"
-           onclick="showListModal(<?= h(json_encode('รุ่นที่ผลิตเดือน ' . thai_month_period_label($ym), JSON_UNESCAPED_UNICODE)) ?>, '<?= $B ?>/dashboard_data.php?type=month_models&v=<?= $ym ?>', '')">
-        <b><?= $c ?: '' ?></b><span><?= h(thai_month_short($ym)) ?></span>
+<div class="panel dash-prod-chart" id="dash-prod-chart">
+  <div class="dash-prod-head">
+    <div class="dash-prod-head-main">
+      <button type="button" class="dash-prod-back" id="dash-prod-back" hidden aria-label="กลับรายปี">‹</button>
+      <div class="dash-prod-head-text">
+        <h3 class="dash-prod-title" id="dash-prod-title">ภาพรวมการผลิตรายปี</h3>
+        <p class="muted dash-prod-subtitle" id="dash-prod-subtitle">6 ปีล่าสุด · แยกตามสถานะเครื่อง</p>
       </div>
-      <?php } ?>
     </div>
   </div>
-
-  <div class="panel">
-    <h3>ผลิตรายปี (6 ปีล่าสุด)</h3>
-    <div class="year-hbar-list">
-      <?php foreach ($years as $y => $c) { ?>
-      <div class="year-hbar-row clickable"
-           onclick="showListModal(<?= h(json_encode("การผลิตปี $y รายเดือน", JSON_UNESCAPED_UNICODE)) ?>, '<?= $B ?>/dashboard_data.php?type=year_months&v=<?= (int)$y ?>', '')">
-        <div class="year-hbar-label"><?= thai_buddhist_year((int)$y) ?></div>
-        <div class="hbar-track"><div class="hbar-fill" style="width:<?= pct($c, $maxY) ?>%"></div></div>
-        <div class="year-hbar-val"><?= number_format($c) ?></div>
-      </div>
-      <?php } ?>
+  <?php if ($dashProdYearPoints) { ?>
+  <div id="dash-prod-year-view">
+    <?php render_dashboard_stacked_chart(
+        $dashProdYearPoints,
+        true,
+        null,
+        '',
+        ['compact' => true, 'inline_drill' => true, 'root_class' => 'dash-prod-stacked', 'show_hint' => false]
+    ); ?>
+  </div>
+  <div id="dash-prod-month-views" hidden>
+    <?php foreach ($dashProdMonthPointsByYear as $y => $monthPoints) { ?>
+    <div class="dash-prod-month-pane" data-year="<?= (int) $y ?>" data-be-label="<?= (int) thai_buddhist_year((int) $y) ?>" hidden>
+      <?php render_dashboard_stacked_chart(
+          $monthPoints,
+          true,
+          null,
+          'ปี ' . thai_buddhist_year((int) $y),
+          ['compact' => true, 'root_class' => 'dash-prod-stacked', 'show_hint' => false]
+      ); ?>
     </div>
+    <?php } ?>
   </div>
-</div>
-
-<div class="panel dash-quick-panel">
-  <?= ui_heading('check', 'ทางลัดที่ใช้บ่อย', 'h3') ?>
-  <div class="quick-grid">
-    <a href="<?= $B ?>/asset_new.php" class="quick-item"><span class="q-ic q-primary"><?= ui_icon_html('assets', 17) ?></span><span>บันทึกเครื่องใหม่<small>ทะเบียนเครื่อง</small></span></a>
-    <a href="<?= $B ?>/ma.php" class="quick-item"><span class="q-ic q-warning"><?= ui_icon_html('ma', 17) ?></span><span>บันทึก MA<small>บำรุงรักษา</small></span></a>
-    <a href="<?= $B ?>/update_new.php" class="quick-item"><span class="q-ic q-info"><?= ui_icon_html('updates', 17) ?></span><span>อัปเดต FW/HW<small>บันทึกเวอร์ชัน</small></span></a>
-    <?php /* รับเข้า/เบิกออกอยู่ในหน้าเดียวกันแล้ว (parts/pages/products.php) จึงเหลือทางลัดเดียว */ ?>
-    <a href="<?= h($partsBase) ?>/pages/products.php" class="quick-item"><span class="q-ic q-info"><?= ui_icon_html('products', 17) ?></span><span>จัดการสต็อกอะไหล่<small>รับเข้า · เบิกออก</small></span></a>
-    <a href="<?= $B ?>/scan.php" class="quick-item"><span class="q-ic q-primary"><?= ui_icon_html('scan', 17) ?></span><span>สแกน QR<small>ค้นเครื่องเร็ว</small></span></a>
-  </div>
+  <?php } else { ?>
+  <p class="muted">ยังไม่มีข้อมูลการผลิต</p>
+  <?php } ?>
 </div>
 
 <div class="panel" id="dash-inventory-panel">
@@ -523,6 +575,60 @@ $partsBase = ui_parts_base_url();
       switchView(btn.getAttribute('data-view') || 'models');
     });
   });
+})();
+(function(){
+  var chart = document.getElementById('dash-prod-chart');
+  var yearView = document.getElementById('dash-prod-year-view');
+  var monthViews = document.getElementById('dash-prod-month-views');
+  var backBtn = document.getElementById('dash-prod-back');
+  var titleEl = document.getElementById('dash-prod-title');
+  var subtitleEl = document.getElementById('dash-prod-subtitle');
+  if (!chart || !yearView) return;
+
+  function setHeadline(title, subtitle) {
+    if (titleEl) titleEl.textContent = title;
+    if (subtitleEl) subtitleEl.textContent = subtitle;
+  }
+
+  function showYearView() {
+    yearView.hidden = false;
+    if (monthViews) monthViews.hidden = true;
+    if (backBtn) backBtn.hidden = true;
+    if (monthViews) {
+      monthViews.querySelectorAll('.dash-prod-month-pane').forEach(function(pane) {
+        pane.hidden = true;
+      });
+    }
+    setHeadline('ภาพรวมการผลิตรายปี', '6 ปีล่าสุด · แยกตามสถานะเครื่อง');
+  }
+
+  function showMonthView(y) {
+    yearView.hidden = true;
+    if (monthViews) monthViews.hidden = false;
+    if (backBtn) backBtn.hidden = false;
+    var beLabel = String(y);
+    if (monthViews) {
+      monthViews.querySelectorAll('.dash-prod-month-pane').forEach(function(pane) {
+        var match = pane.getAttribute('data-year') === String(y);
+        pane.hidden = !match;
+        if (match) {
+          beLabel = pane.getAttribute('data-be-label') || beLabel;
+        }
+      });
+    }
+    setHeadline('ภาพรวมรายเดือน ปี ' + beLabel, '12 เดือน · กดตัวเลขหรือสีในแท่งเพื่อดูรายละเอียด');
+  }
+
+  chart.addEventListener('click', function(e) {
+    if (!yearView.contains(e.target)) return;
+    if (e.target.closest('.dash-bar-seg')) return;
+    var trigger = e.target.closest('[data-inline-year]');
+    if (!trigger) return;
+    var y = trigger.getAttribute('data-inline-year');
+    if (y) showMonthView(y);
+  });
+
+  if (backBtn) backBtn.addEventListener('click', showYearView);
 })();
 </script>
 

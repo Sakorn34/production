@@ -21,12 +21,12 @@
     fix = normItem(fix);
     fw = normItem(fw);
     remark = normItem(remark);
-    var lines = ['✅ ใช้งานได้ปกติ เช็ดทำความสะอาด'];
-    if (rep) lines.push('✨ เปลี่ยน : ' + rep);
-    if (fix) lines.push('🛠️ แก้ไข : ' + fix);
-    lines.push('🛜 FW : ' + fw);
-    lines.push('📝 Note : ' + remark);
-    return lines.join('\n');
+    var parts = ['ใช้งานได้ปกติ เช็ดทำความสะอาด'];
+    if (rep) parts.push('เปลี่ยน: ' + rep);
+    if (fix) parts.push('แก้ไข: ' + fix);
+    if (fw) parts.push('FW: ' + fw);
+    if (remark) parts.push('Note: ' + remark);
+    return parts.join(' · ');
   }
 
   window.maFillSnippets = function (prefix, data) {

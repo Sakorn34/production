@@ -1607,3 +1607,352 @@ Files:
   finishgoogs_ma_update/assets/theme-v2.css
   finishgoogs_ma_update/includes/stockparts_withdraw.php
 
+
+================================================================
+v2026-08-31_153642 | Patch | 2026-08-31 15:36:43
+From: 2026-08-14_183757  ->  To: 23b764c  |  Files: 1
+----------------------------------------------------------------
+- Connect rent wait-MA queue to production MA save; bulk Asset Retirement; optional biton_leasing secrets
+
+Files:
+  finishgoogs_ma_update/config.php
+
+
+================================================================
+v2026-08-31_153703 | Patch | 2026-08-31 15:37:05
+From: 2026-08-14_183757  ->  To: 23b764c  |  Files: 5
+----------------------------------------------------------------
+- Connect rent wait-MA queue to production MA save; bulk Asset Retirement; optional biton_leasing secrets
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/deploy_config.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/server_config.php
+
+
+================================================================
+v2026-08-31_191007 | Patch | 2026-08-31 19:10:12
+From: 2026-08-14_183757  ->  To: 23b764c  |  Files: 13
+----------------------------------------------------------------
+- Rent-MA bridge + MA form UX + rental sync text + unified Firmware (prod/MA/update) + register old S/N + bulk retire
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/ma-snippets.js
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/deploy_config.php
+  finishgoogs_ma_update/includes/ma_snippets.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/server_config.php
+  finishgoogs_ma_update/settings.php
+  finishgoogs_ma_update/update_edit.php
+  finishgoogs_ma_update/update_new.php
+
+
+================================================================
+v2026-08-31_192255 | Patch | 2026-08-31 19:22:57
+From: 2026-08-31_191007  ->  To: 23b764c  |  Files: 1
+----------------------------------------------------------------
+- Hide FW label/column on MA page when product has Firmware disabled in settings
+
+Files:
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-08-31_194517 | Patch | 2026-08-31 19:45:19
+From: 2026-08-31_192255  ->  To: 23b764c  |  Files: 4
+----------------------------------------------------------------
+- asset rental card + hardware version display filter
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/includes/asset_production_edit.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+
+
+================================================================
+v2026-08-31_195529 | Patch | 2026-08-31 19:55:31
+From: 2026-08-31_192255  ->  To: 23b764c  |  Files: 5
+----------------------------------------------------------------
+- assets list leasing status column
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/includes/asset_production_edit.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+
+
+================================================================
+v2026-08-31_195605 | Patch | 2026-08-31 19:56:07
+From: 2026-08-31_192255  ->  To: 23b764c  |  Files: 5
+----------------------------------------------------------------
+- leasing status assets list + asset card + HW filter
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/includes/asset_production_edit.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+
+
+================================================================
+v2026-08-31_205508 | Patch | 2026-08-31 20:55:09
+From: 2026-08-31_195605  ->  To: 23b764c  |  Files: 1
+----------------------------------------------------------------
+- แมปชื่อรุ่นคิวรอ MA: alias Portable Client, legacy 1224, prefix Router
+
+Files:
+  finishgoogs_ma_update/includes/rent_product_name_map.php
+
+
+================================================================
+v2026-08-31_205521 | Patch | 2026-08-31 20:55:22
+From: 2026-08-31_195605  ->  To: 23b764c  |  Files: 2
+----------------------------------------------------------------
+- แมปชื่อรุ่นคิวรอ MA
+
+Files:
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/includes/rent_product_name_map.php
+
+
+================================================================
+v2026-08-31_210134 | Patch | 2026-08-31 21:01:37
+From: 2026-08-31_195605  ->  To: 23b764c  |  Files: 15
+----------------------------------------------------------------
+- Dashboard sold KPI, drill-down sort, asset status sync, MA name map
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/cron/sync_asset_status.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/asset_production_edit.php
+  finishgoogs_ma_update/includes/asset_status_sync.php
+  finishgoogs_ma_update/includes/deploy_config.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/includes/rent_product_name_map.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/server_config.php
+  finishgoogs_ma_update/update_edit.php
+  finishgoogs_ma_update/update_new.php
+
+
+================================================================
+v2026-08-31_210417 | Patch | 2026-08-31 21:04:22
+From: 2026-08-31_195605  ->  To: 23b764c  |  Files: 16
+----------------------------------------------------------------
+- Dashboard sold KPI + MA map + release version badge v210134
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/cron/sync_asset_status.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/asset_production_edit.php
+  finishgoogs_ma_update/includes/asset_status_sync.php
+  finishgoogs_ma_update/includes/deploy_config.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/includes/rent_product_name_map.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/server_config.php
+  finishgoogs_ma_update/update_edit.php
+  finishgoogs_ma_update/update_new.php
+
+
+================================================================
+v2026-08-31_210436 | Patch | 2026-08-31 21:04:40
+From: 2026-08-31_195605  ->  To: 23b764c  |  Files: 16
+----------------------------------------------------------------
+- Dashboard sold KPI + MA map + release version badge
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/cron/sync_asset_status.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/asset_production_edit.php
+  finishgoogs_ma_update/includes/asset_status_sync.php
+  finishgoogs_ma_update/includes/deploy_config.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/includes/rent_product_name_map.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/server_config.php
+  finishgoogs_ma_update/update_edit.php
+  finishgoogs_ma_update/update_new.php
+
+
+================================================================
+v2026-09-01_000342 | Patch | 2026-09-01 00:29:20
+From: 2026-08-31_195605  ->  To: 23b764c  |  Files: 18
+----------------------------------------------------------------
+- Theme preview gallery + CSS variables; dashboard prod chart year drill; modal stacked chart layout
+
+Files:
+  finishgoogs_ma_update/appearance.php
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/cron/sync_asset_status.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/asset_production_edit.php
+  finishgoogs_ma_update/includes/asset_status_sync.php
+  finishgoogs_ma_update/includes/deploy_config.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/includes/rent_product_name_map.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/server_config.php
+  finishgoogs_ma_update/update_edit.php
+  finishgoogs_ma_update/update_new.php
+
+
+================================================================
+v2026-09-01_002921 | Patch | 2026-09-01 00:30:57
+From: 2026-08-31_195605  ->  To: 23b764c  |  Files: 18
+----------------------------------------------------------------
+- Theme preview gallery + CSS variables; dashboard prod chart year drill; modal stacked chart layout
+
+Files:
+  finishgoogs_ma_update/appearance.php
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/cron/sync_asset_status.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/asset_production_edit.php
+  finishgoogs_ma_update/includes/asset_status_sync.php
+  finishgoogs_ma_update/includes/deploy_config.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/includes/rent_product_name_map.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/server_config.php
+  finishgoogs_ma_update/update_edit.php
+  finishgoogs_ma_update/update_new.php
+
+
+================================================================
+v2026-09-01_090834 | Patch | 2026-09-01 09:08:35
+From: 2026-09-01_002921  ->  To: 23b764c  |  Files: 5
+----------------------------------------------------------------
+- Modal stacked chart: ความสูงแท่งตามค่าจริง + ตัวเลขรวมบนหัวแท่ง
+
+Files:
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/cron/sync_asset_status.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/asset_status_sync.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+
+
+================================================================
+v2026-09-01_092329 | Patch | 2026-09-01 09:23:30
+From: 2026-09-01_002921  ->  To: 23b764c  |  Files: 8
+----------------------------------------------------------------
+- Dashboard: กรaph stacked bar รายปี/รายเดือน + หัวข้อโหมด + ลบทางลัด + helper dashboard_chart
+
+Files:
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/cron/sync_asset_status.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/asset_status_sync.php
+  finishgoogs_ma_update/includes/dashboard_chart.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-09-01_101300 | Patch | 2026-09-01 10:13:04
+From: 2026-09-01_002921  ->  To: 23b764c  |  Files: 16
+----------------------------------------------------------------
+- Sidebar Surfe-style docked rail + ค้นหา S/N + brand icon SVG + ลบ overlay เก่า
+
+Files:
+  finishgoogs_ma_update/assets/sidebar.css
+  finishgoogs_ma_update/assets/sidebar.js
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/cron/sync_asset_status.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/asset_status_sync.php
+  finishgoogs_ma_update/includes/dashboard_chart.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/index.php
+  parts/assets/app.js
+  parts/assets/style.css
+  parts/includes/footer.php
+  parts/includes/header.php
+  shared/ui_icons.php
+
+
+================================================================
+v2026-09-01_102337 | Patch | 2026-09-01 10:23:39
+From: 2026-09-01_101300  ->  To: 23b764c  |  Files: 8
+----------------------------------------------------------------
+- Smart search sidebar (SN/MA/อัปเดต) + ปรับกรaphแท่ง dashboard + brand icon SVG
+
+Files:
+  finishgoogs_ma_update/assets/sidebar.css
+  finishgoogs_ma_update/assets/sidebar.js
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/includes/dashboard_chart.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/smart_search.php
+  finishgoogs_ma_update/smart_search.php
+  parts/includes/header.php
+
+
+================================================================
+v2026-09-01_105441 | Patch | 2026-09-01 10:54:41
+From: 2026-09-01_102337  ->  To: 23b764c  |  Files: 1
+----------------------------------------------------------------
+- finishgoogs_ma_update/ma.php
+
+Files:
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+
+
+================================================================
+v2026-09-01_105455 | Patch | 2026-09-01 10:54:56
+From: 2026-09-01_102337  ->  To: 23b764c  |  Files: 2
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-09-01_111919 | Patch | 2026-09-01 11:19:20
+From: 2026-09-01_105455  ->  To: 23b764c  |  Files: 2
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/ma.php
+

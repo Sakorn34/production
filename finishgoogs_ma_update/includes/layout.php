@@ -176,6 +176,12 @@ function page_header($title, $showBack = true, $subtitle = '', $backUrl = '') {
     echo in_array(strtolower($sbAct), ['#fff', '#ffffff'], true) ? 'rgba(255,255,255,.16)' : $sbAct;
   ?>;
   --page-bg: <?= theme_color('color_page_bg', '#f4f1fb') ?>;
+  --border: color-mix(in srgb, var(--page-bg) 55%, #64748b);
+  --border-strong: color-mix(in srgb, var(--page-bg) 38%, #64748b);
+  --surface-muted: color-mix(in srgb, var(--page-bg) 88%, #fff);
+  --surface-soft: color-mix(in srgb, var(--page-bg) 72%, #fff);
+  --primary-soft: color-mix(in srgb, var(--primary) 12%, #fff);
+  --focus-ring: color-mix(in srgb, var(--primary) 25%, transparent);
   --logo-h: <?= max(20, min(160, (int)setting('brand_logo_h', 56))) ?>px;
   --app-font: <?= $fontCfg['font'] ?>;
   --success:#16a34a; --success-soft:#dcfce7;
@@ -190,48 +196,92 @@ function page_header($title, $showBack = true, $subtitle = '', $backUrl = '') {
   <?= theme_font_css_sizes() ?>
 }</style>
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/theme-v2.css?v=<?= @filemtime(__DIR__ . '/../assets/theme-v2.css') ?: time() ?>">
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/sidebar.css?v=<?= @filemtime(__DIR__ . '/../assets/sidebar.css') ?: time() ?>">
 </head>
 <body>
-<div class="sidebar-edge" id="fg-sidebar-edge" aria-hidden="true"></div>
-<button type="button" class="sidebar-toggle" id="fg-sidebar-toggle" aria-label="เปิด/ปิดเมนู"><?= ui_icon_html('menu', 18, 'toggle-svg') ?></button>
 <?php
 $brandLogo = setting('brand_logo');
 $side = setting('sidebar_side', 'left');
 $sideClass = $side === 'right' ? ' sidebar-right' : ($side === 'top' ? ' sidebar-top' : '');
+$dockClass = ($side === 'top') ? '' : ' nav-collapsed';
+$ubUser = ui_userbox_identity();
+$showName = $ubUser['name'] !== 'ผู้ใช้งาน' ? $ubUser['name'] : ($u ? $u['display_name'] : '-');
+$settingsActive = in_array($cur, ['settings.php', 'appearance.php', 'server_config.php', 'line_notify_settings.php', 'activity_logs.php', 'share_admin.php', 'system_doc.php'], true);
 ?>
-<div class="app<?= $sideClass ?>">
-  <aside class="sidebar">
-    <div class="brand">
-      <?php if ($brandLogo) { ?><img src="<?= h(img_url($brandLogo)) ?>" alt="โลโก้" class="brand-logo"><?php } else { ?><?= ui_nav_icon_html('assets', 20, 'brand-icon') ?><span class="brand-text"><?= h(setting('app_name', APP_NAME)) ?></span><?php } ?>
+<div class="app<?= $sideClass . $dockClass ?>">
+  <aside class="sidebar" id="fg-app-sidebar">
+    <div class="sidebar-head">
+      <div class="brand">
+        <?php if ($brandLogo) { ?>
+          <img src="<?= h(img_url($brandLogo)) ?>" alt="โลโก้" class="brand-logo">
+          <span class="brand-text"><?= h(setting('app_name', APP_NAME)) ?></span>
+        <?php } else { ?>
+          <span class="nav-ico"><?= ui_nav_icon_html('technicians', 20, 'nav-svg') ?></span>
+          <span class="brand-text"><?= h(setting('app_name', APP_NAME)) ?></span>
+        <?php } ?>
+      </div>
+      <button type="button" class="sidebar-pin-btn" aria-label="ขยายเมนู" aria-expanded="false">
+        <span class="pin-icon-expand" aria-hidden="true">›</span>
+        <span class="pin-icon-collapse" aria-hidden="true">‹</span>
+      </button>
     </div>
-    <nav>
-      <?= ui_nav_group_label('ทะเบียนเครื่อง') ?>
-      <?php foreach ($nav as $n) { ?>
-        <a href="<?= BASE_URL . '/' . $n['file'] ?>" class="<?= $cur === $n['file'] ? 'active' : '' ?>"><span class="nav-ico"><?= ui_nav_icon_html($n['icon']) ?></span> <?= h($n['label']) ?></a>
-      <?php } ?>
-      <?= ui_sidebar_cross_group('สต็อกอะไหล่', ui_nav_items_parts(), ui_parts_base_url()) ?>
-    </nav>
-    <div class="userbox">
-      <?php
-        // ใช้ helper กลางร่วมกับ sidebar ฝั่ง parts เพื่อไม่ให้ชื่อ/คำบรรยายใต้ชื่อไม่ตรงกันอีก
-        $ubUser = ui_userbox_identity();
-        $showName = $ubUser['name'] !== 'ผู้ใช้งาน' ? $ubUser['name'] : ($u ? $u['display_name'] : '-');
-      ?>
-      <div class="ub-row">
+    <div class="sidebar-search" data-smart-search="<?= BASE_URL ?>/smart_search.php">
+      <div class="sidebar-search-inner">
+        <span class="sidebar-search-icon"><?= ui_icon_html('search', 16) ?></span>
+        <input type="search" class="sidebar-search-input" placeholder="ค้นหา S/N, MA, อัปเดต..." autocomplete="off" aria-label="ค้นหาอัจฉริยะ S/N MA อัปเดต">
+      </div>
+    </div>
+    <div class="sidebar-nav">
+      <nav>
+        <?= ui_nav_group_label('ทะเบียนเครื่อง') ?>
+        <?php foreach ($nav as $n) { ?>
+        <a href="<?= BASE_URL . '/' . $n['file'] ?>" class="<?= $cur === $n['file'] ? 'active' : '' ?>">
+          <span class="nav-ico"><?= ui_nav_icon_html($n['icon']) ?></span>
+          <span class="nav-text"><?= h($n['label']) ?></span>
+        </a>
+        <?php } ?>
+        <?= ui_sidebar_cross_group('สต็อกอะไหล่', ui_nav_items_parts(), ui_parts_base_url()) ?>
+      </nav>
+    </div>
+    <div class="sidebar-foot">
+      <button type="button" class="userbox-trigger" aria-expanded="false" aria-haspopup="true">
         <div class="ub-avatar"><?= h(mb_substr(trim($showName), 0, 1)) ?></div>
         <div class="ub-info">
           <div class="ub-name"><?= h($showName) ?></div>
           <div class="muted"><?= h($ubUser['sub']) ?></div>
         </div>
-        <?= ui_userbox_settings_link(in_array($cur, ['settings.php', 'appearance.php', 'server_config.php', 'line_notify_settings.php', 'activity_logs.php', 'share_admin.php', 'system_doc.php'], true) ? 'is-active' : '') ?>
+        <span class="userbox-chevron" aria-hidden="true">▾</span>
+      </button>
+      <div class="userbox-popover" hidden>
+        <div class="userbox-popover-head">
+          <div class="ub-avatar"><?= h(mb_substr(trim($showName), 0, 1)) ?></div>
+          <div class="ub-info">
+            <div class="ub-name"><?= h($showName) ?></div>
+            <div class="muted"><?= h($ubUser['sub']) ?></div>
+          </div>
+        </div>
+        <a href="<?= BASE_URL ?>/profile.php"><?= ui_icon_html('user', 16) ?> โปรไฟล์</a>
+        <a href="<?= h(ui_settings_admin_url()) ?>"<?= $settingsActive ? ' class="is-active"' : '' ?>><?= ui_icon_html('settings', 16) ?> ตั้งค่าระบบ</a>
+        <div class="userbox-popover-divider"></div>
+        <a href="<?= BASE_URL ?>/logout.php" class="userbox-pop-danger"><?= ui_icon_html('logout', 16) ?> ออกจากระบบ</a>
       </div>
-      <div class="ub-links">
-        <a href="<?= BASE_URL ?>/profile.php">โปรไฟล์</a> ·
-        <a href="<?= BASE_URL ?>/logout.php">ออกจากระบบ</a>
+      <div class="userbox">
+        <div class="ub-row">
+          <div class="ub-avatar"><?= h(mb_substr(trim($showName), 0, 1)) ?></div>
+          <div class="ub-info">
+            <div class="ub-name"><?= h($showName) ?></div>
+            <div class="muted"><?= h($ubUser['sub']) ?></div>
+          </div>
+          <?= ui_userbox_settings_link($settingsActive ? 'is-active' : '') ?>
+        </div>
+        <div class="ub-links">
+          <a href="<?= BASE_URL ?>/profile.php">โปรไฟล์</a> ·
+          <a href="<?= BASE_URL ?>/logout.php">ออกจากระบบ</a>
+        </div>
       </div>
     </div>
   </aside>
-  <div class="nav-backdrop" id="fg-nav-backdrop" aria-hidden="true"></div>
+  <div class="nav-backdrop" id="fg-nav-backdrop" hidden aria-hidden="true"></div>
   <main class="content">
     <div class="pagehead">
       <?php if ($showBack && !page_is_menu_page($cur)) { ?>
@@ -264,20 +314,24 @@ function page_footer() {
 
 <!-- toast แจ้งเตือนสถานะ (จางหายอัตโนมัติ) -->
 <div id="flash-toast-host" class="flash-toast-host" aria-live="polite" aria-atomic="true"></div>
+<?php if (defined('APP_RELEASE_VERSION') && APP_RELEASE_VERSION !== '') { ?>
+<p class="app-release-ver" title="รหัสชุด deploy">v<?= h(APP_RELEASE_VERSION) ?></p>
+<?php } ?>
 
 <!-- modal รายการเจาะลึก (dashboard ฯลฯ) — เจาะได้หลายชั้น มีปุ่มย้อนกลับ -->
 <div id="list-overlay" class="notif-overlay" hidden>
-  <div class="notif-box" style="width:min(820px,94vw); max-height:84vh" role="dialog" aria-modal="true" aria-labelledby="list-title">
-    <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px">
+  <div class="notif-box list-modal-box" role="dialog" aria-modal="true" aria-labelledby="list-title">
+    <div class="list-modal-head">
       <button id="list-back" class="btn-sm btn-line" onclick="modalBack()" hidden>← ย้อน</button>
-      <h2 id="list-title" style="margin:0; flex:1; font-size:16px"></h2>
+      <h2 id="list-title"></h2>
       <button class="btn-sm btn-line btn-icon-only" onclick="closeOverlay('list-overlay')" aria-label="ปิด"><?= ui_icon_html('close', 16, 'btn-svg') ?></button>
     </div>
-    <div id="list-body" style="overflow:auto; max-height:64vh">กำลังโหลด…</div>
-    <div id="list-more" style="margin-top:10px"></div>
+    <div id="list-body" class="list-modal-body">กำลังโหลด…</div>
+    <div id="list-more" class="list-modal-foot"></div>
   </div>
 </div>
 
+<script src="<?= BASE_URL ?>/assets/sidebar.js?v=<?= @filemtime(__DIR__ . '/../assets/sidebar.js') ?: time() ?>"></script>
 <script>
 function closeOverlay(id){ document.getElementById(id).hidden = true; }
 
@@ -323,52 +377,13 @@ function partCodeLineHtml(p){
   return '<span class="ma-part-opt-code">' + d.innerHTML + '</span>';
 }
 (function(){
-  var app = document.querySelector('.app');
-  var edge = document.getElementById('fg-sidebar-edge');
-  var sidebar = app && app.querySelector('.sidebar');
-  var toggle = document.getElementById('fg-sidebar-toggle');
-  var backdrop = document.getElementById('fg-nav-backdrop');
-  var hideTimer = null;
-  if (!app || !sidebar) return;
-  if (app.classList.contains('sidebar-top')) return;
-
-  function showNav(){
-    clearTimeout(hideTimer);
-    app.classList.add('nav-hover');
-  }
-  function hideNav(){
-    clearTimeout(hideTimer);
-    app.classList.remove('nav-hover', 'nav-open');
-  }
-  function scheduleHide(){
-    clearTimeout(hideTimer);
-    hideTimer = setTimeout(hideNav, 280);
-  }
-
-  if (edge) {
-    edge.addEventListener('mouseenter', showNav);
-    edge.addEventListener('mouseleave', function(e){
-      if (sidebar.contains(e.relatedTarget)) return;
-      scheduleHide();
+  if (typeof initAppSidebar === 'function') {
+    initAppSidebar({
+      appEl: document.querySelector('.app'),
+      sidebarEl: document.getElementById('fg-app-sidebar'),
+      backdropEl: document.getElementById('fg-nav-backdrop')
     });
-    edge.addEventListener('click', showNav);
   }
-  sidebar.addEventListener('mouseenter', function(){ clearTimeout(hideTimer); showNav(); });
-  sidebar.addEventListener('mouseleave', scheduleHide);
-
-  if (toggle) toggle.addEventListener('click', function(){
-    if (app.classList.contains('nav-open') || app.classList.contains('nav-hover')) hideNav();
-    else app.classList.add('nav-open');
-  });
-  if (backdrop) backdrop.addEventListener('click', hideNav);
-
-  document.querySelectorAll('.sidebar nav a').forEach(function(a){
-    a.addEventListener('click', hideNav);
-  });
-
-  document.addEventListener('keydown', function(e){
-    if (e.key === 'Escape' && (app.classList.contains('nav-open') || app.classList.contains('nav-hover'))) hideNav();
-  });
 })();
 
 // ฟิลเตอร์ค้นหา: เลือก dropdown แล้วค้นหาทันที ไม่ต้องกดปุ่ม

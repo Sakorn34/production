@@ -97,91 +97,11 @@ body {
     border-left-color: transparent;
 }
 
-/* ─ Layout ──────────────────────────────────────────────────────────────── */
-
-/* ─ Sidebar overlay — เมาส์ชิดขอบซ้ายเปิดทันที (delay อยู่ใน app.js) ─ */
+/* ─ Layout (sidebar docked — ดู sidebar.css) ─────────────────────────────── */
 
 .nav-links { flex: 1; }
 .nav-links-cross-top { flex-shrink: 0; }
 
-.userbox {
-    margin-top: auto;
-    padding: 12px 1.25rem 14px;
-    border-top: 1px solid rgba(255, 255, 255, .15);
-    font-size: calc(13px * var(--font-scale, 1));
-    flex-shrink: 0;
-}
-.userbox a { color: rgba(255, 255, 255, .75); text-decoration: none; }
-.userbox a:hover { color: #fff; }
-.ub-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.ub-avatar {
-    width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--primary); color: #fff; font-weight: 600; font-size: calc(14px * var(--font-scale, 1));
-    text-transform: uppercase;
-}
-.ub-info { min-width: 0; flex: 1; }
-.ub-name { font-weight: 600; color: #fff; font-size: calc(13.5px * var(--font-scale, 1)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ub-info .muted { color: rgba(255, 255, 255, .55); font-size: calc(12px * var(--font-scale, 1)); }
-.ub-links { padding-left: 2px; font-size: calc(12px * var(--font-scale, 1)); }
-.ub-settings-btn {
-    margin-left: auto; flex-shrink: 0;
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 36px; height: 36px; border-radius: 8px;
-    border: 1px solid rgba(255,255,255,.28); background: rgba(255,255,255,.1);
-    color: #fff; text-decoration: none; transition: background .15s, border-color .15s;
-}
-.ub-settings-btn:hover { background: rgba(255,255,255,.2); border-color: rgba(255,255,255,.45); color: #fff; }
-.ub-settings-btn.is-active { background: var(--sidebar-active, var(--primary)); border-color: transparent; }
-
-.sidebar {
-    width: 248px;
-    background: var(--sidebar-bg, var(--sidebar));
-    color: #fff;
-    padding: 1.5rem 0 0;
-    position: fixed;
-    left: 0;
-    top: 0;
-    height: 100vh;
-    overflow-y: auto;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-    box-shadow: 4px 0 28px rgba(15, 23, 42, 0.28);
-    z-index: 1002;
-    transform-origin: left center;
-    transform: perspective(1400px) rotateY(-88deg);
-    opacity: 0;
-    pointer-events: none;
-    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease, box-shadow 0.28s ease;
-    display: flex;
-    flex-direction: column;
-}
-
-.sidebar::-webkit-scrollbar {
-    width: 0;
-    height: 0;
-    display: none;
-}
-
-body.sidebar-hover .sidebar {
-    transform: perspective(1400px) rotateY(0deg);
-    opacity: 1;
-    pointer-events: auto;
-    box-shadow: 8px 0 32px rgba(15, 23, 42, 0.35);
-}
-
-.sidebar-edge {
-    position: fixed;
-    left: 0;
-    top: 0;
-    width: 14px;
-    height: 100vh;
-    z-index: 1003;
-    background: transparent;
-    cursor: pointer;
-}
-
-/* ป้ายหัวข้อกลุ่มเมนู */
 .nav-group-label {
     font-size: calc(10.5px * var(--font-scale, 1));
     font-weight: 700;
@@ -191,7 +111,6 @@ body.sidebar-hover .sidebar {
     padding: 14px 1.25rem 6px;
 }
 
-/* กลุ่มลิงก์ข้ามระบบ (ทะเบียนเครื่อง) */
 .nav-links-cross { margin-top: 4px; border-top: 1px solid rgba(255, 255, 255, .12); }
 .nav-links-cross-top { margin-top: 0; border-top: 0; border-bottom: 1px solid rgba(255, 255, 255, .12); padding-bottom: 6px; }
 .nav-links-cross .nav-cross {
@@ -207,57 +126,17 @@ body.sidebar-hover .sidebar {
 .nav-links-cross .nav-cross:hover { background: rgba(255, 255, 255, .1); color: #fff; }
 .nav-links-cross .nav-cross .nav-ico { display: inline-flex; width: 1.3em; justify-content: center; flex-shrink: 0; }
 
-/* ปุ่ม ☰ สำหรับมือถือ */
-.sidebar-toggle {
-    display: none;
-    position: fixed;
-    top: 12px;
-    left: 12px;
-    z-index: 1004;
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    border: 1px solid var(--border, #e2e8f0);
-    background: #fff;
-    color: var(--text, #1e293b);
-    cursor: pointer;
-    align-items: center;
-    justify-content: center;
-    box-shadow: var(--shadow-sm);
-}
-
-.sidebar-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 1001;
-    background: rgba(15, 23, 42, 0.45);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.22s ease;
-}
-
-body.sidebar-hover .sidebar-backdrop {
-    opacity: 1;
-    pointer-events: auto;
-}
-
 .content {
     margin-left: 0;
     padding: 1.75rem 2rem 2.5rem;
     flex: 1;
     width: 100%;
     max-width: none;
+    min-width: 0;
 }
 
 @media (max-width: 800px) {
-    .sidebar-toggle { display: flex; }
-    /* ซ่อนปุ่ม ☰ เมื่อเมนูเปิด — ไม่ให้ทับโลโก้/ชื่อบน sidebar */
-    body.sidebar-hover .sidebar-toggle {
-        display: none;
-    }
-    .content { padding: 1.25rem 1rem 2rem; padding-top: 64px; }
+    .content { padding: 1.25rem 1rem 2rem; }
 }
 
 body.modal-open {

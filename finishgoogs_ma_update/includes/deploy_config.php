@@ -33,6 +33,7 @@ function deploy_load_finishgoogs_secrets(): array
             'production' => deploy_empty_db_block(),
             'stockparts' => deploy_empty_db_block(),
             'techparts'  => deploy_empty_db_block(),
+            'leasing'    => deploy_empty_db_block(),
         ];
     }
     $data = require $path;
@@ -41,9 +42,10 @@ function deploy_load_finishgoogs_secrets(): array
             'production' => deploy_empty_db_block(),
             'stockparts' => deploy_empty_db_block(),
             'techparts'  => deploy_empty_db_block(),
+            'leasing'    => deploy_empty_db_block(),
         ];
     }
-    foreach (['production', 'stockparts', 'techparts'] as $key) {
+    foreach (['production', 'stockparts', 'techparts', 'leasing'] as $key) {
         if (!isset($data[$key]) || !is_array($data[$key])) {
             $data[$key] = deploy_empty_db_block();
             continue;
@@ -106,7 +108,7 @@ function deploy_parse_form(array $post): array
     ];
 
     $fg = [];
-    foreach (['production', 'stockparts', 'techparts'] as $block) {
+    foreach (['production', 'stockparts', 'techparts', 'leasing'] as $block) {
         $fg[$block] = [
             'host' => trim((string)($post[$block . '_host'] ?? '')),
             'db'   => trim((string)($post[$block . '_db'] ?? '')),
@@ -176,6 +178,13 @@ function deploy_validate_config(array $cfg): array
         if (empty($b['host']) || empty($b['db']) || empty($b['user'])) {
             $errors[] = 'กรุณากรอก host/db/user ของ ' . $block;
         }
+    }
+    $lease = $cfg['finishgoogs']['leasing'] ?? [];
+    $leaseAny = trim((string)($lease['host'] ?? '')) !== ''
+        || trim((string)($lease['db'] ?? '')) !== ''
+        || trim((string)($lease['user'] ?? '')) !== '';
+    if ($leaseAny && (empty($lease['host']) || empty($lease['db']) || empty($lease['user']))) {
+        $errors[] = 'กรุณากรอก host/db/user ของ leasing ให้ครบ หรือเว้นว่างทั้งหมด (ไม่บังคับ)';
     }
     $parts = $cfg['parts'] ?? [];
     if (empty($parts['host']) || empty($parts['db']) || empty($parts['user'])) {
@@ -360,6 +369,14 @@ function deploy_test_all_connections(array $cfg): array
     $out = [];
     foreach (['production', 'stockparts', 'techparts'] as $key) {
         $out[$key] = deploy_test_mysqli($cfg['finishgoogs'][$key] ?? deploy_empty_db_block());
+    }
+    $leaseCfg = $cfg['finishgoogs']['leasing'] ?? deploy_empty_db_block();
+    if (trim((string)($leaseCfg['host'] ?? '')) === ''
+        || trim((string)($leaseCfg['db'] ?? '')) === ''
+        || trim((string)($leaseCfg['user'] ?? '')) === '') {
+        $out['leasing'] = ['ok' => true, 'message' => 'ข้าม (ไม่ได้ตั้งค่า)', 'detail' => ''];
+    } else {
+        $out['leasing'] = deploy_test_mysqli($leaseCfg);
     }
     $out['parts'] = deploy_test_mysqli([
         'host' => $cfg['parts']['host'] ?? '',

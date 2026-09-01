@@ -100,6 +100,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $pid) {
             $nm = trim($nm);
             if ($nm === '') continue;
             $kind = ma_kind_save(isset($kinds[$i]) ? $kinds[$i] : '');
+            if ($kind === 'ma_fw') {
+                continue;
+            }
             $optText = implode("\n", split_lines(isset($opts[$i]) ? $opts[$i] : ''));
             $mode = normalize_input_mode(isset($modes[$i]) ? $modes[$i] : '');
             q("INSERT INTO product_field_config (product_id,context,field_name,field_kind,options_text,input_mode,sort_order)
@@ -419,6 +422,7 @@ foreach ($prodEff as $f) if (!isset($KIND_LABELS[$f['kind']]) && $f['kind'] !== 
           <input type="checkbox" name="show_fw" value="1" <?= $fwChecked ? 'checked' : '' ?> onchange="document.getElementById('fw-opts-wrap').hidden=!this.checked">
           แสดงฟิลด์เวอร์ชัน Firmware
         </label>
+        <p class="muted" style="margin:4px 0 6px; font-size:12px">ใช้ร่วมกันทุกหน้า: บันทึกผลิต · บันทึก MA · อัปเดต FW/HW · ตัวเลือกเวอร์ชันมาจากช่องด้านล่าง</p>
         <div id="fw-opts-wrap" style="margin-top:6px" <?= $fwChecked ? '' : 'hidden' ?>>
           <div style="margin-bottom:6px"><?= input_mode_select('fw_input_mode', $fwInputMode, 'max-width:360px') ?></div>
           <textarea name="fw_options" rows="3" style="width:100%; max-width:480px" placeholder="ตัวเลือก FW เช่น&#10;2.6.6c&#10;2.6.5"><?= h($showFwCfg ? implode("\n", $showFwCfg['options']) : '') ?></textarea>
@@ -495,13 +499,16 @@ foreach ($prodEff as $f) if (!isset($KIND_LABELS[$f['kind']]) && $f['kind'] !== 
 $maConfigured = has_product_config($pid, 'ma');
 $maEff = product_config_fields($pid, 'ma');
 if (!$maEff) $maEff = derive_ma_form_fields($pid);
+$maEff = array_values(array_filter($maEff, function ($f) {
+    return ($f['kind'] ?? '') !== 'ma_fw';
+}));
 ?>
 <h2 style="margin-top:26px">② ฟิลด์หน้า "บันทึก MA"
   <?= $maConfigured ? '<span class="badge st-new">ตั้งค่าเองแล้ว</span>' : '<span class="badge st-spare">อัตโนมัติจากประวัติ</span>' ?>
 </h2>
 <p class="muted" style="margin-bottom:6px">
   กำหนดฟิลด์และตัวเลือกในฟอร์มบันทึก MA · ชนิด <b>รายการ ✅/🔄/🔧</b> = รายการให้เลือกในแต่ละช่อง (บรรทัดละ 1 ค่า) ·
-  <b>Firmware</b> = ตัวเลือกเวอร์ชัน · <b>ลาก ≡ เพื่อจัดลำดับ</b>
+  <b>Firmware</b> ควบคุมจากสวิตช์ในส่วน「บันทึกผลิต」ด้านบน (ไม่ตั้งแยกใน MA) · <b>ลาก ≡ เพื่อจัดลำดับ</b>
 </p>
 <datalist id="ma-kind-options">
   <?php foreach ($MA_KIND_LABELS as $lbl) { ?><option value="<?= h($lbl) ?>"><?php } ?>

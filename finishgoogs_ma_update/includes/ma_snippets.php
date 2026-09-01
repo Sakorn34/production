@@ -66,7 +66,8 @@ function ma_snippets_inner_html($pfx, array $opts = []) {
         <span>4. สรุปส่งงานเช่า Office</span>
         <button type="button" class="btn-sm btn-line btn-with-icon ma-copy-btn" data-target="<?= h($pfx) ?>-rental"><?= ui_btn_label('copy', 'คัดลอก', 13) ?></button>
       </div>
-      <textarea class="ma-snippet-txt ma-snippet-txt-tall" id="<?= h($pfx) ?>-rental" readonly rows="8" aria-label="ข้อความสรุป MA งานเช่า"></textarea>
+      <textarea class="ma-snippet-txt ma-snippet-txt-tall" id="<?= h($pfx) ?>-rental" readonly rows="4" aria-label="ข้อความสรุป MA งานเช่า"></textarea>
+      <p class="muted ma-snippet-note">บันทึกไป「รายการซ่อม」ในระบบเช่าอัตโนมัติเมื่อเลือก ซ่อมแล้ว/เสื่อมสภาพ — ข้อความตรงกับที่แสดงด้านบน</p>
     </div>
     <div class="ma-snippet">
       <a href="https://bit-online.net/rent/detail_product_waitma.php" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-line btn-with-icon ma-waitma-link">

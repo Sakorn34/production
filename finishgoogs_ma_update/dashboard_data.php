@@ -4,15 +4,11 @@
 require __DIR__ . '/config.php';
 require_login();
 header('Content-Type: text/html; charset=utf-8');
+require_once __DIR__ . '/includes/dashboard_chart.php';
 
 $type = isset($_GET['type']) ? $_GET['type'] : '';
 $v    = isset($_GET['v']) ? $_GET['v'] : '';
 $LIMIT = 150;
-
-/** onclick เปิด modal ชั้นถัดไป (ใช้ในแถว/การ์ดที่ inject เข้า modal เดิม) */
-function drill_onclick($title, $url) {
-    return "showListModal(" . h(json_encode($title, JSON_UNESCAPED_UNICODE)) . ", '" . h($url) . "', '')";
-}
 
 function asset_table($res, $clickTimeline = false) {
     echo '<div class="table-wrap"><table class="list"><tr><th>รหัสเครื่อง</th><th>รุ่น</th><th>สถานะ</th><th>ผลิตเมื่อ</th></tr>';
@@ -33,26 +29,17 @@ function asset_table($res, $clickTimeline = false) {
     elseif ($clickTimeline) echo '<p class="muted" style="margin-top:6px; font-size:12px">กดแถวเพื่อดู timeline ของเครื่อง · กดรหัสเครื่องเพื่อเปิดหน้าเต็ม</p>';
 }
 
-/** การ์ดรุ่นสินค้า (รูป + ชื่อ + จำนวน) กดแล้วเจาะไปรายการเครื่องของรุ่นนั้น */
-function model_grid($res, $periodLabel, $nextType, $periodVal) {
-    $n = 0;
-    echo '<div class="grid-products" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">';
-    while ($r = $res->fetch_assoc()) {
-        $n++;
-        $title = 'รุ่น ' . $r['name'] . ' — ' . $periodLabel . ' (' . number_format($r['c']) . ' เครื่อง)';
-        $url = BASE_URL . '/dashboard_data.php?type=' . $nextType . '&v=' . rawurlencode($periodVal) . '&p=' . rawurlencode($r['name']);
-        echo '<div class="pcard clickable" style="cursor:pointer" onclick="' . drill_onclick($title, $url) . '">'
-           . img_tag($r['icon_path'], $r['name'], 'thumb-lg')
-           . '<div class="pname">' . h($r['name']) . '</div>'
-           . '<div class="pmeta"><b style="font-size:16px; color:var(--primary)">' . number_format($r['c']) . '</b> เครื่อง</div></div>';
-    }
-    echo '</div>';
-    if ($n === 0) echo '<p class="muted">ไม่มีข้อมูล</p>';
-    else echo '<p class="muted" style="margin-top:8px; font-size:12px">กดการ์ดรุ่นเพื่อดูรายการเครื่อง</p>';
-}
-
 $ASSET_SQL = "SELECT a.id, a.asset_code, a.status, a.produced_at, p.name pname
               FROM assets a JOIN products p ON p.id=a.product_id";
+
+/**
+ * ลำดับรายการเครื่องใน modal dashboard — วันที่ผลิตล่าสุดก่อน, SN มาก→น้อย
+ *
+ * @return string
+ */
+function asset_list_order_sql() {
+    return ' ORDER BY a.produced_at DESC, a.asset_code DESC, a.id DESC';
+}
 
 /** แปลง 'YYYY-MM' เป็นช่วงวันที่ [start, end) เพื่อให้ query ใช้ idx_assets_produced_at ได้
  *  (แทนการห่อคอลัมน์ด้วย DATE_FORMAT()/YEAR() ซึ่งทำให้ index ใช้ไม่ได้) */
@@ -77,6 +64,7 @@ function asset_status_label($st) {
         'new'    => 'ใหม่ (คลัง)',
         'rental' => 'เครื่องเช่า',
         'spare'  => 'เครื่องสำรอง',
+        'sold'   => 'ขายแล้ว',
     ];
     return isset($map[$st]) ? $map[$st] : $st;
 }
@@ -98,17 +86,38 @@ function asset_status_filter($st, $alias = 'a') {
     return ['sql' => " AND {$alias}.status=?", 'types' => 's', 'params' => [$st]];
 }
 
-/** การ์ดรุ่นสินค้า — ชั้นแรกของ drill-down ตามสถานะ */
+/** การ์ดรุ่นสินค้า (รูป + ชื่อ + จำนวน) กดแล้วเจาะไปรายการเครื่องของรุ่นนั้น */
+function model_grid($res, $periodLabel, $nextType, $periodVal, $st = 'all') {
+    $n = 0;
+    $stLabel = ($st !== 'all' && asset_status_valid($st)) ? ' — ' . asset_status_label($st) : '';
+    echo '<div class="grid-products" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">';
+    while ($r = $res->fetch_assoc()) {
+        $n++;
+        $title = 'รุ่น ' . $r['name'] . ' — ' . $periodLabel . $stLabel . ' (' . number_format($r['c']) . ' เครื่อง)';
+        $url = BASE_URL . '/dashboard_data.php?type=' . $nextType . '&v=' . rawurlencode($periodVal) . '&p=' . rawurlencode($r['name']);
+        if ($st !== 'all' && asset_status_valid($st)) {
+            $url .= '&st=' . rawurlencode($st);
+        }
+        echo '<div class="pcard clickable" style="cursor:pointer" onclick="' . drill_onclick($title, $url) . '">'
+           . img_tag($r['icon_path'], $r['name'], 'thumb-lg')
+           . '<div class="pname">' . h($r['name']) . '</div>'
+           . '<div class="pmeta"><b style="font-size:16px; color:var(--primary)">' . number_format($r['c']) . '</b> เครื่อง</div></div>';
+    }
+    echo '</div>';
+    if ($n === 0) echo '<p class="muted">ไม่มีข้อมูล</p>';
+    else echo '<p class="muted" style="margin-top:8px; font-size:12px">กดการ์ดรุ่นเพื่อดูรายการเครื่อง</p>';
+}
+
 function asset_model_grid($res, $st) {
     $label = asset_status_label($st);
     $n = 0;
     echo '<p class="muted" style="font-size:12px;margin:0 0 10px">' . h($label)
-       . ' · กดรุ่นเพื่อดูรายปี → รายเดือน → หมายเลขเครื่อง</p>';
+       . ' · กดรุ่นเพื่อดูหมายเลขเครื่อง</p>';
     echo '<div class="grid-products" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">';
     while ($r = $res->fetch_assoc()) {
         $n++;
         $title = 'รุ่น ' . $r['name'] . ' — ' . $label . ' (' . number_format($r['c']) . ' เครื่อง)';
-        $url = BASE_URL . '/dashboard_data.php?type=asset_product_years&p=' . (int) $r['pid'] . '&st=' . rawurlencode($st);
+        $url = BASE_URL . '/dashboard_data.php?type=asset_product_list&p=' . (int) $r['pid'] . '&st=' . rawurlencode($st);
         echo '<div class="pcard clickable" style="cursor:pointer" onclick="' . drill_onclick($title, $url) . '">'
            . img_tag($r['icon_path'], $r['name'], 'thumb-lg')
            . '<div class="pname">' . h($r['name']) . '</div>'
@@ -182,57 +191,114 @@ function render_stock_today_table(array $rows, $partsBase) {
 switch ($type) {
     case 'status': // เครื่องตามสถานะ
         if (!in_array($v, status_list(), true)) exit('ไม่รู้จักสถานะ');
-        asset_table(qr("$ASSET_SQL WHERE a.status=? ORDER BY a.id DESC LIMIT $LIMIT", 's', [$v]));
+        asset_table(qr("$ASSET_SQL WHERE a.status=?" . asset_list_order_sql() . " LIMIT $LIMIT", 's', [$v]));
         break;
 
     case 'all':
-        asset_table(qr("$ASSET_SQL ORDER BY a.id DESC LIMIT $LIMIT"));
+        asset_table(qr("$ASSET_SQL" . asset_list_order_sql() . " LIMIT $LIMIT"));
         break;
 
     case 'month': // เครื่องที่ผลิตในเดือนนั้น
         if (!preg_match('/^\d{4}-\d{2}$/', $v)) exit('เดือนไม่ถูกต้อง');
         [$ms, $me] = ym_range($v);
-        asset_table(qr("$ASSET_SQL WHERE a.produced_at>=? AND a.produced_at<? ORDER BY a.asset_code LIMIT $LIMIT", 'ss', [$ms, $me]), true);
+        asset_table(qr("$ASSET_SQL WHERE a.produced_at>=? AND a.produced_at<?" . asset_list_order_sql() . " LIMIT $LIMIT", 'ss', [$ms, $me]), true);
         break;
 
     case 'year': // เครื่องที่ผลิตในปีนั้น
         if (!preg_match('/^\d{4}$/', $v)) exit('ปีไม่ถูกต้อง');
+        $st = isset($_GET['st']) ? (string) $_GET['st'] : 'all';
+        if (!asset_status_valid($st)) {
+            exit('สถานะไม่ถูกต้อง');
+        }
         [$ys, $ye] = year_range($v);
-        asset_table(qr("$ASSET_SQL WHERE a.produced_at>=? AND a.produced_at<? ORDER BY a.produced_at DESC, a.asset_code LIMIT $LIMIT", 'ss', [$ys, $ye]), true);
+        $sf = asset_status_filter($st);
+        asset_table(
+            qr(
+                "$ASSET_SQL WHERE a.produced_at>=? AND a.produced_at<?" . $sf['sql'] . asset_list_order_sql() . " LIMIT $LIMIT",
+                'ss' . $sf['types'],
+                array_merge([$ys, $ye], $sf['params'])
+            ),
+            true
+        );
         break;
 
     case 'year_months': // ปี → กราฟรายเดือนของปีนั้น (ชั้น 1)
         if (!preg_match('/^\d{4}$/', $v)) exit('ปีไม่ถูกต้อง');
         $y = (int)$v;
         [$ys, $ye] = year_range($y);
-        $byM = array_fill(1, 12, 0);
-        $res = qr("SELECT MONTH(produced_at) m, COUNT(*) c FROM assets WHERE produced_at>=? AND produced_at<? GROUP BY m", 'ss', [$ys, $ye]);
-        while ($r = $res->fetch_assoc()) $byM[(int)$r['m']] = (int)$r['c'];
-        $mx = max(1, max($byM));
-        echo '<div class="barchart" style="border:0; height:190px; padding:22px 0 24px">';
+        $byM = [];
+        for ($m = 1; $m <= 12; $m++) {
+            $byM[$m] = asset_status_empty_counts();
+        }
+        $res = qr(
+            'SELECT MONTH(a.produced_at) m, ' . asset_status_count_select_sql() .
+            ' FROM assets a WHERE a.produced_at>=? AND a.produced_at<? GROUP BY m',
+            'ss',
+            [$ys, $ye]
+        );
+        while ($r = $res->fetch_assoc()) {
+            $byM[(int) $r['m']] = asset_status_counts_from_row($r);
+        }
+        $points = [];
         for ($m = 1; $m <= 12; $m++) {
             $ym = sprintf('%04d-%02d', $y, $m);
-            $title = '🏷️ รุ่นที่ผลิตเดือน ' . thai_month_period_label($ym);
-            echo '<div class="bar" style="height:' . round($byM[$m] / $mx * 100) . '%; background:linear-gradient(180deg,#3b82f6,#06b6d4); cursor:pointer" '
-               . 'title="' . h("$ym : {$byM[$m]} เครื่อง") . '" onclick="' . drill_onclick($title, BASE_URL . '/dashboard_data.php?type=month_models&v=' . $ym) . '">'
-               . '<b>' . ($byM[$m] ?: '') . '</b><span>' . h(thai_month_short($ym)) . '</span></div>';
+            $counts = $byM[$m];
+            $titlePrefix = '🏷️ รุ่นที่ผลิตเดือน ' . thai_month_period_label($ym);
+            $baseUrl = BASE_URL . '/dashboard_data.php?type=month_models&v=' . rawurlencode($ym);
+            $points[] = dash_linechart_point(
+                thai_month_short($ym),
+                thai_month_period_label($ym),
+                $counts,
+                $titlePrefix,
+                $baseUrl
+            );
         }
-        echo '</div><p class="muted" style="font-size:12px">กดแท่งเดือนเพื่อดูรุ่นสินค้าที่ผลิตในเดือนนั้น</p>';
+        render_dashboard_stacked_chart($points, true, null, 'ปี ' . thai_buddhist_year($y));
         break;
 
     case 'month_models': // เดือน → รุ่นสินค้าที่ผลิต พร้อมรูป+จำนวน (ชั้น 2)
         if (!preg_match('/^\d{4}-\d{2}$/', $v)) exit('เดือนไม่ถูกต้อง');
+        $st = isset($_GET['st']) ? (string) $_GET['st'] : 'all';
+        if (!asset_status_valid($st)) {
+            exit('สถานะไม่ถูกต้อง');
+        }
         $lbl = thai_month_period_label($v);
+        if ($st !== 'all') {
+            $lbl .= ' · ' . asset_status_label($st);
+        }
         [$ms, $me] = ym_range($v);
-        model_grid(qr("SELECT p.name, p.icon_path, COUNT(*) c FROM assets a JOIN products p ON p.id=a.product_id
-                       WHERE a.produced_at>=? AND a.produced_at<? GROUP BY p.id ORDER BY c DESC", 'ss', [$ms, $me]), $lbl, 'month_product', $v);
+        $sf = asset_status_filter($st);
+        model_grid(
+            qr(
+                'SELECT p.name, p.icon_path, COUNT(*) c FROM assets a JOIN products p ON p.id=a.product_id
+                 WHERE a.produced_at>=? AND a.produced_at<?' . $sf['sql'] . ' GROUP BY p.id ORDER BY c DESC',
+                'ss' . $sf['types'],
+                array_merge([$ms, $me], $sf['params'])
+            ),
+            $lbl,
+            'month_product',
+            $v,
+            $st
+        );
         break;
 
     case 'month_product': // เดือน + รุ่น → รายการเครื่อง (ชั้น 3, กดแถวไป timeline)
         $pn = isset($_GET['p']) ? $_GET['p'] : '';
+        $st = isset($_GET['st']) ? (string) $_GET['st'] : 'all';
         if (!preg_match('/^\d{4}-\d{2}$/', $v) || $pn === '') exit('พารามิเตอร์ไม่ถูกต้อง');
+        if (!asset_status_valid($st)) {
+            exit('สถานะไม่ถูกต้อง');
+        }
         [$ms, $me] = ym_range($v);
-        asset_table(qr("$ASSET_SQL WHERE a.produced_at>=? AND a.produced_at<? AND p.name=? ORDER BY a.asset_code LIMIT $LIMIT", 'sss', [$ms, $me, $pn]), true);
+        $sf = asset_status_filter($st);
+        if ($st !== 'all') {
+            echo '<p class="muted" style="font-size:12px;margin:0 0 8px">' . h(asset_status_label($st)) . '</p>';
+        }
+        asset_table(qr(
+            "$ASSET_SQL WHERE a.produced_at>=? AND a.produced_at<? AND p.name=?{$sf['sql']}" . asset_list_order_sql() . " LIMIT $LIMIT",
+            'sss' . $sf['types'],
+            array_merge([$ms, $me, $pn], $sf['params'])
+        ), true);
         break;
 
     case 'timeline': // เครื่อง → timeline ประวัติทั้งหมด (ชั้น 4)
@@ -252,11 +318,11 @@ switch ($type) {
         break;
 
     case 'category': // เครื่องตามหมวดสินค้า
-        asset_table(qr("$ASSET_SQL WHERE COALESCE(NULLIF(p.category,''),'อื่นๆ')=? ORDER BY a.id DESC LIMIT $LIMIT", 's', [$v]));
+        asset_table(qr("$ASSET_SQL WHERE COALESCE(NULLIF(p.category,''),'อื่นๆ')=?" . asset_list_order_sql() . " LIMIT $LIMIT", 's', [$v]));
         break;
 
     case 'product': // เครื่องตามรุ่น
-        asset_table(qr("$ASSET_SQL WHERE p.name=? ORDER BY a.id DESC LIMIT $LIMIT", 's', [$v]));
+        asset_table(qr("$ASSET_SQL WHERE p.name=?" . asset_list_order_sql() . " LIMIT $LIMIT", 's', [$v]));
         break;
 
     case 'product_years': // รุ่น → กราฟรายปี (ชั้น 1)
@@ -264,55 +330,99 @@ switch ($type) {
         $prod = qr("SELECT name, icon_path FROM products WHERE id=?", 'i', [$pid])->fetch_assoc();
         if (!$prod) exit('<p class="muted">ไม่พบรุ่นนี้</p>');
         $years = [];
-        $res = qr("SELECT YEAR(a.produced_at) y, COUNT(*) c FROM assets a
-                   WHERE a.product_id=? AND a.produced_at IS NOT NULL GROUP BY y ORDER BY y DESC LIMIT 12", 'i', [$pid]);
-        while ($r = $res->fetch_assoc()) $years[(int)$r['y']] = (int)$r['c'];
-        if (!$years) { echo '<p class="muted">ยังไม่มีข้อมูลการผลิตของรุ่น ' . h($prod['name']) . '</p>'; break; }
-        $years = array_reverse($years, true);
-        $mx = max(1, max($years));
-        echo '<div style="display:flex; align-items:center; gap:12px; margin-bottom:12px">'
-           . img_tag($prod['icon_path'], $prod['name'], 'thumb')
-           . '<div><b>' . h($prod['name']) . '</b><div class="muted" style="font-size:12px">กดแท่งปีเพื่อดูรายเดือน</div></div></div>';
-        echo '<div class="barchart" style="border:0; height:190px; padding:22px 0 24px">';
-        foreach ($years as $y => $c) {
-            $title = '📊 ' . $prod['name'] . ' — ปี ' . $y . ' รายเดือน';
-            echo '<div class="bar" style="height:' . round($c / $mx * 100) . '%; background:linear-gradient(180deg,#ec4899,#8b5cf6); cursor:pointer" '
-               . 'title="' . h("$y : $c เครื่อง") . '" onclick="' . drill_onclick($title, BASE_URL . '/dashboard_data.php?type=product_year_months&v=' . (int)$y . '&p=' . (int)$pid) . '">'
-               . '<b>' . $c . '</b><span>' . h($y) . '</span></div>';
+        $res = qr(
+            'SELECT YEAR(a.produced_at) y, ' . asset_status_count_select_sql() .
+            ' FROM assets a WHERE a.product_id=? AND a.produced_at IS NOT NULL GROUP BY y ORDER BY y DESC LIMIT 12',
+            'i',
+            [$pid]
+        );
+        while ($r = $res->fetch_assoc()) {
+            $years[(int) $r['y']] = asset_status_counts_from_row($r);
         }
-        echo '</div><p class="muted" style="font-size:12px">กดแท่งปี → รายเดือน → หมายเลขเครื่อง → เปิดโปรไฟล์สินค้า</p>';
+        if (!$years) {
+            echo '<p class="muted">ยังไม่มีข้อมูลการผลิตของรุ่น ' . h($prod['name']) . '</p>';
+            break;
+        }
+        $years = array_reverse($years, true);
+        $points = [];
+        foreach ($years as $y => $counts) {
+            $titlePrefix = '📊 ' . $prod['name'] . ' — ปี ' . $y . ' รายเดือน';
+            $baseUrl = BASE_URL . '/dashboard_data.php?type=product_year_months&v=' . (int) $y . '&p=' . (int) $pid;
+            $points[] = dash_linechart_point((string) $y, $prod['name'] . ' ปี ' . $y, $counts, $titlePrefix, $baseUrl);
+        }
+        render_dashboard_stacked_chart($points, true, null, $prod['name']);
         break;
 
     case 'product_year_months': // รุ่น+ปี → กราฟรายเดือน (ชั้น 2)
         $y = (int)$v;
         $pid = (int)(isset($_GET['p']) ? $_GET['p'] : 0);
-        $prod = $pid ? qr("SELECT name, icon_path FROM products WHERE id=?", 'i', [$pid])->fetch_assoc() : null;
-        if (!$prod || $y < 1900) exit('พารามิเตอร์ไม่ถูกต้อง');
-        $byM = array_fill(1, 12, 0);
+        $st = isset($_GET['st']) ? (string) $_GET['st'] : 'all';
+        if (!$pid || $y < 1900 || !asset_status_valid($st)) {
+            exit('พารามิเตอร์ไม่ถูกต้อง');
+        }
+        $prod = qr("SELECT name, icon_path FROM products WHERE id=?", 'i', [$pid])->fetch_assoc();
+        if (!$prod) {
+            exit('พารามิเตอร์ไม่ถูกต้อง');
+        }
+        $byM = [];
+        for ($m = 1; $m <= 12; $m++) {
+            $byM[$m] = asset_status_empty_counts();
+        }
         [$ys, $ye] = year_range($y);
-        $res = qr("SELECT MONTH(a.produced_at) m, COUNT(*) c FROM assets a
-                   WHERE a.product_id=? AND a.produced_at>=? AND a.produced_at<? GROUP BY m", 'iss', [$pid, $ys, $ye]);
-        while ($r = $res->fetch_assoc()) $byM[(int)$r['m']] = (int)$r['c'];
-        $mx = max(1, max($byM));
-        echo '<div class="muted" style="margin-bottom:8px">' . h($prod['name']) . ' · ปี ' . $y . '</div>';
-        echo '<div class="barchart" style="border:0; height:190px; padding:22px 0 24px">';
+        $sf = asset_status_filter($st);
+        $res = qr(
+            'SELECT MONTH(a.produced_at) m, ' . asset_status_count_select_sql() .
+            ' FROM assets a WHERE a.product_id=? AND a.produced_at>=? AND a.produced_at<?' . $sf['sql'] . ' GROUP BY m',
+            'iss' . $sf['types'],
+            array_merge([$pid, $ys, $ye], $sf['params'])
+        );
+        while ($r = $res->fetch_assoc()) {
+            $byM[(int) $r['m']] = asset_status_counts_from_row($r);
+        }
+        $multiSeries = ($st === 'all');
+        $points = [];
         for ($m = 1; $m <= 12; $m++) {
             $ym = sprintf('%04d-%02d', $y, $m);
-            $title = '🏷️ ' . $prod['name'] . ' — เดือน ' . thai_month_period_label($ym);
-            echo '<div class="bar" style="height:' . round($byM[$m] / $mx * 100) . '%; background:linear-gradient(180deg,#3b82f6,#06b6d4); cursor:pointer" '
-               . 'title="' . h("$ym : {$byM[$m]} เครื่อง") . '" onclick="' . drill_onclick($title, BASE_URL . '/dashboard_data.php?type=product_month&v=' . $ym . '&p=' . $pid) . '">'
-               . '<b>' . ($byM[$m] ?: '') . '</b><span>' . h(thai_month_short($ym)) . '</span></div>';
+            $counts = $byM[$m];
+            $titlePrefix = '🏷️ ' . $prod['name'] . ' — เดือน ' . thai_month_period_label($ym);
+            $baseUrl = BASE_URL . '/dashboard_data.php?type=product_month&v=' . rawurlencode($ym) . '&p=' . $pid;
+            if ($st !== 'all') {
+                $baseUrl .= '&st=' . rawurlencode($st);
+            }
+            $points[] = dash_linechart_point(
+                thai_month_short($ym),
+                thai_month_period_label($ym),
+                $counts,
+                $titlePrefix,
+                $baseUrl
+            );
         }
-        echo '</div><p class="muted" style="font-size:12px">กดแท่งเดือนเพื่อดูหมายเลขเครื่องที่ผลิตในเดือนนั้น</p>';
+        render_dashboard_stacked_chart(
+            $points,
+            $multiSeries,
+            $st !== 'all' ? $st : null,
+            $prod['name'] . ' · ปี ' . thai_buddhist_year($y) . ($st !== 'all' ? ' · ' . asset_status_label($st) : '')
+        );
         break;
 
     case 'product_month': // รุ่น+เดือน → รายการเครื่อง → เปิดโปรไฟล์ (ชั้น 3)
         if (!preg_match('/^\d{4}-\d{2}$/', $v)) exit('เดือนไม่ถูกต้อง');
         $pid = (int)(isset($_GET['p']) ? $_GET['p'] : 0);
+        $st = isset($_GET['st']) ? (string) $_GET['st'] : 'all';
         $prod = $pid ? qr("SELECT name FROM products WHERE id=?", 'i', [$pid])->fetch_assoc() : null;
-        if (!$prod) exit('พารามิเตอร์ไม่ถูกต้อง');
+        if (!$prod || !asset_status_valid($st)) {
+            exit('พารามิเตอร์ไม่ถูกต้อง');
+        }
         [$ms, $me] = ym_range($v);
-        $res = qr("$ASSET_SQL WHERE a.product_id=? AND a.produced_at>=? AND a.produced_at<? ORDER BY a.asset_code LIMIT $LIMIT", 'iss', [$pid, $ms, $me]);
+        $sf = asset_status_filter($st);
+        $res = qr(
+            "$ASSET_SQL WHERE a.product_id=? AND a.produced_at>=? AND a.produced_at<?{$sf['sql']}" . asset_list_order_sql() . " LIMIT $LIMIT",
+            'iss' . $sf['types'],
+            array_merge([$pid, $ms, $me], $sf['params'])
+        );
+        echo '<div class="muted" style="margin-bottom:8px">' . h($prod['name']) . ' · '
+           . h(thai_month_period_label($v))
+           . ($st !== 'all' ? ' · ' . h(asset_status_label($st)) : '') . '</div>';
         echo '<div class="table-wrap"><table class="list"><tr><th>หมายเลขเครื่อง</th><th>สถานะ</th><th>ผลิตเมื่อ</th></tr>';
         $n = 0;
         while ($r = $res->fetch_assoc()) {
@@ -507,6 +617,28 @@ switch ($type) {
         ), $st);
         break;
 
+    case 'asset_product_list': // รุ่น+สถานะ → รายการ S/N โดยตรง (ข้ามรายปี-เดือน)
+        $pid = (int) (isset($_GET['p']) ? $_GET['p'] : 0);
+        $st = isset($_GET['st']) ? (string) $_GET['st'] : 'all';
+        if ($pid <= 0 || !asset_status_valid($st)) {
+            exit('พารามิเตอร์ไม่ถูกต้อง');
+        }
+        $sf = asset_status_filter($st);
+        $prod = qr('SELECT name, icon_path FROM products WHERE id=?', 'i', [$pid])->fetch_assoc();
+        if (!$prod) {
+            exit('<p class="muted">ไม่พบรุ่นนี้</p>');
+        }
+        echo '<div style="display:flex; align-items:center; gap:12px; margin-bottom:12px">'
+           . img_tag($prod['icon_path'], $prod['name'], 'thumb')
+           . '<div><b>' . h($prod['name']) . '</b>'
+           . '<div class="muted" style="font-size:12px">' . h(asset_status_label($st)) . '</div></div></div>';
+        asset_table(qr(
+            "$ASSET_SQL WHERE a.product_id=?{$sf['sql']}" . asset_list_order_sql() . " LIMIT $LIMIT",
+            'i' . $sf['types'],
+            array_merge([$pid], $sf['params'])
+        ));
+        break;
+
     case 'asset_product_years': // รุ่น+สถานะ → รายปี (ชั้น 2)
         $pid = (int) (isset($_GET['p']) ? $_GET['p'] : 0);
         $st = isset($_GET['st']) ? (string) $_GET['st'] : 'all';
@@ -520,36 +652,39 @@ switch ($type) {
         }
         $years = [];
         $res = qr(
-            "SELECT YEAR(a.produced_at) y, COUNT(*) c FROM assets a
-             WHERE a.product_id=? AND a.produced_at IS NOT NULL{$sf['sql']}
-             GROUP BY y ORDER BY y DESC LIMIT 12",
+            'SELECT YEAR(a.produced_at) y, ' . asset_status_count_select_sql() .
+            ' FROM assets a WHERE a.product_id=? AND a.produced_at IS NOT NULL' . $sf['sql'] .
+            ' GROUP BY y ORDER BY y DESC LIMIT 12',
             'i' . $sf['types'],
             array_merge([$pid], $sf['params'])
         );
         while ($r = $res->fetch_assoc()) {
-            $years[(int) $r['y']] = (int) $r['c'];
+            $years[(int) $r['y']] = asset_status_counts_from_row($r);
         }
         if (!$years) {
             echo '<p class="muted">ยังไม่มีข้อมูลการผลิตของรุ่น ' . h($prod['name']) . '</p>';
             break;
         }
         $years = array_reverse($years, true);
-        $mx = max(1, max($years));
         $ctx = asset_status_label($st);
-        echo '<div style="display:flex; align-items:center; gap:12px; margin-bottom:12px">'
-           . img_tag($prod['icon_path'], $prod['name'], 'thumb')
-           . '<div><b>' . h($prod['name']) . '</b>'
-           . '<div class="muted" style="font-size:12px">' . h($ctx) . ' · กดแท่งปีเพื่อดูรายเดือน</div></div></div>';
-        echo '<div class="barchart" style="border:0; height:190px; padding:22px 0 24px">';
-        foreach ($years as $y => $c) {
-            $title = $prod['name'] . ' — ปี ' . $y . ' รายเดือน (' . $ctx . ')';
-            $url = BASE_URL . '/dashboard_data.php?type=asset_product_year_months&v=' . (int) $y
-               . '&p=' . $pid . '&st=' . rawurlencode($st);
-            echo '<div class="bar" style="height:' . round($c / $mx * 100) . '%; background:linear-gradient(180deg,#ec4899,#8b5cf6); cursor:pointer" '
-               . 'title="' . h("$y : $c เครื่อง") . '" onclick="' . drill_onclick($title, $url) . '">'
-               . '<b>' . $c . '</b><span>' . h($y) . '</span></div>';
+        $multiSeries = ($st === 'all');
+        $points = [];
+        foreach ($years as $y => $counts) {
+            $titlePrefix = $prod['name'] . ' — ปี ' . $y . ' รายเดือน' . ($st !== 'all' ? ' (' . $ctx . ')' : '');
+            $baseUrl = BASE_URL . '/dashboard_data.php?type=asset_product_year_months&v=' . (int) $y
+               . '&p=' . $pid;
+            if ($st !== 'all') {
+                $baseUrl .= '&st=' . rawurlencode($st);
+            }
+            $points[] = dash_linechart_point(
+                (string) $y,
+                $prod['name'] . ' ปี ' . $y,
+                $counts,
+                $titlePrefix,
+                $baseUrl
+            );
         }
-        echo '</div><p class="muted" style="font-size:12px">กดแท่งปี → รายเดือน → หมายเลขเครื่อง</p>';
+        render_dashboard_stacked_chart($points, $multiSeries, $st !== 'all' ? $st : null, $prod['name'] . ' · ' . $ctx);
         break;
 
     case 'asset_product_year_months': // รุ่น+ปี+สถานะ → รายเดือน (ชั้น 3)
@@ -564,32 +699,46 @@ switch ($type) {
         if (!$prod) {
             exit('พารามิเตอร์ไม่ถูกต้อง');
         }
-        $byM = array_fill(1, 12, 0);
+        $byM = [];
+        for ($m = 1; $m <= 12; $m++) {
+            $byM[$m] = asset_status_empty_counts();
+        }
         [$ys, $ye] = year_range($y);
         $res = qr(
-            "SELECT MONTH(a.produced_at) m, COUNT(*) c FROM assets a
-             WHERE a.product_id=? AND a.produced_at>=? AND a.produced_at<?{$sf['sql']}
-             GROUP BY m",
+            'SELECT MONTH(a.produced_at) m, ' . asset_status_count_select_sql() .
+            ' FROM assets a WHERE a.product_id=? AND a.produced_at>=? AND a.produced_at<?' . $sf['sql'] .
+            ' GROUP BY m',
             'iss' . $sf['types'],
             array_merge([$pid, $ys, $ye], $sf['params'])
         );
         while ($r = $res->fetch_assoc()) {
-            $byM[(int) $r['m']] = (int) $r['c'];
+            $byM[(int) $r['m']] = asset_status_counts_from_row($r);
         }
-        $mx = max(1, max($byM));
-        echo '<div class="muted" style="margin-bottom:8px">' . h($prod['name']) . ' · ปี ' . $y
-           . ' · ' . h(asset_status_label($st)) . '</div>';
-        echo '<div class="barchart" style="border:0; height:190px; padding:22px 0 24px">';
+        $multiSeries = ($st === 'all');
+        $points = [];
         for ($m = 1; $m <= 12; $m++) {
             $ym = sprintf('%04d-%02d', $y, $m);
-            $title = $prod['name'] . ' — เดือน ' . thai_month_period_label($ym);
-            $url = BASE_URL . '/dashboard_data.php?type=asset_product_month&v=' . rawurlencode($ym)
-               . '&p=' . $pid . '&st=' . rawurlencode($st);
-            echo '<div class="bar" style="height:' . round($byM[$m] / $mx * 100) . '%; background:linear-gradient(180deg,#3b82f6,#06b6d4); cursor:pointer" '
-               . 'title="' . h("$ym : {$byM[$m]} เครื่อง") . '" onclick="' . drill_onclick($title, $url) . '">'
-               . '<b>' . ($byM[$m] ?: '') . '</b><span>' . h(thai_month_short($ym)) . '</span></div>';
+            $counts = $byM[$m];
+            $titlePrefix = $prod['name'] . ' — เดือน ' . thai_month_period_label($ym);
+            $baseUrl = BASE_URL . '/dashboard_data.php?type=asset_product_month&v=' . rawurlencode($ym)
+               . '&p=' . $pid;
+            if ($st !== 'all') {
+                $baseUrl .= '&st=' . rawurlencode($st);
+            }
+            $points[] = dash_linechart_point(
+                thai_month_short($ym),
+                thai_month_period_label($ym),
+                $counts,
+                $titlePrefix,
+                $baseUrl
+            );
         }
-        echo '</div><p class="muted" style="font-size:12px">กดแท่งเดือนเพื่อดูหมายเลขเครื่อง</p>';
+        render_dashboard_stacked_chart(
+            $points,
+            $multiSeries,
+            $st !== 'all' ? $st : null,
+            $prod['name'] . ' · ปี ' . thai_buddhist_year($y) . ($st !== 'all' ? ' · ' . asset_status_label($st) : '')
+        );
         break;
 
     case 'asset_product_month': // รุ่น+เดือน+สถานะ → รายการ S/N (ชั้น 4)
@@ -608,8 +757,8 @@ switch ($type) {
         $sf = asset_status_filter($st);
         [$ms, $me] = ym_range($v);
         $res = qr(
-            "$ASSET_SQL WHERE a.product_id=? AND a.produced_at>=? AND a.produced_at<?{$sf['sql']}
-             ORDER BY a.asset_code LIMIT $LIMIT",
+            "$ASSET_SQL WHERE a.product_id=? AND a.produced_at>=? AND a.produced_at<?{$sf['sql']}"
+            . asset_list_order_sql() . " LIMIT $LIMIT",
             'iss' . $sf['types'],
             array_merge([$pid, $ms, $me], $sf['params'])
         );

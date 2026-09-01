@@ -1,0 +1,1574 @@
+<?php
+/**
+ * rent_ma_bridge.php
+ * ────────────────────────────────────────────────────────────────────────────────
+ * เชื่อมระบบเช่า (biton_leasing) กับหน้าบันทึก MA และโปรไฟล์เครื่อง — อ่านคิวรอ MA / สถานะเช่า
+ * fail-soft: เช่าล่มแล้วหน้า MA ยังใช้ได้ ไม่ die
+ * ────────────────────────────────────────────────────────────────────────────────
+ */
+
+require_once __DIR__ . '/rent_product_name_map.php';
+
+/**
+ * แปลง serial ให้เทียบกันได้
+ *
+ * @param string $sn หมายเลขสินค้า
+ * @return string
+ */
+function rent_normalize_sn($sn)
+{
+    return strtoupper(trim((string)$sn));
+}
+
+/**
+ * แปลง pro_date จากระบบเช่าเป็นวันที่ผลิต (produced_at) สำหรับลงทะเบียนผลิต
+ *
+ * @param mixed $proDate ค่า pro_date จาก tbl_product (วันที่บันทึกเข้าระบบเช่า)
+ * @return string Y-m-d
+ */
+function rent_lease_produced_date($proDate)
+{
+    $proDate = trim((string)$proDate);
+    if ($proDate === '' || $proDate === '0000-00-00') {
+        return date('Y-m-d');
+    }
+    $dt = DateTime::createFromFormat('Y-m-d', $proDate);
+    if ($dt && $dt->format('Y-m-d') === $proDate) {
+        return $proDate;
+    }
+    $ts = strtotime($proDate);
+    if ($ts !== false) {
+        return date('Y-m-d', $ts);
+    }
+    return date('Y-m-d');
+}
+
+/**
+ * ป้ายสถานะเครื่องในผลิต (สำหรับแสดงในคิวเช่า)
+ *
+ * @param string $status ค่า status จาก assets
+ * @return string
+ */
+function rent_asset_status_label($status)
+{
+    static $map = [
+        'new'    => 'ใหม่ (คลัง)',
+        'rental' => 'เครื่องเช่า',
+        'spare'  => 'เครื่องสำรอง',
+    ];
+    $status = (string)$status;
+    return $map[$status] ?? $status;
+}
+
+/**
+ * แยกหมายเลขสินค้าจากข้อความ (บรรทัด / ลูกน้ำ / ช่องว่าง)
+ *
+ * @param string $raw
+ * @return array<int,string>
+ */
+function rent_parse_serial_list($raw)
+{
+    $parts = preg_split('/[\s,;]+/u', (string)$raw);
+    $out = [];
+    $seen = [];
+    foreach ($parts as $p) {
+        $sn = rent_normalize_sn($p);
+        if ($sn === '' || isset($seen[$sn])) {
+            continue;
+        }
+        $seen[$sn] = true;
+        $out[] = $sn;
+    }
+    return $out;
+}
+
+/**
+ * query ฐานเช่าแบบไม่ die
+ *
+ * @param string $sql
+ * @param string $types
+ * @param array  $params
+ * @return array{ok:bool, error?:string, result?:mysqli_result, insert_id?:int}
+ */
+function rent_q_try($sql, $types = '', $params = [])
+{
+    $conn = dbLeasing();
+    if (!$conn) {
+        return ['ok' => false, 'error' => dbLeasingError()];
+    }
+    $st = $conn->prepare($sql);
+    if ($st === false) {
+        return ['ok' => false, 'error' => $conn->error ?: 'prepare ระบบเช่าไม่สำเร็จ'];
+    }
+    if ($types !== '') {
+        $st->bind_param($types, ...$params);
+    }
+    if (!$st->execute()) {
+        $err = $st->error;
+        $st->close();
+        return ['ok' => false, 'error' => $err ?: 'execute ระบบเช่าไม่สำเร็จ'];
+    }
+    $res = $st->get_result();
+    $insertId = (int)$conn->insert_id;
+    if ($res === false) {
+        $st->close();
+        return ['ok' => true, 'insert_id' => $insertId];
+    }
+    return ['ok' => true, 'result' => $res, 'insert_id' => $insertId];
+}
+
+/**
+ * หาเครื่องในทะเบียนผลิตจาก S/N
+ *
+ * @param string $sn
+ * @return array<string,mixed>|null
+ */
+function rent_find_asset_by_sn($sn)
+{
+    $sn = rent_normalize_sn($sn);
+    if ($sn === '') {
+        return null;
+    }
+    try {
+        return qr(
+            'SELECT a.id, a.asset_code, a.factory_serial, a.product_id, a.status, p.name pname
+             FROM assets a JOIN products p ON p.id = a.product_id
+             WHERE a.asset_code = ? OR a.factory_serial = ?
+             LIMIT 1',
+            'ss',
+            [$sn, $sn]
+        )->fetch_assoc() ?: null;
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+/**
+ * ดึงคิวสินค้าสถานะ MA จากระบบเช่า พร้อมจับคู่ทะเบียนผลิต
+ *
+ * @param int $limit
+ * @return array{ok:bool, error:string, rows:array<int,array<string,mixed>>}
+ */
+function rent_wait_ma_queue($limit = 2000)
+{
+    $limit = max(1, min(5000, (int)$limit));
+    $q = rent_q_try(
+        'SELECT pro_name, pro_sn, pro_status, pro_date FROM tbl_product WHERE pro_status = ? ORDER BY pro_name ASC, pro_sn ASC LIMIT ' . $limit,
+        's',
+        ['MA']
+    );
+    if (!$q['ok']) {
+        return ['ok' => false, 'error' => (string)($q['error'] ?? dbLeasingError()), 'rows' => []];
+    }
+    $rows = [];
+    $sns = [];
+    if (!empty($q['result'])) {
+        while ($r = $q['result']->fetch_assoc()) {
+            $sn = rent_normalize_sn($r['pro_sn'] ?? '');
+            if ($sn === '') {
+                continue;
+            }
+            $rows[] = [
+                'pro_name' => (string)$r['pro_name'],
+                'pro_sn'   => $sn,
+                'pro_date' => (string)($r['pro_date'] ?? ''),
+                'asset'    => null,
+            ];
+            $sns[$sn] = true;
+        }
+    }
+    $snList = array_keys($sns);
+    $assetMap = [];
+    if ($snList) {
+        $ph = implode(',', array_fill(0, count($snList), '?'));
+        $types = str_repeat('s', count($snList) * 2);
+        $params = array_merge($snList, $snList);
+        try {
+            $res = qr(
+                "SELECT a.id, a.asset_code, a.factory_serial, a.product_id, a.status, p.name pname
+                 FROM assets a JOIN products p ON p.id = a.product_id
+                 WHERE a.asset_code IN ($ph) OR a.factory_serial IN ($ph)",
+                $types,
+                $params
+            );
+            while ($a = $res->fetch_assoc()) {
+                $code = rent_normalize_sn($a['asset_code'] ?? '');
+                $fs = rent_normalize_sn($a['factory_serial'] ?? '');
+                if ($code !== '') {
+                    $assetMap[$code] = $a;
+                }
+                if ($fs !== '') {
+                    $assetMap[$fs] = $a;
+                }
+            }
+        } catch (Throwable $e) {
+            // คิวเช่ายังแสดงได้ แม้จับคู่ผลิตพลาด
+        }
+    }
+    foreach ($rows as $i => $row) {
+        $rows[$i]['asset'] = $assetMap[$row['pro_sn']] ?? null;
+    }
+    return ['ok' => true, 'error' => '', 'rows' => $rows];
+}
+
+/**
+ * คิวรอ MA แบบ cache ต่อ request (ลด query ซ้ำ)
+ *
+ * @return array{ok:bool, error:string, rows:array<int,array<string,mixed>>}
+ */
+function rent_wait_ma_queue_cached($forceRefresh = false)
+{
+    static $cache = null;
+    if ($forceRefresh) {
+        $cache = null;
+        rent_wait_ma_rent_name_product_map(true);
+    }
+    if ($cache === null) {
+        $cache = rent_wait_ma_queue();
+    }
+    return $cache;
+}
+
+/**
+ * แยกคิวรอ MA ของรุ่นหนึ่ง — ลงทะเบียนแล้ว / ยังไม่ลงทะเบียน
+ *
+ * @param int $productId
+ * @return array{ok:bool, error:string, matched:array<int,array<string,mixed>>, unmatched:array<int,array<string,mixed>>}
+ */
+function rent_queue_rows_for_product($productId)
+{
+    $productId = (int)$productId;
+    $empty = ['ok' => true, 'error' => '', 'matched' => [], 'unmatched' => []];
+    if ($productId <= 0) {
+        return $empty;
+    }
+    $product = qr('SELECT id, name FROM products WHERE id=? AND is_active=1', 'i', [$productId])->fetch_assoc();
+    if (!$product) {
+        return ['ok' => false, 'error' => 'ไม่พบรุ่นสินค้า', 'matched' => [], 'unmatched' => []];
+    }
+    $q = rent_wait_ma_queue_cached();
+    if (!$q['ok']) {
+        return ['ok' => false, 'error' => (string)$q['error'], 'matched' => [], 'unmatched' => []];
+    }
+    $matched = [];
+    $unmatched = [];
+    foreach ($q['rows'] as $row) {
+        if (!empty($row['asset']) && (int)$row['asset']['product_id'] === $productId) {
+            $matched[] = $row;
+            continue;
+        }
+        if (empty($row['asset']) && rent_product_name_matches($row['pro_name'], $product['name'])) {
+            $unmatched[] = $row;
+        }
+    }
+    return ['ok' => true, 'error' => '', 'matched' => $matched, 'unmatched' => $unmatched];
+}
+
+/**
+ * นับคิวรอ MA ต่อรุ่นสินค้า (ลงทะเบียนแล้ว + ชื่อตรงรุ่นแต่ยังไม่ลงทะเบียน)
+ *
+ * @return array{ok:bool, error:string, counts:array<int,int>, total_matched:int}
+ */
+function rent_wait_ma_counts_by_product()
+{
+    $q = rent_wait_ma_queue_cached();
+    if (!$q['ok']) {
+        return ['ok' => false, 'error' => $q['error'], 'counts' => [], 'total_matched' => 0];
+    }
+    $counts = [];
+    foreach ($q['rows'] as $row) {
+        if (!empty($row['asset'])) {
+            $pid = (int)$row['asset']['product_id'];
+        } else {
+            $pid = rent_product_id_for_rent_name($row['pro_name']);
+            if ($pid <= 0) {
+                continue;
+            }
+        }
+        $counts[$pid] = ($counts[$pid] ?? 0) + 1;
+    }
+    return [
+        'ok'            => true,
+        'error'         => '',
+        'counts'        => $counts,
+        'total_matched' => array_sum($counts),
+    ];
+}
+
+/**
+ * อ่านข้อมูล S/N ที่เสื่อมสภาพไม่สำเร็จ (ไม่ลบ session — ใช้ร่วมกับ consume หลัง render)
+ *
+ * @return array{serials:string, remark:string, errors:array<int,string>, failed_items:array<int,array{sn:string,reason:string}>, success:int, fail:int}|null
+ */
+function rent_bulk_retire_pending_peek()
+{
+    static $state = null;
+    static $loaded = false;
+    if (!$loaded) {
+        $loaded = true;
+        if (isset($_SESSION['bulk_retire_pending']) && is_array($_SESSION['bulk_retire_pending'])) {
+            $state = $_SESSION['bulk_retire_pending'];
+        }
+    }
+    return $state;
+}
+
+/**
+ * ลบข้อมูล pending หลังบันทึกสำเร็จครบทุกรายการ
+ *
+ * @return void
+ */
+function rent_bulk_retire_pending_clear()
+{
+    unset($_SESSION['bulk_retire_pending']);
+}
+
+/**
+ * เก็บ S/N ที่เสื่อมสภาพไม่สำเร็จไว้ใน session สำหรับแสดงในฟอร์มรอบถัดไป
+ *
+ * @param array{serials:string, remark:string, errors?:array<int,string>, failed_items?:array<int,array{sn:string,reason:string}>, success:int, fail:int} $data
+ * @return void
+ */
+function rent_bulk_retire_pending_save(array $data)
+{
+    $_SESSION['bulk_retire_pending'] = $data;
+}
+
+/**
+ * รวมข้อความสาเหตุที่เสื่อมสภาพไม่สำเร็จ
+ *
+ * @param array<int,string> $parts ข้อความจากขั้นตอนก่อนหน้า
+ * @param string $extraReason ข้อความจากขั้นตอนที่ล้มเหลว
+ * @return string
+ */
+function rent_bulk_retire_fail_reason(array $parts, $extraReason = '')
+{
+    $reasonParts = $parts;
+    $extraReason = trim((string)$extraReason);
+    if ($extraReason !== '') {
+        $reasonParts[] = $extraReason;
+    }
+    $reasonParts = array_values(array_filter($reasonParts, static function ($p) {
+        return trim((string)$p) !== '';
+    }));
+    return $reasonParts ? implode(' · ', $reasonParts) : 'บันทึกไม่สำเร็จ';
+}
+
+/**
+ * HTML ตารางสาเหตุที่เสื่อมสภาพไม่สำเร็จ
+ *
+ * @param array<int,array{sn:string,reason:string}> $items
+ * @param int $maxHeight ความสูงสูงสุดของกล่อง scroll (px)
+ * @return string
+ */
+function rent_bulk_retire_fail_table_html(array $items, $maxHeight = 260)
+{
+    if (!$items) {
+        return '';
+    }
+    ob_start();
+    ?>
+    <div class="bulk-retire-fail-wrap" style="max-height:<?= (int)$maxHeight ?>px; overflow:auto; border:1px solid #f0bcbc; border-radius:6px; background:#fff8f8">
+      <table class="tbl bulk-retire-fail-tbl" style="margin:0; font-size:13px">
+        <thead>
+          <tr>
+            <th style="width:34%">หมายเลขสินค้า</th>
+            <th>สาเหตุที่ไม่สำเร็จ</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($items as $item) { ?>
+          <tr>
+            <td><code><?= h((string)($item['sn'] ?? '')) ?></code></td>
+            <td><?= h((string)($item['reason'] ?? '')) ?></td>
+          </tr>
+          <?php } ?>
+        </tbody>
+      </table>
+    </div>
+    <?php
+    return ob_get_clean();
+}
+
+/**
+ * แบนเนอร์สรุปรายการเสื่อมสภาพที่ไม่สำเร็จ (แสดงด้านบนหน้า MA)
+ *
+ * @return string
+ */
+function rent_bulk_retire_pending_alert_html()
+{
+    if (!function_exists('can') || !can('ma')) {
+        return '';
+    }
+    $pending = rent_bulk_retire_pending_peek();
+    if (!is_array($pending) || trim((string)($pending['serials'] ?? '')) === '') {
+        return '';
+    }
+    $items = rent_bulk_retire_pending_items($pending);
+    if (!$items) {
+        return '';
+    }
+    $success = (int)($pending['success'] ?? 0);
+    $fail = (int)($pending['fail'] ?? 0);
+    return '<div class="flash flash-err" style="margin:0 0 14px">'
+        . '<div style="font-weight:600; margin-bottom:6px">เสื่อมสภาพไม่สำเร็จ ' . number_format($fail) . ' รายการ'
+        . ($success > 0 ? ' · สำเร็จแล้ว ' . number_format($success) . ' รายการ' : '')
+        . '</div>'
+        . '<p class="muted" style="margin:0 0 8px">หมายเลขที่ไม่สำเร็จยังอยู่ในช่องกรอกด้านล่าง — แก้ไขตามสาเหตุแล้วกดบันทึกอีกครั้ง</p>'
+        . rent_bulk_retire_fail_table_html($items, 320)
+        . '</div>';
+}
+
+/**
+ * แปลงข้อมูล pending เป็นรายการ {sn, reason}
+ *
+ * @param array<string,mixed> $pending
+ * @return array<int,array{sn:string,reason:string}>
+ */
+function rent_bulk_retire_pending_items(array $pending)
+{
+    if (!empty($pending['failed_items']) && is_array($pending['failed_items'])) {
+        $items = [];
+        foreach ($pending['failed_items'] as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $sn = rent_normalize_sn((string)($row['sn'] ?? ''));
+            $reason = trim((string)($row['reason'] ?? ''));
+            if ($sn === '') {
+                continue;
+            }
+            $items[] = ['sn' => $sn, 'reason' => $reason !== '' ? $reason : 'บันทึกไม่สำเร็จ'];
+        }
+        if ($items) {
+            return $items;
+        }
+    }
+    $items = [];
+    $errors = !empty($pending['errors']) && is_array($pending['errors']) ? $pending['errors'] : [];
+    foreach ($errors as $line) {
+        $line = trim((string)$line);
+        if ($line === '') {
+            continue;
+        }
+        if (preg_match('/^(.+?)\s*—\s*(.+)$/u', $line, $m)) {
+            $items[] = ['sn' => rent_normalize_sn($m[1]), 'reason' => trim($m[2])];
+        } else {
+            $items[] = ['sn' => '', 'reason' => $line];
+        }
+    }
+    return $items;
+}
+
+/**
+ * ปุ่มเปิด/ปิดฟอร์มเสื่อมสภาพหลาย S/N
+ *
+ * @return string
+ */
+function rent_bulk_retire_btn_html()
+{
+    if (!function_exists('can') || !can('ma')) {
+        return '';
+    }
+    $pending = rent_bulk_retire_pending_peek();
+    $hasPending = is_array($pending) && trim((string)($pending['serials'] ?? '')) !== '';
+    $label = $hasPending ? '✕ ปิดฟอร์มเสื่อมสภาพ' : '➕ บันทึกเสื่อมสภาพหลาย S/N';
+    return '<button type="button" class="btn btn-retire" id="retire-bulk-btn" aria-expanded="' . ($hasPending ? 'true' : 'false') . '"'
+        . ' onclick="rentBulkRetireToggle()">'
+        . h($label) . '</button>';
+}
+
+/**
+ * JavaScript เปิด/ปิดฟอร์ม bulk retire (แสดงครั้งเดียวต่อหน้า)
+ *
+ * @return string
+ */
+function rent_bulk_retire_ui_script_html()
+{
+    static $done = false;
+    if ($done) {
+        return '';
+    }
+    $done = true;
+    return <<<'HTML'
+<script>
+function rentBulkRetireToggle() {
+  var wrap = document.getElementById('retire-bulk-wrap');
+  var btn = document.getElementById('retire-bulk-btn');
+  if (!wrap || !btn) return;
+  var willOpen = wrap.hidden;
+  wrap.hidden = !willOpen;
+  btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+  btn.textContent = willOpen ? '✕ ปิดฟอร์มเสื่อมสภาพ' : '➕ บันทึกเสื่อมสภาพหลาย S/N';
+}
+</script>
+HTML;
+}
+
+/**
+ * ฟอร์มเสื่อมสภาพหลาย S/N (ซ่อนจนกว่าจะกดปุ่ม)
+ *
+ * @param int $productId รหัสรุ่น (ใช้ redirect หลังเคลียร์รายการค้าง)
+ * @return string
+ */
+function rent_bulk_retire_panel_html($productId = 0)
+{
+    if (!function_exists('can') || !can('ma')) {
+        return '';
+    }
+    $pending = rent_bulk_retire_pending_peek();
+    $hasPending = is_array($pending) && trim((string)($pending['serials'] ?? '')) !== '';
+    $serialsVal = $hasPending ? (string)$pending['serials'] : '';
+    $remarkVal = $hasPending ? (string)($pending['remark'] ?? '') : '';
+    $failedItems = $hasPending ? rent_bulk_retire_pending_items($pending) : [];
+    $pendingSuccess = $hasPending ? (int)($pending['success'] ?? 0) : 0;
+    $pendingFail = $hasPending ? (int)($pending['fail'] ?? 0) : 0;
+    ob_start();
+    ?>
+    <div id="retire-bulk-wrap"<?= $hasPending ? '' : ' hidden' ?>>
+      <form method="post" class="panel" id="bulk-retire-form" style="margin-bottom:16px" action="<?= h(BASE_URL . '/ma.php' . ($productId > 0 ? '?product=' . (int)$productId : '')) ?>">
+        <?= csrf_field() ?>
+        <input type="hidden" name="bulk_retire_ma" value="1">
+        <?php if ($productId > 0) { ?>
+        <input type="hidden" name="bulk_retire_product" value="<?= (int)$productId ?>">
+        <?php } ?>
+        <h3 style="margin:0 0 6px; font-size:15px">บันทึกเสื่อมสภาพหลาย S/N</h3>
+        <p class="muted" style="margin:0 0 8px">บรรทัดละ 1 หมายเลขสินค้า · สถานะเครื่องในผลิต = เช่า · หมายเหตุเสื่อมสภาพ · ปิดงานเช่าเป็น Asset Retirement</p>
+        <?php if ($hasPending) { ?>
+        <div class="flash flash-err" style="margin:0 0 10px">
+          บันทึกสำเร็จ <?= number_format($pendingSuccess) ?> รายการ · ไม่สำเร็จ <?= number_format($pendingFail) ?> รายการ
+          — หมายเลขที่ไม่สำเร็จยังอยู่ในช่องด้านล่าง แก้ไขแล้วกดบันทึกอีกครั้ง
+        </div>
+        <?php if ($failedItems) { ?>
+        <div style="margin:0 0 10px">
+          <div style="font-weight:600; margin-bottom:6px; font-size:13px">รายการที่บันทึกไม่สำเร็จ</div>
+          <?= rent_bulk_retire_fail_table_html($failedItems, 220) ?>
+        </div>
+        <?php } ?>
+        <?php } ?>
+        <label for="bulk_serials">หมายเลขสินค้า</label>
+        <textarea name="bulk_serials" id="bulk_serials" rows="6" class="full" placeholder="BS22120047&#10;BS22120048" required><?= h($serialsVal) ?></textarea>
+        <label for="bulk_remark" style="margin-top:8px; display:block">หมายเหตุรวม</label>
+        <textarea name="bulk_remark" id="bulk_remark" rows="2" class="full" placeholder="เสื่อมสภาพ — รายละเอียดเพิ่มเติม"><?= h($remarkVal) ?></textarea>
+        <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px; align-items:center">
+          <button type="submit" class="btn btn-retire" onclick="return confirm('บันทึกเสื่อมสภาพตาม S/N ที่กรอก?');">บันทึกเสื่อมสภาพ</button>
+          <button type="submit" class="btn" name="bulk_retire_clear_ma" value="1" formnovalidate
+            onclick="return confirm('ล้างรายการที่ค้างและเริ่มกรอกใหม่?');">เคลียร์รายการ</button>
+        </div>
+      </form>
+    </div>
+    <?= rent_bulk_retire_ui_script_html() ?>
+    <?php
+    return ob_get_clean();
+}
+
+/**
+ * HTML ปุ่ม + ฟอร์มเสื่อมสภาพหลาย S/N (ใช้หน้าเลือกรุ่น)
+ *
+ * @return string
+ */
+function rent_bulk_retire_form_html()
+{
+    if (!function_exists('can') || !can('ma')) {
+        return '';
+    }
+    return '<div style="margin-bottom:10px">' . rent_bulk_retire_btn_html() . '</div>' . rent_bulk_retire_panel_html();
+}
+function rent_close_wait_ma($sn, $status, $remarks, $user, $dateYmd = '')
+{
+    $sn = rent_normalize_sn($sn);
+    if ($sn === '') {
+        return ['ok' => false, 'code' => 'empty', 'message' => 'ไม่มีหมายเลขสินค้า'];
+    }
+    if (!in_array($status, ['finished goods', 'Asset Retirement'], true)) {
+        return ['ok' => false, 'code' => 'status', 'message' => 'สถานะปิดงานเช่าไม่ถูกต้อง'];
+    }
+    $conn = dbLeasing();
+    if (!$conn) {
+        return ['ok' => false, 'code' => 'db', 'message' => dbLeasingError()];
+    }
+    if ($dateYmd === '') {
+        $dateYmd = date('Y-m-d');
+    }
+    $remarks = (string)$remarks;
+    $user = (string)$user;
+    $productName = '';
+    $pId = 0;
+
+    $found = rent_q_try(
+        'SELECT pro_name, pro_status FROM tbl_product WHERE pro_sn = ? LIMIT 1',
+        's',
+        [$sn]
+    );
+    if (!$found['ok']) {
+        return ['ok' => false, 'code' => 'sql', 'message' => (string)($found['error'] ?? 'อ่านสินค้าเช่าไม่สำเร็จ')];
+    }
+    $prod = (!empty($found['result'])) ? $found['result']->fetch_assoc() : null;
+    if (!$prod) {
+        return ['ok' => false, 'code' => 'not_found', 'message' => 'ไม่พบ S/N ' . $sn . ' ในระบบเช่า'];
+    }
+    if ((string)$prod['pro_status'] !== 'MA') {
+        return [
+            'ok'      => true,
+            'code'    => 'skip_not_ma',
+            'message' => 'S/N ' . $sn . ' ไม่ได้อยู่ในคิวรอ MA (สถานะ ' . (string)$prod['pro_status'] . ')',
+        ];
+    }
+    $productName = (string)$prod['pro_name'];
+
+    $pidQ = rent_q_try(
+        "SELECT p_id FROM tbl_rent_product WHERE p_sn = ? AND p_status = 'MA' ORDER BY p_id DESC LIMIT 1",
+        's',
+        [$sn]
+    );
+    if ($pidQ['ok'] && !empty($pidQ['result'])) {
+        $pr = $pidQ['result']->fetch_assoc();
+        if ($pr) {
+            $pId = (int)$pr['p_id'];
+        }
+    }
+
+    if (!$conn->begin_transaction()) {
+        return ['ok' => false, 'code' => 'sql', 'message' => 'เริ่ม transaction ระบบเช่าไม่สำเร็จ'];
+    }
+
+    $ins = $conn->prepare(
+        'INSERT INTO tbl_product_ma (ma_p_id, ma_date, ma_product, ma_sn, ma_remarks, ma_status, ma_user_add)
+         VALUES (?, ?, ?, ?, ?, ?, ?)'
+    );
+    if (!$ins) {
+        $conn->rollback();
+        return ['ok' => false, 'code' => 'sql', 'message' => $conn->error ?: 'เตรียมบันทึกประวัติซ่อมไม่สำเร็จ'];
+    }
+    $ins->bind_param('issssss', $pId, $dateYmd, $productName, $sn, $remarks, $status, $user);
+    if (!$ins->execute()) {
+        $err = $ins->error;
+        $ins->close();
+        $conn->rollback();
+        return ['ok' => false, 'code' => 'sql', 'message' => $err ?: 'บันทึกประวัติซ่อมไม่สำเร็จ'];
+    }
+    $ins->close();
+
+    if ($pId > 0) {
+        $upRent = $conn->prepare("UPDATE tbl_rent_product SET p_status = 'received' WHERE p_id = ?");
+        if (!$upRent) {
+            $conn->rollback();
+            return ['ok' => false, 'code' => 'sql', 'message' => $conn->error ?: 'อัปเดตสัญญาเช่าไม่สำเร็จ'];
+        }
+        $upRent->bind_param('i', $pId);
+        if (!$upRent->execute()) {
+            $err = $upRent->error;
+            $upRent->close();
+            $conn->rollback();
+            return ['ok' => false, 'code' => 'sql', 'message' => $err ?: 'อัปเดตสัญญาเช่าไม่สำเร็จ'];
+        }
+        $upRent->close();
+    }
+
+    $upPro = $conn->prepare('UPDATE tbl_product SET pro_status = ? WHERE pro_sn = ? AND pro_status = ?');
+    if (!$upPro) {
+        $conn->rollback();
+        return ['ok' => false, 'code' => 'sql', 'message' => $conn->error ?: 'อัปเดตสถานะสินค้าไม่สำเร็จ'];
+    }
+    $from = 'MA';
+    $upPro->bind_param('sss', $status, $sn, $from);
+    if (!$upPro->execute()) {
+        $err = $upPro->error;
+        $upPro->close();
+        $conn->rollback();
+        return ['ok' => false, 'code' => 'sql', 'message' => $err ?: 'อัปเดตสถานะสินค้าไม่สำเร็จ'];
+    }
+    if ($upPro->affected_rows < 1) {
+        $upPro->close();
+        $conn->rollback();
+        return ['ok' => false, 'code' => 'skip_not_ma', 'message' => 'S/N ' . $sn . ' ไม่ได้อยู่ในคิวรอ MA แล้ว'];
+    }
+    $upPro->close();
+
+    if (!$conn->commit()) {
+        $conn->rollback();
+        return ['ok' => false, 'code' => 'sql', 'message' => 'commit ระบบเช่าไม่สำเร็จ'];
+    }
+
+    $label = ($status === 'Asset Retirement') ? 'เสื่อมสภาพ' : 'finished goods';
+    return [
+        'ok'      => true,
+        'code'    => 'closed',
+        'message' => 'ปิดงานเช่าสำเร็จ — ' . $label . ' (S/N ' . $sn . ')',
+    ];
+}
+
+/**
+ * ใส่คำว่าเสื่อมสภาพในหมายเหตุ ถ้ายังไม่มี
+ *
+ * @param string $remark
+ * @return string
+ */
+function rent_ensure_retire_remark($remark)
+{
+    $remark = trim((string)$remark);
+    if ($remark === '') {
+        return 'เสื่อมสภาพ';
+    }
+    $remark = preg_replace('/\s+/u', ' ', $remark);
+    if (mb_strpos($remark, 'เสื่อมสภาพ') === false) {
+        return 'เสื่อมสภาพ · ' . preg_replace('/\s+/u', ' ', $remark);
+    }
+    return preg_replace('/\s+/u', ' ', $remark);
+}
+
+/**
+ * ปิดงานเช่าหลังบันทึก MA เครื่องเดียว
+ *
+ * @param string $sn
+ * @param string $action close_fg|retire|keep
+ * @param string|null $replace
+ * @param string|null $repair
+ * @param string $fw
+ * @param string $remark
+ * @return array{ok:bool, code:string, message:string, action:string}
+ */
+function rent_apply_after_ma_save($sn, $action, $replace, $repair, $fw, $remark)
+{
+    $action = (string)$action;
+    if (!in_array($action, ['close_fg', 'retire', 'keep'], true)) {
+        $action = 'close_fg';
+    }
+    if ($action === 'keep') {
+        return [
+            'ok'      => true,
+            'code'    => 'keep',
+            'action'  => $action,
+            'message' => 'ยังไม่ปิดคิวรอ MA ในระบบเช่า',
+        ];
+    }
+    $status = ($action === 'retire') ? 'Asset Retirement' : 'finished goods';
+    $remarks = ($action === 'retire')
+        ? rent_ensure_retire_remark($remark)
+        : ma_rental_office_summary($replace, $repair, $fw, $remark);
+    $res = rent_close_wait_ma($sn, $status, $remarks, actor_name());
+    $res['action'] = $action;
+    return $res;
+}
+
+/**
+ * ปิดงานเช่าหลังบันทึก MA — ลอง asset_code แล้ว fallback factory_serial
+ *
+ * @param array<string,mixed> $asset แถว assets
+ * @param string $action close_fg|retire|keep
+ * @param string|null $replace
+ * @param string|null $repair
+ * @param string $fw
+ * @param string $remark
+ * @return array{ok:bool, code:string, message:string, action:string}
+ */
+function rent_apply_after_ma_save_for_asset(array $asset, $action, $replace, $repair, $fw, $remark)
+{
+    $code = (string)($asset['asset_code'] ?? '');
+    $fs = (string)($asset['factory_serial'] ?? '');
+    $res = rent_apply_after_ma_save($code, $action, $replace, $repair, $fw, $remark);
+    if (($res['code'] ?? '') === 'not_found'
+        && rent_normalize_sn($fs) !== ''
+        && rent_normalize_sn($fs) !== rent_normalize_sn($code)) {
+        $res = rent_apply_after_ma_save($fs, $action, $replace, $repair, $fw, $remark);
+    }
+    return $res;
+}
+
+/**
+ * บันทึก ma_records แบบย่อสำหรับเสื่อมสภาพ
+ *
+ * @param array<string,mixed> $asset
+ * @param string $remark
+ * @return array{ok:bool, message:string}
+ */
+function rent_insert_retire_ma_record(array $asset, $remark)
+{
+    $assetId = (int)($asset['id'] ?? 0);
+    if ($assetId <= 0) {
+        return ['ok' => false, 'message' => 'ไม่พบเครื่องในทะเบียนผลิต'];
+    }
+    $roundAlloc = ma_round_lock_acquire($assetId);
+    if (!$roundAlloc['ok']) {
+        return ['ok' => false, 'message' => (string)($roundAlloc['error'] ?? 'ล็อกรอบ MA ไม่สำเร็จ')];
+    }
+    $lockKey = (string)$roundAlloc['lock_key'];
+    $round = (int)$roundAlloc['round'];
+    $visited = date('Y-m-d H:i:s');
+    $remark = rent_ensure_retire_remark($remark);
+    $doneBy = actor_name();
+    $result = 'ok';
+    $machineStatus = 'rental';
+    try {
+        $ins = q_try(
+            'INSERT INTO ma_records (asset_id,ma_round,visited_at,result,ok_items,replace_items,repair_items,fw_version,machine_status,remark,done_by)
+             VALUES (?,?,?,?,NULL,NULL,NULL,NULL,?,?,?)',
+            'iisssss',
+            [$assetId, $round, $visited, $result, $machineStatus, $remark, $doneBy]
+        );
+        if (empty($ins['ok'])) {
+            return ['ok' => false, 'message' => (string)($ins['error'] ?? 'บันทึก MA ผลิตไม่สำเร็จ')];
+        }
+        q('UPDATE assets SET status=? WHERE id=?', 'si', ['rental', $assetId]);
+        return ['ok' => true, 'message' => 'บันทึก MA ผลิตแล้ว (เช่า + หมายเหตุเสื่อมสภาพ)'];
+    } finally {
+        ma_round_lock_release($lockKey);
+    }
+}
+
+/**
+ * เสื่อมสภาพหลาย S/N ในครั้งเดียว
+ *
+ * @param array<int,string> $serials
+ * @param string $remark
+ * @return array{ok:bool, success:int, fail:int, messages:array<int,string>, failed_serials:array<int,string>, failed_messages:array<int,string>, failed_items:array<int,array{sn:string,reason:string}>}
+ */
+function rent_bulk_retire(array $serials, $remark)
+{
+    $success = 0;
+    $fail = 0;
+    $messages = [];
+    $failedSerials = [];
+    $failedMessages = [];
+    $failedItems = [];
+    foreach ($serials as $sn) {
+        $sn = rent_normalize_sn($sn);
+        if ($sn === '') {
+            continue;
+        }
+        $parts = [];
+        $asset = rent_find_asset_by_sn($sn);
+        if ($asset) {
+            $prod = rent_insert_retire_ma_record($asset, $remark);
+            $parts[] = $prod['ok'] ? $prod['message'] : ('ผลิต: ' . $prod['message']);
+            if (!$prod['ok']) {
+                $fail++;
+                $reason = rent_bulk_retire_fail_reason($parts);
+                $line = $sn . ' — ' . $reason;
+                $messages[] = $line;
+                $failedSerials[] = $sn;
+                $failedMessages[] = $line;
+                $failedItems[] = ['sn' => $sn, 'reason' => $reason];
+                continue;
+            }
+        } else {
+            $parts[] = 'ไม่พบในทะเบียนผลิต';
+        }
+        $rent = rent_close_wait_ma($sn, 'Asset Retirement', rent_ensure_retire_remark($remark), actor_name());
+        if ($rent['ok'] && $rent['code'] === 'closed') {
+            $success++;
+            $parts[] = $rent['message'];
+            $messages[] = $sn . ' — ' . implode(' · ', $parts);
+        } elseif ($rent['ok'] && $rent['code'] === 'skip_not_ma') {
+            $fail++;
+            $reason = rent_bulk_retire_fail_reason($parts, (string)$rent['message']);
+            $line = $sn . ' — ' . $reason;
+            $messages[] = $line;
+            $failedSerials[] = $sn;
+            $failedMessages[] = $line;
+            $failedItems[] = ['sn' => $sn, 'reason' => $reason];
+        } else {
+            $fail++;
+            $reason = rent_bulk_retire_fail_reason($parts, (string)$rent['message']);
+            $line = $sn . ' — ' . $reason;
+            $messages[] = $line;
+            $failedSerials[] = $sn;
+            $failedMessages[] = $line;
+            $failedItems[] = ['sn' => $sn, 'reason' => $reason];
+        }
+    }
+    return [
+        'ok'              => $fail === 0 && $success > 0,
+        'success'         => $success,
+        'fail'            => $fail,
+        'messages'        => $messages,
+        'failed_serials'  => $failedSerials,
+        'failed_messages' => $failedMessages,
+        'failed_items'    => $failedItems,
+    ];
+}
+
+/**
+ * ลงทะเบียน S/N จากคิวเช่าเข้าระบบผลิต (เครื่องเก่าที่ยังไม่มีใน assets)
+ *
+ * @param int    $productId
+ * @param string $sn
+ * @param string $note
+ * @return array{ok:bool, asset_id?:int, message:string}
+ */
+function rent_register_single_asset($productId, $sn, $note = '')
+{
+    $productId = (int)$productId;
+    $sn = rent_normalize_sn($sn);
+    if ($sn === '') {
+        return ['ok' => false, 'message' => 'ไม่มีหมายเลขสินค้า'];
+    }
+    $p = qr('SELECT id, name, code_mode FROM products WHERE id=? AND is_active=1', 'i', [$productId])->fetch_assoc();
+    if (!$p) {
+        return ['ok' => false, 'message' => 'ไม่พบรุ่นสินค้า'];
+    }
+    if (qr('SELECT id FROM assets WHERE asset_code=? OR factory_serial=?', 'ss', [$sn, $sn])->fetch_assoc()) {
+        return ['ok' => false, 'message' => 'S/N ' . $sn . ' มีในทะเบียนผลิตแล้ว'];
+    }
+    $lease = rent_q_try('SELECT pro_name, pro_status, pro_date FROM tbl_product WHERE pro_sn = ? LIMIT 1', 's', [$sn]);
+    if (!$lease['ok']) {
+        return ['ok' => false, 'message' => (string)($lease['error'] ?? 'อ่านระบบเช่าไม่สำเร็จ')];
+    }
+    $row = (!empty($lease['result'])) ? $lease['result']->fetch_assoc() : null;
+    if (!$row) {
+        return ['ok' => false, 'message' => 'ไม่พบ S/N ' . $sn . ' ในระบบเช่า'];
+    }
+    if ((string)$row['pro_status'] !== 'MA') {
+        return ['ok' => false, 'message' => 'S/N ' . $sn . ' ไม่ได้อยู่ในคิวรอ MA'];
+    }
+    if (!rent_product_name_matches($row['pro_name'], $p['name'])) {
+        return ['ok' => false, 'message' => 'S/N ' . $sn . ' ไม่ใช่รุ่น ' . $p['name'] . ' ในระบบเช่า'];
+    }
+    $producedDate = rent_lease_produced_date($row['pro_date'] ?? '');
+    $note = trim((string)$note);
+    if ($note === '') {
+        $note = 'ลงทะเบียนจากคิวรอ MA ระบบเช่า (S/N เก่า)';
+        if ($producedDate !== date('Y-m-d')) {
+            $note .= ' · วันที่บันทึกเช่า ' . $producedDate;
+        }
+    }
+    if ($p['code_mode'] === 'factory_serial') {
+        $r = create_produced_asset($productId, $producedDate, $sn, $note, null);
+        if (isset($r['error'])) {
+            return ['ok' => false, 'message' => (string)$r['error']];
+        }
+        $aid = (int)$r['asset_id'];
+        q("UPDATE assets SET status='rental' WHERE id=?", 'i', [$aid]);
+        share_upsert_asset($aid);
+        return ['ok' => true, 'asset_id' => $aid, 'message' => 'ลงทะเบียน ' . $sn . ' แล้ว'];
+    }
+    $ins = q_try(
+        "INSERT INTO assets (asset_code, factory_serial, product_id, produced_at, status, note) VALUES (?,?,?,?,?,?)",
+        'ssisss',
+        [$sn, $sn, $productId, $producedDate, 'rental', $note]
+    );
+    if (empty($ins['ok'])) {
+        return ['ok' => false, 'message' => db_error_user_message((int)($ins['errno'] ?? 0), (string)($ins['error'] ?? 'บันทึกไม่สำเร็จ'))];
+    }
+    $aid = (int)($ins['insert_id'] ?? 0);
+    if ($aid <= 0) {
+        return ['ok' => false, 'message' => 'บันทึกเครื่องไม่สำเร็จ'];
+    }
+    share_upsert_asset($aid);
+    return ['ok' => true, 'asset_id' => $aid, 'message' => 'ลงทะเบียน ' . $sn . ' แล้ว'];
+}
+
+/**
+ * ลงทะเบียน S/N หลายรายการจากคิวเช่า
+ *
+ * @param int              $productId
+ * @param array<int,string> $serials
+ * @param string           $note
+ * @return array{ok:bool, success:int, fail:int, messages:array<int,string>}
+ */
+function rent_register_assets_to_product($productId, array $serials, $note = '')
+{
+    $success = 0;
+    $fail = 0;
+    $messages = [];
+    $seen = [];
+    foreach ($serials as $sn) {
+        $sn = rent_normalize_sn($sn);
+        if ($sn === '' || isset($seen[$sn])) {
+            continue;
+        }
+        $seen[$sn] = true;
+        $res = rent_register_single_asset($productId, $sn, $note);
+        if ($res['ok']) {
+            $success++;
+        } else {
+            $fail++;
+        }
+        $messages[] = $res['message'];
+        if ($success + $fail >= 150) {
+            $messages[] = '…หยุดที่ 150 รายการต่อครั้ง';
+            break;
+        }
+    }
+    rent_wait_ma_queue_cached(true);
+    return [
+        'ok'       => $fail === 0 && $success > 0,
+        'success'  => $success,
+        'fail'     => $fail,
+        'messages' => $messages,
+    ];
+}
+
+/**
+ * HTML แผงคิวรอ MA + ฟอร์มเสื่อมสภาพหลาย S/N
+ *
+ * @param int $productId กรองเฉพาะรุ่นนี้
+ * @return string
+ */
+function rent_wait_ma_panel_html($productId)
+{
+    $productId = (int)$productId;
+    if ($productId <= 0) {
+        return '';
+    }
+    $split = rent_queue_rows_for_product($productId);
+    if (!$split['ok']) {
+        ob_start();
+        ?>
+        <div class="panel" style="margin-bottom:16px">
+          <h3 class="h-with-icon" style="margin:0 0 8px"><?= function_exists('ui_icon_html') ? ui_icon_html('wrench', 15, 'h-svg') : '' ?><span>คิวรอ MA จากระบบเช่า — <?= h($split['error']) ?></span></h3>
+          <p class="muted" style="margin:0">ยังเชื่อมระบบเช่าไม่ได้ · บันทึก MA ในผลิตใช้ได้ตามเดิม</p>
+        </div>
+        <?php
+        return ob_get_clean();
+    }
+    $matched = $split['matched'];
+    $unmatched = $split['unmatched'];
+    if (!$matched && !$unmatched) {
+        return '';
+    }
+    ob_start();
+    ?>
+    <div class="panel" style="margin-bottom:16px">
+      <h3 class="h-with-icon" style="margin:0 0 8px"><?= function_exists('ui_icon_html') ? ui_icon_html('wrench', 15, 'h-svg') : '' ?><span>คิวรอ MA จากระบบเช่า (รุ่นนี้)</span></h3>
+      <?php if ($matched) { ?>
+        <p class="muted" style="margin:0 0 8px"><?= number_format(count($matched)) ?> รายการลงทะเบียนแล้ว · กดรหัสเครื่องเพื่อเปิดฟอร์ม MA</p>
+        <div class="table-wrap" style="margin-bottom:12px">
+          <table class="list" style="margin:0">
+            <tr><th>S/N</th><th>สินค้า (เช่า)</th><th>วันที่บันทึกเช่า</th><th>สถานะผลิต</th></tr>
+            <?php foreach ($matched as $row) {
+                $a = $row['asset'];
+                $st = rent_asset_status_label($a['status'] ?? '');
+                ?>
+            <tr>
+              <td><a href="<?= h(BASE_URL . '/ma.php?product=' . (int)$a['product_id'] . '&record=' . (int)$a['id']) ?>"><b><?= h($row['pro_sn']) ?></b></a></td>
+              <td><?= h($row['pro_name']) ?></td>
+              <td style="white-space:nowrap"><?= function_exists('dthai') ? dthai($row['pro_date'] ?? '') : h($row['pro_date'] ?? '') ?></td>
+              <td class="muted">พบในทะเบียนผลิต<?= $st !== '' ? ' · ' . h($st) : '' ?></td>
+            </tr>
+            <?php } ?>
+          </table>
+        </div>
+      <?php } ?>
+
+      <?php if ($unmatched && function_exists('can') && can('ma')) { ?>
+        <h4 style="margin:12px 0 6px; font-size:14px">ยังไม่ลงทะเบียนผลิต (S/N เก่าจากระบบเช่า)</h4>
+        <p class="muted" style="margin:0 0 8px"><?= number_format(count($unmatched)) ?> รายการ · เลือกแล้วกดลงทะเบียน — วันที่ผลิตจะใช้ตามวันที่บันทึกเข้าระบบเช่า</p>
+        <form method="post" onsubmit="return confirm('ลงทะเบียน S/N ที่เลือกเข้าระบบผลิต?');">
+          <?= csrf_field() ?>
+          <input type="hidden" name="register_rent_assets" value="1">
+          <input type="hidden" name="product_id" value="<?= (int)$productId ?>">
+          <div class="table-wrap">
+            <table class="list" style="margin:0">
+              <tr>
+                <th style="width:36px"><input type="checkbox" id="rent-reg-all" checked title="เลือกทั้งหมด"></th>
+                <th>S/N</th><th>สินค้า (เช่า)</th><th>วันที่บันทึกเช่า</th>
+              </tr>
+              <?php foreach ($unmatched as $row) { ?>
+              <tr>
+                <td><input type="checkbox" class="rent-reg-sn" name="register_sns[]" value="<?= h($row['pro_sn']) ?>" checked></td>
+                <td><b><?= h($row['pro_sn']) ?></b></td>
+                <td><?= h($row['pro_name']) ?></td>
+                <td style="white-space:nowrap"><?= function_exists('dthai') ? dthai($row['pro_date'] ?? '') : h($row['pro_date'] ?? '') ?></td>
+              </tr>
+              <?php } ?>
+            </table>
+          </div>
+          <div style="margin-top:10px">
+            <button type="submit" class="btn btn-line">ลงทะเบียนทะเบียนผลิตที่เลือก</button>
+          </div>
+        </form>
+        <script>
+        (function(){
+          var all = document.getElementById('rent-reg-all');
+          if (!all) return;
+          all.addEventListener('change', function(){
+            document.querySelectorAll('.rent-reg-sn').forEach(function(el){ el.checked = all.checked; });
+          });
+        })();
+        </script>
+      <?php } elseif ($unmatched) { ?>
+        <p class="muted" style="margin:12px 0 0"><?= number_format(count($unmatched)) ?> รายการยังไม่ลงทะเบียนผลิต — ต้องมีสิทธิ์ MA</p>
+      <?php } ?>
+    </div>
+    <?php
+    return ob_get_clean();
+}
+
+/**
+ * ตรวจว่าวันที่จากระบบเช่าใช้แสดงผลได้หรือไม่
+ *
+ * @param mixed $date
+ * @return bool
+ */
+function rent_leasing_valid_date($date)
+{
+    $d = trim((string) $date);
+    return $d !== '' && $d !== '0000-00-00' && strpos($d, '0000-00-00') !== 0;
+}
+
+/**
+ * ป้ายสถานะเช่า (รวม pro_status + p_status) เป็นภาษาไทย
+ *
+ * @param string $proStatus tbl_product.pro_status
+ * @param string $pStatus   tbl_rent_product.p_status ล่าสุด
+ * @return string
+ */
+function rent_leasing_status_label($proStatus, $pStatus)
+{
+    $pro = trim((string) $proStatus);
+    $p = trim((string) $pStatus);
+    if ($p === 'active') {
+        return 'ใช้งานอยู่กับลูกค้า';
+    }
+    if ($pro === 'MA' || $p === 'MA') {
+        return 'รอซ่อม MA';
+    }
+    if ($pro === 'Asset Retirement') {
+        return 'เสื่อมสภาพ';
+    }
+    if ($pro === 'claim' || $p === 'claim') {
+        return 'เคลม';
+    }
+    if ($pro === 'Awaiting Return') {
+        return 'รอส่งคืน';
+    }
+    if ($pro === 'finished goods') {
+        return 'คลังพร้อมเช่า';
+    }
+    if ($pro === 'rent') {
+        return 'ปล่อยเช่า (ไม่ active)';
+    }
+    if ($pro === 'sale') {
+        return 'ขายขาด';
+    }
+    if ($pro === 'Lost') {
+        return 'สูญหาย';
+    }
+    if ($p === 'received') {
+        return 'รับคืนแล้ว';
+    }
+    if ($pro !== '') {
+        return $pro;
+    }
+    return $p !== '' ? $p : '—';
+}
+
+/**
+ * class CSS ของ badge สถานะเช่า
+ *
+ * @param string $proStatus
+ * @param string $pStatus
+ * @return string
+ */
+function rent_leasing_status_badge_class($proStatus, $pStatus)
+{
+    $pro = trim((string) $proStatus);
+    $p = trim((string) $pStatus);
+    if ($p === 'active') {
+        return 'asset-rent-badge-active';
+    }
+    if ($pro === 'MA' || $p === 'MA') {
+        return 'asset-rent-badge-ma';
+    }
+    if ($pro === 'Asset Retirement') {
+        return 'asset-rent-badge-retire';
+    }
+    if ($pro === 'claim' || $p === 'claim') {
+        return 'asset-rent-badge-claim';
+    }
+    if ($pro === 'Awaiting Return') {
+        return 'asset-rent-badge-await';
+    }
+    if ($pro === 'finished goods') {
+        return 'asset-rent-badge-fg';
+    }
+    return 'asset-rent-badge-default';
+}
+
+/**
+ * สร้าง HTML badge สถานะเช่า
+ *
+ * @param string $proStatus
+ * @param string $pStatus
+ * @return string
+ */
+function rent_leasing_status_badge_html($proStatus, $pStatus)
+{
+    $cls = rent_leasing_status_badge_class($proStatus, $pStatus);
+    return '<span class="badge asset-rent-status ' . h($cls) . '">'
+        . h(rent_leasing_status_label($proStatus, $pStatus)) . '</span>';
+}
+
+/**
+ * อ่านโปรไฟล์เช่าจาก biton_leasing สำหรับหน้า asset.php (read-only)
+ *
+ * @param string $assetCode     รหัสเครื่อง production
+ * @param string $factorySerial factory_serial (fallback)
+ * @return array<string,mixed>
+ */
+function asset_leasing_info($assetCode, $factorySerial = '')
+{
+    $out = [
+        'ok' => false,
+        'found' => false,
+        'message' => '',
+        'serial' => '',
+        'product_name' => '',
+        'pro_status' => '',
+        'pro_date' => '',
+        'pro_remarks' => '',
+        'p_status' => '',
+        'customer_name' => '',
+        'site_id' => '',
+        'site_name' => '',
+        'r_startdate' => '',
+        'r_enddate' => '',
+        'r_po' => '',
+        'r_code' => '',
+        'p_date_received' => '',
+        'p_remarks' => '',
+        'status_label' => '',
+    ];
+
+    $candidates = [];
+    foreach ([$assetCode, $factorySerial] as $raw) {
+        $sn = rent_normalize_sn($raw);
+        if ($sn !== '' && !in_array($sn, $candidates, true)) {
+            $candidates[] = $sn;
+        }
+    }
+    if (!$candidates) {
+        $out['message'] = 'ไม่มี S/N';
+        return $out;
+    }
+
+    if (!dbLeasing()) {
+        $out['message'] = dbLeasingError();
+        return $out;
+    }
+    $out['ok'] = true;
+
+    $product = null;
+    foreach ($candidates as $sn) {
+        $q = rent_q_try(
+            'SELECT pro_name, pro_sn, pro_status, pro_date, pro_remarks
+             FROM tbl_product WHERE pro_sn = ? LIMIT 1',
+            's',
+            [$sn]
+        );
+        if (!$q['ok']) {
+            $out['ok'] = false;
+            $out['message'] = (string) ($q['error'] ?? dbLeasingError());
+            return $out;
+        }
+        if (!empty($q['result']) && ($row = $q['result']->fetch_assoc())) {
+            $product = $row;
+            break;
+        }
+    }
+
+    if (!$product) {
+        $out['message'] = 'ไม่พบ S/N ในระบบเช่า';
+        return $out;
+    }
+
+    $out['found'] = true;
+    $out['serial'] = trim((string) ($product['pro_sn'] ?? ''));
+    $out['product_name'] = trim((string) ($product['pro_name'] ?? ''));
+    $out['pro_status'] = trim((string) ($product['pro_status'] ?? ''));
+    $out['pro_date'] = trim((string) ($product['pro_date'] ?? ''));
+    $out['pro_remarks'] = trim((string) ($product['pro_remarks'] ?? ''));
+
+    $line = null;
+    $lq = rent_q_try(
+        'SELECT rp.p_id, rp.p_cus_id, rp.p_status, rp.p_siteid, rp.p_sitename, rp.p_remarks,
+                rp.p_date_received, r.r_startdate, r.r_enddate, r.r_po, r.r_code
+         FROM tbl_rent_product rp
+         LEFT JOIN tbl_rent r ON rp.p_r_id = r.r_id
+         WHERE rp.p_sn = ?
+         ORDER BY CASE WHEN rp.p_status = ? THEN 0 ELSE 1 END, rp.p_id DESC
+         LIMIT 1',
+        'ss',
+        [$out['serial'], 'active']
+    );
+    if (!$lq['ok']) {
+        $out['ok'] = false;
+        $out['message'] = (string) ($lq['error'] ?? dbLeasingError());
+        return $out;
+    }
+    if (!empty($lq['result'])) {
+        $line = $lq['result']->fetch_assoc() ?: null;
+    }
+
+    if ($line) {
+        $out['p_status'] = trim((string) ($line['p_status'] ?? ''));
+        $out['site_id'] = trim((string) ($line['p_siteid'] ?? ''));
+        $out['site_name'] = trim((string) ($line['p_sitename'] ?? ''));
+        $out['p_date_received'] = trim((string) ($line['p_date_received'] ?? ''));
+        $out['p_remarks'] = trim((string) ($line['p_remarks'] ?? ''));
+        $out['r_startdate'] = trim((string) ($line['r_startdate'] ?? ''));
+        $out['r_enddate'] = trim((string) ($line['r_enddate'] ?? ''));
+        $out['r_po'] = trim((string) ($line['r_po'] ?? ''));
+        $out['r_code'] = trim((string) ($line['r_code'] ?? ''));
+
+        $cusId = trim((string) ($line['p_cus_id'] ?? ''));
+        if ($cusId !== '') {
+            $cq = rent_q_try('SELECT cus_name FROM tbl_customer WHERE cus_id = ? LIMIT 1', 's', [$cusId]);
+            if ($cq['ok'] && !empty($cq['result']) && ($cr = $cq['result']->fetch_assoc())) {
+                $out['customer_name'] = trim((string) ($cr['cus_name'] ?? ''));
+            }
+        }
+    }
+
+    $out['status_label'] = rent_leasing_status_label($out['pro_status'], $out['p_status']);
+    return $out;
+}
+
+/**
+ * สถานะเช่าแบบ batch สำหรับตาราง assets.php (read-only)
+ *
+ * @param array<int,array{asset_code:string,factory_serial?:string}> $assets
+ * @return array<string,array{found:bool,pro_status:string,p_status:string,status_label:string,badge_class:string,customer_name:string}>
+ */
+function asset_leasing_status_by_assets(array $assets): array
+{
+    $out = [];
+    if (!$assets || !dbLeasing()) {
+        return $out;
+    }
+
+    $lookup = [];
+    $allSns = [];
+    foreach ($assets as $a) {
+        $assetCode = trim((string) ($a['asset_code'] ?? ''));
+        if ($assetCode === '') {
+            continue;
+        }
+        foreach ([$assetCode, trim((string) ($a['factory_serial'] ?? ''))] as $raw) {
+            $sn = rent_normalize_sn($raw);
+            if ($sn === '') {
+                continue;
+            }
+            $allSns[$sn] = true;
+            if (!isset($lookup[$assetCode])) {
+                $lookup[$assetCode] = [];
+            }
+            if (!in_array($sn, $lookup[$assetCode], true)) {
+                $lookup[$assetCode][] = $sn;
+            }
+        }
+    }
+
+    $sns = array_keys($allSns);
+    if (!$sns) {
+        return $out;
+    }
+
+    $products = [];
+    foreach (array_chunk($sns, 100) as $chunk) {
+        $ph = implode(',', array_fill(0, count($chunk), '?'));
+        $q = rent_q_try(
+            "SELECT pro_sn, pro_status FROM tbl_product WHERE pro_sn IN ($ph)",
+            str_repeat('s', count($chunk)),
+            $chunk
+        );
+        if (!$q['ok'] || empty($q['result'])) {
+            continue;
+        }
+        while ($row = $q['result']->fetch_assoc()) {
+            $proSn = rent_normalize_sn($row['pro_sn'] ?? '');
+            if ($proSn !== '') {
+                $products[$proSn] = $row;
+            }
+        }
+    }
+    if (!$products) {
+        return $out;
+    }
+
+    $foundSns = array_keys($products);
+    $lines = [];
+    foreach (array_chunk($foundSns, 100) as $chunk) {
+        $ph = implode(',', array_fill(0, count($chunk), '?'));
+        $lq = rent_q_try(
+            "SELECT rp.p_sn, rp.p_status, rp.p_cus_id
+             FROM tbl_rent_product rp
+             WHERE rp.p_sn IN ($ph)
+             ORDER BY CASE WHEN rp.p_status = 'active' THEN 0 ELSE 1 END, rp.p_id DESC",
+            str_repeat('s', count($chunk)),
+            $chunk
+        );
+        if (!$lq['ok'] || empty($lq['result'])) {
+            continue;
+        }
+        while ($row = $lq['result']->fetch_assoc()) {
+            $pSn = rent_normalize_sn($row['p_sn'] ?? '');
+            if ($pSn !== '' && !isset($lines[$pSn])) {
+                $lines[$pSn] = $row;
+            }
+        }
+    }
+
+    $cusIds = [];
+    foreach ($lines as $row) {
+        $cid = trim((string) ($row['p_cus_id'] ?? ''));
+        if ($cid !== '') {
+            $cusIds[$cid] = true;
+        }
+    }
+    $cusNames = [];
+    if ($cusIds) {
+        $ids = array_keys($cusIds);
+        foreach (array_chunk($ids, 100) as $chunk) {
+            $ph = implode(',', array_fill(0, count($chunk), '?'));
+            $cq = rent_q_try(
+                "SELECT cus_id, cus_name FROM tbl_customer WHERE cus_id IN ($ph)",
+                str_repeat('s', count($chunk)),
+                $chunk
+            );
+            if (!$cq['ok'] || empty($cq['result'])) {
+                continue;
+            }
+            while ($cr = $cq['result']->fetch_assoc()) {
+                $cusNames[trim((string) ($cr['cus_id'] ?? ''))] = trim((string) ($cr['cus_name'] ?? ''));
+            }
+        }
+    }
+
+    foreach ($lookup as $assetCode => $candidates) {
+        $prod = null;
+        $matchedSn = '';
+        foreach ($candidates as $sn) {
+            if (isset($products[$sn])) {
+                $prod = $products[$sn];
+                $matchedSn = $sn;
+                break;
+            }
+        }
+        if (!$prod) {
+            continue;
+        }
+        $pro = trim((string) ($prod['pro_status'] ?? ''));
+        $line = $lines[$matchedSn] ?? null;
+        $pSt = $line ? trim((string) ($line['p_status'] ?? '')) : '';
+        $cusId = $line ? trim((string) ($line['p_cus_id'] ?? '')) : '';
+        $out[$assetCode] = [
+            'found' => true,
+            'pro_status' => $pro,
+            'p_status' => $pSt,
+            'status_label' => rent_leasing_status_label($pro, $pSt),
+            'badge_class' => rent_leasing_status_badge_class($pro, $pSt),
+            'customer_name' => $cusId !== '' ? ($cusNames[$cusId] ?? '') : '',
+        ];
+    }
+
+    return $out;
+}
+
+/**
+ * ป้ายสถานะเช่าสำหรับตารางรายการเครื่อง
+ *
+ * @param array<string,mixed> $status จาก asset_leasing_status_by_assets()
+ * @return string
+ */
+function rent_leasing_list_status_html(array $status): string
+{
+    $title = 'ระบบเช่า';
+    $cus = trim((string) ($status['customer_name'] ?? ''));
+    if ($cus !== '') {
+        $title .= ' · ' . $cus;
+    }
+    return '<span class="sale-tag asset-rent-status ' . h((string) ($status['badge_class'] ?? 'asset-rent-badge-default')) . '" title="' . h($title) . '">'
+        . h((string) ($status['status_label'] ?? '')) . '</span>';
+}
+
+/**
+ * แถว dl ใน card เช่า — ใช้ stockparts_withdraw_dl_row ถ้ามี
+ *
+ * @param string $label
+ * @param string $value HTML
+ * @return string
+ */
+function rent_leasing_dl_row($label, $value)
+{
+    if ($value === '') {
+        return '';
+    }
+    if (function_exists('stockparts_withdraw_dl_row')) {
+        return stockparts_withdraw_dl_row($label, $value);
+    }
+    return '<dt>' . h($label) . '</dt><dd>' . $value . '</dd>';
+}
+
+/**
+ * สร้าง HTML card「การเบิกเช่า」บนโปรไฟล์เครื่อง production
+ *
+ * @param array<string,mixed> $info จาก asset_leasing_info()
+ * @return string
+ */
+function asset_leasing_card_html(array $info)
+{
+    $icon = function_exists('ui_icon_html') ? ui_icon_html('customers', 16) : '';
+    $out = '<div class="asset-sales-card asset-rent-card">';
+    $out .= '<div class="asset-sales-card-head">' . $icon . '<b>การเบิกเช่า</b></div>';
+    $out .= '<div class="asset-sales-card-body">';
+
+    if (empty($info['found'])) {
+        $msg = trim((string) ($info['message'] ?? 'ไม่พบข้อมูลเช่า'));
+        $out .= '<p class="muted asset-sales-empty">' . h($msg !== '' ? $msg : 'ไม่พบ S/N ในระบบเช่า') . '</p>';
+        $out .= '</div></div>';
+        return $out;
+    }
+
+    $pro = (string) ($info['pro_status'] ?? '');
+    $pSt = (string) ($info['p_status'] ?? '');
+
+    $out .= '<div class="asset-rent-status-row">';
+    $out .= rent_leasing_status_badge_html($pro, $pSt);
+    $out .= '</div>';
+
+    $out .= '<dl class="asset-sales-dl asset-sales-dl-inline">';
+    $out .= rent_leasing_dl_row('S/N', '<b>' . h((string) ($info['serial'] ?? '')) . '</b>');
+    if (!empty($info['product_name'])) {
+        $out .= rent_leasing_dl_row('รุ่น (เช่า)', h((string) $info['product_name']));
+    }
+    if (!empty($info['customer_name'])) {
+        $out .= rent_leasing_dl_row('ลูกค้า', '<b>' . h((string) $info['customer_name']) . '</b>');
+    }
+    if (!empty($info['site_id'])) {
+        $out .= rent_leasing_dl_row('Site ID', h((string) $info['site_id']));
+    }
+    if (!empty($info['site_name'])) {
+        $out .= rent_leasing_dl_row('Site Name', h((string) $info['site_name']));
+    }
+    if (rent_leasing_valid_date($info['r_startdate'] ?? '')) {
+        $out .= rent_leasing_dl_row('เริ่มสัญญา', h(dthai($info['r_startdate'])));
+    }
+    if ($pSt === 'active' && rent_leasing_valid_date($info['r_enddate'] ?? '')) {
+        $out .= rent_leasing_dl_row('หมดสัญญา', h(dthai($info['r_enddate'])));
+    }
+    if (rent_leasing_valid_date($info['p_date_received'] ?? '')) {
+        $out .= rent_leasing_dl_row('วันที่รับคืน', h(dthai($info['p_date_received'])));
+    }
+    if (!empty($info['r_po'])) {
+        $out .= rent_leasing_dl_row('PO', h((string) $info['r_po']));
+    }
+    if (!empty($info['r_code'])) {
+        $out .= rent_leasing_dl_row('รหัสสัญญา', h((string) $info['r_code']));
+    }
+    if (rent_leasing_valid_date($info['pro_date'] ?? '')) {
+        $out .= rent_leasing_dl_row('ลงทะเบียนเช่า', h(dthai($info['pro_date'])));
+    }
+    $remarks = trim((string) ($info['p_remarks'] ?? ''));
+    if ($remarks === '' && !empty($info['pro_remarks'])) {
+        $remarks = trim((string) $info['pro_remarks']);
+    }
+    if ($remarks !== '') {
+        $out .= rent_leasing_dl_row('หมายเหตุ', h($remarks));
+    }
+    $out .= '</dl>';
+
+    $out .= '</div></div>';
+    return $out;
+}

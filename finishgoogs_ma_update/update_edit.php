@@ -43,6 +43,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_update'])) {
     }
 
     $type = in_array($_POST['update_type'], ['firmware', 'hardware', 'other'], true) ? $_POST['update_type'] : 'other';
+    if ($type === 'firmware' && !product_show_fw((int) $log['product_id'])) {
+        $type = 'other';
+    }
     $comp = trim($_POST['component_name']);
     $old = trim($_POST['old_value']);
     $new = trim($_POST['new_value']);
@@ -116,6 +119,11 @@ foreach (effective_fields((int)$log['product_id'], 'update') as $f) {
     }
     $compOptions[$f['name']] = $f['options'];
 }
+$updShowFw = product_show_fw((int) $log['product_id']);
+$updAllowFwType = $updShowFw || ($log['update_type'] ?? '') === 'firmware';
+if ($updShowFw) {
+    $compOptions['Firmware'] = effective_fw_options((int) $log['product_id']);
+}
 ?>
 <p>
   แก้ไขรายการของเครื่อง <b><?= h($log['asset_code']) ?></b> (<?= h($log['pname']) ?>)
@@ -139,7 +147,7 @@ foreach (effective_fields((int)$log['product_id'], 'update') as $f) {
         <div class="upd-field">
           <label for="utype">ประเภทการอัปเดต</label>
           <select name="update_type" id="utype" onchange="fillOld()">
-            <option value="firmware" <?= $log['update_type'] === 'firmware' ? 'selected' : '' ?>>Firmware</option>
+            <?php if ($updAllowFwType) { ?><option value="firmware" <?= $log['update_type'] === 'firmware' ? 'selected' : '' ?>>Firmware</option><?php } ?>
             <option value="hardware" <?= $log['update_type'] === 'hardware' ? 'selected' : '' ?>>Hardware (เปลี่ยนชิ้นส่วน)</option>
             <option value="other" <?= $log['update_type'] === 'other' ? 'selected' : '' ?>>อื่นๆ</option>
           </select>
@@ -219,17 +227,17 @@ function fillOld(){
   var t = document.getElementById('utype').value;
   var c = document.getElementById('comp').value;
   var o = document.getElementById('oldv');
-  // เติมให้เฉพาะตอนช่องว่างเท่านั้น
-  //
-  // ตรรกะเติมอัตโนมัติยกมาจากฟอร์มบันทึกใหม่ ซึ่งที่นั่นถูกต้อง (ค่าเดิม = ค่าปัจจุบันของเครื่อง)
-  // แต่ในฟอร์มแก้ไข ค่าปัจจุบันคือ "ค่าใหม่" ที่อัปเดตไปแล้ว การเติมทับจึงลบประวัติของจริงทิ้ง
-  // — เปิดหน้าแก้ไขเฉย ๆ ก็เห็นค่าเดิมกลายเป็นค่าใหม่ และถ้ากดบันทึกจะทับข้อมูลถาวร
   if (!o.value) {
     if (t === 'firmware') o.value = curFw || '';
     else if (comps[c]) o.value = comps[c];
   }
   var dl = document.getElementById('newvlist');
-  var opts = compOptions[c] || [];
+  var opts = [];
+  if (t === 'firmware') {
+    opts = compOptions['Firmware'] || compOptions['FW'] || [];
+  } else if (c) {
+    opts = compOptions[c] || [];
+  }
   dl.innerHTML = opts.map(function(v){ return '<option value="' + esc(v) + '">'; }).join('');
 }
 document.getElementById('comp').addEventListener('input', fillOld);

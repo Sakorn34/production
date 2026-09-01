@@ -167,7 +167,22 @@ $partsSnCounts = parts_stock_out_counts_by_sn(array_column($assetRows, 'asset_co
 // สถานะการเบิกขาย — อ่านจากระบบ stock ที่เดียวกับการ์ดในหน้าโปรไฟล์เครื่อง
 // เดิมคอลัมน์นี้อ่าน stock_movements ซึ่งนับ "เบิกผลิต" เป็นเบิกออกด้วย จึงไม่ใช่การขาย
 require_once __DIR__ . '/includes/stockparts_withdraw.php';
+require_once __DIR__ . '/includes/rent_ma_bridge.php';
+require_once __DIR__ . '/includes/asset_status_sync.php';
 $saleStatus = asset_stockparts_sale_status_by_sn(array_column($assetRows, 'asset_code'));
+$leaseStatus = asset_leasing_status_by_assets($assetRows);
+try {
+    asset_status_sync_batch($assetRows, true);
+    foreach ($assetRows as &$ar) {
+        $ref = qr('SELECT status FROM assets WHERE id=? LIMIT 1', 'i', [(int) ($ar['id'] ?? 0)])->fetch_assoc();
+        if ($ref) {
+            $ar['status'] = $ref['status'];
+        }
+    }
+    unset($ar);
+} catch (Throwable $e) {
+    error_log('[asset_status_sync_batch] ' . $e->getMessage());
+}
 
 $productList = qr("SELECT DISTINCT p.name FROM products p JOIN assets a ON a.product_id=p.id ORDER BY p.name");
 
@@ -250,6 +265,7 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
 .sale-out { background: var(--warning-soft, #fef9c3); color: #a16207; }
 /* ไม่พบ S/N ในทะเบียน stock — ต่างจาก "อยู่ในคลัง" เพราะเราไม่รู้ ไม่ใช่รู้ว่ายังไม่ขาย */
 .sale-unknown { background: transparent; color: var(--text-muted, #6b6480); font-weight: 500; }
+.sale-tag.asset-rent-status { border: 1px solid transparent; font-size: calc(11px * var(--font-scale, 1)); }
 </style>
 <script>
 (function(){
@@ -280,7 +296,7 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
 
 <div class="table-wrap">
 <table class="list">
-  <tr><th>ผลิตเมื่อ</th><th></th><th>รหัสเครื่อง</th><th>รุ่น</th><th>สถานะ</th><th>เบิกอะไหล่</th><th>ผู้บันทึกรายการ</th><th>FW</th><th>การเบิกใช้งานขาย</th></tr>
+  <tr><th>ผลิตเมื่อ</th><th></th><th>รหัสเครื่อง</th><th>รุ่น</th><th>สถานะ</th><th>เบิกอะไหล่</th><th>ผู้บันทึกรายการ</th><th>FW</th><th>การเบิกใช้งาน</th></tr>
   <?php if (!$assetRows) { ?>
   <tr><td colspan="9" class="muted" style="text-align:center;padding:20px">ไม่พบเครื่องที่ตรงกับเงื่อนไข</td></tr>
   <?php } ?>
@@ -319,11 +335,13 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
     <td><?= h($r['recorder'] ?: '-') ?></td>
     <td><?= h($r['current_fw_version'] ?: '-') ?></td>
     <?php
-      // ผูกกับ setup_id ในระบบ stock = ถูกเบิกขายไปแล้ว · ไม่มี key = ไม่พบ S/N ในทะเบียน stock
+      $lease = $leaseStatus[$r['asset_code']] ?? null;
       $sale = $saleStatus[$r['asset_code']] ?? null;
     ?>
     <td style="white-space:nowrap">
-      <?php if ($sale === null) { ?>
+      <?php if (!empty($lease['found'])) { ?>
+        <?= rent_leasing_list_status_html($lease) ?>
+      <?php } elseif ($sale === null) { ?>
         <span class="sale-tag sale-unknown" title="ไม่พบ S/N นี้ในทะเบียน stock">—</span>
       <?php } elseif ($sale['sold']) {
           $saleSrc = (string) ($sale['resolve_source'] ?? '');

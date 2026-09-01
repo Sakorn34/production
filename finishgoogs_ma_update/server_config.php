@@ -76,7 +76,7 @@ page_header('ตั้งค่า Server / Deploy');
 
 
 <div class="deploy-note">
-  <b>ก่อนเอาขึ้น Server</b> — ตั้ง path ไฟล์ secrets (นอก web root), การเชื่อมต่อ MySQL ทั้ง 3 ฐานข้อมูล,
+  <b>ก่อนเอาขึ้น Server</b> — ตั้ง path ไฟล์ secrets (นอก web root), การเชื่อมต่อ MySQL (production / stockparts / tech_parts และ leasing ถ้าใช้คิวรอ MA จากระบบเช่า),
   SSO URL และทดสอบการเชื่อมต่อจากหน้านี้ · หลังบันทึก ระบบจะเขียน
   <code>config.paths.php</code>, <code>finishgoogs.secrets.php</code> และ <code>parts.secrets.php</code>
 </div>
@@ -131,6 +131,7 @@ page_header('ตั้งค่า Server / Deploy');
         'production' => 'bit_production (หลัก)',
         'stockparts' => 'biton_stockparts (S/N)',
         'techparts'  => 'biton_tech_parts (สต็อกช่าง)',
+        'leasing'    => 'biton_leasing (ระบบเช่า — ไม่บังคับ)',
     ];
     foreach ($dbLabels as $key => $label) {
         $b = $fg[$key] ?? deploy_empty_db_block();
@@ -166,7 +167,7 @@ page_header('ตั้งค่า Server / Deploy');
     <b>ผลทดสอบการเชื่อมต่อ</b>
     <div class="test-row">
       <?php
-      $testLabels = ['production' => 'Production', 'stockparts' => 'Stockparts', 'techparts' => 'Tech parts', 'parts' => 'Parts app'];
+      $testLabels = ['production' => 'Production', 'stockparts' => 'Stockparts', 'techparts' => 'Tech parts', 'leasing' => 'Leasing (เช่า)', 'parts' => 'Parts app'];
       foreach ($testLabels as $k => $lbl) {
           $t = $testResults[$k] ?? ['ok' => false, 'message' => '-', 'detail' => ''];
           ?>
@@ -187,7 +188,7 @@ page_header('ตั้งค่า Server / Deploy');
 <div class="panel deploy-section muted" style="font-size:12.5px; line-height:1.7">
   <b>Checklist หลังบันทึก</b>
   <ol style="margin:8px 0 0 18px">
-    <li>Import DB ทั้ง 3 ตัวบน server (production, stockparts, tech_parts)</li>
+    <li>Import DB บน server (production, stockparts, tech_parts และ biton_leasing ถ้าใช้คิวรอ MA)</li>
     <li>Deploy โฟลเดอร์ <code>/production/</code> ครบ (finishgoogs_ma_update, parts, shared)</li>
     <li>ตั้ง SSO callback ให้กลับ domain ที่ deploy</li>
     <li>ทดสอบ login ทั้ง Production และ Parts</li>

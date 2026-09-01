@@ -10,6 +10,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
     if (!$a) exit('ไม่พบเครื่อง');
     $type = in_array($_POST['update_type'], ['firmware','hardware','other'], true) ? $_POST['update_type'] : 'other';
+    if ($type === 'firmware' && !product_show_fw((int) $a['product_id'])) {
+        $type = 'other';
+    }
     $comp = trim($_POST['component_name']);
     $old  = trim($_POST['old_value']);
     $new  = trim($_POST['new_value']);
@@ -51,6 +54,11 @@ foreach (effective_fields($a['product_id'], 'update') as $f) {
     $compOptions[$f['name']] = $f['options'];
     $compInputModes[$f['name']] = normalize_input_mode($f['input_mode'] ?? 'chip_single_free');
 }
+$updShowFw = product_show_fw((int) $a['product_id']);
+if ($updShowFw) {
+    $compOptions['Firmware'] = effective_fw_options((int) $a['product_id']);
+    $compInputModes['Firmware'] = effective_fw_input_mode((int) $a['product_id']);
+}
 ?>
 <p>เครื่อง <b><?= h($a['asset_code']) ?></b> (<?= h($a['pname']) ?>) — FW ปัจจุบัน: <?= h($a['current_fw_version'] ?: '-') ?></p>
 <form method="post" class="upd-form" enctype="multipart/form-data">
@@ -64,8 +72,8 @@ foreach (effective_fields($a['product_id'], 'update') as $f) {
       <div class="upd-field upd-field-half">
         <label for="utype">ประเภทการอัปเดต</label>
         <select name="update_type" id="utype" onchange="fillOld()">
-          <option value="firmware">Firmware</option>
-          <option value="hardware">Hardware (เปลี่ยนชิ้นส่วน)</option>
+          <?php if ($updShowFw) { ?><option value="firmware">Firmware</option><?php } ?>
+          <option value="hardware"<?= !$updShowFw ? ' selected' : '' ?>>Hardware (เปลี่ยนชิ้นส่วน)</option>
           <option value="other">อื่นๆ</option>
         </select>
       </div>
@@ -123,6 +131,8 @@ foreach (effective_fields($a['product_id'], 'update') as $f) {
 var comps = <?= json_encode($compData, JSON_UNESCAPED_UNICODE) ?>;
 var compOptions = <?= json_encode($compOptions, JSON_UNESCAPED_UNICODE) ?>;
 var compInputModes = <?= json_encode($compInputModes, JSON_UNESCAPED_UNICODE) ?>;
+var updShowFw = <?= $updShowFw ? 'true' : 'false' ?>;
+var updFwInputMode = <?= json_encode(effective_fw_input_mode((int) $a['product_id']), JSON_UNESCAPED_UNICODE) ?>;
 var curFw = <?= json_encode($a['current_fw_version']) ?>;
 function esc(s){ var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
 function renderNewValue(){
@@ -136,7 +146,7 @@ function renderNewValue(){
   var mode = 'chip_single_free';
   var opts = [];
   if (t === 'firmware') {
-    mode = 'chip_single_free';
+    mode = updFwInputMode || 'chip_single_free';
     opts = compOptions['Firmware'] || compOptions['FW'] || [];
   } else if (c) {
     mode = compInputModes[c] || 'chip_single_free';
@@ -162,6 +172,12 @@ function syncCompField(){
   if (el) el.hidden = document.getElementById('utype').value !== 'hardware';
 }
 document.getElementById('utype').addEventListener('change', syncCompField);
+document.getElementById('utype').addEventListener('change', function(){
+  if (!updShowFw && document.getElementById('utype').value === 'firmware') {
+    document.getElementById('utype').value = 'hardware';
+    syncCompField();
+  }
+});
 
 // รอให้สคริปต์ของ footer นิยาม chipDdHtml เสร็จก่อน ช่อง "ค่าใหม่" จึงจะเป็น dropdown ได้จริง
 document.addEventListener('DOMContentLoaded', function () {

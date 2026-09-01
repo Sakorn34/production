@@ -544,11 +544,72 @@ function asset_head_row_html(string $label, string $valueHtml): string {
 
 
 /**
-
- * HTML ส่วน asset-head — จัดกลุ่มข้อมูลเครื่อง / บันทึกผลิต / ฮาร์ดแวร์ (read-only)
-
+ * ตรวจว่าฟิลด์เป็นชื่อผู้ผลิต (Board *) ไม่ใช่เวอร์ชันฮาร์ดแวร์
  *
+ * @param string $name ชื่อฟิลด์
+ * @param string $kind field_kind จาก config
+ * @return bool
+ */
+function asset_head_is_hw_manufacturer_field(string $name, string $kind = 'component'): bool
+{
+    if ($kind === 'ผู้ผลิต') {
+        return true;
+    }
+    return (bool) preg_match('/^Board\s+/ui', trim($name));
+}
 
+
+
+/**
+ * รายการชิ้นส่วนฮาร์ดแวร์สำหรับแสดงบน asset-head — เฉพาะเวอร์ชัน/ค่าที่มีข้อมูล
+ *
+ * @param array<string,mixed>            $ctx           จาก asset_production_edit_load()
+ * @param array<int,array<string,mixed>> $componentRows จาก asset_components
+ * @return array<int,array{name:string,value:string}>
+ */
+function asset_head_hardware_field_rows(array $ctx, array $componentRows): array
+{
+    $rows = [];
+    $seen = [];
+
+    foreach ((array)($ctx['fields'] ?? []) as $f) {
+        $kind = (string)($f['kind'] ?? '');
+        if ($kind !== 'component') {
+            continue;
+        }
+        $name = (string)($f['name'] ?? '');
+        if ($name === '' || asset_head_is_hw_manufacturer_field($name, $kind)) {
+            continue;
+        }
+        $val = trim((string)($f['value'] ?? ''));
+        if ($val === '' || $val === '-') {
+            continue;
+        }
+        $rows[] = ['name' => $name, 'value' => $val];
+        $seen[$name] = true;
+    }
+
+    foreach ($componentRows as $c) {
+        $name = (string)($c['component_name'] ?? '');
+        if ($name === '' || isset($seen[$name]) || asset_head_is_hw_manufacturer_field($name)) {
+            continue;
+        }
+        $val = trim((string)($c['component_value'] ?? ''));
+        if ($val === '' || $val === '-') {
+            continue;
+        }
+        $rows[] = ['name' => $name, 'value' => $val];
+        $seen[$name] = true;
+    }
+
+    return $rows;
+}
+
+
+
+/**
+ * HTML ส่วน asset-head — จัดกลุ่มข้อมูลเครื่อง / บันทึกผลิต / ฮาร์ดแวร์ (read-only)
+ *
  * @param array<string,mixed>            $assetRow
 
  * @param array<string,mixed>            $ctx
@@ -687,13 +748,15 @@ function asset_head_dl_html(array $assetRow, array $ctx, array $componentRows): 
 
 
 
-    if ($componentRows) {
+    $hwRows = asset_head_hardware_field_rows($ctx, $componentRows);
+
+    if ($hwRows) {
 
         $out .= '<dt class="asset-dl-section">ชิ้นส่วนฮาร์ดแวร์</dt>';
 
-        foreach ($componentRows as $c) {
+        foreach ($hwRows as $c) {
 
-            $out .= asset_head_row_html((string)$c['component_name'], h((string)$c['component_value']));
+            $out .= asset_head_row_html((string)$c['name'], h((string)$c['value']));
 
         }
 

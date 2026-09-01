@@ -16,6 +16,14 @@ $a = qr("SELECT a.*, p.name pname, p.icon_path
          FROM assets a JOIN products p ON p.id=a.product_id WHERE a.id=?", 'i', [$id])->fetch_assoc();
 if (!$a) { http_response_code(404); exit('ไม่พบเครื่องนี้'); }
 
+try {
+    asset_status_sync_one($id, true);
+    $a = qr("SELECT a.*, p.name pname, p.icon_path
+             FROM assets a JOIN products p ON p.id=a.product_id WHERE a.id=?", 'i', [$id])->fetch_assoc();
+} catch (Throwable $e) {
+    error_log('[asset_status_sync_one] ' . $e->getMessage());
+}
+
 // เปลี่ยนสถานะเครื่อง
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_status'])) {
     csrf_check();
@@ -194,26 +202,8 @@ $assetEditCtx = asset_production_edit_load($id, (int)$a['product_id'], $componen
 
 /** ตัวเลือก FW ที่เคยใช้กับรุ่นนี้ (สำหรับ datalist) */
 $fwSuggest = [];
-$stdFw = product_std_fields((int)$a['product_id']);
-if (!empty($stdFw['fw']['options'])) {
-    foreach ($stdFw['fw']['options'] as $o) {
-        if ($o !== '' && !in_array($o, $fwSuggest, true)) $fwSuggest[] = $o;
-    }
-}
-foreach (effective_ma_fw_options((int)$a['product_id']) as $o) {
-    if ($o !== '' && !in_array($o, $fwSuggest, true)) $fwSuggest[] = $o;
-}
-$resFw = qr("SELECT pr.fw_version v FROM production_records pr JOIN assets ax ON ax.id=pr.asset_id
-             WHERE ax.product_id=? AND pr.fw_version IS NOT NULL AND TRIM(pr.fw_version)<>'' AND pr.fw_version<>'-'
-             GROUP BY pr.fw_version ORDER BY MAX(pr.id) DESC LIMIT 12", 'i', [(int)$a['product_id']]);
-while ($rf = $resFw->fetch_assoc()) {
-    if (!in_array($rf['v'], $fwSuggest, true)) $fwSuggest[] = $rf['v'];
-}
-$resFw2 = qr("SELECT u.new_value v FROM update_logs u JOIN assets ax ON ax.id=u.asset_id
-              WHERE ax.product_id=? AND u.update_type='firmware' AND u.new_value IS NOT NULL AND TRIM(u.new_value)<>''
-              GROUP BY u.new_value ORDER BY MAX(u.id) DESC LIMIT 12", 'i', [(int)$a['product_id']]);
-while ($rf = $resFw2->fetch_assoc()) {
-    if (!in_array($rf['v'], $fwSuggest, true)) $fwSuggest[] = $rf['v'];
+if (product_show_fw((int)$a['product_id'])) {
+    $fwSuggest = effective_fw_options((int)$a['product_id']);
 }
 if ($a['current_fw_version'] && !in_array($a['current_fw_version'], $fwSuggest, true)) {
     array_unshift($fwSuggest, $a['current_fw_version']);
@@ -225,7 +215,8 @@ $partAlertsHtml = part_alerts_html($id, $a['produced_at']);
 // รวม timeline ทุกประเภท (ฟังก์ชันกลาง includes/timeline.php — ใช้ร่วมกับ popup เจาะลึกจาก dashboard)
 require __DIR__ . "/includes/timeline.php";
 require __DIR__ . "/includes/list_search.php";
-require __DIR__ . '/includes/stockparts_withdraw.php';
+require_once __DIR__ . '/includes/stockparts_withdraw.php';
+require_once __DIR__ . '/includes/rent_ma_bridge.php';
 require __DIR__ . '/includes/ma_snippets.php';
 $tlData = asset_timeline_items($id);
 $tl = $tlData["tl"];
@@ -238,6 +229,10 @@ if ($showPartsWithdraw && ($partsSummary['out_count'] > 0 || $partsUsed)) {
 }
 
 $stockWithdraw = asset_stockparts_withdraw_info((string) $a['asset_code']);
+$leaseInfo = asset_leasing_info(
+    (string) ($a['asset_code'] ?? ''),
+    (string) ($a['factory_serial'] ?? '')
+);
 $assetBackHref = page_back_url('');
 
 $assetShowSnippets = product_show_snippets((int)$a['product_id']);
@@ -316,7 +311,11 @@ page_header('เครื่อง ' . $a['asset_code'], false);
       <?= asset_head_dl_html($a, $assetEditCtx, $componentRows) ?>
     </dl>
   </div>
+  <?php if (!empty($leaseInfo['found'])) { ?>
+  <?= asset_leasing_card_html($leaseInfo) ?>
+  <?php } else { ?>
   <?= asset_stockparts_withdraw_card_html($stockWithdraw) ?>
+  <?php } ?>
 </div>
 
 <?php if ($partAlertsHtml) { ?>
