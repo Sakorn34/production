@@ -26,9 +26,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // ตำแหน่งเมนู
     $side = $_POST['sidebar_side'] ?? 'left';
     set_setting('sidebar_side', in_array($side, ['left', 'right', 'top'], true) ? $side : 'left');
-    // ความสูงโลโก้ (px)
-    $lh = (int)($_POST['brand_logo_h'] ?? 0);
-    if ($lh >= 20 && $lh <= 160) set_setting('brand_logo_h', $lh);
     // ขนาดตัวอักษร (เปอร์เซ็นต์)
     $fontScale = (int)($_POST['font_scale_percent'] ?? 100);
     if ($fontScale >= 90 && $fontScale <= 140) set_setting('font_scale_percent', $fontScale);
@@ -50,9 +47,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$p) $upErrors[] = "$label: ไฟล์ไม่ใช่รูปที่รองรับ (PNG / JPG / GIF / WebP / ICO)";
         return $p;
     };
-    $logo = $brandUpload('brand_logo', 'โลโก้');
-    if ($logo) set_setting('brand_logo', $logo);
-    elseif (!empty($_POST['remove_logo'])) set_setting('brand_logo', '');
     $fav = $brandUpload('favicon', 'ไอคอน (Favicon)');
     if ($fav) set_setting('favicon', $fav);
     elseif (!empty($_POST['remove_favicon'])) set_setting('favicon', '');
@@ -111,7 +105,6 @@ foreach (nav_default() as $i => $n) {
 }
 usort($navRows, function ($a, $b) { return $a['order'] - $b['order']; });
 
-$logo = setting('brand_logo');
 page_header('ปรับแต่งหน้าตาระบบ');
 ?>
 <p class="muted" style="margin-bottom:14px">ปรับข้อความ โลโก้ สีธีม และเมนู (ไอคอน/ลำดับ/ตำแหน่ง) ของทั้งระบบ · มีผลกับทุกคนหลังบันทึก</p>
@@ -126,15 +119,6 @@ page_header('ปรับแต่งหน้าตาระบบ');
         <input id="ap-app-name" type="text" name="app_name" value="<?= h(setting('app_name', APP_NAME)) ?>" style="width:100%"></div>
       <div class="field"><label for="ap-login-sub">ข้อความรองหน้า Login</label>
         <input id="ap-login-sub" type="text" name="login_subtitle" value="<?= h(setting('login_subtitle', 'บันทึกผลิตใหม่ · อัปเดต FW/HW · ซ่อมบำรุง · MA เครื่องเช่า/สำรอง')) ?>" style="width:100%"></div>
-      <div class="field"><label>โลโก้ (แทนชื่อระบบบนแถบเมนู)</label>
-        <?php if ($logo) { ?><div style="margin-bottom:6px; background:var(--sidebar-bg); padding:8px; border-radius:8px; display:inline-block"><img src="<?= h(img_url($logo)) ?>" class="brand-logo"></div>
-          <label style="display:block; font-weight:400"><input type="checkbox" name="remove_logo" value="1"> ลบโลโก้ (กลับไปใช้ชื่อระบบ)</label><?php } ?>
-        <input type="file" name="brand_logo" accept="image/*">
-        <div style="display:flex; align-items:center; gap:8px; margin-top:8px">
-          <label for="ap-logo-h" style="font-weight:400; font-size:<?= theme_fs_css(13) ?>; margin:0">ความสูงโลโก้:</label>
-          <input id="ap-logo-h" type="range" name="brand_logo_h" min="20" max="160" step="2" value="<?= (int)setting('brand_logo_h', 56) ?>" oninput="document.getElementById('logo-h-val').textContent=this.value" style="flex:1">
-          <span style="font-size:<?= theme_fs_css(13) ?>; min-width:44px"><b id="logo-h-val"><?= (int)setting('brand_logo_h', 56) ?></b> px</span>
-        </div></div>
       <div class="field"><label>ไอคอนบนแท็บเบราว์เซอร์ (Favicon)</label>
         <?php $favCur = setting('favicon'); if ($favCur) { ?>
           <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px">

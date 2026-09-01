@@ -460,11 +460,7 @@
   justify-content: center;
   width: auto;
 }
-.app.nav-collapsed:not(.sidebar-top) .brand-logo {
-  height: 28px;
-  margin: 0 auto;
-  object-position: center;
-}
+
 .app.nav-collapsed:not(.sidebar-top) .sidebar nav a,
 .app.nav-collapsed:not(.sidebar-top) .sidebar .nav-links a,
 .app.nav-collapsed:not(.sidebar-top) .sidebar .nav-cross {
@@ -767,4 +763,15 @@
 .app.nav-collapsed:not(.sidebar-top) .sidebar-nav a,
 .app.nav-collapsed:not(.sidebar-top) .sidebar-nav .nav-cross {
   gap: 0;
+}
+
+/* ── เส้นคั่นก่อนกลุ่มลิงก์ข้ามระบบ ─────────────────────────────────────────
+   ป้ายหัวข้อกลุ่มถูกเอาออกแล้ว ซึ่งเคยเป็นสิ่งเดียวที่บอกว่าเมนูของแอปนี้จบตรงไหน
+   แล้วลิงก์ไปอีกแอปเริ่มตรงไหน — ใช้เส้นคั่นแทน จับเฉพาะ .nav-cross ตัวแรก
+   คือตัวที่ตามหลังลิงก์ธรรมดา ไม่ใช่ทุกตัวในกลุ่ม */
+/* ใช้ margin ไม่ใช่ padding — กฎ padding ของรางแคบมี specificity สูงกว่า (5 คลาส
+   เทียบ 3) จะทับ padding-top ที่นี่เฉพาะตอนหุบ ทำให้สูงไม่เท่ากัน 3px */
+.sidebar-nav a:not(.nav-cross) + a.nav-cross {
+  margin-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, .14);
 }

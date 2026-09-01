@@ -65,13 +65,6 @@ body {
     letter-spacing: -0.01em;
 }
 
-.sidebar-brand .brand-logo {
-    height: var(--logo-h, 40px);
-    max-width: 100%;
-    object-fit: contain;
-    object-position: left center;
-}
-
 .brand-icon { flex-shrink: 0; }
 
 .nav-links a {

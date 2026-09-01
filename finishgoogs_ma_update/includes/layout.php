@@ -184,7 +184,6 @@ function page_header($title, $showBack = true, $subtitle = '', $backUrl = '', $a
   --surface-soft: color-mix(in srgb, var(--page-bg) 72%, #fff);
   --primary-soft: color-mix(in srgb, var(--primary) 12%, #fff);
   --focus-ring: color-mix(in srgb, var(--primary) 25%, transparent);
-  --logo-h: <?= max(20, min(160, (int)setting('brand_logo_h', 56))) ?>px;
   --app-font: <?= $fontCfg['font'] ?>;
   --success:#16a34a; --success-soft:#dcfce7;
   --info:#1d4ed8; --info-soft:#dbeafe;
@@ -204,7 +203,6 @@ function page_header($title, $showBack = true, $subtitle = '', $backUrl = '', $a
 </head>
 <body>
 <?php
-$brandLogo = setting('brand_logo');
 $side = setting('sidebar_side', 'left');
 $sideClass = $side === 'right' ? ' sidebar-right' : ($side === 'top' ? ' sidebar-top' : '');
 $dockClass = ($side === 'top') ? '' : ' nav-collapsed';

@@ -94,19 +94,6 @@ function main_upload_url(string $rel): string
     return app_uploads_public_base() . $rel;
 }
 
-/**
- * URL โลโก้จากระบบหลัก (relative uploads path)
- *
- * @return string|null
- */
-function main_brand_logo_url(): ?string
-{
-    $logo = trim((string) main_setting('brand_logo', ''));
-    if ($logo === '') {
-        return null;
-    }
-    return main_upload_url($logo);
-}
 
 /**
  * สีเมนู active — กันค่าขาวล้วน (legacy default) ที่จะกลืนกับตัวอักษรเมนูสีขาว
@@ -153,7 +140,6 @@ function main_font_css_sizes(): string
 function parts_theme_css_block(): string
 {
     $fontCfg = main_font_config();
-    $logoH = max(20, min(160, (int) main_setting('brand_logo_h', 40)));
 
     return ':root{
   --primary:' . main_theme_color('color_primary', '#e11d74') . ';
@@ -163,7 +149,6 @@ function parts_theme_css_block(): string
   --sidebar-active:' . parts_sidebar_active_color() . ';
   --bg:' . main_theme_color('color_page_bg', '#f4f1fb') . ';
   --page-bg:' . main_theme_color('color_page_bg', '#f4f1fb') . ';
-  --logo-h:' . $logoH . 'px;
   --app-font:' . $fontCfg['font'] . ';
   --success:#16a34a; --success-soft:#dcfce7;
   --info:#1d4ed8; --info-soft:#dbeafe;

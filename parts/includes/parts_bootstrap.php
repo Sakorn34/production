@@ -55,7 +55,6 @@ $stock = new StockService($db);
 $currentPage = basename($_SERVER['PHP_SELF'], '.php');
 $flash = getFlash();
 $fontCfg = main_font_config();
-$brandLogo = main_brand_logo_url();
 $partsAppName = trim((string) main_setting('app_name', '')) ?: 'Stock ช่าง';
 
 // เมนูของ parts มาจาก source กลางเดียวกับกลุ่มข้ามระบบใน finishgoogs (shared/ui_icons.php)

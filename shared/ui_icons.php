@@ -401,7 +401,10 @@ function ui_userbox_identity(): array
  */
 function ui_nav_group_label(string $text): string
 {
-    return '<div class="nav-group-label">' . htmlspecialchars($text, ENT_QUOTES, 'UTF-8') . '</div>';
+    // ป้ายหัวข้อกลุ่มถูกเอาออกจาก sidebar แล้ว — เส้นคั่นระหว่างกลุ่มยังอยู่
+    // คืนค่าว่างที่นี่ที่เดียว จุดเรียกทั้งหมดจึงไม่ต้องแก้ และเอากลับได้ง่าย
+    unset($text);
+    return '';
 }
 
 /**
