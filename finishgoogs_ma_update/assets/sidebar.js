@@ -52,6 +52,7 @@
         function setExpanded(expanded, persist) {
             app.classList.toggle('nav-expanded', expanded);
             app.classList.toggle('nav-collapsed', !expanded);
+            if (typeof hideTip === 'function') hideTip();
             if (pinBtn) {
                 pinBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
                 pinBtn.setAttribute('aria-label', expanded ? 'หุบเมนู' : 'ขยายเมนู');
@@ -183,6 +184,49 @@
         }
 
         app.classList.add('nav-docked');
+        // ── ป้ายชื่อเมนูตอนหุบ — ใบเดียวลอยที่ body หนี overflow ของ sidebar ──
+        var tipEl = document.querySelector('.sidebar-tip');
+        if (!tipEl) {
+            tipEl = document.createElement('div');
+            tipEl.className = 'sidebar-tip';
+            tipEl.setAttribute('role', 'tooltip');
+            document.body.appendChild(tipEl);
+        }
+        function showTip(a) {
+            if (!app.classList.contains('nav-collapsed')) return;
+            var label = a.getAttribute('data-tooltip');
+            if (!label) return;
+            var r = a.getBoundingClientRect();
+            tipEl.textContent = label;
+            tipEl.style.top = (r.top + r.height / 2) + 'px';
+            if (app.classList.contains('sidebar-right')) {
+                tipEl.style.left = 'auto';
+                tipEl.style.right = (window.innerWidth - r.left + 10) + 'px';
+            } else {
+                tipEl.style.right = 'auto';
+                tipEl.style.left = (r.right + 10) + 'px';
+            }
+            tipEl.classList.add('is-on');
+        }
+        function hideTip() { tipEl.classList.remove('is-on'); }
+
+        sidebar.addEventListener('mouseover', function (e) {
+            var a = e.target.closest ? e.target.closest('[data-tooltip]') : null;
+            if (a && sidebar.contains(a)) showTip(a);
+        });
+        sidebar.addEventListener('mouseout', function (e) {
+            var a = e.target.closest ? e.target.closest('[data-tooltip]') : null;
+            if (a) hideTip();
+        });
+        // คีย์บอร์ดก็ต้องเห็นป้าย ไม่ใช่แค่เมาส์
+        sidebar.addEventListener('focusin', function (e) {
+            var a = e.target.closest ? e.target.closest('[data-tooltip]') : null;
+            if (a) showTip(a);
+        });
+        sidebar.addEventListener('focusout', hideTip);
+        // ป้ายลอยแบบ fixed ไม่เลื่อนตามเนื้อหา ต้องซ่อนเมื่อมีการเลื่อน
+        sidebar.addEventListener('scroll', hideTip, true);
+        window.addEventListener('scroll', hideTip, { passive: true });
         setExpanded(loadExpanded(), false);
 
         if (pinBtn) {

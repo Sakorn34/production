@@ -30,6 +30,12 @@ $settingsActive = false;
 </head>
 <body>
 <div class="app nav-collapsed">
+<?php // ตั้ง class ให้ตรงกับที่ผู้ใช้เลือกไว้ ก่อนเบราว์เซอร์วาดเฟรมแรก
+     // ไม่งั้นหน้าจะวาดแบบหุบก่อน แล้ว sidebar.js (โหลดท้ายหน้า) ค่อยสั่งขยาย
+     // ทำให้เห็นอนิเมชัน 56->248px ซ้ำทุกครั้งที่เปลี่ยนหน้า ?>
+<script>(function(){try{var a=document.currentScript.parentElement;
+if(a&&a.classList.contains('nav-collapsed')&&localStorage.getItem('fg-sidebar-expanded')==='1'){
+a.classList.remove('nav-collapsed');a.classList.add('nav-expanded');}}catch(e){}})();</script>
     <aside class="sidebar" id="app-sidebar">
         <div class="sidebar-head">
             <div class="brand sidebar-brand">

@@ -447,38 +447,33 @@
   width: 100%;
 }
 
-.app.nav-collapsed .sidebar-nav a[data-tooltip]::after,
-.app.nav-collapsed .sidebar-nav .nav-cross[data-tooltip]::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  left: calc(100% + 10px);
-  top: 50%;
-  transform: translateY(-50%);
+/* ── ป้ายชื่อเมนูตอนหุบ ──────────────────────────────────────────────────────
+   เดิมเป็น ::after ของตัวลิงก์ วางที่ left: calc(100% + 10px) ซึ่งอยู่นอกกล่อง
+   แต่ .sidebar-nav มี overflow-x:hidden และ .sidebar มี overflow:hidden
+   ป้ายจึงถูกตัดทิ้งทั้งใบ เอาเมาส์ไปวางแล้วไม่เห็นอะไรเลย
+
+   element ที่ถูก clip หนีออกจากกล่องไม่ได้ไม่ว่า z-index เท่าไหร่ จึงย้ายมาเป็น
+   ป้ายลอยใบเดียวที่ท้าย body ใช้ position:fixed แล้วให้ sidebar.js วางตำแหน่งให้ */
+.sidebar-tip {
+  position: fixed;
+  z-index: 1200;
   padding: 6px 10px;
   border-radius: var(--radius-sm, 8px);
   background: #1e293b;
   color: #f8fafc;
+  font-family: var(--app-font, inherit);
   font-size: calc(12px * var(--font-scale, 1));
   font-weight: 600;
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;
-  visibility: hidden;
-  transition: opacity .12s, visibility .12s;
-  z-index: 100;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, .28);
+  transform: translateY(-50%);
+  transition: opacity .12s ease;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, .3);
 }
-.app.sidebar-right.nav-collapsed .sidebar-nav a[data-tooltip]::after,
-.app.sidebar-right.nav-collapsed .sidebar-nav .nav-cross[data-tooltip]::after {
-  left: auto;
-  right: calc(100% + 10px);
-}
-.app.nav-collapsed .sidebar-nav a[data-tooltip]:hover::after,
-.app.nav-collapsed .sidebar-nav a[data-tooltip]:focus-visible::after,
-.app.nav-collapsed .sidebar-nav .nav-cross[data-tooltip]:hover::after,
-.app.nav-collapsed .sidebar-nav .nav-cross[data-tooltip]:focus-visible::after {
-  opacity: 1;
-  visibility: visible;
+.sidebar-tip.is-on { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-tip { transition-duration: .01ms; }
 }
 
 /* ── Footer user + popover ── */

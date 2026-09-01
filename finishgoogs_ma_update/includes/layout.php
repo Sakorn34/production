@@ -213,6 +213,12 @@ $showName = $ubUser['name'] !== 'ผู้ใช้งาน' ? $ubUser['name'] 
 $settingsActive = in_array($cur, ['settings.php', 'appearance.php', 'server_config.php', 'line_notify_settings.php', 'activity_logs.php', 'share_admin.php', 'system_doc.php'], true);
 ?>
 <div class="app<?= $sideClass . $dockClass ?>">
+<?php // ตั้ง class ให้ตรงกับที่ผู้ใช้เลือกไว้ ก่อนเบราว์เซอร์วาดเฟรมแรก
+     // ไม่งั้นหน้าจะวาดแบบหุบก่อน แล้ว sidebar.js (โหลดท้ายหน้า) ค่อยสั่งขยาย
+     // ทำให้เห็นอนิเมชัน 56->248px ซ้ำทุกครั้งที่เปลี่ยนหน้า ?>
+<script>(function(){try{var a=document.currentScript.parentElement;
+if(a&&a.classList.contains('nav-collapsed')&&localStorage.getItem('fg-sidebar-expanded')==='1'){
+a.classList.remove('nav-collapsed');a.classList.add('nav-expanded');}}catch(e){}})();</script>
   <aside class="sidebar" id="fg-app-sidebar">
     <div class="sidebar-head">
       <div class="brand">
