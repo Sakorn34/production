@@ -41,7 +41,10 @@ body {
     font-family: var(--app-font, 'Noto Sans Thai', 'Segoe UI', system-ui, sans-serif);
     background: var(--bg);
     color: var(--text);
-    display: flex;
+    /* เดิมเป็น display:flex สมัยที่ .sidebar ยังเป็นลูกตรงของ body
+       ตอนนี้ลูกตรงมีแค่ .app ซึ่งเป็น flex-item ที่ flex-grow:0 จึงหดตามเนื้อหา
+       ทำให้หน้ากว้างแค่ ~1333px บนจอ 1920px ส่วน .app มี display:flex + min-height
+       ของตัวเองอยู่แล้วใน sidebar.css (ไฟล์ที่ทั้งสองแอปโหลดร่วมกัน) */
     min-height: 100vh;
     line-height: 1.5;
     font-size: var(--fs-body);
