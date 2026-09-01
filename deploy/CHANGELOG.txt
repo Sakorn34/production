@@ -1956,3 +1956,34 @@ Files:
   finishgoogs_ma_update/includes/rent_ma_bridge.php
   finishgoogs_ma_update/ma.php
 
+
+================================================================
+v2026-09-01_182308 | Patch | 2026-09-01 18:23:13
+From: 2026-09-01_111919  ->  To: 0c5b730  |  Files: 23
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/appearance.php
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/assets/ma-prom-instrument.css
+  finishgoogs_ma_update/assets/sidebar.css
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/dashboard_chart.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/includes/settings_gate.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/line_notify_settings.php
+  finishgoogs_ma_update/scan.php
+  finishgoogs_ma_update/server_config.php
+  finishgoogs_ma_update/settings_bulk.php
+  finishgoogs_ma_update/share.php
+  finishgoogs_ma_update/share_admin.php
+  finishgoogs_ma_update/system_doc.php
+  parts/assets/style.css
+  parts/includes/footer.php
+  parts/includes/header.php
+
