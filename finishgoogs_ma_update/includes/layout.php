@@ -220,16 +220,8 @@ $settingsActive = in_array($cur, ['settings.php', 'appearance.php', 'server_conf
 if(a&&a.classList.contains('nav-collapsed')&&localStorage.getItem('fg-sidebar-expanded')==='1'){
 a.classList.remove('nav-collapsed');a.classList.add('nav-expanded');}}catch(e){}})();</script>
   <aside class="sidebar" id="fg-app-sidebar">
+    <?php // หัวแถบเหลือแค่ปุ่มหุบ/ขยาย ชื่อแอปกับโลโก้ถูกเอาออกตามที่ตกลง ?>
     <div class="sidebar-head">
-      <div class="brand">
-        <?php if ($brandLogo) { ?>
-          <img src="<?= h(img_url($brandLogo)) ?>" alt="โลโก้" class="brand-logo">
-          <span class="brand-text"><?= h(setting('app_name', APP_NAME)) ?></span>
-        <?php } else { ?>
-          <span class="nav-ico"><?= ui_nav_icon_html('technicians', 20, 'nav-svg') ?></span>
-          <span class="brand-text"><?= h(setting('app_name', APP_NAME)) ?></span>
-        <?php } ?>
-      </div>
       <button type="button" class="sidebar-pin-btn" aria-label="ขยายเมนู" aria-expanded="false">
         <?php // ไอคอนเดียวหมุน 180 องศาเมื่อขยาย — เดิมเป็นตัวอักษร › ‹ สองอันสลับ display กัน ?>
         <?= ui_icon_html('chevron-right', 16, 'pin-chevron') ?>

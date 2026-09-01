@@ -57,18 +57,18 @@
 }
 
 /* ── Head: brand + ปุ่มขยาย/หุบ ── */
+/* ── หัวแถบ: เหลือแค่ปุ่มหุบ/ขยาย ────────────────────────────────────────────
+   ปุ่มวางกึ่งกลางที่ x=28 ซึ่งเป็นจุดเดียวกับกึ่งกลางไอคอนเมนูทั้งสองสถานะ
+   (รางแคบกว้าง 56 กึ่งกลาง 28 · ตอนขยายไอคอนเมนูก็อยู่กึ่งกลาง 28 พอดี)
+   ปุ่มจึงไม่ขยับเลยเวลาสลับ และเรียงตรงคอลัมน์เดียวกับไอคอนด้านล่าง          */
 .sidebar-head {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 14px 10px 10px;
+  justify-content: flex-start;
+  padding: 10px 14px;
   flex-shrink: 0;
   border-bottom: 1px solid rgba(255, 255, 255, .1);
-  /* สูงคงที่ทั้งสองสถานะ เมนูข้างล่างจะได้ไม่ขยับตอนสลับ */
-  min-height: 80px;
-  justify-content: flex-start;
 }
-.sidebar-head .sidebar-pin-btn { margin-left: auto; }
 .sidebar .brand,
 .sidebar .sidebar-brand {
   flex: 1;
@@ -449,27 +449,10 @@
     transition-duration: .01ms !important;
   }
 }
-/* ── ตอนหุบ: ยังเป็นแถวเหมือนเดิม ไม่สลับเป็น column ──────────────────────────
-   เดิมสลับเป็น flex-direction: column ทำให้โลโก้กับปุ่มซ้อนกันเป็นสองบรรทัด
-   flex-direction เปลี่ยนค่าแบบทันที ไม่มีสถานะกลางให้เคลื่อนไหว ทั้งสองชิ้นจึง
-   กระโดดเข้าที่ใหม่ในเฟรมเดียว แม้ความสูงรวมจะเท่ากันแล้วก็ยังเห็นสะดุด
-
-   คงแถวไว้แล้วให้ชื่อย่อความกว้างหายไปแทน (เหมือนป้ายเมนู) เหลือแต่ปุ่มในราง
-   ซึ่งเคลื่อนที่ต่อเนื่องไปตามความกว้างที่กำลังเปลี่ยน                        */
-.app.nav-collapsed:not(.sidebar-top) .sidebar-head {
-  /* ราง 56px: 4 + 20(โลโก้) + 2 + 24(ปุ่ม) + 4 = 54 เหลือช่องว่าง 2px */
-  padding: 12px 4px 8px;
-  gap: 2px;
-  justify-content: flex-start;
-}
-/* .brand มี gap ของตัวเองระหว่างไอคอนกับข้อความ ข้อความยุบไปแล้วแต่ gap ยังกินที่ */
-.app.nav-collapsed:not(.sidebar-top) .sidebar-head .brand { gap: 0; }
+/* ไม่มีกฎแยกสำหรับตอนหุบอีกแล้ว — หัวแถบเหมือนกันทั้งสองสถานะ
+   เดิมต้องแยกเพราะมีโลโก้ต้องจัดที่ให้ ตอนนี้เหลือปุ่มอย่างเดียว */
 /* โลโก้ต้องไม่ยืด/ไม่หด ไม่งั้น flex บีบไอคอน 20px ให้เหลือ 10px แล้วล้นกรอบ */
 .app.nav-collapsed:not(.sidebar-top) .sidebar-head .brand { flex: 0 0 auto; }
-.app.nav-collapsed:not(.sidebar-top) .sidebar-head .sidebar-pin-btn { width: 24px; height: 24px; }
-.app.nav-collapsed:not(.sidebar-top) .sidebar-head .sidebar-pin-btn {
-  margin-left: 0;
-}
 /* เดิม width:100% มาจากตอนที่หัวแถบเป็น column แล้วโลโก้อยู่บรรทัดของตัวเอง
    ตอนนี้เป็นแถวเดียวกับปุ่ม ถ้ากางเต็มความกว้างจะดันปุ่มล้นราง */
 .app.nav-collapsed:not(.sidebar-top) .sidebar .brand,
@@ -764,3 +747,24 @@
 }
 .app-release-ver:hover { opacity: 1; }
 @media (max-width: 800px) { .app-release-ver { display: none; } }
+
+/* ── รางแคบ: ซ่อนแถบเลื่อน ────────────────────────────────────────────────
+   แถบเลื่อนกว้าง 10px ในราง 56px คือ 18% ของความกว้าง มันบีบเนื้อที่เหลือ
+   เป็น 30px ไอคอน 20px จึงล้นกรอบแล้วถูกดันชิดซ้าย อยู่ที่กึ่งกลาง 18
+   แทนที่จะเป็น 28 ตามกึ่งกลางราง — ซ่อนแล้วยังเลื่อนด้วยล้อ/คีย์บอร์ดได้ปกติ
+   ตอนขยายยังแสดงแถบเลื่อนตามเดิม เพราะที่นั่นมันบอกว่ายังมีเมนูอยู่ข้างล่าง */
+.app.nav-collapsed:not(.sidebar-top) .sidebar-nav {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.app.nav-collapsed:not(.sidebar-top) .sidebar-nav::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* ไอคอนต้องอยู่กึ่งกลางรางพอดี — .nav-text ยุบเหลือ 0 แล้วแต่ gap ระหว่างมัน
+   กับไอคอนยังกินที่ ดันไอคอนเยื้องซ้าย 5px (กึ่งกลาง 23 แทนที่จะเป็น 28) */
+.app.nav-collapsed:not(.sidebar-top) .sidebar-nav a,
+.app.nav-collapsed:not(.sidebar-top) .sidebar-nav .nav-cross {
+  gap: 0;
+}

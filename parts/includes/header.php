@@ -37,16 +37,8 @@ $settingsActive = false;
 if(a&&a.classList.contains('nav-collapsed')&&localStorage.getItem('fg-sidebar-expanded')==='1'){
 a.classList.remove('nav-collapsed');a.classList.add('nav-expanded');}}catch(e){}})();</script>
     <aside class="sidebar" id="app-sidebar">
+        <?php // หัวแถบเหลือแค่ปุ่มหุบ/ขยาย ชื่อแอปกับโลโก้ถูกเอาออกตามที่ตกลง ?>
         <div class="sidebar-head">
-            <div class="brand sidebar-brand">
-                <?php if ($brandLogo): ?>
-                    <img src="<?= e($brandLogo) ?>" alt="<?= e($partsAppName) ?>" class="brand-logo">
-                    <span class="brand-text"><?= e($partsAppName) ?></span>
-                <?php else: ?>
-                    <?= ui_nav_icon_html('box', 20, 'brand-icon') ?>
-                    <span class="brand-text"><?= e($partsAppName) ?></span>
-                <?php endif; ?>
-            </div>
             <button type="button" class="sidebar-pin-btn" aria-label="ขยายเมนู" aria-expanded="false">
                 <?= ui_icon_html('chevron-right', 16, 'pin-chevron') ?>
             </button>
