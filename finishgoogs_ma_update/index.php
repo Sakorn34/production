@@ -99,7 +99,11 @@ if ($dashProdYears) {
 
 // ---- จำนวนเครื่องรายรุ่น ----
 $perModel = [];
-$res = qr("SELECT p.id pid, p.name, p.icon_path, COUNT(*) c FROM assets a JOIN products p ON p.id=a.product_id
+// นับแยกตามสถานะด้วย เพื่อให้แถบในการ์ดสื่อสัดส่วนจริง ไม่ใช่แค่ความยาว
+$res = qr("SELECT p.id pid, p.name, p.icon_path, COUNT(*) c,
+                  SUM(a.status='new') c_new, SUM(a.status='rental') c_rental,
+                  SUM(a.status='spare') c_spare, SUM(a.status='sold') c_sold
+           FROM assets a JOIN products p ON p.id=a.product_id
            GROUP BY p.id ORDER BY c DESC");
 while ($r = $res->fetch_assoc()) $perModel[] = $r;
 $maxPM = 1; foreach ($perModel as $m) $maxPM = max($maxPM, (int)$m['c']);
@@ -158,7 +162,6 @@ foreach ($perPart as $p) {
 }
 ksort($partSuppliers, SORT_NATURAL | SORT_FLAG_CASE);
 
-$PALETTE = ['#ec4899','#8b5cf6','#3b82f6','#f59e0b','#10b981','#06b6d4','#f43f5e','#a855f7','#14b8a6','#eab308','#6366f1','#ef4444'];
 function pct($v, $t) { return $t > 0 ? round($v / $t * 100) : 0; }
 
 /**
@@ -376,7 +379,20 @@ $partsBase = ui_parts_base_url();
 
   <div class="dash-view-pane" id="dash-view-models" role="tabpanel">
   <div class="model-card-grid">
-    <?php $mi = 0; foreach ($perModel as $m) { $col = $PALETTE[$mi++ % count($PALETTE)]; ?>
+    <?php foreach ($perModel as $m) {
+        // สัดส่วนตามสถานะ ใช้สีเดียวกับกราฟด้านบน (dash_chart_color) ให้ legend เดียวอ่านได้ทั้งหน้า
+        $segs = [];
+        $tipParts = [];
+        foreach (status_list() as $st) {
+            $n = (int) ($m['c_' . $st] ?? 0);
+            if ($n <= 0) { continue; }
+            $segs[] = '<span class="model-card-seg" style="flex:' . $n
+                . ';background:' . h(dash_chart_color($st)) . '"></span>';
+            $tipParts[] = status_th($st) . ' ' . number_format($n);
+        }
+        $barTip = $m['name'] . ' — ' . number_format($m['c']) . ' เครื่อง'
+            . ($tipParts ? ' · ' . implode(' · ', $tipParts) : '');
+    ?>
     <?php // เป็น <a> เพื่อให้ Tab ถึงและเปิดแท็บใหม่ได้ · คลิกปกติยังเปิด modal เหมือนเดิม ?>
     <a class="model-card clickable" href="<?= h("$B/assets.php?product=" . urlencode($m['name'])) ?>"
          onclick="if(event.ctrlKey||event.metaKey||event.shiftKey||event.button===1)return true;showListModal(<?= h(json_encode('การผลิตรุ่น ' . $m['name'] . ' รายปี', JSON_UNESCAPED_UNICODE)) ?>, '<?= h("$B/dashboard_data.php?type=product_years&v=" . (int)$m['pid']) ?>', '<?= h("$B/assets.php?product=" . urlencode($m['name'])) ?>');return false;">
@@ -385,7 +401,9 @@ $partsBase = ui_parts_base_url();
       </div>
       <div class="model-card-body">
         <div class="model-card-name" title="<?= h($m['name']) ?>"><?= h($m['name']) ?></div>
-        <div class="model-card-bar"><div class="model-card-fill" style="width:<?= pct($m['c'], $maxPM) ?>%; background:<?= h($col) ?>"></div></div>
+        <div class="model-card-bar" title="<?= h($barTip) ?>">
+          <div class="model-card-fill" style="width:<?= pct($m['c'], $maxPM) ?>%"><?= implode('', $segs) ?></div>
+        </div>
         <div class="model-card-num"><?= number_format($m['c']) ?></div>
       </div>
     </a>
