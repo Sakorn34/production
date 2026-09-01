@@ -64,6 +64,10 @@
   padding: 14px 10px 10px;
   flex-shrink: 0;
   border-bottom: 1px solid rgba(255, 255, 255, .1);
+  /* สูงเท่ากันทั้งสองสถานะ ตอนหุบเรียงแนวตั้งจึงสูงกว่าราว 7px
+     ถ้าไม่ล็อกไว้ เมนูทั้งแถบจะขยับทุกครั้งที่สลับ */
+  min-height: 80px;
+  justify-content: center;
 }
 .sidebar .brand,
 .sidebar .sidebar-brand {
@@ -360,17 +364,16 @@
 }
 
 /* ช่องค้นหาและหัวข้อกลุ่มเป็นบล็อกเต็มความกว้าง ย่อด้วยความสูงแทน */
-.sidebar-search-inner,
-.nav-group-label {
+/* ช่องค้นหายุบความสูงได้ เพราะปุ่มแว่นขึ้นมาแทนที่ ความสูงรวมของกล่องจึงเท่าเดิม */
+.sidebar-search-inner {
   overflow: hidden;
   opacity: 1;
+  max-height: 90px;
   transition: opacity .18s ease .1s, max-height .26s cubic-bezier(.4, 0, .2, 1),
               padding .26s cubic-bezier(.4, 0, .2, 1),
               margin .26s cubic-bezier(.4, 0, .2, 1);
-  max-height: 90px;
 }
-.app.nav-collapsed:not(.sidebar-top) .sidebar-search-inner,
-.app.nav-collapsed:not(.sidebar-top) .nav-group-label {
+.app.nav-collapsed:not(.sidebar-top) .sidebar-search-inner {
   opacity: 0;
   max-height: 0;
   min-height: 0;
@@ -381,6 +384,23 @@
   transition: opacity .1s ease, max-height .26s cubic-bezier(.4, 0, .2, 1),
               padding .26s cubic-bezier(.4, 0, .2, 1),
               margin .26s cubic-bezier(.4, 0, .2, 1);
+}
+
+/* ── ป้ายหัวข้อกลุ่ม: จางอย่างเดียว ห้ามยุบความสูง ─────────────────────────
+   เดิมยุบ max-height 90px -> 0 พร้อม padding ใน 260ms และมีป้ายสองอัน
+   ทุกเมนูที่อยู่ใต้ป้ายจึงไหลขึ้นลง 28-56px ตลอดช่วงนั้น พร้อม ๆ กับที่แถบ
+   กำลังเปลี่ยนความกว้างอยู่ ตาเห็นเป็นรายการเมนูดิ้นไปมาสองแกนพร้อมกัน
+
+   คงกล่องไว้เท่าเดิมแล้วจางเฉพาะตัวอักษร ไม่มีอะไรขยับแนวตั้งเลย
+   ช่องว่างที่เหลือในรางแคบทำหน้าที่คั่นกลุ่มแทนตัวหนังสือได้พอดี          */
+.nav-group-label {
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity .18s ease .1s;
+}
+.app.nav-collapsed:not(.sidebar-top) .nav-group-label {
+  opacity: 0;
+  transition: opacity .1s ease;
 }
 
 /* ── ปุ่มแว่นขยายตอนหุบ ──────────────────────────────────────────────────────
@@ -424,8 +444,12 @@
 }
 .app.nav-collapsed:not(.sidebar-top) .sidebar-head {
   flex-direction: column;
+  /* padding แนวตั้งเท่าตอนขยาย (14/10) หัวแถบจะได้สูงเท่ากันทั้งสองสถานะ
+     ไม่งั้นเมนูทั้งแถบขยับ 3px ทุกครั้งที่สลับ */
   padding: 12px 6px 8px;
-  gap: 8px;
+  /* gap แคบลง เนื้อหาแนวตั้งจะได้ต่ำกว่า min-height 80px
+     ไม่งั้นกล่องดันสูงเกินแล้ว min-height ก็ไม่มีผล */
+  gap: 4px;
 }
 .app.nav-collapsed:not(.sidebar-top) .sidebar .brand,
 .app.nav-collapsed:not(.sidebar-top) .sidebar .sidebar-brand {
@@ -441,7 +465,9 @@
 .app.nav-collapsed:not(.sidebar-top) .sidebar .nav-links a,
 .app.nav-collapsed:not(.sidebar-top) .sidebar .nav-cross {
   justify-content: center;
-  padding: 10px 8px;
+  /* แนวตั้งต้องเท่าตอนขยาย (9px) ไม่งั้นทุกรายการสูงต่างกัน 2px
+     แล้วรายการล่าง ๆ เลื่อนสะสมได้ถึง 17px ทุกครั้งที่สลับ */
+  padding: 9px 8px;
 }
 .app.nav-collapsed:not(.sidebar-top) .sidebar-pin-btn {
   width: 100%;
