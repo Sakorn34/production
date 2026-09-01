@@ -321,7 +321,7 @@ function page_footer() {
 <!-- toast แจ้งเตือนสถานะ (จางหายอัตโนมัติ) -->
 <div id="flash-toast-host" class="flash-toast-host" aria-live="polite" aria-atomic="true"></div>
 <?php if (defined('APP_RELEASE_VERSION') && APP_RELEASE_VERSION !== '') { ?>
-<p class="app-release-ver" title="รหัสชุด deploy">v<?= h(APP_RELEASE_VERSION) ?></p>
+<p class="app-release-ver" title="รหัสชุด deploy — ใช้เทียบว่าเซิร์ฟเวอร์ได้ไฟล์ล่าสุดแล้วหรือยัง">Version <?= h(APP_RELEASE_VERSION) ?></p>
 <?php } ?>
 
 <!-- modal รายการเจาะลึก (dashboard ฯลฯ) — เจาะได้หลายชั้น มีปุ่มย้อนกลับ -->

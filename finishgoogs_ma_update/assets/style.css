@@ -900,17 +900,7 @@ button:active, .btn:active { transform: scale(.96); }
   .ppl-list { grid-template-columns: 1fr 1fr; }
 }
 
-.app-release-ver {
-  position: fixed;
-  right: 10px;
-  bottom: 6px;
-  margin: 0;
-  font-size: calc(10px * var(--font-scale, 1));
-  color: #94a3b8;
-  opacity: .65;
-  pointer-events: none;
-  z-index: 5;
-}
+/* ป้ายรหัสชุด deploy ย้ายไป sidebar.css แล้ว — เป็นไฟล์เดียวที่ทั้งสองแอปโหลดร่วมกัน */
 
 /* theme preview gallery (appearance.php) */
 .theme-preview-grid {

@@ -31,6 +31,23 @@ $BaselineFile = Join-Path $DeployDir '.last-deploy.json'
 $BuildInfoFile = Join-Path $DeployDir '.last-build.json'
 $ChangelogFile = Join-Path $DeployDir 'CHANGELOG.txt'
 $VersionId = Get-Date -Format 'yyyy-MM-dd_HHmmss'
+
+# ประทับรหัสชุด deploy ลง config.php ก่อนเก็บไฟล์ ป้ายเวอร์ชันบนหน้าเว็บจะได้ตรงกับ patch จริง
+# ต้องทำก่อน Get-PatchCandidatePaths ไม่งั้น config.php จะไม่ถูกนับว่าเปลี่ยนและไม่ติดไปกับ patch
+$ConfigFile = Join-Path $Root 'finishgoogs_ma_update/config.php'
+if (Test-Path -LiteralPath $ConfigFile) {
+    $cfgRaw = Get-Content -LiteralPath $ConfigFile -Raw -Encoding UTF8
+    $pattern = "(define\('APP_RELEASE_VERSION',\s*')[^']*('\))"
+    if ($cfgRaw -match $pattern) {
+        $cfgNew = [regex]::Replace($cfgRaw, $pattern, "`${1}$VersionId`${2}")
+        if ($cfgNew -ne $cfgRaw) {
+            [IO.File]::WriteAllText($ConfigFile, $cfgNew, (New-Object Text.UTF8Encoding $false))
+            Write-Host "  Stamped APP_RELEASE_VERSION = $VersionId"
+        }
+    } else {
+        Write-Warning 'APP_RELEASE_VERSION not found in config.php - version badge will be stale'
+    }
+}
 $VersionDir = Join-Path $VersionsRoot $VersionId
 
 $baseline = Read-DeployBaseline -BaselineFile $BaselineFile

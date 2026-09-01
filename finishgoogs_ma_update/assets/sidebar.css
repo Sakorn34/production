@@ -613,3 +613,26 @@
 
 /* ซ่อน rail เก่า */
 .sidebar-rail-wrap { display: none !important; }
+
+/* ป้ายรหัสชุด deploy — มุมล่างซ้าย ใช้ดูว่าเซิร์ฟเวอร์ได้ patch ล่าสุดแล้วหรือยัง
+   ค่ามาจาก APP_RELEASE_VERSION ที่ build-patch.ps1 ประทับให้อัตโนมัติทุกครั้งที่ build */
+.app-release-ver {
+  position: fixed;
+  /* เลี่ยงปุ่มผู้ใช้ที่มุมล่างซ้าย (.userbox-trigger กว้าง 40px เริ่มที่ 8px) */
+  left: 58px;
+  bottom: 8px;
+  margin: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border);
+  font-size: calc(10.5px * var(--font-scale, 1));
+  font-weight: 600;
+  letter-spacing: .02em;
+  color: var(--text-muted);
+  opacity: .8;
+  z-index: 5;
+  user-select: all;   /* ดับเบิลคลิกคัดลอกได้ทั้งก้อน เวลาแจ้งปัญหา */
+}
+.app-release-ver:hover { opacity: 1; }
+@media (max-width: 800px) { .app-release-ver { display: none; } }

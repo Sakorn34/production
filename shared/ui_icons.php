@@ -530,3 +530,31 @@ function ui_timeline_group_order(): array
 {
     return ['production', 'update', 'ma', 'parts', 'repair', 'stock', 'spare'];
 }
+
+/**
+ * รหัสชุด deploy สำหรับแสดงบนหน้าเว็บ
+ *
+ * แอปผลิตมี APP_RELEASE_VERSION จาก config.php อยู่แล้ว ส่วนแอปอะไหล่ใช้คนละ config
+ * จึงอ่านค่าจากไฟล์ตรง ๆ ครั้งเดียวแล้วจำไว้ ไม่ต้อง include config ทั้งก้อน
+ *
+ * @return string ค่าว่างถ้าหาไม่เจอ (ผู้เรียกต้องเช็คก่อนแสดง)
+ */
+function app_release_version()
+{
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
+    if (defined('APP_RELEASE_VERSION')) {
+        return $cached = (string) APP_RELEASE_VERSION;
+    }
+    $cfg = dirname(__DIR__) . '/finishgoogs_ma_update/config.php';
+    if (is_file($cfg)) {
+        // อ่านเฉพาะช่วงต้นไฟล์ ค่านี้ประกาศอยู่บรรทัดที่ 36
+        $head = (string) @file_get_contents($cfg, false, null, 0, 4096);
+        if (preg_match("~APP_RELEASE_VERSION',\s*'([^']*)'~", $head, $m)) {
+            return $cached = $m[1];
+        }
+    }
+    return $cached = '';
+}
