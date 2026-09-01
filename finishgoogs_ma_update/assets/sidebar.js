@@ -28,6 +28,7 @@
 
         var pinBtn = sidebar.querySelector('.sidebar-pin-btn');
         var searchInput = sidebar.querySelector('.sidebar-search-input');
+        var searchMiniBtn = sidebar.querySelector('.sidebar-search-mini');
         var userTrigger = sidebar.querySelector('.userbox-trigger');
         var userPopover = sidebar.querySelector('.userbox-popover');
         var navRoot = sidebar.querySelector('.sidebar-nav') || sidebar.querySelector('nav') || sidebar;
@@ -188,6 +189,22 @@
             pinBtn.addEventListener('click', function (e) {
                 e.stopPropagation();
                 toggleExpanded();
+            });
+        }
+
+        // ปุ่มแว่นในรางแคบ: ขยายเมนูก่อน แล้วค่อยโฟกัสช่องค้นหา
+        // รอ 280ms ให้ transition ของกล่อง (260ms) จบก่อน ไม่งั้นโฟกัสตอนช่องยังกว้าง 0
+        // แล้วเบราว์เซอร์จะเลื่อนหน้าไปหา element ที่มองไม่เห็น
+        if (searchMiniBtn) {
+            searchMiniBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                setExpanded(true, true);
+                if (searchInput) {
+                    setTimeout(function () {
+                        try { searchInput.focus({ preventScroll: true }); }
+                        catch (err) { searchInput.focus(); }
+                    }, 280);
+                }
             });
         }
 

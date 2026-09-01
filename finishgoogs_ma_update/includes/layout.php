@@ -234,6 +234,8 @@ $settingsActive = in_array($cur, ['settings.php', 'appearance.php', 'server_conf
         <span class="sidebar-search-icon"><?= ui_icon_html('search', 16) ?></span>
         <input type="search" class="sidebar-search-input" placeholder="ค้นหา S/N, MA, อัปเดต..." autocomplete="off" aria-label="ค้นหาอัจฉริยะ S/N MA อัปเดต">
       </div>
+      <?php // ตอนหุบเมนู ช่องค้นหาเต็มไม่มีที่ยืน — ปุ่มนี้แทนที่ กดแล้วขยายเมนูพร้อมโฟกัสช่องค้นหา ?>
+      <button type="button" class="sidebar-search-mini" aria-label="ค้นหา" title="ค้นหา"><?= ui_icon_html('search', 16) ?></button>
     </div>
     <div class="sidebar-nav">
       <nav>
