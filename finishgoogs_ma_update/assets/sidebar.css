@@ -667,12 +667,11 @@
 /* ซ่อน rail เก่า */
 .sidebar-rail-wrap { display: none !important; }
 
-/* ป้ายรหัสชุด deploy — มุมล่างซ้าย ใช้ดูว่าเซิร์ฟเวอร์ได้ patch ล่าสุดแล้วหรือยัง
+/* ป้ายรหัสชุด deploy — มุมล่างขวา ใช้ดูว่าเซิร์ฟเวอร์ได้ patch ล่าสุดแล้วหรือยัง
    ค่ามาจาก APP_RELEASE_VERSION ที่ build-patch.ps1 ประทับให้อัตโนมัติทุกครั้งที่ build */
 .app-release-ver {
   position: fixed;
-  /* เลี่ยงปุ่มผู้ใช้ที่มุมล่างซ้าย (.userbox-trigger กว้าง 40px เริ่มที่ 8px) */
-  left: 58px;
+  right: 12px;
   bottom: 8px;
   margin: 0;
   padding: 2px 8px;
