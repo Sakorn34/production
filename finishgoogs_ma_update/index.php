@@ -70,7 +70,7 @@ if ($dashProdYears) {
     foreach ($dashProdYears as $y => $counts) {
         $y = (int) $y;
         $label = (string) thai_buddhist_year($y);
-        $titlePrefix = '📊 การผลิตปี ' . $label;
+        $titlePrefix = 'การผลิตปี ' . $label;
         $baseUrl = BASE_URL . '/dashboard_data.php?type=year&v=' . $y;
         $pt = dash_chart_point($label, 'ปี ' . $label, $counts, $titlePrefix, $baseUrl);
         $pt['inline_year'] = $y;
@@ -80,15 +80,18 @@ if ($dashProdYears) {
         for ($m = 1; $m <= 12; $m++) {
             $ym = sprintf('%04d-%02d', $y, $m);
             $mCounts = $dashProdMonthPointsByYear[$y][$m];
-            $mTitlePrefix = '🏷️ รุ่นที่ผลิตเดือน ' . thai_month_period_label($ym);
+            $mTitlePrefix = 'รุ่นที่ผลิตเดือน ' . thai_month_period_label($ym);
             $mBaseUrl = BASE_URL . '/dashboard_data.php?type=month_models&v=' . rawurlencode($ym);
-            $monthPoints[] = dash_chart_point(
+            $mp = dash_chart_point(
                 thai_month_short($ym),
                 thai_month_period_label($ym),
                 $mCounts,
                 $mTitlePrefix,
                 $mBaseUrl
             );
+            // เดือนที่ยังมาไม่ถึง ต้องแสดงต่างจากเดือนที่ผลิต 0 เครื่อง
+            $mp["is_future"] = $ym > date("Y-m");
+            $monthPoints[] = $mp;
         }
         $dashProdMonthPointsByYear[$y] = $monthPoints;
     }
@@ -214,9 +217,27 @@ page_header('Dashboard', true, 'ภาพรวมการผลิตและ
  * @param bool   $subHtml  อนุญาต HTML ใน $sub (เช่น <br>)
  * @param bool   $numHtml  อนุญาต HTML ใน $numText
  */
-function kpi($num, $label, $icon, $tone, $sub = '', $onclick = '', $sys = '', $numText = '', $subHtml = false, $numHtml = false) {
-    $click = $onclick !== '' ? ' clickable" onclick="' . h($onclick) : '';
-    echo '<div class="kpi kpi-' . h($tone) . $click . '">';
+function kpi($num, $label, $icon, $tone, $sub = '', $onclick = '', $sys = '', $numText = '', $subHtml = false, $numHtml = false, $href = '') {
+    // การ์ดที่กดได้ต้องเป็น <a> ไม่ใช่ <div onclick> — ไม่งั้น Tab ไปไม่ถึง
+    // โปรแกรมอ่านหน้าจอไม่รู้ว่ากดได้ และเปิดแท็บใหม่/คัดลอกลิงก์ไม่ได้
+    // ถ้าเป็น modal: คลิกปกติเปิด modal (return false) ส่วน Ctrl/กลางคลิกไปหน้าเต็มตาม href
+    $tag = $href !== '' ? 'a' : 'div';
+    $attr = '';
+    if ($href !== '') {
+        $attr .= ' href="' . h($href) . '"';
+        if ($onclick !== '') {
+            $attr .= ' onclick="if(event.ctrlKey||event.metaKey||event.shiftKey||event.button===1)return true;'
+                   . h($onclick) . ';return false;"';
+        }
+        $attr .= ' class="kpi kpi-' . h($tone) . ' clickable"';
+    } elseif ($onclick !== '') {
+        $attr .= ' class="kpi kpi-' . h($tone) . ' clickable" onclick="' . h($onclick) . '"'
+               . ' role="button" tabindex="0"'
+               . ' onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.click();}"';
+    } else {
+        $attr .= ' class="kpi kpi-' . h($tone) . '"';
+    }
+    echo '<' . $tag . $attr . '>';
     if ($sys !== '') echo '<span class="kpi-sys">' . h($sys) . '</span>';
     echo '<div class="kpi-top"><span class="kpi-ic">' . ui_icon_html($icon, 14) . '</span> ' . h($label) . '</div>';
     if ($numText !== '') {
@@ -229,7 +250,7 @@ function kpi($num, $label, $icon, $tone, $sub = '', $onclick = '', $sys = '', $n
         $subClass = 'kpi-sub' . ($subHtml ? ' kpi-sub-stack' : '');
         echo '<div class="' . $subClass . '">' . ($subHtml ? $sub : h($sub)) . '</div>';
     }
-    echo '</div>';
+    echo '</' . $tag . '>';
 }
 /** สร้างโค้ด JS ดิบสำหรับ onclick — ต้องครอบด้วย h() เมื่อใส่ใน attribute */
 function modal_js($title, $dataUrl, $moreUrl = '') {
@@ -244,29 +265,29 @@ $partsBase = ui_parts_base_url();
 <div class="kpi-grid">
   <?php
   kpi($total, 'เครื่องทั้งหมด', 'assets', 'primary', '',
-      modal_js('เครื่องทั้งหมด — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=all", "$B/assets.php"), 'เครื่อง');
+      modal_js('เครื่องทั้งหมด — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=all", "$B/assets.php"), 'เครื่อง', '', false, false, "$B/assets.php");
   kpi($byStatus['new'], 'ใหม่ (คลัง)', 'box', 'success', pct_label($byStatus['new'], $total) . ' ของทั้งหมด',
-      modal_js('เครื่องใหม่ — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=new", "$B/assets.php?status=new"), 'เครื่อง');
+      modal_js('เครื่องใหม่ — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=new", "$B/assets.php?status=new"), 'เครื่อง', '', false, false, "$B/assets.php?status=new");
   kpi($byStatus['rental'], 'เครื่องเช่า', 'updates', 'info', pct_label($byStatus['rental'], $total) . ' ของทั้งหมด',
-      modal_js('เครื่องเช่า — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=rental", "$B/assets.php?status=rental"), 'เครื่อง');
+      modal_js('เครื่องเช่า — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=rental", "$B/assets.php?status=rental"), 'เครื่อง', '', false, false, "$B/assets.php?status=rental");
   kpi($byStatus['sold'], 'ขายแล้ว', 'stock-out-set', 'primary', pct_label($byStatus['sold'], $total) . ' ของทั้งหมด',
-      modal_js('ขายแล้ว — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=sold", "$B/assets.php?status=sold"), 'เครื่อง');
+      modal_js('ขายแล้ว — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=sold", "$B/assets.php?status=sold"), 'เครื่อง', '', false, false, "$B/assets.php?status=sold");
   kpi($byStatus['spare'], 'เครื่องสำรอง', 'box', 'warning',
       pct_label($byStatus['spare'], $total) . ' ของทั้งหมด<br>คลังเครื่องสำรอง — ทดแทนเครื่องเช่า',
       modal_js('เครื่องสำรอง — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=spare", "$B/assets.php?status=spare"), 'เครื่อง',
-      '', true);
+      '', true, false, "$B/assets.php?status=spare");
   if ($stock['ok']) {
       kpi($stock['qty'], 'สต็อกคงเหลือรวม', 'parts', 'primary', number_format($stock['items']) . ' รายการ (ผลรวมดิบข้ามหน่วย ใช้อ้างอิงคร่าวๆ)',
-          "location.href='" . h($partsBase) . "/pages/products.php'", 'อะไหล่');
+          '', 'อะไหล่', '', false, false, $partsBase . '/pages/products.php');
       kpi($stock['low'], 'อะไหล่ควรสั่งเพิ่ม', 'alert', $stock['low'] > 0 ? 'warning' : 'success', $stock['low'] > 0 ? '<span class="kpi-down">ต้องตรวจสอบ/สั่งซื้อ</span>' : 'ทุกรายการเพียงพอ',
           $stock['low'] > 0
               ? modal_js('อะไหล่ที่ควรสั่งเพิ่ม (' . number_format($stock['low']) . ' รายการ)', "$B/dashboard_data.php?type=low_stock", "$partsBase/pages/products.php")
               : "location.href='" . h($partsBase) . "/pages/products.php'",
-          'อะไหล่', '', true);
+          'อะไหล่', '', true, false, $partsBase . '/pages/products.php');
       kpi(0, 'รับเข้า / เบิกออก', 'history', 'info', 'ความเคลื่อนไหววันนี้',
           modal_js('รับเข้า / เบิกออกวันนี้', "$B/dashboard_data.php?type=stock_today", "$partsBase/pages/history.php"), 'วันนี้',
-          'รับเข้า ' . number_format($stock['in_today']) . ' ชิ้น<br>เบิกออก ' . number_format($stock['out_today']) . ' ชิ้น',
-          false, true);
+          'รับเข้า ' . number_format($stock['in_today']) . ' ชิ้น · เบิกออก ' . number_format($stock['out_today']) . ' ชิ้น',
+          false, true, $partsBase . '/pages/history.php');
   } else {
       echo '<div class="kpi kpi-warning"><div class="kpi-top"><span class="kpi-ic">' . ui_icon_html('alert', 14) . '</span> สต็อกอะไหล่</div><b class="kpi-num">—</b><div class="kpi-sub">เชื่อมต่อระบบสต็อกไม่ได้</div></div>';
   }
@@ -356,8 +377,9 @@ $partsBase = ui_parts_base_url();
   <div class="dash-view-pane" id="dash-view-models" role="tabpanel">
   <div class="model-card-grid">
     <?php $mi = 0; foreach ($perModel as $m) { $col = $PALETTE[$mi++ % count($PALETTE)]; ?>
-    <div class="model-card clickable"
-         onclick="showListModal(<?= h(json_encode('การผลิตรุ่น ' . $m['name'] . ' รายปี', JSON_UNESCAPED_UNICODE)) ?>, '<?= h("$B/dashboard_data.php?type=product_years&v=" . (int)$m['pid']) ?>', '<?= h("$B/assets.php?product=" . urlencode($m['name'])) ?>')">
+    <?php // เป็น <a> เพื่อให้ Tab ถึงและเปิดแท็บใหม่ได้ · คลิกปกติยังเปิด modal เหมือนเดิม ?>
+    <a class="model-card clickable" href="<?= h("$B/assets.php?product=" . urlencode($m['name'])) ?>"
+         onclick="if(event.ctrlKey||event.metaKey||event.shiftKey||event.button===1)return true;showListModal(<?= h(json_encode('การผลิตรุ่น ' . $m['name'] . ' รายปี', JSON_UNESCAPED_UNICODE)) ?>, '<?= h("$B/dashboard_data.php?type=product_years&v=" . (int)$m['pid']) ?>', '<?= h("$B/assets.php?product=" . urlencode($m['name'])) ?>');return false;">
       <div class="model-card-img">
         <?= img_tag($m['icon_path'], $m['name'], 'model-thumb') ?>
       </div>
@@ -366,7 +388,7 @@ $partsBase = ui_parts_base_url();
         <div class="model-card-bar"><div class="model-card-fill" style="width:<?= pct($m['c'], $maxPM) ?>%; background:<?= h($col) ?>"></div></div>
         <div class="model-card-num"><?= number_format($m['c']) ?></div>
       </div>
-    </div>
+    </a>
     <?php } ?>
   </div>
   </div>
@@ -395,7 +417,11 @@ $partsBase = ui_parts_base_url();
         $barColor = $stockMeta['color'];
         $barPct = part_stock_bar_pct($qty, $min);
     ?>
-    <div class="model-card clickable dash-part-card" data-stock-status="<?= h($stockStatus) ?>" data-supplier="<?= h($supplier) ?>"
+    <?php // การ์ดนี้มีลิงก์ "สั่งซื้อ" อยู่ข้างใน จึงทำเป็น <a> ซ้อนไม่ได้
+         // ใช้ role=button + tabindex เพื่อให้ Tab ถึงและกด Enter/Space ได้ ?>
+    <div class="model-card clickable dash-part-card" role="button" tabindex="0"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}"
+         data-stock-status="<?= h($stockStatus) ?>" data-supplier="<?= h($supplier) ?>"
          onclick="showListModal(<?= h(json_encode('โปรไฟล์: ' . $displayName, JSON_UNESCAPED_UNICODE)) ?>, '<?= h("$B/dashboard_data.php?type=part_profile&v=" . (int) $p['id']) ?>', '<?= h("$partsBase/pages/product-detail.php?id=" . (int) $p['id']) ?>')"
          title="<?= h($cardTitle) ?>">
       <div class="model-card-img">
@@ -449,7 +475,7 @@ $partsBase = ui_parts_base_url();
   var currentSupplierFilter = '';
   var labels = {
     models: { title: 'จำนวนเครื่องรายรุ่น', meta: '<?= count($perModel) ?> รุ่น' },
-    parts:  { title: 'สต็อกอะไหล่รายการ' }
+    parts:  { title: 'สต็อกอะไหล่' }
   };
   var emptyMsgs = {
     all: 'ไม่มีอะไหล่ตามตัวกรองที่เลือก',

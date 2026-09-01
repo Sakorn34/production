@@ -339,7 +339,53 @@ function page_footer() {
 
 <script src="<?= BASE_URL ?>/assets/sidebar.js?v=<?= @filemtime(__DIR__ . '/../assets/sidebar.js') ?: time() ?>"></script>
 <script>
-function closeOverlay(id){ document.getElementById(id).hidden = true; }
+/* ── overlay: ปิดด้วย Esc / คลิกพื้นหลัง · ล็อกการเลื่อนหน้า · คืนโฟกัสให้ที่เดิม ──
+   แอปอะไหล่ทำสามอย่างนี้อยู่แล้ว ฝั่งนี้เดิมปิดได้ทางเดียวคือกดปุ่มปิด */
+var __overlayReturnFocus = null;
+
+function openOverlay(id){
+  var ov = document.getElementById(id);
+  if (!ov || !ov.hidden) return;
+  __overlayReturnFocus = document.activeElement;
+  ov.hidden = false;
+  document.body.classList.add('modal-open');
+  // ย้ายโฟกัสเข้ากล่อง ไม่งั้นคีย์บอร์ดยังอยู่หลัง overlay
+  var box = ov.querySelector('[role="dialog"]');
+  if (box) {
+    if (!box.hasAttribute('tabindex')) box.setAttribute('tabindex', '-1');
+    try { box.focus({ preventScroll: true }); } catch (e) { box.focus(); }
+  }
+}
+
+function closeOverlay(id){
+  var ov = document.getElementById(id);
+  if (!ov) return;
+  ov.hidden = true;
+  if (!document.querySelector('.notif-overlay:not([hidden])')) {
+    document.body.classList.remove('modal-open');
+  }
+  if (__overlayReturnFocus && document.contains(__overlayReturnFocus)) {
+    try { __overlayReturnFocus.focus({ preventScroll: true }); } catch (e) {}
+  }
+  __overlayReturnFocus = null;
+}
+
+/** ปิด overlay ที่เปิดอยู่บนสุด */
+function closeTopOverlay(){
+  var open = document.querySelectorAll('.notif-overlay:not([hidden])');
+  if (!open.length) return false;
+  closeOverlay(open[open.length - 1].id);
+  return true;
+}
+
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape' || e.key === 'Esc') { if (closeTopOverlay()) e.preventDefault(); }
+});
+
+/* คลิกที่พื้นหลัง (ตัว overlay เอง) เท่านั้น — คลิกในกล่องต้องไม่ปิด */
+document.addEventListener('click', function(e){
+  if (e.target.classList && e.target.classList.contains('notif-overlay')) closeOverlay(e.target.id);
+});
 
 /** ปุ่มย้อนกลับ — ใช้ประวัติเบราว์เซอร์ก่อน ไม่มีประวัติค่อยไป fallback */
 function fgPageBack(e, fallbackHref) {
@@ -496,7 +542,7 @@ window.__flashToast = function(msg, type, duration){
       else { li.textContent = it.text; }
       ul.appendChild(li);
     });
-    document.getElementById('notif-overlay').hidden = false;
+    openOverlay('notif-overlay');
   }).catch(function(){});
 })();
 
@@ -514,7 +560,7 @@ function showListModal(title, url, moreUrl, isBack){
   document.getElementById('list-body').innerHTML = 'กำลังโหลด…';
   document.getElementById('list-more').innerHTML = moreUrl
     ? '<a class="btn btn-sm btn-line" href="' + moreUrl + '">ดูทั้งหมดแบบเต็มหน้า →</a>' : '';
-  overlay.hidden = false;
+  openOverlay('list-overlay');
   fetch(url).then(function(r){ return r.text(); }).then(function(html){
     if (__modalCur && __modalCur.u === url) document.getElementById('list-body').innerHTML = html;
   }).catch(function(){

@@ -879,3 +879,15 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .list-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
 .list-toolbar form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0; }
 .list-toolbar input[type=text], .list-toolbar select, .list-toolbar button, .list-toolbar .btn { min-height: var(--input-h, 40px); }
+
+/* ── overlay: ล็อกการเลื่อนหน้าหลังขณะเปิด (คู่กับ openOverlay/closeOverlay) ── */
+body.modal-open { overflow: hidden; }
+/* กล่อง modal ให้ใช้มุมโค้งและเงาชุดเดียวกับการ์ดอื่นในระบบ เดิมเป็น 8px ไม่มีเงา */
+.notif-box { border-radius: var(--radius, 12px); box-shadow: var(--shadow-md); }
+.notif-box:focus { outline: none; }
+.notif-box:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* การ์ด KPI เป็น <a> แล้ว — ตัดสไตล์ลิงก์ออกและใส่วงโฟกัสให้เห็นชัด */
+a.kpi { text-decoration: none; color: inherit; display: block; }
+a.kpi:hover { text-decoration: none; }
+.kpi.clickable:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }

@@ -294,7 +294,11 @@ function render_dashboard_stacked_chart(array $points, $multiSeries = true, $fil
                    . number_format($total) . '</button>';
             }
         } else {
-            echo '<span class="dash-bar-total dash-bar-total-empty">·</span>';
+            // เดิมเป็นเป้าคลิกตาย: cursor เป็นมือแต่กดแล้วไม่มีอะไรเกิด และไม่บอกว่าทำไมว่าง
+            // แยก "ยังไม่ถึงช่วงนี้" ออกจาก "ผลิต 0 เครื่อง" ให้อ่านออก
+            $future = !empty($pt['is_future']);
+            echo '<span class="dash-bar-total dash-bar-total-empty' . ($future ? ' is-future' : '') . '" title="' . ($future ? 'ยังไม่ถึงช่วงนี้' : 'ไม่มีการผลิตในช่วงนี้') . '" aria-label="' . h($pt['label']) . ' — '
+               . ($future ? 'ยังไม่ถึงช่วงนี้' : 'ผลิต 0 เครื่อง') . '">' . ($future ? '–' : '0') . '</span>';
         }
 
         echo '<div class="dash-bar-area" style="height:' . round($barH, 2) . '%"';

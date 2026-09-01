@@ -18,7 +18,7 @@ function asset_table($res, $clickTimeline = false) {
         $attr = '';
         if ($clickTimeline) {
             $attr = ' class="clickable" style="cursor:pointer" onclick="' .
-                drill_onclick('⏱️ Timeline เครื่อง ' . $r['asset_code'], BASE_URL . '/dashboard_data.php?type=timeline&v=' . (int)$r['id']) . '"';
+                drill_onclick('Timeline เครื่อง ' . $r['asset_code'], BASE_URL . '/dashboard_data.php?type=timeline&v=' . (int)$r['id']) . '"';
         }
         echo "<tr$attr><td><a href=\"" . BASE_URL . '/asset.php?id=' . $r['id'] . '" onclick="event.stopPropagation()"><b>' . h($r['asset_code']) . '</b></a></td>'
            . '<td>' . h($r['pname']) . '</td><td>' . status_badge($r['status']) . '</td>'
@@ -89,7 +89,10 @@ function asset_status_filter($st, $alias = 'a') {
 /** การ์ดรุ่นสินค้า (รูป + ชื่อ + จำนวน) กดแล้วเจาะไปรายการเครื่องของรุ่นนั้น */
 function model_grid($res, $periodLabel, $nextType, $periodVal, $st = 'all') {
     $n = 0;
-    $stLabel = ($st !== 'all' && asset_status_valid($st)) ? ' — ' . asset_status_label($st) : '';
+    // ผู้เรียกบางรายผนวกสถานะไว้ใน $periodLabel แล้ว (เช่น "ม.ค. 2569 · ใหม่ (คลัง)")
+    // เติมซ้ำจะได้หัวข้อแบบ "… · ใหม่ (คลัง) — ใหม่ (คลัง)" จึงเช็คก่อนว่ามีอยู่แล้วหรือยัง
+    $stName = ($st !== 'all' && asset_status_valid($st)) ? asset_status_label($st) : '';
+    $stLabel = ($stName !== '' && mb_strpos($periodLabel, $stName) === false) ? ' — ' . $stName : '';
     echo '<div class="grid-products" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">';
     while ($r = $res->fetch_assoc()) {
         $n++;
@@ -243,7 +246,7 @@ switch ($type) {
         for ($m = 1; $m <= 12; $m++) {
             $ym = sprintf('%04d-%02d', $y, $m);
             $counts = $byM[$m];
-            $titlePrefix = '🏷️ รุ่นที่ผลิตเดือน ' . thai_month_period_label($ym);
+            $titlePrefix = 'รุ่นที่ผลิตเดือน ' . thai_month_period_label($ym);
             $baseUrl = BASE_URL . '/dashboard_data.php?type=month_models&v=' . rawurlencode($ym);
             $points[] = dash_linechart_point(
                 thai_month_short($ym),
@@ -346,7 +349,7 @@ switch ($type) {
         $years = array_reverse($years, true);
         $points = [];
         foreach ($years as $y => $counts) {
-            $titlePrefix = '📊 ' . $prod['name'] . ' — ปี ' . $y . ' รายเดือน';
+            $titlePrefix = $prod['name'] . ' — ปี ' . $y . ' รายเดือน';
             $baseUrl = BASE_URL . '/dashboard_data.php?type=product_year_months&v=' . (int) $y . '&p=' . (int) $pid;
             $points[] = dash_linechart_point((string) $y, $prod['name'] . ' ปี ' . $y, $counts, $titlePrefix, $baseUrl);
         }
@@ -384,7 +387,7 @@ switch ($type) {
         for ($m = 1; $m <= 12; $m++) {
             $ym = sprintf('%04d-%02d', $y, $m);
             $counts = $byM[$m];
-            $titlePrefix = '🏷️ ' . $prod['name'] . ' — เดือน ' . thai_month_period_label($ym);
+            $titlePrefix = $prod['name'] . ' — เดือน ' . thai_month_period_label($ym);
             $baseUrl = BASE_URL . '/dashboard_data.php?type=product_month&v=' . rawurlencode($ym) . '&p=' . $pid;
             if ($st !== 'all') {
                 $baseUrl .= '&st=' . rawurlencode($st);
