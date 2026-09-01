@@ -143,7 +143,7 @@ function page_back_url_default() {
     }
 }
 
-function page_header($title, $showBack = true, $subtitle = '', $backUrl = '') {
+function page_header($title, $showBack = true, $subtitle = '', $backUrl = '', $actionsHtml = '') {
     $u = user();
     $cur = basename($_SERVER['SCRIPT_NAME']);
     $nav = nav_effective();
@@ -176,8 +176,10 @@ function page_header($title, $showBack = true, $subtitle = '', $backUrl = '') {
     echo in_array(strtolower($sbAct), ['#fff', '#ffffff'], true) ? 'rgba(255,255,255,.16)' : $sbAct;
   ?>;
   --page-bg: <?= theme_color('color_page_bg', '#f4f1fb') ?>;
-  --border: color-mix(in srgb, var(--page-bg) 55%, #64748b);
-  --border-strong: color-mix(in srgb, var(--page-bg) 38%, #64748b);
+  /* เส้นขอบผสมจากพื้นหน้ากับสีเมนู ให้อยู่ตระกูลม่วงเดียวกับธีมและตรงกับฝั่งอะไหล่
+     สูตรเดิมผสมกับ #64748b ซึ่งเป็นเทาอมฟ้า ขอบจึงคนละโทนกับสีอื่นในหน้า */
+  --border: color-mix(in srgb, var(--page-bg) 91%, var(--sidebar-bg) 9%);
+  --border-strong: color-mix(in srgb, var(--page-bg) 78%, var(--sidebar-bg) 22%);
   --surface-muted: color-mix(in srgb, var(--page-bg) 88%, #fff);
   --surface-soft: color-mix(in srgb, var(--page-bg) 72%, #fff);
   --primary-soft: color-mix(in srgb, var(--primary) 12%, #fff);
@@ -187,11 +189,13 @@ function page_header($title, $showBack = true, $subtitle = '', $backUrl = '') {
   --success:#16a34a; --success-soft:#dcfce7;
   --info:#1d4ed8; --info-soft:#dbeafe;
   --warning:#a16207; --warning-soft:#fef9c3;
-  --near:#ca8a04; --near-soft:#fefce8;
+  --near:#eab308; --near-soft:#fefce8;
   --danger:#b91c1c; --danger-soft:#fee2e2;
   --radius:12px; --radius-sm:8px;
   --shadow-sm:0 1px 2px rgba(15,23,42,.06);
   --shadow-md:0 4px 16px rgba(15,23,42,.08);
+  --text:#2a2440; --text-muted:#6b6480; --text-faint:#9992ad;
+  --surface:#ffffff;
   --input-h:40px; --transition:.18s ease;
   <?= theme_font_css_sizes() ?>
 }</style>
@@ -291,6 +295,8 @@ $settingsActive = in_array($cur, ['settings.php', 'appearance.php', 'server_conf
         <h1><?= h($title) ?></h1>
         <?php if ($subtitle !== '') { ?><p class="pagehead-sub"><?= h($subtitle) ?></p><?php } ?>
       </div>
+      <?php // ช่องปุ่มการทำงานของหน้า — เดิมไม่มี ปุ่มหลักจึงต้องไปแขวนในแถบกรอง ?>
+      <?php if ($actionsHtml !== '') { ?><div class="pagehead-actions"><?= $actionsHtml ?></div><?php } ?>
     </div>
     <?php if ($flash) { ?>
     <script>window.__flash = <?= json_encode(['msg' => $flash[0], 'type' => $flash[1]], JSON_UNESCAPED_UNICODE) ?>;</script>

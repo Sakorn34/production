@@ -335,7 +335,7 @@ page_header('เครื่อง ' . $a['asset_code'], false);
 </details>
 
 <?php if ($showPartsWithdraw) { ?>
-<div id="parts-withdraw" style="margin-bottom:20px;padding:14px 16px;background:#fff;border:1px solid #dfe4ec;border-radius:8px">
+<div id="parts-withdraw" style="margin-bottom:20px;padding:14px 16px;background:#fff;border:1px solid var(--border, #dfe4ec);border-radius:8px">
   <b class="h-with-icon" style="font-size:14px"><?= ui_icon_html('parts', 16, 'h-svg') ?><span>สถานะการเบิกอะไหล่</span></b>
   <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-start">
     <div>

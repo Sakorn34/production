@@ -64,7 +64,7 @@ function settings_gate_render($wrong = false) {
 .pin-display {
   font-size: 28px; letter-spacing: 8px; font-weight: 700;
   padding: 14px 16px; border: 2px solid var(--border,#dde3ec); border-radius: 10px;
-  background: var(--card,#fff); min-height: 52px; margin-bottom: 16px;
+  background: var(--surface,#fff); min-height: 52px; margin-bottom: 16px;
   color: #1f2430;
   font-variant-numeric: tabular-nums;
 }
@@ -73,7 +73,7 @@ function settings_gate_render($wrong = false) {
 .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .pin-pad button {
   font-size: 22px; padding: 16px 0; border-radius: 10px; border: 1px solid var(--border,#dde3ec);
-  background: var(--card,#fff); cursor: pointer; font-weight: 600;
+  background: var(--surface,#fff); cursor: pointer; font-weight: 600;
   color: #1f2430; /* ต้อง override — global button เป็นตัวอักษรขาว จะกลืนกับพื้นขาวจนมองไม่เห็นเลข */
 }
 .pin-pad button:hover { background: #f4f1fb; }

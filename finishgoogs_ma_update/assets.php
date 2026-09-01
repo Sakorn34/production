@@ -186,7 +186,9 @@ try {
 
 $productList = qr("SELECT DISTINCT p.name FROM products p JOIN assets a ON a.product_id=p.id ORDER BY p.name");
 
-page_header('ทะเบียนเครื่องผลิตใหม่ (' . number_format($totalRows) . ')');
+$assetsCta = '<a class="btn" href="' . BASE_URL . '/asset_new.php">'
+    . ui_btn_label('assets', ' ลงทะเบียนเครื่องผลิตใหม่') . '</a>';
+page_header('ทะเบียนเครื่องผลิตใหม่', true, number_format($totalRows) . ' เครื่อง', '', $assetsCta);
 ?>
 <div class="filter assets-filter">
 <form method="get" style="display:contents">
@@ -229,7 +231,6 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
     <button type="submit" class="btn btn-sm btn-line btn-with-icon"><?= ui_btn_label('refresh', 'Sync รายการเบิก (' . number_format($withdrawSyncPendingCount) . ')') ?></button>
   </form>
   <?php } ?>
-  <a class="btn assets-filter-cta" href="<?= BASE_URL ?>/asset_new.php"><?= ui_btn_label('assets', ' ลงทะเบียนเครื่องผลิตใหม่') ?></a>
 </div>
 
 <style>
@@ -248,9 +249,8 @@ page_header('ทะเบียนเครื่องผลิตใหม่ 
 .assets-filter .btn { min-height: var(--input-h, 40px); }
 .assets-filter select { min-width: 150px; }
 /* ปุ่มลงทะเบียนดันไปชิดขวาสุด แยกจากกลุ่มค้นหาอย่างชัดเจน */
-.assets-filter-cta { margin-left: auto; }
+
 @media (max-width: 780px) {
-  .assets-filter-cta { margin-left: 0; width: 100%; justify-content: center; }
 }
 /* ป้ายสถานะการเบิกขาย */
 .sale-tag {

@@ -10,12 +10,12 @@ $B = BASE_URL;
 <style>
 .doc-section { margin-bottom: 28px; }
 .doc-section h2 { font-size: 17px; margin: 0 0 12px; padding-bottom: 8px; border-bottom: 2px solid var(--primary); color: var(--primary); }
-.doc-section h3 { font-size: 14px; font-weight: 700; margin: 14px 0 6px; color: #45506a; }
+.doc-section h3 { font-size: 14px; font-weight: 700; margin: 14px 0 6px; color: var(--text-muted, #45506a); }
 .doc-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .doc-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
 .tag-db1 { background: #dbeafe; color: #1d4ed8; }
 .tag-db2 { background: #fce7f3; color: #9d174d; }
-.tag-table { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+.tag-table { background: #f3f4f6; color: var(--text, #374151); border: 1px solid #d1d5db; }
 .tag-fn { background: #fef3c7; color: #92400e; }
 .db-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 900px) { .db-grid { grid-template-columns: 1fr; } }
@@ -23,14 +23,14 @@ $B = BASE_URL;
 .db-box-head { padding: 12px 16px; font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 8px; }
 .db-box-head.primary { background: #1d4ed8; color: #fff; }
 .db-box-head.secondary { background: #9d174d; color: #fff; }
-.db-box-body { border: 1px solid #e5e7eb; border-top: 0; border-radius: 0 0 10px 10px; padding: 10px 0; }
+.db-box-body { border: 1px solid var(--border, #e5e7eb); border-top: 0; border-radius: 0 0 10px 10px; padding: 10px 0; }
 .tbl-item { display: flex; align-items: flex-start; gap: 10px; padding: 7px 14px; font-size: 13px; border-bottom: 1px solid #f3f4f6; }
 .tbl-item:last-child { border-bottom: 0; }
-.tbl-name { font-family: monospace; font-weight: 700; color: #374151; min-width: 165px; flex-shrink: 0; }
+.tbl-name { font-family: monospace; font-weight: 700; color: var(--text, #374151); min-width: 165px; flex-shrink: 0; }
 .tbl-desc { color: #6b7280; line-height: 1.45; }
 .tbl-rows { font-size: 11px; color: #9ca3af; margin-top: 2px; }
 .flow-steps { counter-reset: step; display: flex; flex-direction: column; gap: 0; }
-.flow-step { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px dashed #e5e7eb; }
+.flow-step { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px dashed var(--border, #e5e7eb); }
 .flow-step:last-child { border-bottom: 0; }
 .flow-num { counter-increment: step; content: counter(step); width: 26px; height: 26px; border-radius: 50%; background: var(--primary); color: #fff; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
 .flow-body { flex: 1; font-size: 13px; line-height: 1.55; }
@@ -39,18 +39,18 @@ $B = BASE_URL;
 .flow-write { font-size: 11px; font-family: monospace; background: #fef3c7; color: #92400e; padding: 1px 6px; border-radius: 4px; }
 .flow-write.del { background: #fee2e2; color: #991b1b; }
 .rel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 10px; }
-.rel-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 14px; font-size: 12.5px; }
+.rel-box { background: #f9fafb; border: 1px solid var(--border, #e5e7eb); border-radius: 8px; padding: 10px 14px; font-size: 12.5px; }
 .rel-box b { font-size: 13px; font-family: monospace; color: #1d4ed8; }
-.rel-box ul { margin: 6px 0 0 16px; color: #4b5563; line-height: 1.7; }
+.rel-box ul { margin: 6px 0 0 16px; color: var(--text-muted, #4b5563); line-height: 1.7; }
 .schema-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-.schema-table th { background: #f3f4f6; padding: 6px 10px; text-align: left; border: 1px solid #e5e7eb; font-weight: 600; color: #374151; }
-.schema-table td { padding: 5px 10px; border: 1px solid #e5e7eb; color: #374151; }
+.schema-table th { background: #f3f4f6; padding: 6px 10px; text-align: left; border: 1px solid var(--border, #e5e7eb); font-weight: 600; color: var(--text, #374151); }
+.schema-table td { padding: 5px 10px; border: 1px solid var(--border, #e5e7eb); color: var(--text, #374151); }
 .schema-table tr:hover td { background: #fafafa; }
 .col-pk { background: #fef9c3; }
 .col-fk { background: #dbeafe; }
 .col-key { font-family: monospace; font-weight: 600; }
 .page-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: 10px; margin-top: 8px; }
-.page-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 14px; font-size: 12.5px; }
+.page-card { background: #fff; border: 1px solid var(--border, #e5e7eb); border-radius: 8px; padding: 10px 14px; font-size: 12.5px; }
 .page-card .pfile { font-family: monospace; font-weight: 700; color: var(--primary); font-size: 13px; }
 .page-card .pdesc { color: #6b7280; margin-top: 3px; line-height: 1.45; }
 .page-card .pread { font-size: 11px; color: #9ca3af; margin-top: 4px; font-family: monospace; }
@@ -59,9 +59,9 @@ $B = BASE_URL;
 .perm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 8px; }
 .perm-box { border-radius: 8px; overflow: hidden; font-size: 12.5px; }
 .perm-head { padding: 7px 12px; font-weight: 700; color: #fff; }
-.perm-list { padding: 7px 12px; border: 1px solid #e5e7eb; border-top: 0; border-radius: 0 0 8px 8px; }
-.perm-list li { color: #4b5563; line-height: 1.7; }
-.inline-code { font-family: monospace; font-size: 12px; background: #f3f4f6; padding: 1px 6px; border-radius: 4px; color: #374151; }
+.perm-list { padding: 7px 12px; border: 1px solid var(--border, #e5e7eb); border-top: 0; border-radius: 0 0 8px 8px; }
+.perm-list li { color: var(--text-muted, #4b5563); line-height: 1.7; }
+.inline-code { font-family: monospace; font-size: 12px; background: #f3f4f6; padding: 1px 6px; border-radius: 4px; color: var(--text, #374151); }
 </style>
 
 <!-- TOC ด่วน -->
@@ -86,7 +86,7 @@ $B = BASE_URL;
 <!-- ① ภาพรวม -->
 <div class="panel doc-section" id="overview">
   <h2>① ภาพรวมระบบ</h2>
-  <p style="font-size:13px; color:#4b5563; margin-bottom:12px">
+  <p style="font-size:13px; color:var(--text-muted, #4b5563); margin-bottom:12px">
     ระบบบันทึกข้อมูลการผลิตและการจัดการสินค้า (Production &amp; Asset Management) พัฒนาด้วย <b>PHP</b> บน <b>AppServ (Windows)</b> ใช้ <b>MySQL</b> ผ่าน <b>mysqli / PDO</b> (prepared statements) · Login ผ่าน <b>SSO bit-online</b> (localhost dev = Tom อัตโนมัติ)
   </p>
   <div class="section-note" style="margin-bottom:12px">
@@ -152,7 +152,7 @@ $B = BASE_URL;
     <tr><td class="col-key">rental</td><td>เครื่องเช่า</td><td>ออกไปเช่าลูกค้า</td><td><span class="inline-code">st-rental</span></td></tr>
     <tr><td class="col-key">spare</td><td>เครื่องสำรอง</td><td>เครื่องสำรอง / ยืมทดแทน</td><td><span class="inline-code">st-spare</span></td></tr>
   </table>
-  <ul style="font-size:13px; color:#4b5563; margin:0 0 0 18px; line-height:1.75">
+  <ul style="font-size:13px; color:var(--text-muted, #4b5563); margin:0 0 0 18px; line-height:1.75">
     <li><b>ประเภท DB:</b> <span class="inline-code">ENUM('new','rental','spare')</span> DEFAULT 'new'</li>
     <li><b>ตอนผลิตใหม่:</b> <span class="inline-code">create_produced_asset()</span> INSERT ด้วย <span class="inline-code">status='new'</span> เสมอ</li>
     <li><b>เปลี่ยนสถานะ:</b> หน้า <span class="inline-code">asset.php</span> (dropdown + บันทึก) หรือ <span class="inline-code">ma.php</span> (เลือกสถานะหลังบันทึก MA)</li>
@@ -316,17 +316,17 @@ $B = BASE_URL;
       <div class="pdesc">Activity Log ร่วม Production + Parts: filter ผู้ใช้/ระบบ/วันที่, Export CSV (PIN 9981)</div>
       <div class="pread">อ่าน: activity_logs (biton_production)</div>
     </div>
-    <div class="page-card" style="border-top:3px solid #64748b">
+    <div class="page-card" style="border-top:3px solid var(--border-strong, #64748b)">
       <div class="pfile">scan.php</div>
       <div class="pdesc">สแกน QR/บาร์โค้ดด้วย camera → redirect ไปหน้าเครื่อง</div>
       <div class="pread">ไม่อ่าน DB (client-side scan ด้วย html5-qrcode)</div>
     </div>
-    <div class="page-card" style="border-top:3px solid #64748b">
+    <div class="page-card" style="border-top:3px solid var(--border-strong, #64748b)">
       <div class="pfile">share.php</div>
       <div class="pdesc">ทะเบียนสินค้า (stock) แบบอ่าน/ค้นหา — จัดการเต็มรูปแบบอยู่ที่ share_admin.php</div>
       <div class="pread">อ่าน: biton_stockparts.stock</div>
     </div>
-    <div class="page-card" style="border-top:3px solid #64748b">
+    <div class="page-card" style="border-top:3px solid var(--border-strong, #64748b)">
       <div class="pfile">system_doc.php</div>
       <div class="pdesc">เอกสารหลักการทำงานของระบบ (หน้านี้)</div>
       <div class="pread">ไม่อ่าน DB</div>
@@ -627,7 +627,7 @@ $B = BASE_URL;
       ['nav_effective()', 'Build sidebar ฝั่ง production จาก site_settings.nav_items (parts ใช้ shared/ui_icons.php::ui_nav_apply_override() อ่าน settings ชุดเดียวกัน — ทั้ง 2 แอปจึงเห็นเมนูตรงกัน)'],
     ];
     foreach ($fns as $f) {
-        echo '<div class="rel-box"><b style="color:#92400e">' . h($f[0]) . '</b><ul><li style="list-style:none; margin-left:0; color:#374151">' . h($f[1]) . '</li></ul></div>';
+        echo '<div class="rel-box"><b style="color:#92400e">' . h($f[0]) . '</b><ul><li style="list-style:none; margin-left:0; color:var(--text, #374151)">' . h($f[1]) . '</li></ul></div>';
     }
     ?>
   </div>
@@ -686,7 +686,7 @@ $B = BASE_URL;
 
   <h3 style="margin-top:16px">📥 share_admin.php → Import CSV (Web UI)</h3>
   <div class="section-note">Admin กด Import บนหน้า share_admin (PIN 9981) — นำเข้าเข้า biton_stockparts.stock โดยตรง</div>
-  <ul style="font-size:13px; color:#4b5563; margin: 6px 0 0 20px; line-height:1.8">
+  <ul style="font-size:13px; color:var(--text-muted, #4b5563); margin: 6px 0 0 20px; line-height:1.8">
     <li>คอลัมน์ที่คาดหวัง: timestamp, serial_number, model, id, create_name, setup_id, active</li>
     <li>active Y/y → 1, N/n → 0</li>
     <li>Auto-detect รูปแบบวันที่ per-file เช่นกัน (<span class="inline-code">share_detect_fmt()</span>)</li>
@@ -694,7 +694,7 @@ $B = BASE_URL;
   </ul>
 
   <h3 style="margin-top:16px">🔄 share_admin.php → Sync จากระบบ (Web UI)</h3>
-  <ul style="font-size:13px; color:#4b5563; margin: 6px 0 0 20px; line-height:1.8">
+  <ul style="font-size:13px; color:var(--text-muted, #4b5563); margin: 6px 0 0 20px; line-height:1.8">
     <li>ดึงเครื่องทุกเครื่องจาก assets ที่ยังไม่มีใน stock</li>
     <li>ใช้ <span class="inline-code">INSERT IGNORE</span> ป้องกัน duplicate</li>
     <li>ใช้ <span class="inline-code">DENSE_RANK()</span> จัด batch id ตาม produced_at</li>
@@ -703,7 +703,7 @@ $B = BASE_URL;
 
   <h3 style="margin-top:16px">🛠️ fix_stock_data.php (CLI — เติมข้อมูล stock ที่ขาด)</h3>
   <div class="section-note" style="background:#f0fdf4; border-color:#10b981; color:#065f46">รันครั้งเดียว 2026-07-13 — เติม create_name 7,338 แถว + timestamp 20 แถว จนครบ 100% (0 ค่าว่าง)</div>
-  <ul style="font-size:13px; color:#4b5563; margin: 6px 0 0 20px; line-height:1.8">
+  <ul style="font-size:13px; color:var(--text-muted, #4b5563); margin: 6px 0 0 20px; line-height:1.8">
     <li><b>Source 1</b>: production_records.made_by / assembly_by (7,243 แถว)</li>
     <li><b>Source 2</b>: StockmasterDB.csv คอลัมน์ "ผู้บันทึก" (1 แถว)</li>
     <li><b>Source 3</b>: เพื่อนบ้านรุ่นเดียวกัน หมายเลขใกล้เคียง — เทียบตัวเลขที่ฝังใน serial (91 แถว)</li>
@@ -734,19 +734,19 @@ $B = BASE_URL;
   <div class="section-note">
     อยู่ใน <span class="inline-code">shared/</span> ใช้ร่วมกันทั้ง 2 แอป — ไม่ใช่ระบบแยกต่างหาก
   </div>
-  <ul style="font-size:13px; color:#4b5563; margin:0 0 12px 18px; line-height:1.8">
+  <ul style="font-size:13px; color:var(--text-muted, #4b5563); margin:0 0 12px 18px; line-height:1.8">
     <li><span class="inline-code">shared/line_notify_core.php</span> — คิว/ส่งข้อความผ่าน LINE Messaging API</li>
     <li><span class="inline-code">shared/line_flex_templates.php</span> — สร้าง Flex Message ตามประเภทเหตุการณ์ (พบปัญหาตอนผลิต, ต้องซ่อมตอน MA, สต็อกอะไหล่ต่ำ)</li>
     <li><span class="inline-code">shared/line_notify_jobs.php</span> — ตัว runner ที่ cron เรียกเพื่อประมวลผลคิว</li>
   </ul>
   <h3>จุดที่ยิงแจ้งเตือนจริง</h3>
-  <ul style="font-size:13px; color:#4b5563; margin:0 0 12px 18px; line-height:1.8">
+  <ul style="font-size:13px; color:var(--text-muted, #4b5563); margin:0 0 12px 18px; line-height:1.8">
     <li><span class="inline-code">asset_new.php</span> — เมื่อพบปัญหาตอนผลิต (<span class="inline-code">production.problem_found</span>)</li>
     <li><span class="inline-code">ma.php</span> — เมื่อผลตรวจ MA ต้องซ่อม (<span class="inline-code">ma.repair_required</span>)</li>
     <li><span class="inline-code">parts/includes/StockService.php</span> — เมื่อสต็อกอะไหล่ต่ำกว่าขั้นต่ำ</li>
   </ul>
   <h3>Cron ที่เกี่ยวข้อง (CLI-only — ดูหัวข้อ ⑨)</h3>
-  <ul style="font-size:13px; color:#4b5563; margin:0 0 0 18px; line-height:1.8">
+  <ul style="font-size:13px; color:var(--text-muted, #4b5563); margin:0 0 0 18px; line-height:1.8">
     <li><span class="inline-code">cron/line_notify_worker.php</span> — ส่งคิวที่ค้างอยู่</li>
     <li><span class="inline-code">cron/line_notify_scheduled.php</span> — งานแจ้งเตือนตามรอบเวลา</li>
     <li><span class="inline-code">cron/plesk_line_run_job.php</span>, <span class="inline-code">cron/plesk_line_worker.php</span> — ตัวเรียกสำหรับ Plesk scheduled task</li>

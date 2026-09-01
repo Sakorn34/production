@@ -481,7 +481,7 @@ page_header('ทะเบียนสินค้า (stock)');
 <style>
 .stock-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px; }
 @media (max-width:720px) { .stock-stats { grid-template-columns:repeat(2,1fr); } }
-.stock-stat-card { background:var(--card,#fff); border:1px solid var(--border,#dde3ec); border-radius:10px; padding:12px 8px; text-align:center; }
+.stock-stat-card { background:var(--surface,#fff); border:1px solid var(--border,#dde3ec); border-radius:10px; padding:12px 8px; text-align:center; }
 .stock-stat-num { font-size:22px; font-weight:700; color:var(--primary); line-height:1.2; }
 .stock-stat-lbl { font-size:11px; margin-top:2px; }
 .stock-actions { margin-bottom:12px; }

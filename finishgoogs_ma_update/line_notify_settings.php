@@ -134,7 +134,7 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
 .ln-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px; margin-bottom:16px; }
 
-.ln-card { border:1px solid var(--border,#e5e7eb); border-radius:10px; padding:12px 14px; font-size:13px; }
+.ln-card { border:1px solid var(--border,var(--border, #e5e7eb)); border-radius:10px; padding:12px 14px; font-size:13px; }
 
 .ln-card.ok { border-color:#86efac; background:#f0fdf4; }
 
@@ -150,7 +150,7 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
 .ln-send-form { display:inline; margin:0; }
 
-.ln-plesk-path { font-family:Consolas,'Courier New',monospace; font-size:11px; word-break:break-all; color:#374151; line-height:1.35; }
+.ln-plesk-path { font-family:Consolas,'Courier New',monospace; font-size:11px; word-break:break-all; color:var(--text, #374151); line-height:1.35; }
 
 .ln-plesk-hint { font-size:11px; color:#6b7280; margin-top:2px; }
 
@@ -170,7 +170,7 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
 .ln-outbox-list { display:flex; flex-direction:column; gap:10px; }
 
-.ln-outbox-item { border:1px solid var(--border,#e5e7eb); border-radius:10px; padding:12px 14px; background:#fff; }
+.ln-outbox-item { border:1px solid var(--border,var(--border, #e5e7eb)); border-radius:10px; padding:12px 14px; background:#fff; }
 
 .ln-outbox-item.ln-ob-sent { border-left:3px solid #22c55e; }
 
@@ -196,9 +196,9 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
 .ln-outbox-id { font-size:11px; color:#9ca3af; }
 
-.ln-outbox-meta { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:4px 16px; font-size:12.5px; color:#4b5563; }
+.ln-outbox-meta { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:4px 16px; font-size:12.5px; color:var(--text-muted, #4b5563); }
 
-.ln-outbox-meta b { color:#374151; font-weight:600; }
+.ln-outbox-meta b { color:var(--text, #374151); font-weight:600; }
 
 .ln-outbox-error { margin-top:8px; padding:8px 10px; border-radius:6px; background:#fef2f2; color:#991b1b; font-size:12px; line-height:1.45; word-break:break-word; }
 
@@ -218,7 +218,7 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
 .ln-plesk-status--failed { background:#ffedd5; color:#9a3412; }
 
-.ln-plesk-recipe { font-size:11.5px; color:#4b5563; line-height:1.45; }
+.ln-plesk-recipe { font-size:11.5px; color:var(--text-muted, #4b5563); line-height:1.45; }
 
 .ln-plesk-check .tbl { font-size:12.5px; }
 
@@ -233,7 +233,7 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 .ln-form-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; max-width: 640px; }
 
 .ln-form-field > label,
-.ln-form-grid label { display: flex; flex-direction: column; gap: 4px; font-size: calc(13px * var(--font-scale, 1)); color: #45506a; font-weight: 500; line-height: 1.4; }
+.ln-form-grid label { display: flex; flex-direction: column; gap: 4px; font-size: calc(13px * var(--font-scale, 1)); color: var(--text-muted, #45506a); font-weight: 500; line-height: 1.4; }
 
 .ln-form-grid { display: grid; grid-template-columns: 1fr; gap: 12px; max-width: 640px; margin-bottom: 20px; }
 
@@ -242,7 +242,7 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 .ln-form-grid input[type=url],
 .ln-form-field input[type=text] {
   width: 100%; box-sizing: border-box;
-  padding: 7px 10px; border: 1px solid #c9d2e0; border-radius: 6px;
+  padding: 7px 10px; border: 1px solid var(--border, #c9d2e0); border-radius: 6px;
   font-family: inherit; font-size: calc(14px * var(--font-scale, 1));
   min-height: 36px; background: #fff;
 }
@@ -250,7 +250,7 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 .ln-form-grid input:focus,
 .ln-form-field input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(225,29,116,.13); }
 
-.ln-form-check { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; font-size: calc(13.5px * var(--font-scale, 1)); color: #374151; }
+.ln-form-check { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; font-size: calc(13.5px * var(--font-scale, 1)); color: var(--text, #374151); }
 
 .ln-form-check input[type=checkbox] { width: 16px; height: 16px; flex-shrink: 0; }
 
@@ -258,7 +258,7 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
 .ln-types .tbl { width: 100%; border-collapse: collapse; font-size: calc(13px * var(--font-scale, 1)); }
 
-.ln-types .tbl th { background: #eef1f6; text-align: left; padding: 8px 10px; font-size: calc(13px * var(--font-scale, 1)); color: #45506a; font-weight: 600; white-space: nowrap; border-bottom: 1px solid #dfe4ec; }
+.ln-types .tbl th { background: #eef1f6; text-align: left; padding: 8px 10px; font-size: calc(13px * var(--font-scale, 1)); color: var(--text-muted, #45506a); font-weight: 600; white-space: nowrap; border-bottom: 1px solid var(--border, #dfe4ec); }
 
 .ln-types .tbl td { padding: 9px 10px; border-top: 1px solid #eceff4; vertical-align: middle; line-height: 1.45; }
 

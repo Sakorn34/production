@@ -56,7 +56,7 @@ page_header('ตั้งค่า Server / Deploy');
 ?>
 <style>
 .deploy-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:10px; margin-bottom:16px; }
-.deploy-card { border:1px solid var(--border,#e5e7eb); border-radius:10px; padding:12px 14px; font-size:13px; }
+.deploy-card { border:1px solid var(--border,var(--border, #e5e7eb)); border-radius:10px; padding:12px 14px; font-size:13px; }
 .deploy-card.ok { border-color:#86efac; background:#f0fdf4; }
 .deploy-card.fail { border-color:#fecaca; background:#fef2f2; }
 .deploy-card b { display:block; margin-bottom:4px; }

@@ -180,7 +180,7 @@ page_header('สแกน QR / Barcode');
 .scan-hit-code { font-size: calc(15px * var(--font-scale, 1)); font-weight: 800; letter-spacing: .04em; }
 
 .scan-status {
-  margin: 10px 0 0; font-size: calc(12.5px * var(--font-scale, 1)); color: #6b6480;
+  margin: 10px 0 0; font-size: calc(12.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480);
   display: flex; align-items: center; gap: 7px;
 }
 .scan-spin {

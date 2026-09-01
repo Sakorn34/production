@@ -191,7 +191,7 @@ page_header('ปรับแต่งหน้าตาระบบ');
       <div class="field">
         <?php foreach ($COLORS as $k => $meta) { ?>
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:7px" class="color-row" data-color-key="<?= h($k) ?>">
-          <input type="color" id="c_<?= $k ?>" name="<?= $k ?>" value="<?= h(theme_color($k, $meta[1])) ?>" style="width:46px; height:32px; padding:2px; border:1px solid #c9d2e0; border-radius:6px; cursor:pointer">
+          <input type="color" id="c_<?= $k ?>" name="<?= $k ?>" value="<?= h(theme_color($k, $meta[1])) ?>" style="width:46px; height:32px; padding:2px; border:1px solid var(--border, #c9d2e0); border-radius:6px; cursor:pointer">
           <span style="font-size:<?= theme_fs_css(13) ?>; flex:1"><?= h($meta[0]) ?></span>
           <span id="contrast_<?= $k ?>" class="contrast-badge" style="font-size:<?= theme_fs_css(11) ?>; padding:2px 8px; border-radius:999px; font-weight:600"></span>
         </div>
@@ -248,7 +248,7 @@ var PRESETS = {
 };
 var THEME_GALLERY = [
   { id:'slate', label:'Slate กลาง', desc:'เงียบ ให้กราฟเด่น', badge:'แนะนำ',
-    surface:{ border:'#e2e8f0', borderStrong:'#cbd5e1', surfaceSoft:'#f1f5f9', surfaceMuted:'#f8fafc' } },
+    surface:{ border:'var(--border, #e2e8f0)', borderStrong:'#cbd5e1', surfaceSoft:'#f1f5f9', surfaceMuted:'#f8fafc' } },
   { id:'sky', label:'Sky Blue', desc:'เข้ากับแถบเช่าในกราฟ', badge:'',
     surface:{ border:'#dbeafe', borderStrong:'#bfdbfe', surfaceSoft:'#eff6ff', surfaceMuted:'#f8fafc' } },
   { id:'mint', label:'Mint Teal', desc:'เข้ากับแถบใหม่ในกราฟ', badge:'',

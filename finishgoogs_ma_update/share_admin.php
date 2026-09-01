@@ -449,7 +449,7 @@ page_header('หลังบ้าน — เปรียบเทียบ asse
 
 <style>
 .rc-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin:14px 0; }
-.rc-stat { background:var(--card,#fff); border:1px solid var(--border,#dde3ec); border-radius:10px; padding:10px 8px; text-align:center; }
+.rc-stat { background:var(--surface,#fff); border:1px solid var(--border,#dde3ec); border-radius:10px; padding:10px 8px; text-align:center; }
 .rc-num { font-size:20px; font-weight:700; color:var(--primary); }
 .rc-lbl { font-size:11px; }
 .rc-tools summary { user-select:none; }
@@ -459,7 +459,7 @@ page_header('หลังบ้าน — เปรียบเทียบ asse
 .rc-bulk { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px; padding:8px 12px; background:#f0f6ff; border:1px solid #b8d4f0; border-radius:8px; }
 .rc-bulk[hidden] { display:none !important; }
 #rc-table .rc-pick { width:15px; height:15px; accent-color:var(--primary); }
-.sync-bar { margin:0 0 14px; padding:10px 14px; background:var(--card,#fff); border:1px solid var(--border,#dde3ec); border-radius:10px; flex-wrap:wrap; }
+.sync-bar { margin:0 0 14px; padding:10px 14px; background:var(--surface,#fff); border:1px solid var(--border,#dde3ec); border-radius:10px; flex-wrap:wrap; }
 </style>
 <script>
 (function(){

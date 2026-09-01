@@ -191,7 +191,7 @@ page_header('ตั้งค่ารวมทุกรุ่น', true, '', BAS
   </div>
   <p class="muted" id="bulk-empty" hidden style="padding:10px 0">ไม่พบรุ่นที่ค้นหา</p>
 
-  <div class="form-actions" style="margin-top:16px; position:sticky; bottom:0; background:var(--card,#fff); padding:12px 0; border-top:1px solid var(--border)">
+  <div class="form-actions" style="margin-top:16px; position:sticky; bottom:0; background:var(--surface,#fff); padding:12px 0; border-top:1px solid var(--border)">
     <button type="submit" class="btn btn-primary"><?= ui_btn_label('check', 'บันทึกทุกรุ่น', 16) ?></button>
     <a href="<?= BASE_URL ?>/settings.php" class="btn btn-line">ยกเลิก</a>
   </div>
