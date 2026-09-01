@@ -277,7 +277,8 @@ $partsBase = ui_parts_base_url();
       modal_js('เครื่องทั้งหมด — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=all", "$B/assets.php"), 'เครื่อง', '', false, false, "$B/assets.php");
   kpi($byStatus['new'], 'ใหม่ (คลัง)', 'box', 'success', pct_label($byStatus['new'], $total) . ' ของทั้งหมด',
       modal_js('เครื่องใหม่ — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=new", "$B/assets.php?status=new"), 'เครื่อง', '', false, false, "$B/assets.php?status=new");
-  kpi($byStatus['rental'], 'เครื่องเช่า', 'updates', 'info', pct_label($byStatus['rental'], $total) . ' ของทั้งหมด',
+  // ไอคอนอาคาร สื่อว่าเครื่องอยู่ที่ลูกค้า — เดิมยืม 'updates' มาใช้ ซึ่งไม่เกี่ยวกัน
+  kpi($byStatus['rental'], 'เครื่องเช่า', 'customers', 'info', pct_label($byStatus['rental'], $total) . ' ของทั้งหมด',
       modal_js('เครื่องเช่า — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=rental", "$B/assets.php?status=rental"), 'เครื่อง', '', false, false, "$B/assets.php?status=rental");
   kpi($byStatus['sold'], 'ขายแล้ว', 'stock-out-set', 'primary', pct_label($byStatus['sold'], $total) . ' ของทั้งหมด',
       modal_js('ขายแล้ว — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=sold", "$B/assets.php?status=sold"), 'เครื่อง', '', false, false, "$B/assets.php?status=sold");
