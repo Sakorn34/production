@@ -538,7 +538,9 @@
 }
 .app.nav-collapsed .userbox-trigger {
   justify-content: center;
-  padding: 8px 4px;
+  /* .ub-info ยุบเหลือ 0 แล้วแต่ gap ยังกินที่ ดัน avatar เยื้องซ้าย 5px */
+  gap: 0;
+  padding: 8px 2px;
 }
 .app.nav-collapsed .userbox-chevron { display: none; }
 
@@ -773,5 +775,15 @@
    เทียบ 3) จะทับ padding-top ที่นี่เฉพาะตอนหุบ ทำให้สูงไม่เท่ากัน 3px */
 .sidebar-nav a:not(.nav-cross) + a.nav-cross {
   margin-top: 14px;
+  position: relative;
+}
+/* วาดเส้นเป็น ::before ไม่ใช่ border ของลิงก์ — ลิงก์มีมุมโค้ง 8px
+   ขอบบนจึงโค้งลงปลายทั้งสองข้าง ดูเหมือนขอบกล่องหรือเงา ไม่ใช่เส้นคั่น */
+.sidebar-nav a:not(.nav-cross) + a.nav-cross::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -7px;
   border-top: 1px solid rgba(255, 255, 255, .14);
 }
