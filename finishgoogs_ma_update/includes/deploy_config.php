@@ -25,27 +25,63 @@ function deploy_empty_db_block(): array
  *
  * @return array<string,mixed>
  */
+/**
+ * ฐานข้อมูลที่ระบบต้องมี — ขาดตัวใดตัวหนึ่งถือว่าตั้งค่าไม่ครบ
+ *
+ * @return array<int,string>
+ */
+function deploy_required_db_keys(): array
+{
+    return ['production', 'stockparts', 'techparts'];
+}
+
+/**
+ * ฐานข้อมูลที่ไม่บังคับ — ไม่ตั้งค่าก็แค่ปิดฟีเจอร์ที่ใช้มันไป ไม่ใช่ความผิดพลาด
+ * leasing = ระบบเช่า · maintenance = ระบบซ่อม
+ *
+ * @return array<int,string>
+ */
+function deploy_optional_db_keys(): array
+{
+    return ['leasing', 'maintenance'];
+}
+
+/**
+ * ฐานข้อมูลทั้งหมดที่หน้าตั้งค่าดูแล — ใช้ทุกที่ที่ต้องวนอ่าน/บันทึก
+ * เพิ่มฐานใหม่ให้แก้ที่ deploy_required_db_keys() หรือ deploy_optional_db_keys()
+ * ที่เดียว ไม่ต้องไล่แก้ตามจุดต่าง ๆ อีก
+ *
+ * @return array<int,string>
+ */
+function deploy_all_db_keys(): array
+{
+    return array_merge(deploy_required_db_keys(), deploy_optional_db_keys());
+}
+
+/**
+ * โครงว่างของทุกฐาน ใช้ตอนยังไม่มีไฟล์ secrets
+ *
+ * @return array<string,array<string,string>>
+ */
+function deploy_empty_db_set(): array
+{
+    $out = [];
+    foreach (deploy_all_db_keys() as $k) {
+        $out[$k] = deploy_empty_db_block();
+    }
+    return $out;
+}
 function deploy_load_finishgoogs_secrets(): array
 {
     $path = app_finishgoogs_secrets_path();
     if (!is_file($path)) {
-        return [
-            'production' => deploy_empty_db_block(),
-            'stockparts' => deploy_empty_db_block(),
-            'techparts'  => deploy_empty_db_block(),
-            'leasing'    => deploy_empty_db_block(),
-        ];
+        return deploy_empty_db_set();
     }
     $data = require $path;
     if (!is_array($data)) {
-        return [
-            'production' => deploy_empty_db_block(),
-            'stockparts' => deploy_empty_db_block(),
-            'techparts'  => deploy_empty_db_block(),
-            'leasing'    => deploy_empty_db_block(),
-        ];
+        return deploy_empty_db_set();
     }
-    foreach (['production', 'stockparts', 'techparts', 'leasing'] as $key) {
+    foreach (deploy_all_db_keys() as $key) {
         if (!isset($data[$key]) || !is_array($data[$key])) {
             $data[$key] = deploy_empty_db_block();
             continue;
@@ -108,7 +144,7 @@ function deploy_parse_form(array $post): array
     ];
 
     $fg = [];
-    foreach (['production', 'stockparts', 'techparts', 'leasing'] as $block) {
+    foreach (deploy_all_db_keys() as $block) {
         $fg[$block] = [
             'host' => trim((string)($post[$block . '_host'] ?? '')),
             'db'   => trim((string)($post[$block . '_db'] ?? '')),
@@ -173,18 +209,22 @@ function deploy_validate_config(array $cfg): array
             $errors[] = 'กรุณาระบุ path: ' . $pk;
         }
     }
-    foreach (['production', 'stockparts', 'techparts'] as $block) {
+    foreach (deploy_required_db_keys() as $block) {
         $b = $cfg['finishgoogs'][$block] ?? [];
         if (empty($b['host']) || empty($b['db']) || empty($b['user'])) {
             $errors[] = 'กรุณากรอก host/db/user ของ ' . $block;
         }
     }
-    $lease = $cfg['finishgoogs']['leasing'] ?? [];
-    $leaseAny = trim((string)($lease['host'] ?? '')) !== ''
-        || trim((string)($lease['db'] ?? '')) !== ''
-        || trim((string)($lease['user'] ?? '')) !== '';
-    if ($leaseAny && (empty($lease['host']) || empty($lease['db']) || empty($lease['user']))) {
-        $errors[] = 'กรุณากรอก host/db/user ของ leasing ให้ครบ หรือเว้นว่างทั้งหมด (ไม่บังคับ)';
+    // ฐานไม่บังคับ: กรอกก็ต้องกรอกให้ครบ ไม่กรอกเลยก็ได้
+    foreach (deploy_optional_db_keys() as $block) {
+        $b = $cfg['finishgoogs'][$block] ?? [];
+        $any = trim((string)($b['host'] ?? '')) !== ''
+            || trim((string)($b['db'] ?? '')) !== ''
+            || trim((string)($b['user'] ?? '')) !== '';
+        if ($any && (empty($b['host']) || empty($b['db']) || empty($b['user']))) {
+            $errors[] = 'กรุณากรอก host/db/user ของ ' . $block
+                . ' ให้ครบ หรือเว้นว่างทั้งหมด (ไม่บังคับ)';
+        }
     }
     $parts = $cfg['parts'] ?? [];
     if (empty($parts['host']) || empty($parts['db']) || empty($parts['user'])) {
@@ -367,11 +407,11 @@ function deploy_test_mysqli(array $cfg): array
 function deploy_test_all_connections(array $cfg): array
 {
     $out = [];
-    foreach (['production', 'stockparts', 'techparts'] as $key) {
+    foreach (deploy_required_db_keys() as $key) {
         $out[$key] = deploy_test_mysqli($cfg['finishgoogs'][$key] ?? deploy_empty_db_block());
     }
     // ฐานที่ไม่บังคับ — ยังไม่ตั้งค่าก็ข้ามไป ไม่ถือว่าพัง
-    foreach (['leasing', 'maintenance'] as $key) {
+    foreach (deploy_optional_db_keys() as $key) {
         $optCfg = $cfg['finishgoogs'][$key] ?? deploy_empty_db_block();
         if (trim((string)($optCfg['host'] ?? '')) === ''
             || trim((string)($optCfg['db'] ?? '')) === ''
