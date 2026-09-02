@@ -217,6 +217,7 @@ require __DIR__ . "/includes/timeline.php";
 require __DIR__ . "/includes/list_search.php";
 require_once __DIR__ . '/includes/stockparts_withdraw.php';
 require_once __DIR__ . '/includes/rent_ma_bridge.php';
+require_once __DIR__ . '/includes/maintenance_repair_bridge.php';
 require __DIR__ . '/includes/ma_snippets.php';
 $tlData = asset_timeline_items($id);
 $tl = $tlData["tl"];
@@ -233,6 +234,8 @@ $leaseInfo = asset_leasing_info(
     (string) ($a['asset_code'] ?? ''),
     (string) ($a['factory_serial'] ?? '')
 );
+// ประวัติซ่อมจากระบบ MA — อ่านอย่างเดียว ต่อฐานไม่ได้ก็ไม่ล้มทั้งหน้า
+$maRepairInfo = asset_maintenance_info((string) $a['asset_code']);
 $assetBackHref = page_back_url('');
 
 $assetShowSnippets = product_show_snippets((int)$a['product_id']);
@@ -473,6 +476,8 @@ $addWithdrawModalUrl = BASE_URL . '/parts.php?ajax=add_move_form&asset_id=' . (i
 <p class="muted" style="margin:-4px 0 16px;font-size:13px">ยังไม่มีรายการเบิกใน production — กดปุ่มด้านบนเพื่อเบิกอะไหล่ใช้กับเครื่องนี้ (หักสต็อก Parts อัตโนมัติ)</p>
 <?php } ?>
 <?php } ?>
+
+<?= asset_maintenance_section_html($maRepairInfo) ?>
 
 <h2>ประวัติทั้งหมด (<?= count($tl) ?> รายการ) — จัดกลุ่มตามประเภท · เรียงตามวันที่ในแต่ละกลุ่ม</h2>
 <p class="muted" style="margin:-6px 0 12px; font-size:13px">เลื่อนแนวนอนเพื่อดูแต่ละประเภทงาน · รายการในแต่ละคอลัมน์เรียงจากใหม่ → เก่า</p>

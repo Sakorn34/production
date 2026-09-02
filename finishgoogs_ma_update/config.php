@@ -33,7 +33,7 @@ function app_base_url() {
 define('BASE_URL', app_base_url());
 define('APP_NAME', 'ระบบทะเบียนเครื่องและซ่อมบำรุง');
 /** รหัสชุด deploy — อัปเมื่อ build patch แล้วเทียบกับ server ว่าอัปครบหรือยัง */
-define('APP_RELEASE_VERSION', '2026-09-02_125446');
+define('APP_RELEASE_VERSION', '2026-09-02_232932');
 
 /**
  * โหลด secrets แบบ cache ต่อ request
@@ -185,6 +185,72 @@ function dbLeasingError()
         return '';
     }
     return (string)($GLOBALS['_dbLeasingError'] ?? 'เชื่อมต่อฐานระบบเช่าไม่ได้');
+}
+/**
+ * เชื่อมต่อฐานระบบซ่อม (biton_maintenance) — อ่านอย่างเดียว fail-soft ไม่ die
+ *
+ * ระบบซ่อมเป็นคนละแอปคนละ MySQL user เราแตะโค้ดฝั่งนั้นไม่ได้ตามที่ตกลงไว้
+ * จึงอ่านจากฐานของมันตรง ๆ ถ้าต่อไม่ได้ต้องคืน null เฉย ๆ ไม่ใช่ล้มทั้งหน้า
+ * เพราะหน้าโปรไฟล์เครื่องมีเรื่องอื่นให้แสดงอีกมาก
+ *
+ * @return mysqli|null
+ */
+function dbMaintenance()
+{
+    static $db = false;
+    static $error = '';
+    if ($db !== false) {
+        $GLOBALS['_dbMaintenanceError'] = $error;
+        return $db;
+    }
+    $db = null;
+    $c = db_secrets();
+    if (empty($c['maintenance']) || !is_array($c['maintenance'])) {
+        $error = 'ยังไม่ได้ตั้งค่า maintenance ใน finishgoogs.secrets.php';
+        $GLOBALS['_dbMaintenanceError'] = $error;
+        return null;
+    }
+    $cfg = $c['maintenance'];
+    $host = trim((string)($cfg['host'] ?? ''));
+    $user = trim((string)($cfg['user'] ?? ''));
+    $pass = (string)($cfg['pass'] ?? '');
+    $name = trim((string)($cfg['db'] ?? ''));
+    if ($host === '' || $name === '' || $user === '') {
+        $error = 'ค่าเชื่อมต่อระบบซ่อมไม่ครบ (host / db / user)';
+        $GLOBALS['_dbMaintenanceError'] = $error;
+        return null;
+    }
+    $mysqli = mysqli_init();
+    if (!$mysqli) {
+        $error = 'สร้างการเชื่อมต่อระบบซ่อมไม่สำเร็จ';
+        $GLOBALS['_dbMaintenanceError'] = $error;
+        return null;
+    }
+    // 3 วินาทีคือเพดานที่กันหน้าค้างถ้าเครื่องปลายทางไม่ตอบ
+    $mysqli->options(MYSQLI_OPT_CONNECT_TIMEOUT, 3);
+    if (!@$mysqli->real_connect($host, $user, $pass, $name)) {
+        $error = 'เชื่อมต่อฐานระบบซ่อมไม่ได้';
+        $GLOBALS['_dbMaintenanceError'] = $error;
+        return null;
+    }
+    $mysqli->set_charset('utf8mb4');
+    $db = $mysqli;
+    $error = '';
+    $GLOBALS['_dbMaintenanceError'] = '';
+    return $db;
+}
+
+/**
+ * ข้อความ error ล่าสุดของ dbMaintenance()
+ *
+ * @return string
+ */
+function dbMaintenanceError()
+{
+    if (dbMaintenance() !== null) {
+        return '';
+    }
+    return (string)($GLOBALS['_dbMaintenanceError'] ?? 'เชื่อมต่อฐานระบบซ่อมไม่ได้');
 }
 
 function db() {

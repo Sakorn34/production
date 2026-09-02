@@ -894,3 +894,208 @@ body.modal-open { overflow: hidden; }
 a.kpi { text-decoration: none; color: inherit; display: block; }
 a.kpi:hover { text-decoration: none; }
 .kpi.clickable:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ประวัติงานซ่อมจากระบบ MA (includes/maintenance_repair_bridge.php)
+   โครงสองชั้น: แถบขั้นตอนตอบว่า "ตอนนี้ถึงไหน" แล้วแยกเป็น
+   ซ้าย = เรื่องราวมีเลขกำกับลำดับ (แจ้ง → วินิจฉัย → ทำอะไรไป)
+   ขวา = ข้อเท็จจริงที่เปิดหาเป็นจุด ๆ คั่นด้วยเส้น
+   ═══════════════════════════════════════════════════════════════════════════ */
+.ma-repair-section { margin-bottom: 26px; }
+.ma-hint { margin: -4px 0 12px; font-size: 12.5px; color: var(--text-muted); }
+.ma-faint { color: var(--text-faint); }
+.ma-muted { color: var(--text-muted); }
+.ma-mono {
+  font-family: ui-monospace, "Consolas", monospace;
+  font-size: 12.5px; font-variant-numeric: tabular-nums;
+}
+.ma-unavailable { font-size: 13px; margin: 0 0 18px; }
+.ma-subhead { margin: 22px 0 6px; font-size: 15px; font-weight: 600; color: var(--text); }
+
+.ma-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); margin-bottom: 18px; overflow: hidden;
+}
+.ma-tblscroll { overflow-x: auto; }
+.ma-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.ma-table th {
+  text-align: left; font-weight: 600; font-size: 12px; color: var(--text-muted);
+  padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.ma-table td { padding: 9px 10px; border-top: 1px solid var(--border); vertical-align: top; }
+.ma-table tbody tr:first-child td { border-top: 0; }
+
+/* ── ป้ายสถานะ ─────────────────────────────────────────────────────────── */
+.ma-pill {
+  display: inline-block; padding: 2px 9px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 600; white-space: nowrap; line-height: 1.6;
+}
+.ma-pill-done { background: var(--success-soft); color: #15803d; }
+.ma-pill-open { background: var(--warning-soft); color: var(--warning); }
+.ma-pill-out { background: var(--primary-soft); color: var(--primary-dark); }
+.ma-pill-urgent { background: var(--danger-soft); color: var(--danger); }
+.ma-pill-declined {
+  background: var(--surface-muted); color: var(--text-muted);
+  border: 1px solid var(--border-strong);
+}
+
+/* ── ตารางงานซ่อม: แถวกางได้ ───────────────────────────────────────────── */
+.ma-tbl { min-width: 660px; }
+.ma-thead {
+  display: grid; grid-template-columns: 92px 96px 116px 1fr 96px 18px;
+  gap: 10px; padding: 9px 10px; border-bottom: 1px solid var(--border);
+  font-size: 12px; font-weight: 600; color: var(--text-muted);
+}
+.ma-jobrow { border-top: 1px solid var(--border); }
+.ma-jobrow:first-of-type { border-top: 0; }
+.ma-jobrow > summary {
+  display: grid; grid-template-columns: 92px 96px 116px 1fr 96px 18px;
+  gap: 10px; align-items: baseline; padding: 10px; cursor: pointer;
+  list-style: none; font-size: 13.5px;
+}
+.ma-jobrow > summary::-webkit-details-marker { display: none; }
+.ma-jobrow > summary:hover,
+.ma-jobrow[open] > summary { background: var(--surface-soft); }
+.ma-jobrow > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.ma-chev { color: var(--text-faint); justify-self: end; transition: transform .18s; }
+.ma-jobrow[open] .ma-chev { transform: rotate(90deg); }
+
+.ma-jobdetail {
+  padding: 18px 16px 22px 20px; background: var(--surface-soft);
+  border-left: 3px solid var(--primary);
+}
+
+/* ── แถบขั้นตอนงาน ─────────────────────────────────────────────────────── */
+.ma-stagewrap { margin-bottom: 18px; }
+.ma-caption {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--text-faint); margin: 0 0 10px;
+}
+.ma-stages { display: flex; list-style: none; margin: 0; padding: 0 0 2px; overflow-x: auto; }
+.ma-stage { position: relative; flex: 1 1 0; min-width: 112px; }
+.ma-dot {
+  display: block; width: 11px; height: 11px; border-radius: 50%; box-sizing: border-box;
+  background: var(--surface); border: 2px solid var(--border-strong);
+  position: relative; z-index: 1;
+}
+.ma-stage::after {
+  content: ""; position: absolute; left: 11px; top: 4.5px; right: 0; height: 2px;
+  background: var(--border-strong);
+}
+.ma-stage:last-child::after { display: none; }
+.ma-lbl {
+  display: block; font-size: 11.5px; color: var(--text-muted);
+  margin: 8px 0 1px; padding-right: 12px;
+}
+.ma-dt {
+  display: block; font-family: ui-monospace, "Consolas", monospace;
+  font-size: 11.5px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums;
+}
+.ma-stage.is-done .ma-dot { background: var(--success); border-color: var(--success); }
+.ma-stage.is-done::after { background: color-mix(in srgb, var(--success) 45%, var(--surface)); }
+.ma-stage.is-now .ma-dot {
+  border-color: var(--warning);
+  box-shadow: 0 0 0 3.5px var(--warning-soft);
+}
+.ma-stage.is-now .ma-lbl { color: var(--warning); font-weight: 600; }
+.ma-stage.is-now .ma-dt { color: var(--warning); }
+.ma-stage.is-stop .ma-dot { background: var(--danger); border-color: var(--danger); }
+.ma-stage.is-stop .ma-lbl { color: var(--danger); font-weight: 600; }
+.ma-stage.is-stop::after {
+  background: repeating-linear-gradient(90deg,
+    var(--border-strong) 0 4px, transparent 4px 9px);
+}
+.ma-stage.is-todo::after {
+  background: repeating-linear-gradient(90deg,
+    var(--border-strong) 0 4px, transparent 4px 9px);
+}
+.ma-stage.is-todo .ma-lbl, .ma-stage.is-todo .ma-dt { color: var(--text-faint); }
+
+/* ── ผลการอนุมัติ + บันทึกท้ายการอนุมัติ ────────────────────────────────
+   ที่ที่คนคีย์ใส่ "ซ่อมด่วน" / "เปลี่ยนเฉพาะหน้าจอ" / "ซื้อใหม่" ไว้
+   ต้องอยู่ระดับสายตา ไม่ใช่ซ่อนท้ายกล่องข้อมูล                            */
+.ma-decision {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px;
+  margin-bottom: 16px; padding: 9px 13px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--success); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.ma-decision.is-declined { border-left-color: var(--danger); }
+.ma-decision-label { font-size: 13px; font-weight: 700; color: var(--success); }
+.ma-decision.is-declined .ma-decision-label { color: var(--danger); }
+.ma-decision-note { font-size: 13px; color: var(--text); }
+
+/* ── ตัวงาน: เรื่องราว | ข้อเท็จจริง ───────────────────────────────────── */
+.ma-jobbody {
+  display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  gap: 0 24px; align-items: start;
+}
+.ma-storyline { counter-reset: ma-step; }
+.ma-step { position: relative; padding: 0 0 15px 29px; }
+.ma-step:last-child { padding-bottom: 0; }
+.ma-step::before {
+  counter-increment: ma-step; content: counter(ma-step);
+  position: absolute; left: 0; top: 0;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--sidebar-bg); color: #fff;
+  font-size: 11px; font-weight: 700; line-height: 20px; text-align: center;
+}
+.ma-step::after {
+  content: ""; position: absolute; left: 9.5px; top: 24px; bottom: 3px; width: 1.5px;
+  background: var(--border-strong);
+}
+.ma-step:last-child::after { display: none; }
+.ma-step h4 {
+  margin: 0 0 7px; font-size: 13px; font-weight: 700; color: var(--text); line-height: 20px;
+}
+.ma-by { font-weight: 400; font-size: 11.5px; color: var(--text-muted); margin-left: 7px; }
+
+.ma-facts { border-left: 1px solid var(--border); padding-left: 22px; }
+.ma-fgroup + .ma-fgroup { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--border); }
+.ma-fgroup h4 {
+  margin: 0 0 7px; font-size: 10.5px; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--sidebar-bg);
+}
+.ma-fgroup dl {
+  display: grid; grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 14px; margin: 0; font-size: 12.5px;
+}
+.ma-fgroup dt { color: var(--text-muted); white-space: nowrap; padding: 4px 0; border-top: 1px solid var(--border); }
+.ma-fgroup dd { margin: 0; padding: 4px 0; border-top: 1px solid var(--border); }
+.ma-fgroup dl > *:nth-child(1), .ma-fgroup dl > *:nth-child(2) { border-top: 0; padding-top: 0; }
+
+.ma-longtext {
+  font-size: 12.5px; line-height: 1.7; background: var(--surface);
+  border: 1px solid var(--border); border-left: 3px solid var(--border-strong);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 8px 11px; white-space: pre-wrap; word-break: break-word; margin: 0;
+}
+.ma-items { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 5px; }
+.ma-items li {
+  font-size: 12px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 3px 9px;
+}
+.ma-sublabel { font-size: 11px; font-weight: 600; color: var(--text-faint); margin: 11px 0 5px; }
+.ma-svcs { display: flex; flex-wrap: wrap; gap: 5px; }
+.ma-svcs span {
+  font-size: 11.5px; background: var(--surface-muted); border: 1px dashed var(--border-strong);
+  color: var(--text-muted); border-radius: 6px; padding: 2px 8px;
+}
+
+/* ── กดกางดูเครื่องสำรองที่เหลือ ────────────────────────────────────────── */
+.ma-more > summary {
+  padding: 10px 14px; cursor: pointer; font-size: 13px; font-weight: 600;
+  color: var(--primary); border-top: 1px solid var(--border); list-style: none;
+}
+.ma-more > summary::-webkit-details-marker { display: none; }
+.ma-more > summary:hover { background: var(--surface-soft); }
+.ma-more > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.ma-more .ma-tblscroll { border-top: 1px solid var(--border); }
+
+@media (max-width: 900px) {
+  .ma-jobbody { grid-template-columns: 1fr; gap: 20px; }
+  .ma-facts {
+    border-left: 0; border-top: 1px solid var(--border);
+    padding-left: 0; padding-top: 16px;
+  }
+}

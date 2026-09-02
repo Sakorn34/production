@@ -370,13 +370,16 @@ function deploy_test_all_connections(array $cfg): array
     foreach (['production', 'stockparts', 'techparts'] as $key) {
         $out[$key] = deploy_test_mysqli($cfg['finishgoogs'][$key] ?? deploy_empty_db_block());
     }
-    $leaseCfg = $cfg['finishgoogs']['leasing'] ?? deploy_empty_db_block();
-    if (trim((string)($leaseCfg['host'] ?? '')) === ''
-        || trim((string)($leaseCfg['db'] ?? '')) === ''
-        || trim((string)($leaseCfg['user'] ?? '')) === '') {
-        $out['leasing'] = ['ok' => true, 'message' => 'ข้าม (ไม่ได้ตั้งค่า)', 'detail' => ''];
-    } else {
-        $out['leasing'] = deploy_test_mysqli($leaseCfg);
+    // ฐานที่ไม่บังคับ — ยังไม่ตั้งค่าก็ข้ามไป ไม่ถือว่าพัง
+    foreach (['leasing', 'maintenance'] as $key) {
+        $optCfg = $cfg['finishgoogs'][$key] ?? deploy_empty_db_block();
+        if (trim((string)($optCfg['host'] ?? '')) === ''
+            || trim((string)($optCfg['db'] ?? '')) === ''
+            || trim((string)($optCfg['user'] ?? '')) === '') {
+            $out[$key] = ['ok' => true, 'message' => 'ข้าม (ไม่ได้ตั้งค่า)', 'detail' => ''];
+        } else {
+            $out[$key] = deploy_test_mysqli($optCfg);
+        }
     }
     $out['parts'] = deploy_test_mysqli([
         'host' => $cfg['parts']['host'] ?? '',

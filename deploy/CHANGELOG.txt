@@ -2204,3 +2204,31 @@ Files:
   finishgoogs_ma_update/config.php
   shared/line_notify_jobs.php
 
+
+================================================================
+v2026-09-02_232703 | Patch | 2026-09-02 23:27:05
+From: 2026-09-02_125446  ->  To: cdec9f4  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/deploy_config.php
+  finishgoogs_ma_update/includes/maintenance_repair_bridge.php
+  finishgoogs_ma_update/server_config.php
+
+
+================================================================
+v2026-09-02_232932 | Patch | 2026-09-02 23:29:33
+From: 2026-09-02_125446  ->  To: cdec9f4  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/deploy_config.php
+  finishgoogs_ma_update/includes/maintenance_repair_bridge.php
+  finishgoogs_ma_update/server_config.php
+

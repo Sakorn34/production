@@ -132,6 +132,7 @@ page_header('ตั้งค่า Server / Deploy');
         'stockparts' => 'biton_stockparts (S/N)',
         'techparts'  => 'biton_tech_parts (สต็อกช่าง)',
         'leasing'    => 'biton_leasing (ระบบเช่า — ไม่บังคับ)',
+        'maintenance' => 'biton_maintenance (ระบบซ่อม — ไม่บังคับ)',
     ];
     foreach ($dbLabels as $key => $label) {
         $b = $fg[$key] ?? deploy_empty_db_block();
@@ -167,7 +168,7 @@ page_header('ตั้งค่า Server / Deploy');
     <b>ผลทดสอบการเชื่อมต่อ</b>
     <div class="test-row">
       <?php
-      $testLabels = ['production' => 'Production', 'stockparts' => 'Stockparts', 'techparts' => 'Tech parts', 'leasing' => 'Leasing (เช่า)', 'parts' => 'Parts app'];
+      $testLabels = ['production' => 'Production', 'stockparts' => 'Stockparts', 'techparts' => 'Tech parts', 'leasing' => 'Leasing (เช่า)', 'maintenance' => 'Maintenance (ซ่อม)', 'parts' => 'Parts app'];
       foreach ($testLabels as $k => $lbl) {
           $t = $testResults[$k] ?? ['ok' => false, 'message' => '-', 'detail' => ''];
           ?>
