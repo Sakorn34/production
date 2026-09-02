@@ -475,6 +475,50 @@ function stockparts_fetch_movement_for_serial($db, string $serial, string $setup
  * @param string $serial
  * @return array<string,mixed>|null
  */
+/**
+ * อ่าน stock_old หลาย S/N ในคิวรีเดียว — ใช้ตอนเช็คเป็นชุด จะได้ไม่ยิงทีละตัว
+ *
+ * @param mysqli            $db
+ * @param array<int,string> $serials
+ * @return array<string,array<string,mixed>>  คีย์เป็น S/N ตามที่ส่งเข้ามา
+ */
+function stockparts_fetch_stock_old_rows($db, array $serials): array
+{
+    $serials = array_values(array_unique(array_filter(array_map('trim', $serials), 'strlen')));
+    if (!$serials) {
+        return [];
+    }
+    $ph = implode(',', array_fill(0, count($serials), '?'));
+    $st = $db->prepare(
+        'SELECT serial_number, model, timestamp, create_name, setup_id, security_company, active
+         FROM stock_old
+         WHERE serial_number COLLATE utf8mb4_general_ci IN (' . $ph . ')'
+    );
+    if (!$st) {
+        return [];
+    }
+    $st->bind_param(str_repeat('s', count($serials)), ...$serials);
+    if (!$st->execute()) {
+        $st->close();
+        return [];
+    }
+    // เทียบกลับแบบไม่สนตัวพิมพ์ ให้ตรงกับ COLLATE ที่ใช้ในคิวรี
+    $byUpper = [];
+    $res = $st->get_result();
+    while ($row = $res->fetch_assoc()) {
+        $byUpper[strtoupper(trim((string) $row['serial_number']))] = $row;
+    }
+    $st->close();
+
+    $out = [];
+    foreach ($serials as $sn) {
+        $k = strtoupper($sn);
+        if (isset($byUpper[$k])) {
+            $out[$sn] = $byUpper[$k];
+        }
+    }
+    return $out;
+}
 function stockparts_fetch_stock_old_row($db, string $serial): ?array
 {
     $serial = trim($serial);
@@ -1243,6 +1287,16 @@ function asset_stockparts_sale_status_by_sn(array $serials): array
 
     $resolvedMap = stockparts_batch_resolve_withdraw_refs($db, $stockRows);
 
+    // เครื่องที่ยังมีทะเบียนใน stock แต่หาใบเบิกไม่เจอ อาจส่งมอบไปแล้วก็ได้
+    // ต้องเช็ค stock_old ด้วย ไม่งั้นจะค้างเป็น "อยู่ในคลัง" ทั้งที่ติดตั้งที่ไซต์งานแล้ว
+    $needOld = [];
+    foreach ($stockRows as $sn => $row) {
+        if (!isset($resolvedMap[$sn])) {
+            $needOld[] = $sn;
+        }
+    }
+    $oldRows = $needOld ? stockparts_fetch_stock_old_rows($db, $needOld) : [];
+
     $out = [];
     foreach ($stockRows as $sn => $row) {
         if (isset($resolvedMap[$sn])) {
@@ -1250,6 +1304,16 @@ function asset_stockparts_sale_status_by_sn(array $serials): array
                 'sold' => true,
                 'setup_id' => $resolvedMap[$sn]['ref'],
                 'resolve_source' => $resolvedMap[$sn]['source'],
+            ];
+        } elseif (isset($oldRows[$sn])) {
+            $label = trim((string) ($oldRows[$sn]['setup_id'] ?? ''));
+            $out[$sn] = [
+                'sold' => true,
+                'setup_id' => $label !== '' ? $label : 'ส่งมอบแล้ว',
+                'resolve_source' => 'stock_old',
+                // หลักฐานมาจากประวัติส่งมอบ ไม่ใช่ใบเบิกขาย — ตัวตัดสินสถานะ
+                // ต้องถ่วงน้ำหนักเบากว่า เพื่อไม่ให้ไปทับเครื่องที่อยู่ในสัญญาเช่า
+                'from_delivery' => true,
             ];
         } else {
             $out[$sn] = [
@@ -1282,6 +1346,7 @@ function asset_stockparts_sale_status_by_sn(array $serials): array
                 'sold' => true,
                 'setup_id' => $label,
                 'resolve_source' => 'stock_old',
+                'from_delivery' => true,
             ];
         }
     }

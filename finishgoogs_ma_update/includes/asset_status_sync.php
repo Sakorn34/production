@@ -60,7 +60,8 @@ function asset_status_target_from_external(string $current, ?array $sale, ?array
 {
     $current = trim($current) !== '' ? trim($current) : 'new';
 
-    if ($sale && !empty($sale['sold'])) {
+    // ใบเบิกขายเป็นหลักฐานหนักสุด ชนะทุกอย่าง
+    if ($sale && !empty($sale['sold']) && empty($sale['from_delivery'])) {
         return ['target' => 'sold', 'reason' => 'เบิกขายจาก stock'];
     }
 
@@ -74,6 +75,15 @@ function asset_status_target_from_external(string $current, ?array $sale, ?array
 
     if ($current === 'rental' && $lease && asset_status_leasing_implies_new($lease)) {
         return ['target' => 'new', 'reason' => 'รับคืน/คลังพร้อมเช่า'];
+    }
+
+    // ส่งมอบไปไซต์งานแล้วและไม่มีชื่อในระบบเช่าเลย = ขายขาด
+    // วางท้ายสุดเพราะหลักฐานเป็นแค่ประวัติการส่งมอบ ไม่มีใบเบิกขายรองรับ
+    // จึงต้องแพ้ให้ทุกกฎข้างบน และแตะเฉพาะเครื่องที่ยังเป็น new เท่านั้น
+    if ($current === 'new'
+        && $sale && !empty($sale['sold']) && !empty($sale['from_delivery'])
+        && (!$lease || empty($lease['found']))) {
+        return ['target' => 'sold', 'reason' => 'ส่งมอบให้ลูกค้าแล้ว (ไม่มีสัญญาเช่า)'];
     }
 
     return ['target' => null, 'reason' => ''];
