@@ -517,6 +517,10 @@ function line_flex_build_messages(string $eventKey, array $payload): array
                 return [line_flex_production_no_data_summary('month', (string)($payload['timestamp'] ?? date('d/m/Y H:i')))];
             }
             return [line_flex_production_summary_overview($eventKey, $payload)];
+        case 'finishgood.shortage':
+            require_once __DIR__ . '/line_flex_finishgood_shortage.php';
+            $items = isset($payload['items']) && is_array($payload['items']) ? $payload['items'] : [];
+            return line_flex_finishgood_shortage_messages($items, (string)($payload['timestamp'] ?? date('d/m/Y H:i') . ' น.'));
         case 'line.test':
             return [['type' => 'text', 'text' => line_flex_text((string)($payload['message'] ?? 'ทดสอบ LINE ✅'), 500)]];
         default:

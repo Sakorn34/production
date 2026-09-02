@@ -2145,3 +2145,62 @@ Files:
   finishgoogs_ma_update/assets/sidebar.css
   finishgoogs_ma_update/config.php
 
+
+================================================================
+v2026-09-02_112558 | Patch | 2026-09-02 11:26:00
+From: 2026-09-02_010611  ->  To: 5ac632f  |  Files: 7
+----------------------------------------------------------------
+- เพิ่มแจ้งเตือน LINE: สินค้าสำเร็จรูปที่ต้องผลิตเพิ่ม (finishgood.shortage)
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/cron/plesk_line_job_finishgood_shortage.php
+  finishgoogs_ma_update/finishgood_shortage_preview.php
+  shared/finishgood_shortage_client.php
+  shared/line_flex_finishgood_shortage.php
+  shared/line_flex_templates.php
+  shared/line_notify_jobs.php
+
+
+================================================================
+v2026-09-02_120316 | Patch | 2026-09-02 12:03:21
+From: 2026-09-02_010611  ->  To: 5ac632f  |  Files: 7
+----------------------------------------------------------------
+- แจ้งเตือน finishgood.shortage + รูปสินค้าใช้ map กลาง line_flex_model_image_map()
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/cron/plesk_line_job_finishgood_shortage.php
+  finishgoogs_ma_update/finishgood_shortage_preview.php
+  shared/finishgood_shortage_client.php
+  shared/line_flex_finishgood_shortage.php
+  shared/line_flex_templates.php
+  shared/line_notify_jobs.php
+
+
+================================================================
+v2026-09-02_123451 | Patch | 2026-09-02 12:34:53
+From: 2026-09-02_010611  ->  To: 5ac632f  |  Files: 7
+----------------------------------------------------------------
+- finishgood.shortage: ใช้รูปสินค้าที่อัปในหน้าตั้งค่า (products.icon_path) ก่อน แล้วค่อยตกไป map กลาง
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/cron/plesk_line_job_finishgood_shortage.php
+  finishgoogs_ma_update/finishgood_shortage_preview.php
+  shared/finishgood_shortage_client.php
+  shared/line_flex_finishgood_shortage.php
+  shared/line_flex_templates.php
+  shared/line_notify_jobs.php
+
+
+================================================================
+v2026-09-02_125446 | Patch | 2026-09-02 12:54:47
+From: 2026-09-02_123451  ->  To: 5ac632f  |  Files: 2
+----------------------------------------------------------------
+- ลงทะเบียน finishgood.shortage ในหน้าตั้งค่า LINE (catalog + plesk script map)
+
+Files:
+  finishgoogs_ma_update/config.php
+  shared/line_notify_jobs.php
+

@@ -76,6 +76,14 @@ function line_notify_type_catalog(): array
             'schedule_type'   => 'monthly_last_day',
             'default_delivery'=> 'scheduled',
         ],
+        'finishgood.shortage' => [
+            'label'           => 'สินค้าที่ต้องผลิตเพิ่ม',
+            'can_instant'     => false,
+            'can_scheduled'   => true,
+            'job'             => 'finishgood_shortage',
+            'schedule_type'   => 'daily',
+            'default_delivery'=> 'scheduled',
+        ],
     ];
 }
 
@@ -506,6 +514,31 @@ function line_notify_run_job(string $job, array $opts = []): array
             }
             break;
 
+        case 'finishgood_shortage':
+            // ตัวเลขมาจาก setupsystem ทางเดียว — production ไม่มีสูตรคำนวณซ้ำ
+            require_once __DIR__ . '/finishgood_shortage_client.php';
+            try {
+                $fetched = finishgood_shortage_fetch();
+                if (!$fetched['ok']) {
+                    $result['skipped'] = $fetched['error'];
+                    break;
+                }
+                if ($fetched['items'] === []) {
+                    $result['skipped'] = 'no shortage';
+                    break;
+                }
+                line_notify_dispatch('finishgood.shortage', [
+                    'items'     => $fetched['items'],
+                    'timestamp' => $fetched['timestamp_text'],
+                ], array_merge($dispatchOpts, ['dedup_key' => 'finishgood.shortage:scan:' . date('Y-m-d')]));
+                $result['dispatched'] = 1;
+                $result['event_key'] = 'finishgood.shortage';
+                $result['items'] = count($fetched['items']);
+            } catch (Throwable $e) {
+                $result['skipped'] = $e->getMessage();
+            }
+            break;
+
         default:
             $result['skipped'] = 'unknown job';
     }
@@ -726,6 +759,7 @@ function line_notify_plesk_script_name(string $eventKey): ?string
         'production.summary.daily_update'=> 'plesk_line_job_daily_update.php',
         'production.summary.weekly'     => 'plesk_line_job_weekly.php',
         'production.summary.monthly'    => 'plesk_line_job_monthly.php',
+        'finishgood.shortage'           => 'plesk_line_job_finishgood_shortage.php',
     ];
     return $map[$eventKey] ?? null;
 }
