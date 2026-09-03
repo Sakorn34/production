@@ -381,6 +381,10 @@ page_header('เครื่อง ' . $a['asset_code'], false);
         echo '<code class="parts-meta-doc">' . h($doc ? $doc['doc_no'] : ('#' . $sid)) . '</code>';
     }
     ?>
+    <?php
+    // ปุ่ม Sync โผล่เฉพาะตอนข้อมูลจริงหลุดกันเท่านั้น — วัดจาก 366 เครื่องที่มีรายการเบิก
+    // ทุกตัว "Stock ตรง" อยู่แล้วไม่มีข้อยกเว้น ปุ่มที่ไม่เคยมีอะไรให้ sync ก็ไม่ต้องโชว์ทุกครั้ง
+    if (asset_needs_withdraw_list_sync($partsSummary)) { ?>
     <span class="parts-meta-links">
       <?php
       $withdrawN = (int) ($partsSummary['out_count'] ?? 0);
@@ -395,6 +399,7 @@ page_header('เครื่อง ' . $a['asset_code'], false);
         <button type="submit">ตรวจ Sync</button>
       </form>
     </span>
+    <?php } ?>
   <?php } elseif (($partsSummary['stock_out_count'] ?? 0) > 0) { ?>
     <span class="muted">มีเบิกใน Parts app แต่ยังไม่ผูกกับเครื่องนี้</span>
   <?php } ?>
