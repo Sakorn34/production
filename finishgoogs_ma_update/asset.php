@@ -357,73 +357,64 @@ page_header('เครื่อง ' . $a['asset_code'], false);
   <form method="post" id="del-asset-form"><?= csrf_field() ?><input type="hidden" name="delete_asset" value="1"></form>
 </details>
 
-<?php // ไม่มีรายการเบิกเลยก็ไม่ต้องขึ้นกล่องสถานะ BOM
+<?php // ไม่มีรายการเบิกเลยก็ไม่ต้องขึ้นแถบนี้
      if ($hasPartsRows) { ?>
-<div id="parts-withdraw" style="margin-bottom:20px;padding:14px 16px;background:#fff;border:1px solid var(--border, #dfe4ec);border-radius:8px">
-  <b class="h-with-icon" style="font-size:14px"><?= ui_icon_html('parts', 16, 'h-svg') ?><span>สถานะการเบิกอะไหล่</span></b>
-  <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-start">
-    <div>
-      <span class="muted" style="font-size:12px">สถานะ</span><br>
-      <?= asset_parts_status_badge($partsSummary) ?>
-      <?php if ($partsSummary['bom_count'] > 0 && ($partsSummary['bom_match'] ?? 'none') !== 'none') { ?>
-      <span class="muted" style="font-size:11px;margin-left:6px"><?= h(asset_bom_match_label([
-          'bom_match' => $partsSummary['bom_match'] ?? 'none',
-          'bom_count' => (int)$partsSummary['bom_count'],
-          'bom_extra_parts' => (int)($partsSummary['bom_extra_parts'] ?? 0),
-          'bom_missing_parts' => (int)($partsSummary['bom_missing_parts'] ?? 0),
-      ])) ?></span>
-      <?php } ?>
-    </div>
-    <?php if ($partsSummary['out_count'] > 0) { ?>
-    <div>
-      <span class="muted" style="font-size:12px">อ้างอิง Stock ช่าง</span><br>
-      <?php
-      $docShown = [];
-      foreach ($partsSummary['movements'] as $mv) {
-          $sid = (int)($mv['tech_stock_out_id'] ?? 0);
-          if ($sid <= 0 || isset($docShown[$sid])) continue;
-          $docShown[$sid] = true;
-          $doc = $partsSummary['stock_docs'][$sid] ?? null;
-          $docNo = $doc ? $doc['doc_no'] : ('#' . $sid);
-          echo '<span style="display:inline-block;margin:2px 6px 2px 0;font-size:12px"><code>' . h($docNo) . '</code></span>';
-      }
-      if (!$docShown) {
-          echo '<span class="muted" style="font-size:12px">movement ในระบบ (ยังไม่ link doc)</span>';
-      }
-      ?>
-    </div>
-    <div>
-      <a class="btn btn-sm btn-line btn-with-icon" href="<?= h($partsSummary['production_url']) ?>"><?= ui_btn_label('clipboard', 'ประวัติเบิก (production)') ?></a>
+<?php
+// แถบสรุปการเบิกอะไหล่ — เดิมเป็นกล่องใหญ่มีป้ายสถานะ Stock ตัวเบ้อเริ่ม
+// แต่วัดจาก 366 เครื่องที่มีรายการเบิกจริง ป้ายนั้นขึ้น "ตรง" ทุกตัวไม่มียกเว้น
+// เช่นเดียวกับสถานะ sync ที่เป็น synced ทุกตัว — เอาออกเพราะไม่ได้บอกอะไร
+// เหลือไว้เฉพาะผลตรวจ BOM ซึ่งไม่ตรงจริง 46% กับเลขอ้างอิงและลิงก์ที่ใช้ตามรอยต่อ
+$bomWarn = '';
+if (($partsSummary['bom_count'] ?? 0) > 0 && ($partsSummary['bom_match'] ?? 'none') !== 'none'
+    && ($partsSummary['bom_match'] ?? '') !== 'ok') {
+    $bomWarn = asset_bom_match_label([
+        'bom_match'         => $partsSummary['bom_match'] ?? 'none',
+        'bom_count'         => (int) $partsSummary['bom_count'],
+        'bom_extra_parts'   => (int) ($partsSummary['bom_extra_parts'] ?? 0),
+        'bom_missing_parts' => (int) ($partsSummary['bom_missing_parts'] ?? 0),
+    ]);
+}
+?>
+<div id="parts-withdraw" class="parts-meta">
+  <?php if ($bomWarn !== '') { ?>
+  <span class="parts-meta-warn"><?= ui_icon_html('alert', 13) ?><?= h($bomWarn) ?></span>
+  <?php } ?>
+
+  <?php if (($partsSummary['out_count'] ?? 0) > 0) { ?>
+    <?php
+    $docShown = [];
+    foreach ($partsSummary['movements'] as $mv) {
+        $sid = (int) ($mv['tech_stock_out_id'] ?? 0);
+        if ($sid <= 0 || isset($docShown[$sid])) { continue; }
+        $docShown[$sid] = true;
+        $doc = $partsSummary['stock_docs'][$sid] ?? null;
+        echo '<code class="parts-meta-doc">' . h($doc ? $doc['doc_no'] : ('#' . $sid)) . '</code>';
+    }
+    ?>
+    <span class="parts-meta-links">
+      <a href="<?= h($partsSummary['production_url']) ?>">ประวัติเบิก</a>
       <?php if (!empty($partsSummary['in_parts_history'])) { ?>
-      <a class="btn btn-sm btn-line btn-with-icon" href="<?= h(parts_app_base_url() . '/pages/history.php') ?>" target="_blank"><?= ui_btn_label('box', 'Stock ช่าง (Parts app)') ?></a>
+      <a href="<?= h(parts_app_base_url() . '/pages/history.php') ?>" target="_blank">Stock ช่าง</a>
       <?php } ?>
       <?php
-      $needsWithdrawSync = asset_needs_withdraw_list_sync($partsSummary);
-      $withdrawN = (int)($partsSummary['out_count'] ?? 0);
-      $withdrawConfirm = "Sync ตามรายการเบิกในตาราง?\n\n";
-      $withdrawConfirm .= "• ผูก Stock ตาม {$withdrawN} รายการในตาราง\n";
-      $withdrawConfirm .= "• ลบใบเบิกซ้ำ/เกินใน Parts (คืนสต็อกเมื่อหักแล้ว)\n\n";
-      $withdrawConfirm .= "รายการในตาราง production จะไม่ถูกลบ";
+      $withdrawN = (int) ($partsSummary['out_count'] ?? 0);
+      $withdrawConfirm = "Sync ตามรายการเบิกในตาราง?\n\n"
+          . "• ผูก Stock ตาม {$withdrawN} รายการในตาราง\n"
+          . "• ลบใบเบิกซ้ำ/เกินใน Parts (คืนสต็อก)\n\n"
+          . "รายการในตาราง production จะไม่ถูกลบ";
       ?>
-      <form method="post" style="display:inline" onsubmit="return confirm(<?= h(json_encode($withdrawConfirm, JSON_UNESCAPED_UNICODE)) ?>)">
+      <form method="post" class="parts-meta-sync" onsubmit="return confirm(<?= h(json_encode($withdrawConfirm, JSON_UNESCAPED_UNICODE)) ?>)">
         <?= csrf_field() ?>
         <input type="hidden" name="sync_withdraw_list" value="1">
-        <button type="submit" class="btn btn-sm btn-with-icon"><?= ui_btn_label('refresh', $needsWithdrawSync ? 'Sync ตามรายการเบิก' : 'Sync ตามรายการเบิก (ตรวจ)') ?></button>
+        <button type="submit">ตรวจ Sync</button>
       </form>
-    </div>
-    <?php } elseif ($partsSummary['stock_out_count'] > 0) { ?>
-    <div>
-      <span class="muted" style="font-size:12px">มีเบิกใน Parts app แต่ยังไม่มีบันทึก production สำหรับ S/N นี้</span><br>
-      <a class="btn btn-sm btn-line btn-with-icon" href="<?= h(parts_app_base_url() . '/pages/history.php') ?>" target="_blank"><?= ui_btn_label('box', 'Stock ช่าง (Parts app)') ?></a>
-    </div>
-    <?php } elseif ($partsSummary['bom_count'] > 0) { ?>
-    <div>
-      <span class="muted" style="font-size:12px">รุ่นนี้มี BOM <?= (int)$partsSummary['bom_count'] ?> ชนิด — ยังไม่มีการเบิกอะไหล่สำหรับเครื่องนี้</span>
-    </div>
-    <?php } else { ?>
-    <div><span class="muted" style="font-size:12px">ไม่มี BOM กำหนดไว้สำหรับรุ่นนี้</span></div>
-    <?php } ?>
-  </div>
+    </span>
+  <?php } elseif (($partsSummary['stock_out_count'] ?? 0) > 0) { ?>
+    <span class="muted">มีเบิกใน Parts app แต่ยังไม่ผูกกับเครื่องนี้</span>
+    <span class="parts-meta-links">
+      <a href="<?= h(parts_app_base_url() . '/pages/history.php') ?>" target="_blank">Stock ช่าง</a>
+    </span>
+  <?php } ?>
 </div>
 
 <?php if ($partsSummary['out_count'] > 0) { ?>

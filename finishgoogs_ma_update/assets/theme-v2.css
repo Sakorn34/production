@@ -1191,3 +1191,36 @@ a.kpi:hover { text-decoration: none; }
   display: inline-block; flex: none;
   background: var(--surface-muted); border: 1px dashed var(--border-strong);
 }
+
+/* ── แถบสรุปการเบิกอะไหล่ ────────────────────────────────────────────────
+   เดิมเป็นกล่องเต็มใบมีป้ายสถานะตัวใหญ่ แต่ป้ายนั้นขึ้น "Stock ตรง" เหมือนกัน
+   ทั้ง 366 เครื่องที่มีรายการเบิก เช่นเดียวกับสถานะ sync — ไม่ได้บอกอะไรเลย
+   เหลือแถวเดียว เอาไว้เฉพาะสิ่งที่ต่างกันจริงกับลิงก์ที่ใช้ตามรอย            */
+.parts-meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
+  margin: -4px 0 14px; font-size: calc(12px * var(--font-scale, 1));
+  color: var(--text-muted);
+}
+.parts-meta-warn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 9px; border-radius: 999px; font-weight: 600;
+  background: var(--warning-soft); color: var(--warning);
+}
+.parts-meta-warn svg { flex: none; }
+.parts-meta-doc {
+  font-family: ui-monospace, "Consolas", monospace;
+  font-size: calc(11px * var(--font-scale, 1));
+  background: var(--surface-muted); border: 1px solid var(--border);
+  padding: 1px 7px; border-radius: 5px; color: var(--text-muted);
+}
+.parts-meta-links { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.parts-meta-links a { color: var(--primary); text-decoration: none; font-weight: 600; }
+.parts-meta-links a:hover { text-decoration: underline; }
+.parts-meta-sync { display: inline; }
+.parts-meta-sync button {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; font-weight: 600; color: var(--primary);
+}
+.parts-meta-sync button:hover { text-decoration: underline; }
+.parts-meta-links a:focus-visible,
+.parts-meta-sync button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 3px; }
