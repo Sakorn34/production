@@ -236,6 +236,14 @@ $leaseInfo = asset_leasing_info(
 );
 // ประวัติซ่อมจากระบบ MA — อ่านอย่างเดียว ต่อฐานไม่ได้ก็ไม่ล้มทั้งหน้า
 $maRepairInfo = asset_maintenance_info((string) $a['asset_code']);
+// ปุ่มเพิ่มรายการเบิกย้ายไปอยู่แถบเครื่องมือ จึงต้องรู้ค่าพวกนี้ตั้งแต่ก่อนวาดแถบ
+$assetPartsBackUrl = urlencode(BASE_URL . '/asset.php?id=' . $id . '#parts-withdraw');
+$addWithdrawModalUrl = BASE_URL . '/parts.php?ajax=add_move_form&asset_id=' . (int)$id
+    . '&back=' . $assetPartsBackUrl;
+// ไม่มีรายการเบิกเลย = ไม่ต้องมีข้อความเรื่องอะไหล่บนหน้านี้สักบรรทัด
+$hasPartsRows = $showPartsWithdraw
+    && (((int)($partsSummary['out_count'] ?? 0) > 0) || !empty($partsUsed));
+
 $assetBackHref = page_back_url('');
 
 $assetShowSnippets = product_show_snippets((int)$a['product_id']);
@@ -304,7 +312,14 @@ page_header('เครื่อง ' . $a['asset_code'], false);
     <?php if ($assetShowSnippets) { ?>
     <button type="button" class="btn btn-sm btn-with-icon asset-snippet-open"<?= ma_snippet_data_attrs($assetSnippetPayload) ?>><?= ui_btn_label('clipboard', ma_snippets_title(false)) ?></button>
     <?php } ?>
-  <button type="button" class="btn btn-sm btn-line btn-with-icon asset-edit-toggle"
+  <?php if ($showPartsWithdraw) { ?>
+      <button type="button" class="btn btn-sm btn-line btn-with-icon"
+        onclick="showListModal(<?= h(json_encode('เพิ่มรายการเบิก — ' . $a['asset_code'], JSON_UNESCAPED_UNICODE)) ?>,<?= h(json_encode($addWithdrawModalUrl)) ?>,'')">
+        <?= ui_btn_label('stock-out-item', 'เพิ่มรายการเบิก') ?>
+      </button>
+      <?php } ?>
+
+      <button type="button" class="btn btn-sm btn-line btn-with-icon asset-edit-toggle"
         aria-expanded="false" aria-controls="asset-edit-details"><?= ui_btn_label('edit', 'แก้ไขเครื่อง') ?></button>
 
       </div>
@@ -342,7 +357,8 @@ page_header('เครื่อง ' . $a['asset_code'], false);
   <form method="post" id="del-asset-form"><?= csrf_field() ?><input type="hidden" name="delete_asset" value="1"></form>
 </details>
 
-<?php if ($showPartsWithdraw) { ?>
+<?php // ไม่มีรายการเบิกเลยก็ไม่ต้องขึ้นกล่องสถานะ BOM
+     if ($hasPartsRows) { ?>
 <div id="parts-withdraw" style="margin-bottom:20px;padding:14px 16px;background:#fff;border:1px solid var(--border, #dfe4ec);border-radius:8px">
   <b class="h-with-icon" style="font-size:14px"><?= ui_icon_html('parts', 16, 'h-svg') ?><span>สถานะการเบิกอะไหล่</span></b>
   <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-start">
@@ -410,26 +426,15 @@ page_header('เครื่อง ' . $a['asset_code'], false);
   </div>
 </div>
 
-<?php
-$assetBackUrl = urlencode(BASE_URL . '/asset.php?id=' . $id . '#parts-withdraw');
-$addWithdrawModalUrl = BASE_URL . '/parts.php?ajax=add_move_form&asset_id=' . (int)$id . '&back=' . $assetBackUrl;
-?>
-
 <?php if ($partsSummary['out_count'] > 0) { ?>
-<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px">
   <?= ui_heading('parts', 'อะไหล่ที่เบิกใช้กับเครื่องนี้', 'h2') ?>
-  <button type="button" class="btn btn-sm btn-line btn-with-icon" style="margin-left:auto"
-    onclick="showListModal(<?= h(json_encode('เพิ่มรายการเบิก — ' . $a['asset_code'], JSON_UNESCAPED_UNICODE)) ?>,<?= h(json_encode($addWithdrawModalUrl)) ?>,'')">
-    <?= ui_btn_label('stock-out-item', 'เพิ่มรายการเบิก') ?>
-  </button>
-</div>
 <div class="table-wrap">
 <table class="list" style="max-width:920px; margin-bottom:20px">
   <tr><th>อะไหล่</th><th style="text-align:right">จำนวน</th><th>ประเภท</th><th>วันเวลา</th><th>รหัส Stock</th><th></th></tr>
   <?php foreach ($partsSummary['movements'] as $mv) {
       $modeLabel = part_movement_mode_label($mv['mode'] ?? '');
       $modeClass = $modeLabel === 'MA' ? 'st-spare' : ($modeLabel === 'ผลิต' ? 'st-new' : 'st-rental');
-      $editUrl = BASE_URL . '/parts.php?ajax=edit_move_form&id=' . (int)$mv['id'] . '&back=' . $assetBackUrl;
+      $editUrl = BASE_URL . '/parts.php?ajax=edit_move_form&id=' . (int)$mv['id'] . '&back=' . $assetPartsBackUrl;
   ?>
   <tr>
     <td><?= h($mv['pname']) ?><?php if (!empty($mv['part_code']) && trim((string)$mv['part_code']) !== trim((string)$mv['pname'])) { ?><br><span class="muted" style="font-size:11px"><?= h($mv['part_code']) ?></span><?php } ?></td>
@@ -470,15 +475,6 @@ $addWithdrawModalUrl = BASE_URL . '/parts.php?ajax=add_move_form&asset_id=' . (i
   <?php } ?>
 </table>
 </div>
-<?php } else { ?>
-<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px">
-  <?= ui_heading('parts', 'อะไหล่ที่เบิกใช้กับเครื่องนี้', 'h2') ?>
-  <button type="button" class="btn btn-sm btn-line btn-with-icon" style="margin-left:auto"
-    onclick="showListModal(<?= h(json_encode('เพิ่มรายการเบิก — ' . $a['asset_code'], JSON_UNESCAPED_UNICODE)) ?>,<?= h(json_encode($addWithdrawModalUrl)) ?>,'')">
-    <?= ui_btn_label('stock-out-item', 'เพิ่มรายการเบิก') ?>
-  </button>
-</div>
-<p class="muted" style="margin:-4px 0 16px;font-size:13px">ยังไม่มีรายการเบิกใน production — กดปุ่มด้านบนเพื่อเบิกอะไหล่ใช้กับเครื่องนี้ (หักสต็อก Parts อัตโนมัติ)</p>
 <?php } ?>
 <?php } ?>
 
