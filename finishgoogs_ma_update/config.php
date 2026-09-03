@@ -33,7 +33,7 @@ function app_base_url() {
 define('BASE_URL', app_base_url());
 define('APP_NAME', 'ระบบทะเบียนเครื่องและซ่อมบำรุง');
 /** รหัสชุด deploy — อัปเมื่อ build patch แล้วเทียบกับ server ว่าอัปครบหรือยัง */
-define('APP_RELEASE_VERSION', '2026-09-03_153039');
+define('APP_RELEASE_VERSION', '2026-09-03_221036');
 
 /**
  * โหลด secrets แบบ cache ต่อ request
@@ -366,7 +366,10 @@ function recompute_asset_status_from_ma(int $assetId): void
 }
 
 /**
- * เพิ่มค่า sold ใน ENUM assets.status (ครั้งเดียว)
+ * เติมค่าที่ยังไม่มีใน ENUM assets.status (ครั้งเดียวต่อ request)
+ *
+ * ต้องรันก่อนเขียนสถานะเสมอ — ค่าที่ไม่อยู่ใน ENUM จะถูก MySQL ปัดเป็นค่าว่าง
+ * (หรือ error ถ้าเปิด strict mode) เงียบ ๆ ไม่มีอะไรฟ้อง
  *
  * @return void
  */
@@ -381,9 +384,17 @@ function ensure_asset_status_sold_schema()
         $res = db()->query("SHOW COLUMNS FROM assets LIKE 'status'");
         if ($res && ($row = $res->fetch_assoc())) {
             $type = (string) ($row['Type'] ?? '');
-            if (stripos($type, 'sold') === false) {
+            $missing = false;
+            foreach (['sold', 'retired', 'lost'] as $val) {
+                if (stripos($type, "'" . $val . "'") === false) {
+                    $missing = true;
+                    break;
+                }
+            }
+            if ($missing) {
                 db()->query(
-                    "ALTER TABLE assets MODIFY status ENUM('new','rental','spare','sold') NOT NULL DEFAULT 'new'"
+                    "ALTER TABLE assets MODIFY status"
+                    . " ENUM('new','rental','spare','sold','retired','lost') NOT NULL DEFAULT 'new'"
                 );
             }
         }
@@ -979,10 +990,13 @@ function theme_font_config() {
 
 // ---------- สถานะ ----------
 function status_th($s) {
-    $m = ['new' => 'เครื่องใหม่', 'rental' => 'เครื่องเช่า', 'spare' => 'เครื่องสำรอง', 'sold' => 'ขายแล้ว'];
+    $m = [
+        'new' => 'เครื่องใหม่', 'rental' => 'เครื่องเช่า', 'spare' => 'เครื่องสำรอง',
+        'sold' => 'ขายแล้ว', 'retired' => 'เสื่อมสภาพ', 'lost' => 'สูญหาย',
+    ];
     return isset($m[$s]) ? $m[$s] : $s;
 }
-function status_list() { return ['new', 'rental', 'spare', 'sold']; }
+function status_list() { return ['new', 'rental', 'spare', 'sold', 'retired', 'lost']; }
 function status_badge($s) {
     return '<span class="badge st-' . h($s) . '">' . h(status_th($s)) . '</span>';
 }

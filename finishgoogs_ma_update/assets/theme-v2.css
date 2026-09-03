@@ -176,6 +176,14 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .kpi-warning { border-left: 4px solid var(--warning); }
 .kpi-warning .kpi-ic { background: var(--warning-soft); color: var(--warning); }
 .kpi-warning .kpi-num { color: var(--warning); }
+/* เสื่อมสภาพ = หมดอายุใช้งานแล้ว โทนเทาให้จมกว่าสถานะที่ยังใช้งานได้
+   สูญหาย = ของที่ยังตามหาอยู่ ต้องสะดุดตากว่า จึงใช้โทนเตือน */
+.kpi-muted { border-left: 4px solid var(--text-muted); }
+.kpi-muted .kpi-ic { background: var(--surface-muted); color: var(--text-muted); }
+.kpi-muted .kpi-num { color: var(--text-muted); }
+.kpi-danger { border-left: 4px solid var(--danger); }
+.kpi-danger .kpi-ic { background: var(--danger-soft); color: var(--danger); }
+.kpi-danger .kpi-num { color: var(--danger); }
 
 /* ── Dashboard รวม: อะไหล่ใกล้หมด (modal / popup) ── */
 .dash-low-stock-empty { margin: 0; padding: 4px 0; }

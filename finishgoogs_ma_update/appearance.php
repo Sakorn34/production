@@ -219,8 +219,9 @@ page_header('ปรับแต่งหน้าตาระบบ');
 </form>
 
 <script>
-var CHART_COLORS = { new:'#6ee7b7', rental:'#93c5fd', sold:'#fdba74', spare:'#fde68a' };
-var CHART_SEG_FLEX = { new:3, rental:2, sold:1, spare:1 };
+var CHART_COLORS = { new:'#6ee7b7', rental:'#93c5fd', sold:'#fdba74', spare:'#fde68a',
+                     retired:'#cbd5e1', lost:'#fca5a5' };
+var CHART_SEG_FLEX = { new:3, rental:2, sold:1, spare:1, retired:1, lost:1 };
 var PRESETS = {
   slate: { color_primary:'#64748b', color_primary_dark:'#475569', color_sidebar:'#334155', color_sidebar_active:'#64748b', color_page_bg:'#f8fafc' },
   sky: { color_primary:'#38bdf8', color_primary_dark:'#0ea5e9', color_sidebar:'#1e40af', color_sidebar_active:'#38bdf8', color_page_bg:'#f8fafc' },

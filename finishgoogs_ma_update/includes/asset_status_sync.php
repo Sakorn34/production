@@ -26,10 +26,40 @@ function asset_status_leasing_implies_rental(array $lease): bool
     if ($p === 'active') {
         return true;
     }
-    if (in_array($pro, ['MA', 'claim', 'Awaiting Return', 'rent', 'Asset Retirement'], true)) {
+    if (in_array($pro, ['MA', 'claim', 'Awaiting Return', 'rent'], true)) {
         return true;
     }
     return in_array($p, ['MA', 'claim'], true);
+}
+
+/**
+ * ระบบเช่าบ่งชี้ว่าเครื่องปลดระวาง/เสื่อมสภาพแล้ว
+ *
+ * @param array<string,mixed> $lease
+ * @return bool
+ */
+function asset_status_leasing_implies_retired(array $lease): bool
+{
+    if (empty($lease['found'])) {
+        return false;
+    }
+    return trim((string) ($lease['pro_status'] ?? '')) === 'Asset Retirement'
+        || trim((string) ($lease['p_status'] ?? '')) === 'Asset Retirement';
+}
+
+/**
+ * ระบบเช่าบ่งชี้ว่าเครื่องสูญหาย
+ *
+ * @param array<string,mixed> $lease
+ * @return bool
+ */
+function asset_status_leasing_implies_lost(array $lease): bool
+{
+    if (empty($lease['found'])) {
+        return false;
+    }
+    return trim((string) ($lease['pro_status'] ?? '')) === 'Lost'
+        || trim((string) ($lease['p_status'] ?? '')) === 'Lost';
 }
 
 /**
@@ -60,11 +90,24 @@ function asset_status_target_from_external(string $current, ?array $sale, ?array
 {
     $current = trim($current) !== '' ? trim($current) : 'new';
 
-    // สัญญาเช่าที่ยังใช้งานอยู่ชนะใบเบิกขาย — เครื่องเช่าก็ต้องเบิกออกจากคลัง
-    // เหมือนกัน ใบเบิกจึงบอกได้แค่ว่าเครื่องออกไปแล้ว ไม่ได้บอกว่าออกไปแบบไหน
+    // ระบบเช่าชนะใบเบิกขาย — เครื่องเช่าก็ต้องเบิกออกจากคลังเหมือนกัน ใบเบิกจึงบอกได้
+    // แค่ว่าเครื่องออกไปแล้ว ไม่ได้บอกว่าออกไปแบบไหน
     // ยกเว้นเครื่องสำรองที่ตั้งไว้เอง ยังคงไม่แตะเหมือนเดิม
-    if ($current !== 'spare' && $lease && asset_status_leasing_implies_rental($lease)) {
-        return ['target' => 'rental', 'reason' => 'สถานะระบบเช่า'];
+    if ($current !== 'spare' && $lease && !empty($lease['found'])) {
+        // สัญญาที่ยัง active ชนะทุกอย่าง — เครื่องอยู่กับลูกค้าจริง ต่อให้ทะเบียนเครื่อง
+        // เขียนว่าปลดระวาง/สูญหาย ก็ถือว่าข้อมูลสองฝั่งขัดกัน แล้วเชื่อสัญญาที่ยังเดินอยู่
+        if (trim((string) ($lease['p_status'] ?? '')) === 'active') {
+            return ['target' => 'rental', 'reason' => 'สถานะระบบเช่า'];
+        }
+        if (asset_status_leasing_implies_lost($lease)) {
+            return ['target' => 'lost', 'reason' => 'ระบบเช่าแจ้งสูญหาย'];
+        }
+        if (asset_status_leasing_implies_retired($lease)) {
+            return ['target' => 'retired', 'reason' => 'ระบบเช่าแจ้งปลดระวาง'];
+        }
+        if (asset_status_leasing_implies_rental($lease)) {
+            return ['target' => 'rental', 'reason' => 'สถานะระบบเช่า'];
+        }
     }
 
     if ($sale && !empty($sale['sold']) && empty($sale['from_delivery'])) {
@@ -75,7 +118,10 @@ function asset_status_target_from_external(string $current, ?array $sale, ?array
         return ['target' => null, 'reason' => 'เครื่องสำรอง — ไม่ sync อัตโนมัติ'];
     }
 
-    if ($current === 'rental' && $lease && asset_status_leasing_implies_new($lease)) {
+    // เครื่องที่เคยปลดระวาง/สูญหายแล้วระบบเช่าเปลี่ยนใจ ก็ต้องกลับเข้าคลังได้เหมือนเครื่องเช่า
+    // (มาถึงตรงนี้ได้แปลว่าไม่เข้ากฎ Lost/Asset Retirement ข้างบนแล้ว)
+    if (in_array($current, ['rental', 'retired', 'lost'], true)
+        && $lease && asset_status_leasing_implies_new($lease)) {
         return ['target' => 'new', 'reason' => 'รับคืน/คลังพร้อมเช่า'];
     }
 

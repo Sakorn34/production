@@ -153,7 +153,7 @@ $B = BASE_URL;
     <tr><td class="col-key">spare</td><td>เครื่องสำรอง</td><td>เครื่องสำรอง / ยืมทดแทน</td><td><span class="inline-code">st-spare</span></td></tr>
   </table>
   <ul style="font-size:13px; color:var(--text-muted, #4b5563); margin:0 0 0 18px; line-height:1.75">
-    <li><b>ประเภท DB:</b> <span class="inline-code">ENUM('new','rental','spare')</span> DEFAULT 'new'</li>
+    <li><b>ประเภท DB:</b> <span class="inline-code">ENUM('new','rental','spare','sold','retired','lost')</span> DEFAULT 'new'</li>
     <li><b>ตอนผลิตใหม่:</b> <span class="inline-code">create_produced_asset()</span> INSERT ด้วย <span class="inline-code">status='new'</span> เสมอ</li>
     <li><b>เปลี่ยนสถานะ:</b> หน้า <span class="inline-code">asset.php</span> (dropdown + บันทึก) หรือ <span class="inline-code">ma.php</span> (เลือกสถานะหลังบันทึก MA)</li>
     <li><b>Dashboard / assets.php:</b> นับ GROUP BY status · filter <span class="inline-code">?status=new|rental|spare</span></li>
@@ -420,7 +420,7 @@ $B = BASE_URL;
     <tr><td class="col-fk col-key">product_id</td><td>BIGINT UNSIGNED NOT NULL</td><td>FK → products(id)</td></tr>
     <tr><td>running_no</td><td>INT UNSIGNED NULL</td><td>ตัวเลขวิ่งใน รหัส (ใช้ generated mode)</td></tr>
     <tr><td>produced_at</td><td>DATE NULL</td><td>วันที่ผลิต (ขึ้น YY/MM ในรหัส)</td></tr>
-    <tr><td>status</td><td>ENUM('new','rental','spare')</td><td>new=คลัง, rental=เช่า, spare=สำรอง</td></tr>
+    <tr><td>status</td><td>ENUM('new','rental','spare','sold','retired','lost')</td><td>new=คลัง, rental=เช่า, spare=สำรอง, sold=ขายแล้ว, retired=เสื่อมสภาพ, lost=สูญหาย (4 ตัวหลัง sync จากระบบเช่า/stock — ดู includes/asset_status_sync.php)</td></tr>
     <tr><td class="col-fk">current_customer_id</td><td>BIGINT UNSIGNED NULL</td><td>FK → customers(id) — legacy, ไม่มี UI จัดการแล้ว</td></tr>
     <tr><td>current_fw_version</td><td>VARCHAR(50) NULL</td><td>FW ล่าสุดที่ทราบ (อัปเดตตอน update/MA)</td></tr>
     <tr><td>ma_interval_months</td><td>TINYINT UNSIGNED NULL</td><td>ระยะ MA เป็นเดือน</td></tr>

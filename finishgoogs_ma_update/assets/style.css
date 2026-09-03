@@ -100,7 +100,10 @@ table.list tr:hover td { background: #f7f9fc; }
 .st-sold { background: #fef3c7; color: #92400e; }
 .st-spare, .st-on_loan { background: var(--warning-soft, #fef9c3); color: #a16207; }
 .st-in_repair { background: var(--danger-soft, #fee2e2); color: #b91c1c; }
+/* เสื่อมสภาพ = จบอายุใช้งาน โทนเทาให้จมลงไปจากสถานะที่ยังใช้งานได้
+   สูญหาย = ต้องสะดุดตากว่า เพราะเป็นของที่ยังตามหาอยู่ ไม่ใช่ของที่ปลดแล้วจบ */
 .st-retired { background: #e8e8e8; color: #666; }
+.st-lost { background: var(--danger-soft, #fee2e2); color: #b91c1c; }
 
 .parts-status { display: inline-block; padding: 0.22rem 0.62rem; border-radius: 999px; font-size: var(--fs-badge); white-space: nowrap; text-decoration: none; font-weight: 600; }
 .parts-status-done { background: var(--success-soft, #dcfce7); color: #15803d; }

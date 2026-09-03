@@ -10,7 +10,7 @@ require_login();
 // ไม่รัน full sync บนหน้า dashboard — 18k+ เครื่องใช้เวลานานและเสี่ยง timeout
 
 // ---- สรุปสถานะ ----
-$byStatus = ['new' => 0, 'rental' => 0, 'spare' => 0, 'sold' => 0];
+$byStatus = array_fill_keys(status_list(), 0);
 $res = qr("SELECT status, COUNT(*) c FROM assets GROUP BY status");
 while ($r = $res->fetch_assoc()) $byStatus[$r['status']] = (int)$r['c'];
 $total = array_sum($byStatus);
@@ -286,6 +286,15 @@ $partsBase = ui_parts_base_url();
       pct_label($byStatus['spare'], $total) . ' ของทั้งหมด<br>คลังเครื่องสำรอง — ทดแทนเครื่องเช่า',
       modal_js('เครื่องสำรอง — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=spare", "$B/assets.php?status=spare"), 'เครื่อง',
       '', true, false, "$B/assets.php?status=spare");
+  // สองใบนี้ sync มาจากระบบเช่า (Asset Retirement / Lost) ไม่ได้ตั้งเองในระบบนี้
+  kpi($byStatus['retired'], 'เสื่อมสภาพ', 'status-replace', 'muted',
+      pct_label($byStatus['retired'], $total) . ' ของทั้งหมด<br>ปลดระวางจากระบบเช่าแล้ว',
+      modal_js('เสื่อมสภาพ — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=retired", "$B/assets.php?status=retired"), 'เครื่อง',
+      '', true, false, "$B/assets.php?status=retired");
+  kpi($byStatus['lost'], 'สูญหาย', 'alert', 'danger',
+      pct_label($byStatus['lost'], $total) . ' ของทั้งหมด<br>ระบบเช่าแจ้งสูญหาย',
+      modal_js('สูญหาย — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=lost", "$B/assets.php?status=lost"), 'เครื่อง',
+      '', true, false, "$B/assets.php?status=lost");
   if ($stock['ok']) {
       kpi($stock['qty'], 'สต็อกคงเหลือรวม', 'parts', 'primary', number_format($stock['items']) . ' รายการ (ผลรวมดิบข้ามหน่วย ใช้อ้างอิงคร่าวๆ)',
           '', 'อะไหล่', '', false, false, $partsBase . '/pages/products.php');

@@ -59,14 +59,16 @@ function asset_status_valid($st) {
 
 /** ป้ายชื่อสถานะสำหรับ modal */
 function asset_status_label($st) {
+    // ชื่อในหน้า dashboard ต่างจาก status_th() อยู่ตัวเดียว (new = "ใหม่ (คลัง)")
+    // ที่เหลือถอยไปใช้ status_th() เพื่อไม่ต้องมาไล่เติมสองที่ทุกครั้งที่เพิ่มสถานะ
     static $map = [
-        'all'    => 'เครื่องทั้งหมด',
-        'new'    => 'ใหม่ (คลัง)',
-        'rental' => 'เครื่องเช่า',
-        'spare'  => 'เครื่องสำรอง',
-        'sold'   => 'ขายแล้ว',
+        'all' => 'เครื่องทั้งหมด',
+        'new' => 'ใหม่ (คลัง)',
     ];
-    return isset($map[$st]) ? $map[$st] : $st;
+    if (isset($map[$st])) {
+        return $map[$st];
+    }
+    return function_exists('status_th') ? status_th($st) : $st;
 }
 
 /**
