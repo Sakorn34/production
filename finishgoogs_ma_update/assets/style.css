@@ -266,7 +266,11 @@ img.broken { visibility: hidden; }
 #list-overlay .list-modal-box {
   width: min(860px, 96vw);
   max-height: 92vh;
-  height: min(92vh, 860px);
+  /* เดิมล็อกความสูงไว้ตายตัวทุกกรณี เพราะเขียนไว้ให้ modal กราฟ dashboard
+     ที่ต้องกางเต็มจอ — ฟอร์มสั้น ๆ ที่ใช้กล่องเดียวกันจึงเหลือที่ว่างใต้เนื้อหา
+     (ฟอร์มเพิ่มรายการเบิก: เนื้อหา 314px ในกล่อง 647px ว่าง 251px)
+     ให้สูงตามเนื้อหาเป็นค่าเริ่มต้น แล้วค่อยกางเต็มเฉพาะตอนมีกราฟ */
+  height: auto;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1041,3 +1045,20 @@ button:active, .btn:active { transform: scale(.96); }
 }
 
 .dash-bar-total-empty.is-future { opacity: .55; }
+
+/* ── modal ที่ใช้ร่วมกัน: ปรับขนาดตามชนิดเนื้อหา ─────────────────────────
+   #list-overlay ถูกใช้ทั้งกราฟ dashboard, รายการยาว และฟอร์มสั้น ๆ
+   ขนาดเดียวจึงพอดีกับอย่างเดียว ที่เหลือดูหลวมหรืออึดอัด                   */
+
+/* กราฟต้องการพื้นที่เต็ม — กางความสูงคืนเฉพาะกรณีนี้ */
+#list-overlay .list-modal-box:has(.dash-stacked-chart) {
+  height: min(92vh, 860px);
+}
+
+/* ฟอร์มแคบไม่ควรลอยอยู่ในกล่องกว้าง 860px — ย่อกล่องให้พอดีฟอร์ม */
+#list-overlay .list-modal-box:has(.formgrid.form-narrow) {
+  width: min(520px, 94vw);
+}
+#list-overlay .list-modal-box:has(.formgrid.form-narrow) .formgrid.form-narrow {
+  max-width: 100%;
+}

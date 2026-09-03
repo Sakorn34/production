@@ -304,7 +304,10 @@ page_header('เครื่อง ' . $a['asset_code'], false);
     <?php if ($assetShowSnippets) { ?>
     <button type="button" class="btn btn-sm btn-with-icon asset-snippet-open"<?= ma_snippet_data_attrs($assetSnippetPayload) ?>><?= ui_btn_label('clipboard', ma_snippets_title(false)) ?></button>
     <?php } ?>
-  </div>
+  <button type="button" class="btn btn-sm btn-line btn-with-icon asset-edit-toggle"
+        aria-expanded="false" aria-controls="asset-edit-details"><?= ui_btn_label('edit', 'แก้ไขเครื่อง') ?></button>
+
+      </div>
 </div>
 
 <div class="asset-head">
@@ -325,7 +328,7 @@ page_header('เครื่อง ' . $a['asset_code'], false);
 <div style="margin-bottom:16px"><?= $partAlertsHtml ?></div>
 <?php } ?>
 
-<details style="margin-bottom:16px" class="asset-edit-details">
+<details id="asset-edit-details" style="margin-bottom:16px" class="asset-edit-details">
   <summary class="btn btn-line btn-sm btn-with-icon" style="list-style:none; cursor:pointer; display:inline-flex"><?= ui_btn_label('edit', 'แก้ไขข้อมูลเครื่อง') ?></summary>
   <?= asset_production_edit_form_html($a, $assetEditCtx, $productList, $fwSuggest) ?>
   <div style="margin-top:16px;padding:12px 14px;border:1px solid #b91c1c;background:var(--danger-soft, #fee2e2);border-radius:8px">
@@ -496,4 +499,27 @@ $addWithdrawModalUrl = BASE_URL . '/parts.php?ajax=add_move_form&asset_id=' . (i
   </div>
 </div>
 <script src="<?= BASE_URL ?>/assets/ma-snippets.js?v=<?= @filemtime(__DIR__ . '/assets/ma-snippets.js') ?: time() ?>"></script>
+<script>
+// ปุ่มแก้ไขอยู่บนแถบเครื่องมือ แต่ฟอร์มอยู่ใน <details> ด้านล่าง — ต่อสองอันเข้าด้วยกัน
+// ซ่อน summary เดิมด้วย JS เท่านั้น ไม่ได้ซ่อนใน HTML เพื่อให้ยังกดได้ถ้า JS ไม่ทำงาน
+(function () {
+  var box = document.getElementById('asset-edit-details');
+  var btn = document.querySelector('.asset-edit-toggle');
+  if (!box || !btn) { return; }
+
+  var sum = box.querySelector('summary');
+  if (sum) { sum.hidden = true; }
+
+  function sync() {
+    btn.setAttribute('aria-expanded', box.open ? 'true' : 'false');
+  }
+  btn.addEventListener('click', function () {
+    box.open = !box.open;
+    sync();
+    if (box.open) { box.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  });
+  box.addEventListener('toggle', sync);
+  sync();
+})();
+</script>
 <?php page_footer();
