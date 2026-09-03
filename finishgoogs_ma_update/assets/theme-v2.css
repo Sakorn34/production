@@ -1225,17 +1225,8 @@ a.kpi:hover { text-decoration: none; }
 .parts-meta-links a:focus-visible,
 .parts-meta-sync button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 3px; }
 
-/* หัวข้ออะไหล่กับแถบข้อมูลอยู่แถวเดียวกัน — หัวข้อชิดซ้าย ข้อมูลไหลไปขวา
-   จอแคบก็ตกลงมาเป็นสองแถวเอง ไม่ต้องมี media query */
-.parts-head-row {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px;
-  margin-bottom: 10px;
-}
-.parts-head-row > h2 { margin: 0; }
-.parts-head-row .parts-meta { margin: 0 0 0 auto; }
-
-/* จอแคบจนตกบรรทัด: ไม่ต้องดันไปขวาอีก ให้ชิดซ้ายใต้หัวข้อ
-   960px คือจุดเดียวกับที่ toolbar ของหน้านี้เปลี่ยนการจัดวางอยู่แล้ว */
-@media (max-width: 960px) {
-  .parts-head-row .parts-meta { margin-left: 0; }
-}
+/* หัวข้ออะไหล่กับแถบข้อมูล — แถบอยู่ใต้หัวข้อ ชิดซ้ายตรงกัน
+   หัวข้อสร้างครั้งเดียวที่ wrapper นี้ ไม่แยกตามสาขาของตาราง */
+.parts-head-row { margin-bottom: 10px; }
+.parts-head-row > h2 { margin: 0 0 8px; }
+.parts-head-row .parts-meta { margin: 0; }

@@ -375,7 +375,7 @@ if (($partsSummary['bom_count'] ?? 0) > 0 && ($partsSummary['bom_match'] ?? 'non
     ]);
 }
 ?>
-<?php // หัวข้อกับแถบข้อมูลอยู่แถวเดียวกัน ไม่ต้องกินสองบรรทัด ?>
+<?php // หัวข้อสร้างที่เดียวตรงนี้ แถบข้อมูลอยู่ใต้หัวข้อ ?>
 <div class="parts-head-row">
   <?= ui_heading('parts', 'อะไหล่ที่เบิกใช้กับเครื่องนี้', 'h2') ?>
 <div id="parts-withdraw" class="parts-meta">
@@ -395,10 +395,6 @@ if (($partsSummary['bom_count'] ?? 0) > 0 && ($partsSummary['bom_match'] ?? 'non
     }
     ?>
     <span class="parts-meta-links">
-      <a href="<?= h($partsSummary['production_url']) ?>">ประวัติเบิก</a>
-      <?php if (!empty($partsSummary['in_parts_history'])) { ?>
-      <a href="<?= h(parts_app_base_url() . '/pages/history.php') ?>" target="_blank">Stock ช่าง</a>
-      <?php } ?>
       <?php
       $withdrawN = (int) ($partsSummary['out_count'] ?? 0);
       $withdrawConfirm = "Sync ตามรายการเบิกในตาราง?\n\n"
@@ -414,9 +410,6 @@ if (($partsSummary['bom_count'] ?? 0) > 0 && ($partsSummary['bom_match'] ?? 'non
     </span>
   <?php } elseif (($partsSummary['stock_out_count'] ?? 0) > 0) { ?>
     <span class="muted">มีเบิกใน Parts app แต่ยังไม่ผูกกับเครื่องนี้</span>
-    <span class="parts-meta-links">
-      <a href="<?= h(parts_app_base_url() . '/pages/history.php') ?>" target="_blank">Stock ช่าง</a>
-    </span>
   <?php } ?>
 </div>
 </div>
@@ -427,7 +420,9 @@ if (($partsSummary['bom_count'] ?? 0) > 0 && ($partsSummary['bom_match'] ?? 'non
   <tr><th>อะไหล่</th><th style="text-align:right">จำนวน</th><th>ประเภท</th><th>วันเวลา</th><th>รหัส Stock</th><th></th></tr>
   <?php foreach ($partsSummary['movements'] as $mv) {
       $modeLabel = part_movement_mode_label($mv['mode'] ?? '');
-      $modeClass = $modeLabel === 'MA' ? 'st-spare' : ($modeLabel === 'ผลิต' ? 'st-new' : 'st-rental');
+      $modeClass = $modeLabel === 'MA' ? 'st-spare'
+          : ($modeLabel === 'ผลิต' ? 'st-new'
+          : ($modeLabel === 'ซ่อม' ? 'st-in_repair' : 'st-rental'));
       $editUrl = BASE_URL . '/parts.php?ajax=edit_move_form&id=' . (int)$mv['id'] . '&back=' . $assetPartsBackUrl;
   ?>
   <tr>

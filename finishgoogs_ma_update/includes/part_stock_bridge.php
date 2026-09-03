@@ -1390,10 +1390,12 @@ function part_movement_mode_label($mode) {
         return 'MA';
     }
     if (preg_match('/: Out\s*$/i', $mode)) {
-        return 'ภลิต';
+        return 'ผลิต';
     }
-    if ($mode === 'ซ่อม') {
-        return 'เบิกใช้';
+    // งานซ่อมเขียนมาสองแบบ — production ใช้ 'ซ่อม' ส่วน Stock ช่างใช้ 'เบิกงานซ่อม'
+    // ทั้งคู่คือเรื่องเดียวกัน ให้ขึ้นป้ายเดียวกัน จะได้ไม่แยกเป็นคนละประเภทในสายตาคนอ่าน
+    if (strpos($mode, 'ซ่อม') !== false) {
+        return 'ซ่อม';
     }
     if (strpos($mode, 'ผลิต') !== false || strpos($mode, 'BOM') !== false || strpos($mode, 'ชุดอะไหล่') !== false) {
         return 'ผลิต';
@@ -1414,6 +1416,7 @@ function part_movement_mode_form_options(): array
     return [
         'เบิกใช้' => 'เบิกใช้',
         'ผลิต'   => 'ผลิต',
+        'ซ่อม'   => 'ซ่อม',
         'MA'     => 'MA',
     ];
 }
@@ -1448,6 +1451,10 @@ function part_movement_mode_from_form(string $formValue): string
             return production_bom_movement_modes()[0] ?? 'เบิกอัตโนมัติ (ชุดอะไหล่รุ่น)';
         }
         return 'เบิกอัตโนมัติ (ชุดอะไหล่รุ่น)';
+    }
+    if ($v === 'ซ่อม') {
+        // ลงเป็นค่าเดียวกับที่ Stock ช่างเขียนอยู่แล้ว (มีของเดิม 25 รายการ) จะได้นับรวมกันได้
+        return 'เบิกงานซ่อม';
     }
     if ($v === 'MA') {
         return 'MA';
