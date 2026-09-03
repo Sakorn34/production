@@ -1178,6 +1178,91 @@ function rent_leasing_fault_notes(array $rows)
 }
 
 /**
+ * ประวัติงาน MA ของเครื่องจากระบบเช่า (tbl_product_ma) — ใหม่สุดขึ้นก่อน
+ *
+ * ตารางนี้คือสมุดบันทึกงาน MA ฝั่งระบบเช่า คนละเล่มกับระบบซ่อม (biton_maintenance)
+ * ma_remarks กรอกไว้ครบทุกแถว จึงเป็นแหล่งเดียวที่บอกได้ว่าเครื่องถูกปลดระวางเพราะอะไร
+ * — ช่อง pro_remarks ที่ควรเก็บเรื่องนี้ว่างทั้งตาราง
+ *
+ * @param string $serial S/N ที่ normalize แล้ว
+ * @return array<int,array{date:string,status:string,remarks:string}>
+ */
+function rent_leasing_ma_history($serial)
+{
+    $serial = trim((string) $serial);
+    if ($serial === '') {
+        return [];
+    }
+    $q = rent_q_try(
+        'SELECT ma_date, ma_status, ma_remarks FROM tbl_product_ma
+         WHERE ma_sn = ? ORDER BY ma_date DESC, ma_id DESC',
+        's',
+        [$serial]
+    );
+    if (!$q['ok'] || empty($q['result'])) {
+        return [];
+    }
+    $rows = [];
+    while ($row = $q['result']->fetch_assoc()) {
+        $remarks = trim((string) ($row['ma_remarks'] ?? ''));
+        if ($remarks === '') {
+            continue;
+        }
+        $rows[] = [
+            'date' => trim((string) ($row['ma_date'] ?? '')),
+            'status' => trim((string) ($row['ma_status'] ?? '')),
+            'remarks' => $remarks,
+        ];
+    }
+    return $rows;
+}
+
+/**
+ * เหตุผลที่ปลดระวาง — แถว Asset Retirement ล่าสุด
+ *
+ * @param array<int,array<string,mixed>> $history จาก rent_leasing_ma_history()
+ * @return string
+ */
+function rent_leasing_ma_retire_reason(array $history)
+{
+    foreach ($history as $row) {
+        if (trim((string) ($row['status'] ?? '')) === 'Asset Retirement') {
+            return trim((string) ($row['remarks'] ?? ''));
+        }
+    }
+    return '';
+}
+
+/**
+ * แยกหมายเหตุ MA เป็นข้อ ๆ เท่าที่แยกได้อย่างปลอดภัย
+ *
+ * ช่างกรอกหลายข้อในช่องเดียว บางแถวคั่นด้วยช่องว่างหลายตัวหรือขึ้นบรรทัดใหม่ (59 แถว
+ * แยกได้) แต่อีก 64 แถวเขียนติดกันไม่มีตัวคั่นเลย เช่น "พิมพ์ใบผ่าน OKPort type-c
+ * กล่องเป็นรอยเยอะ" — พวกนั้นปล่อยเป็นก้อนเดียว ไม่เดาแยกเพราะเสี่ยงตัดผิดกลางคำ
+ *
+ * @param string $text
+ * @return array<int,string>
+ */
+function rent_leasing_ma_note_parts($text)
+{
+    $t = trim((string) $text);
+    if ($t === '') {
+        return [];
+    }
+    $parts = preg_split('/\s{2,}|[\r\n]+/u', $t);
+    $out = [];
+    foreach ((array) $parts as $p) {
+        $p = trim(preg_replace('/\s+/u', ' ', (string) $p));
+        // ตัวคั่นที่ค้างหัวท้ายหลังแยก — "ok  / fw 6.8" ไม่ควรได้ข้อว่า "/ fw 6.8"
+        $p = trim($p, " /·,-");
+        if ($p !== '') {
+            $out[] = $p;
+        }
+    }
+    return $out ?: [preg_replace('/\s+/u', ' ', $t)];
+}
+
+/**
  * ป้ายสถานะเช่า (รวม pro_status + p_status) เป็นภาษาไทย
  *
  * @param string $proStatus tbl_product.pro_status
@@ -1299,6 +1384,8 @@ function asset_leasing_info($assetCode, $factorySerial = '')
         'p_date_received' => '',
         'p_remarks' => '',
         'fault_notes' => [],
+        'ma_history' => [],
+        'ma_retire_reason' => '',
         'status_label' => '',
     ];
 
@@ -1399,6 +1486,8 @@ function asset_leasing_info($assetCode, $factorySerial = '')
     }
 
     $out['fault_notes'] = rent_leasing_fault_notes($rentRows);
+    $out['ma_history'] = rent_leasing_ma_history($out['serial']);
+    $out['ma_retire_reason'] = rent_leasing_ma_retire_reason($out['ma_history']);
     $out['status_label'] = rent_leasing_status_label($out['pro_status'], $out['p_status']);
     return $out;
 }
@@ -1580,6 +1669,43 @@ function rent_leasing_dl_row($label, $value)
 }
 
 /**
+ * ส่วน「ประวัติงาน MA (ระบบเช่า)」เต็มความกว้าง — แยกจากการ์ดเพราะเป็นตาราง
+ *
+ * @param array<string,mixed> $info จาก asset_leasing_info()
+ * @return string
+ */
+function asset_leasing_ma_section_html(array $info)
+{
+    $rows = is_array($info['ma_history'] ?? null) ? $info['ma_history'] : [];
+    if (!$rows) {
+        return '';
+    }
+    $icon = function_exists('ui_icon_html') ? ui_icon_html('ma', 18) : '';
+    $out = '<section class="rent-ma-section">';
+    $out .= '<h2 class="h-with-icon">' . $icon . 'ประวัติงาน MA (ระบบเช่า)</h2>';
+    $out .= '<p class="muted rent-ma-sub">' . number_format(count($rows)) . ' รายการ · ใหม่ → เก่า</p>';
+    $out .= '<div class="table-wrap"><table class="list rent-ma-table">';
+    $out .= '<tr><th>วันที่</th><th>สถานะหลังงาน</th><th>สิ่งที่บันทึกไว้</th></tr>';
+    foreach ($rows as $r) {
+        $isRetire = trim((string) ($r['status'] ?? '')) === 'Asset Retirement';
+        $date = rent_leasing_valid_date($r['date'] ?? '') ? dthai($r['date']) : '—';
+        $badge = $isRetire
+            ? '<span class="badge st-retired">ปลดระวาง</span>'
+            : '<span class="badge st-new">กลับเข้าคลัง</span>';
+        $parts = rent_leasing_ma_note_parts((string) ($r['remarks'] ?? ''));
+        $body = count($parts) > 1
+            ? '<ul class="rent-ma-note-list"><li>' . implode('</li><li>', array_map('h', $parts)) . '</li></ul>'
+            : h($parts ? $parts[0] : '');
+        $out .= '<tr' . ($isRetire ? ' class="is-retire"' : '') . '>'
+            . '<td style="white-space:nowrap">' . h($date) . '</td>'
+            . '<td>' . $badge . '</td>'
+            . '<td>' . $body . '</td></tr>';
+    }
+    $out .= '</table></div></section>';
+    return $out;
+}
+
+/**
  * สร้าง HTML card「การเบิกเช่า」บนโปรไฟล์เครื่อง production
  *
  * @param array<string,mixed> $info จาก asset_leasing_info()
@@ -1637,6 +1763,19 @@ function asset_leasing_card_html(array $info)
     }
     if (rent_leasing_valid_date($info['pro_date'] ?? '')) {
         $out .= rent_leasing_dl_row('ลงทะเบียนเช่า', h(dthai($info['pro_date'])));
+    }
+    $retire = trim((string) ($info['ma_retire_reason'] ?? ''));
+    // เครื่องที่เคยปลดแล้วถูกเอากลับมาปล่อยเช่าใหม่ ยังมีแถว Asset Retirement ค้างในประวัติ
+    // ถ้าโชว์เหตุผลปลดระวางคู่กับป้าย "เครื่องเช่า" จะอ่านแล้วขัดกันเอง — ประวัติยังเห็นได้ในตาราง
+    if (trim((string) ($info['pro_status'] ?? '')) !== 'Asset Retirement') {
+        $retire = '';
+    }
+    if ($retire !== '') {
+        $parts = rent_leasing_ma_note_parts($retire);
+        $val = count($parts) > 1
+            ? '<ul class="rent-ma-note-list"><li>' . implode('</li><li>', array_map('h', $parts)) . '</li></ul>'
+            : h($parts ? $parts[0] : '');
+        $out .= rent_leasing_dl_row('เหตุผลที่ปลดระวาง', '<span class="rent-retire-reason">' . $val . '</span>');
     }
     $faults = is_array($info['fault_notes'] ?? null) ? $info['fault_notes'] : [];
     if ($faults) {

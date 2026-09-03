@@ -476,6 +476,9 @@ page_header('เครื่อง ' . $a['asset_code'], false);
 <?php } ?>
 <?php } ?>
 
+<?php // ประวัติ MA ฝั่งระบบเช่า — คนละเล่มกับระบบซ่อม วางคู่กันเพื่อให้เห็นครบในที่เดียว ?>
+<?= asset_leasing_ma_section_html($leaseInfo) ?>
+
 <?= asset_maintenance_section_html($maRepairInfo) ?>
 
 <h2>ประวัติทั้งหมด (<?= count($tl) ?> รายการ) — จัดกลุ่มตามประเภท · เรียงตามวันที่ในแต่ละกลุ่ม</h2>

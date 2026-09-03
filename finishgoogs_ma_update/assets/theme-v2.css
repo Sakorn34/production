@@ -1244,3 +1244,15 @@ a.kpi:hover { text-decoration: none; }
   color: #b91c1c;
   font-size: calc(12px * var(--font-scale, 1));
 }
+
+/* ── ประวัติงาน MA จากระบบเช่า (tbl_product_ma) ─────────────────────────
+   คนละเล่มกับประวัติซ่อมของระบบ MA จึงวางเป็นคนละ section แต่หน้าตาเดียวกัน */
+.rent-ma-section { margin: 0 0 22px; }
+.rent-ma-sub { margin: -6px 0 12px; font-size: calc(13px * var(--font-scale, 1)); }
+.rent-ma-table { max-width: 920px; }
+/* แถวที่ปลดระวางคือบรรทัดสุดท้ายของชีวิตเครื่อง ทำให้เห็นก่อนแถวอื่น */
+.rent-ma-table tr.is-retire td { background: color-mix(in srgb, var(--danger-soft, #fee2e2) 45%, #fff); }
+.rent-ma-note-list { margin: 0; padding-left: 18px; }
+.rent-ma-note-list li { margin: 1px 0; }
+.rent-retire-reason { font-weight: 600; color: var(--text); }
+.rent-retire-reason .rent-ma-note-list { font-weight: 400; }
