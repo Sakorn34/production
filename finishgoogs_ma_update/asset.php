@@ -222,7 +222,8 @@ require __DIR__ . '/includes/ma_snippets.php';
 $tlData = asset_timeline_items($id);
 $tl = $tlData["tl"];
 $partsUsed = $tlData["partsUsed"];
-$partsSummary = asset_parts_withdraw_summary($id, true);
+// false: ไม่แสดงผลตรวจ BOM แล้ว (เอาออกจากหน้านี้) ไม่ต้องคำนวณ qty-level ที่ query ข้าม DB
+$partsSummary = asset_parts_withdraw_summary($id, false);
 $showPartsWithdraw = !empty($partsSummary['show_section']);
 // มีตารางอะไหล่ด้านบนแล้ว — ไม่แสดงคอลัมน์เบิกอะไหล่ซ้ำใน timeline
 if ($showPartsWithdraw && ($partsSummary['out_count'] > 0 || $partsUsed)) {
@@ -360,34 +361,14 @@ page_header('เครื่อง ' . $a['asset_code'], false);
 <?php // ไม่มีรายการเบิกเลยก็ไม่ต้องขึ้นแถบนี้
      if ($hasPartsRows) { ?>
 <?php
-// แถบสรุปการเบิกอะไหล่ — เดิมเป็นกล่องใหญ่มีป้ายสถานะ Stock ตัวเบ้อเริ่ม
-// แต่วัดจาก 366 เครื่องที่มีรายการเบิกจริง ป้ายนั้นขึ้น "ตรง" ทุกตัวไม่มียกเว้น
-// เช่นเดียวกับสถานะ sync ที่เป็น synced ทุกตัว — เอาออกเพราะไม่ได้บอกอะไร
-// เหลือไว้เฉพาะผลตรวจ BOM ซึ่งไม่ตรงจริง 46% กับเลขอ้างอิงและลิงก์ที่ใช้ตามรอยต่อ
-//
-// BOM ผูกกับเบิกผลิตเท่านั้น เครื่องที่ผลิตก่อนมีระบบนี้จะไม่เคยมีเบิกผลิตเลย มีแต่เบิกซ่อม
-// ("never") กรณีนี้ไม่ใช่ปัญหาที่ต้องเตือน จึงใช้ป้ายสีกลาง ไม่ใช่ป้ายเตือนสีเหลือง/ไอคอน ⚠
-$bomWarn = '';
-$bomIsNeutral = ($partsSummary['bom_match'] ?? '') === 'never';
-if (($partsSummary['bom_count'] ?? 0) > 0 && ($partsSummary['bom_match'] ?? 'none') !== 'none'
-    && ($partsSummary['bom_match'] ?? '') !== 'ok') {
-    $bomWarn = asset_bom_match_label([
-        'bom_match'         => $partsSummary['bom_match'] ?? 'none',
-        'bom_count'         => (int) $partsSummary['bom_count'],
-        'bom_extra_parts'   => (int) ($partsSummary['bom_extra_parts'] ?? 0),
-        'bom_missing_parts' => (int) ($partsSummary['bom_missing_parts'] ?? 0),
-    ]);
-}
+// เคยมีป้ายผลตรวจ BOM อยู่ตรงนี้ด้วย — เอาออกเพราะเครื่องผลิตใหม่เบิกอะไหล่ไม่ตรง BOM เป๊ะเสมอไป
+// (เปลี่ยนไปตาม lot ที่มีของตอนนั้น) และการนับก็มี bug นับ mode เบิกผลิตได้ไม่ครบทุกแบบอยู่แล้ว
+// ป้ายจึงไม่ได้บอกอะไรที่เชื่อถือได้ ดู git history ของบรรทัดนี้ถ้าจะเอากลับมาทำใหม่
 ?>
 <?php // หัวข้อสร้างที่เดียวตรงนี้ แถบข้อมูลอยู่ใต้หัวข้อ ?>
 <div class="parts-head-row">
   <?= ui_heading('parts', 'อะไหล่ที่เบิกใช้กับเครื่องนี้', 'h2') ?>
 <div id="parts-withdraw" class="parts-meta">
-  <?php if ($bomWarn !== '' && $bomIsNeutral) { ?>
-  <span class="parts-meta-note"><?= h($bomWarn) ?></span>
-  <?php } elseif ($bomWarn !== '') { ?>
-  <span class="parts-meta-warn"><?= ui_icon_html('alert', 13) ?><?= h($bomWarn) ?></span>
-  <?php } ?>
 
   <?php if (($partsSummary['out_count'] ?? 0) > 0) { ?>
     <?php
