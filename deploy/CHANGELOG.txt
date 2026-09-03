@@ -2257,3 +2257,13 @@ Files:
   finishgoogs_ma_update/includes/asset_status_sync.php
   finishgoogs_ma_update/includes/stockparts_withdraw.php
 
+
+================================================================
+v2026-09-03_084815 | Patch | 2026-09-03 08:48:17
+From: 2026-09-03_000813  ->  To: 7c0653c  |  Files: 2
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/asset_status_sync.php
+

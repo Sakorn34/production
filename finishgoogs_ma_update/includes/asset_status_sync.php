@@ -60,17 +60,19 @@ function asset_status_target_from_external(string $current, ?array $sale, ?array
 {
     $current = trim($current) !== '' ? trim($current) : 'new';
 
-    // ใบเบิกขายเป็นหลักฐานหนักสุด ชนะทุกอย่าง
+    // สัญญาเช่าที่ยังใช้งานอยู่ชนะใบเบิกขาย — เครื่องเช่าก็ต้องเบิกออกจากคลัง
+    // เหมือนกัน ใบเบิกจึงบอกได้แค่ว่าเครื่องออกไปแล้ว ไม่ได้บอกว่าออกไปแบบไหน
+    // ยกเว้นเครื่องสำรองที่ตั้งไว้เอง ยังคงไม่แตะเหมือนเดิม
+    if ($current !== 'spare' && $lease && asset_status_leasing_implies_rental($lease)) {
+        return ['target' => 'rental', 'reason' => 'สถานะระบบเช่า'];
+    }
+
     if ($sale && !empty($sale['sold']) && empty($sale['from_delivery'])) {
         return ['target' => 'sold', 'reason' => 'เบิกขายจาก stock'];
     }
 
     if ($current === 'spare') {
         return ['target' => null, 'reason' => 'เครื่องสำรอง — ไม่ sync อัตโนมัติ'];
-    }
-
-    if ($lease && asset_status_leasing_implies_rental($lease)) {
-        return ['target' => 'rental', 'reason' => 'สถานะระบบเช่า'];
     }
 
     if ($current === 'rental' && $lease && asset_status_leasing_implies_new($lease)) {
