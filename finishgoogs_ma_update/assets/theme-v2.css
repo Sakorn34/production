@@ -1116,3 +1116,38 @@ a.kpi:hover { text-decoration: none; }
 }
 .ln-pick-models:hover { text-decoration: underline; }
 .ln-pick-models:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 3px; }
+
+/* ── ตารางประวัติการส่งมอบ: แก้ข้อความทับกัน ─────────────────────────────
+   ตารางนี้มี 7 คอลัมน์ แต่ยืมสไตล์ .asset-sales-lines ซึ่งกำหนดความกว้างไว้
+   สำหรับตารางคำสั่งเบิก 6 คอลัมน์ รวมกันได้ 100% พอดี — คอลัมน์ที่ 7 จึงเหลือ 0px
+   และ "ไซต์งาน" กับ "บริษัท รปภ." ที่เป็นข้อความไทยยาว ๆ ก็ล้นไปทับคอลัมน์ข้างกัน
+   ให้เบราว์เซอร์จัดความกว้างตามเนื้อหาแทน และเลื่อนแนวนอนได้ถ้าการ์ดแคบเกิน
+   ใช้ selector ประกอบสองคลาสเพื่อให้ชนะกฎ nth-child ของ .asset-sales-lines     */
+.asset-sales-section-stock-old { overflow-x: auto; }
+
+.asset-sales-lines.asset-sales-stock-old-table {
+  table-layout: auto;
+  min-width: 100%;
+}
+.asset-sales-lines.asset-sales-stock-old-table th:nth-child(1),
+.asset-sales-lines.asset-sales-stock-old-table td:nth-child(1),
+.asset-sales-lines.asset-sales-stock-old-table th:nth-child(2),
+.asset-sales-lines.asset-sales-stock-old-table td:nth-child(2),
+.asset-sales-lines.asset-sales-stock-old-table th:nth-child(3),
+.asset-sales-lines.asset-sales-stock-old-table td:nth-child(3),
+.asset-sales-lines.asset-sales-stock-old-table th:nth-child(4),
+.asset-sales-lines.asset-sales-stock-old-table td:nth-child(4),
+.asset-sales-lines.asset-sales-stock-old-table th:nth-child(5),
+.asset-sales-lines.asset-sales-stock-old-table td:nth-child(5),
+.asset-sales-lines.asset-sales-stock-old-table th:nth-child(6),
+.asset-sales-lines.asset-sales-stock-old-table td:nth-child(6) { width: auto; }
+
+/* คอลัมน์สั้นห้ามตัดบรรทัด ส่วนสองคอลัมน์ข้อความยาวให้ตัดคำได้ */
+.asset-sales-lines.asset-sales-stock-old-table td:nth-child(1),
+.asset-sales-lines.asset-sales-stock-old-table td:nth-child(2),
+.asset-sales-lines.asset-sales-stock-old-table td:nth-child(4),
+.asset-sales-lines.asset-sales-stock-old-table td:nth-child(7) { white-space: nowrap; }
+.asset-sales-lines.asset-sales-stock-old-table td:nth-child(5),
+.asset-sales-lines.asset-sales-stock-old-table td:nth-child(6) {
+  white-space: normal; word-break: break-word; min-width: 110px;
+}

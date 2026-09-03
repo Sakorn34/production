@@ -2372,3 +2372,13 @@ Files:
   finishgoogs_ma_update/includes/maintenance_repair_bridge.php
   finishgoogs_ma_update/line_notify_settings.php
 
+
+================================================================
+v2026-09-03_140508 | Patch | 2026-09-03 14:05:09
+From: 2026-09-03_135620  ->  To: 84b5a01  |  Files: 2
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+
