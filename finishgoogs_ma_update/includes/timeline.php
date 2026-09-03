@@ -77,6 +77,9 @@ function timeline_note_html($label, $text, $mod = '') {
 /**
  * สร้างเนื้อหา timeline ของบันทึกผลิต — แสดงเฉพาะ checklist (meta อยู่ที่ asset-head)
  *
+ * checklist ของ QC ยาวได้ถึง 20 กว่าข้อ ถ้ากางไว้ตลอดจะกินความสูงจนรายการอื่นในไทม์ไลน์
+ * ถูกดันหายไปหมด — พับไว้ก่อน ใครอยากดูค่อยกดกาง
+ *
  * @param array<string, mixed> $r แถวจาก production_records
  * @return string HTML (escape แล้ว)
  */
@@ -85,11 +88,14 @@ function timeline_production_body_html(array $r) {
     if (!$items) {
         return '<span class="muted">ไม่มี checklist</span>';
     }
-    $out = '<ul class="tl-checklist">';
+    $out = '<details class="tl-checklist-box">'
+        . '<summary class="tl-checklist-toggle">checklist '
+        . number_format(count($items)) . ' รายการ</summary>'
+        . '<ul class="tl-checklist">';
     foreach ($items as $it) {
         $out .= '<li>' . h($it) . '</li>';
     }
-    return $out . '</ul>';
+    return $out . '</ul></details>';
 }
 
 /**

@@ -179,8 +179,10 @@ button:focus-visible, .btn:focus-visible {
 img.broken { visibility: hidden; }
 
 .timeline { list-style: none; border-left: 3px solid var(--border, #c9d2e0); margin: 8px 0 8px 8px; padding-left: 18px; }
-.timeline li { margin-bottom: 14px; position: relative; background: #fff; border: 1px solid var(--border, #dfe4ec); border-radius: var(--radius-sm, 8px); padding: 10px 14px; }
-.timeline li::before { content: ''; position: absolute; left: -27px; top: 14px; width: 13px; height: 13px; border-radius: 50%; background: var(--primary); border: 2px solid #fff; }
+/* ต้องเป็น > li เท่านั้น — เนื้อในรายการมี <ul><li> ของตัวเอง (เช่น checklist ของ QC)
+   ถ้าปล่อยให้ตกถึงลูกหลาน รายการ checklist จะกลายเป็นการ์ดมีจุดไทม์ไลน์ของตัวเองทุกบรรทัด */
+.timeline > li { margin-bottom: 14px; position: relative; background: #fff; border: 1px solid var(--border, #dfe4ec); border-radius: var(--radius-sm, 8px); padding: 10px 14px; }
+.timeline > li::before { content: ''; position: absolute; left: -27px; top: 14px; width: 13px; height: 13px; border-radius: 50%; background: var(--primary); border: 2px solid #fff; }
 .timeline .tl-date { font-size: calc(12px * var(--font-scale, 1)); color: var(--text-muted, #667085); }
 .timeline .tl-type { font-weight: 600; font-size: calc(14px * var(--font-scale, 1)); }
 .tl-sec { display: flex; gap: 8px; align-items: flex-start; margin: 5px 0; background: #f7f9fc; border: 1px solid #eceff4; border-radius: var(--radius-sm, 8px); padding: 6px 9px; }
