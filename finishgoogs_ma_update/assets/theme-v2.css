@@ -1232,3 +1232,15 @@ a.kpi:hover { text-decoration: none; }
 .parts-head-row { margin-bottom: 10px; }
 .parts-head-row > h2 { margin: 0 0 8px; }
 .parts-head-row .parts-meta { margin: 0; }
+
+/* อาการที่แจ้งเคลม — คนละเรื่องกับหมายเหตุทั่วไป จึงทำเป็นชิปให้แยกออกจากกันได้
+   เครื่องหนึ่งเคลมได้หลายรอบ (สูงสุดที่เจอคือ 3 อาการ) ชิปช่วยไม่ให้อ่านติดกันเป็นพืด */
+.rent-fault-note {
+  display: inline-block;
+  padding: 1px 8px;
+  margin: 0 4px 3px 0;
+  border-radius: 999px;
+  background: var(--danger-soft, #fee2e2);
+  color: #b91c1c;
+  font-size: calc(12px * var(--font-scale, 1));
+}

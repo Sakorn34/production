@@ -1108,6 +1108,76 @@ function rent_leasing_valid_date($date)
 }
 
 /**
+ * ข้อความนี้บอก "อาการเสียของเครื่อง" หรือเป็นแค่งานเอกสาร
+ *
+ * ระบบเช่าไม่มีช่องเก็บเหตุผลที่ปลดระวาง/สูญหายเลย (pro_remarks ว่างทั้งหมด) ที่พอใช้ได้
+ * คือหมายเหตุการเคลมในบรรทัดสัญญา แต่ในนั้นปนสองเรื่องอยู่ — อาการเสียจริง เช่น
+ * "ชาร์จไม่เข้า" "เฟืองหัก" กับงานสัญญา เช่น "ต่อสัญญาเช่า" (ซึ่งมีถึง 201 ครั้ง
+ * มากที่สุดในตาราง) ถ้าเอามาโชว์ดิบ ๆ เครื่องส่วนใหญ่จะขึ้นว่า "ต่อสัญญาเช่า"
+ * แล้วคนอ่านจะเข้าใจว่านั่นคือสาเหตุที่เครื่องเสีย
+ *
+ * ใช้วิธี deny-list ไม่ใช่ allow-list เพราะข้อความอาการเสียเป็นคำที่คนพิมพ์เองอิสระ
+ * มี 53 แบบและจะมีแบบใหม่เรื่อย ๆ ส่วนคำงานเอกสารมีไม่กี่แบบและซ้ำเดิม
+ *
+ * @param string $text
+ * @return bool
+ */
+function rent_leasing_is_fault_note($text)
+{
+    $t = trim((string) $text);
+    if ($t === '' || $t === '0') {
+        return false;
+    }
+    // บอกแค่ว่าเคลม หรือบอกแค่ชื่อสินค้า ไม่ได้บอกอาการ — เทียบทั้งสตริง ไม่ใช่ substring
+    // เพราะคำว่า "เคลม" ไปโผล่กลางข้อความที่บอกอาการจริงได้
+    $exact = ['-', '--', 'เคลม', 'เคลม printer', 'เคลม smc s', 'เคลม smartcard s'];
+    if (in_array(mb_strtolower($t), $exact, true)) {
+        return false;
+    }
+    $deny = [
+        'ต่อสัญญา', 'รับคืน', 'มาบันทึกระบบภายหลัง', 'ไม่รายการนี้มาในชุด',
+        'ซื้อต่อ', 'ซื้อใหม่ทดแทน', 'ยกเลิกใช้งาน', 'ย้ายหน่วยงาน', 'ส่งผิดที่อยู่',
+        'ไม่รู้หมายเลขเครื่อง', 'เคลมไปพร้อมมือถือ',
+    ];
+    foreach ($deny as $d) {
+        if (mb_strpos($t, $d) !== false) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * อาการเสียที่เคยแจ้งไว้ — คัดจากบรรทัดสัญญาที่ผู้เรียกอ่านมาแล้ว
+ *
+ * รับ rows แทนที่จะ query เอง เพราะ tbl_rent_product ไม่มี index บน p_sn (วัดได้ 51 ms
+ * ต่อครั้ง) และ asset_leasing_info() ก็ scan ตารางนี้ด้วยเงื่อนไขเดียวกันอยู่แล้ว
+ * ยิงซ้ำอีกรอบคือจ่ายค่าเดิมสองเท่าโดยไม่ได้อะไรเพิ่ม — schema ฝั่งระบบเช่าเราไม่แก้
+ *
+ * @param array<int,array<string,mixed>> $rows แถวจาก tbl_rent_product (ต้องมี p_id, p_remarks, p_remarks_claim)
+ * @return array<int,string>
+ */
+function rent_leasing_fault_notes(array $rows)
+{
+    $rows = is_array($rows) ? $rows : [];
+    // เรียงใหม่สุดก่อน — ผู้เรียกเรียงบรรทัด active ขึ้นหน้าเพื่อเลือกสัญญาที่จะโชว์
+    // ซึ่งคนละเกณฑ์กับอาการเสียที่ควรไล่ตามเวลา
+    usort($rows, function ($a, $b) {
+        return (int) ($b['p_id'] ?? 0) <=> (int) ($a['p_id'] ?? 0);
+    });
+    $notes = [];
+    foreach ($rows as $row) {
+        foreach ([$row['p_remarks_claim'] ?? '', $row['p_remarks'] ?? ''] as $raw) {
+            $t = trim((string) $raw);
+            if (rent_leasing_is_fault_note($t) && !in_array($t, $notes, true)) {
+                $notes[] = $t;
+            }
+        }
+    }
+    return $notes;
+}
+
+/**
  * ป้ายสถานะเช่า (รวม pro_status + p_status) เป็นภาษาไทย
  *
  * @param string $proStatus tbl_product.pro_status
@@ -1228,6 +1298,7 @@ function asset_leasing_info($assetCode, $factorySerial = '')
         'r_code' => '',
         'p_date_received' => '',
         'p_remarks' => '',
+        'fault_notes' => [],
         'status_label' => '',
     ];
 
@@ -1280,15 +1351,18 @@ function asset_leasing_info($assetCode, $factorySerial = '')
     $out['pro_date'] = trim((string) ($product['pro_date'] ?? ''));
     $out['pro_remarks'] = trim((string) ($product['pro_remarks'] ?? ''));
 
+    // ดึงทุกบรรทัดสัญญาของ S/N นี้ในนัดเดียว — แถวแรกคือบรรทัดที่เอามาแสดง (active ก่อน
+    // แล้วใหม่สุด) ส่วนที่เหลือใช้ไล่อาการเสีย เครื่องหนึ่งเคลมได้หลายรอบข้ามสัญญา และรอบ
+    // ที่ทำให้เครื่องถูกปลดมักไม่ใช่บรรทัดล่าสุด · ตารางนี้ไม่มี index บน p_sn จึงต้องยิงรอบเดียว
     $line = null;
+    $rentRows = [];
     $lq = rent_q_try(
         'SELECT rp.p_id, rp.p_cus_id, rp.p_status, rp.p_siteid, rp.p_sitename, rp.p_remarks,
-                rp.p_date_received, r.r_startdate, r.r_enddate, r.r_po, r.r_code
+                rp.p_remarks_claim, rp.p_date_received, r.r_startdate, r.r_enddate, r.r_po, r.r_code
          FROM tbl_rent_product rp
          LEFT JOIN tbl_rent r ON rp.p_r_id = r.r_id
          WHERE rp.p_sn = ?
-         ORDER BY CASE WHEN rp.p_status = ? THEN 0 ELSE 1 END, rp.p_id DESC
-         LIMIT 1',
+         ORDER BY CASE WHEN rp.p_status = ? THEN 0 ELSE 1 END, rp.p_id DESC',
         'ss',
         [$out['serial'], 'active']
     );
@@ -1298,7 +1372,10 @@ function asset_leasing_info($assetCode, $factorySerial = '')
         return $out;
     }
     if (!empty($lq['result'])) {
-        $line = $lq['result']->fetch_assoc() ?: null;
+        while ($row = $lq['result']->fetch_assoc()) {
+            $rentRows[] = $row;
+        }
+        $line = $rentRows ? $rentRows[0] : null;
     }
 
     if ($line) {
@@ -1321,6 +1398,7 @@ function asset_leasing_info($assetCode, $factorySerial = '')
         }
     }
 
+    $out['fault_notes'] = rent_leasing_fault_notes($rentRows);
     $out['status_label'] = rent_leasing_status_label($out['pro_status'], $out['p_status']);
     return $out;
 }
@@ -1559,6 +1637,14 @@ function asset_leasing_card_html(array $info)
     }
     if (rent_leasing_valid_date($info['pro_date'] ?? '')) {
         $out .= rent_leasing_dl_row('ลงทะเบียนเช่า', h(dthai($info['pro_date'])));
+    }
+    $faults = is_array($info['fault_notes'] ?? null) ? $info['fault_notes'] : [];
+    if ($faults) {
+        $bits = [];
+        foreach ($faults as $fx) {
+            $bits[] = '<span class="rent-fault-note">' . h($fx) . '</span>';
+        }
+        $out .= rent_leasing_dl_row('อาการที่แจ้งเคลม', implode(' ', $bits));
     }
     $remarks = trim((string) ($info['p_remarks'] ?? ''));
     if ($remarks === '' && !empty($info['pro_remarks'])) {
