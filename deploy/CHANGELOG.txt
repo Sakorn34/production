@@ -2324,3 +2324,15 @@ From: 2026-09-03_101216  ->  To: c2386b6  |  Files: 1
 Files:
   finishgoogs_ma_update/config.php
 
+
+================================================================
+v2026-09-03_110541 | Patch | 2026-09-03 11:05:42
+From: 2026-09-03_104906  ->  To: 149cba6  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/finishgood_shortage_preview.php
+  shared/finishgood_shortage_filter.php
+  shared/line_notify_jobs.php
+

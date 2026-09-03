@@ -10,10 +10,29 @@
 require __DIR__ . '/config.php';
 require_once dirname(__DIR__) . '/shared/finishgood_shortage_client.php';
 require_once dirname(__DIR__) . '/shared/line_flex_finishgood_shortage.php';
+require_once dirname(__DIR__) . '/shared/finishgood_shortage_filter.php';
 
 require_login();
 
-$fetched = finishgood_shortage_fetch();
+// บันทึกรุ่นที่เลือกปิดแจ้งเตือน
+$savedMsg = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_skip'])) {
+    csrf_check();
+    $posted = isset($_POST['skip']) && is_array($_POST['skip']) ? $_POST['skip'] : [];
+    fg_shortage_save_skipped_codes($posted);
+    header('Location: ' . BASE_URL . '/finishgood_shortage_preview.php?saved=1');
+    exit;
+}
+
+$fetchedAll = finishgood_shortage_fetch();
+$skipCodes  = fg_shortage_skipped_codes();
+$fetched    = $fetchedAll;
+if (!empty($fetchedAll['ok'])) {
+    $flt = fg_shortage_filter_items($fetchedAll['items']);
+    $fetched['items'] = $flt['items'];
+    $fetched['total_shortage'] = 0;
+    foreach ($flt['items'] as $__it) { $fetched['total_shortage'] += (int)($__it['need'] ?? 0); }
+}
 $messages = $fetched['ok']
     ? line_flex_finishgood_shortage_messages($fetched['items'], $fetched['timestamp_text'])
     : [];
@@ -244,6 +263,33 @@ $allJson = $messages !== []
         </div>
     <?php endif; ?>
 </div>
+
+<?php if (!empty($fetchedAll['ok'])): ?>
+<div class="panel" style="margin-bottom:12px">
+    <h2 style="margin:0 0 4px;font-size:16px">เลือกรุ่นที่จะแจ้งเตือน</h2>
+    <p style="margin:0 0 10px;font-size:13px;color:#666">
+        ติ๊กรุ่นที่ <b>ไม่ต้องการ</b> ให้แจ้งเตือน · รุ่นใหม่ที่เพิ่มมาทีหลังจะถูกแจ้งเตือนเองโดยไม่ต้องมาตั้งค่า
+    </p>
+    <?php if (isset($_GET['saved'])): ?><div class="ok" style="margin-bottom:10px">บันทึกแล้ว</div><?php endif; ?>
+    <form method="post">
+        <?= csrf_field() ?>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:6px 16px;margin-bottom:12px">
+        <?php foreach ($fetchedAll['items'] as $it):
+            $code = (string)($it['product_code'] ?? '');
+            $off  = in_array(strtoupper(trim($code)), $skipCodes, true); ?>
+            <label style="display:flex;gap:7px;align-items:baseline;font-size:13.5px;<?= $off ? 'opacity:.55' : '' ?>">
+                <input type="checkbox" name="skip[]" value="<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>" <?= $off ? 'checked' : '' ?>>
+                <span><?= htmlspecialchars((string)$it['product_name'], ENT_QUOTES, 'UTF-8') ?>
+                    <span style="color:#999">(<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>)</span>
+                    <b style="color:#c0392b"><?= (int)($it['need'] ?? 0) ?></b></span>
+            </label>
+        <?php endforeach; ?>
+        </div>
+        <button type="submit" name="save_skip" value="1">บันทึกการเลือก</button>
+        <span style="margin-left:10px;font-size:13px;color:#666">ปิดอยู่ <?= count($skipCodes) ?> รุ่น · จะส่ง <?= count($fetched['items']) ?> รุ่น</span>
+    </form>
+</div>
+<?php endif; ?>
 
 <?php foreach ($messages as $index => $message): ?>
     <?php $bytes = strlen(json_encode($message, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)); ?>

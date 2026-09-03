@@ -517,14 +517,21 @@ function line_notify_run_job(string $job, array $opts = []): array
         case 'finishgood_shortage':
             // ตัวเลขมาจาก setupsystem ทางเดียว — production ไม่มีสูตรคำนวณซ้ำ
             require_once __DIR__ . '/finishgood_shortage_client.php';
+            require_once __DIR__ . '/finishgood_shortage_filter.php';
             try {
                 $fetched = finishgood_shortage_fetch();
                 if (!$fetched['ok']) {
                     $result['skipped'] = $fetched['error'];
                     break;
                 }
+                // ตัดรุ่นที่ปิดแจ้งเตือนไว้ออกก่อน
+                $filtered = fg_shortage_filter_items($fetched['items']);
+                $fetched['items'] = $filtered['items'];
+                $result['excluded'] = $filtered['skipped'];
                 if ($fetched['items'] === []) {
-                    $result['skipped'] = 'no shortage';
+                    $result['skipped'] = $filtered['skipped'] > 0
+                        ? 'ทุกรุ่นที่ขาดถูกปิดแจ้งเตือนไว้'
+                        : 'no shortage';
                     break;
                 }
                 line_notify_dispatch('finishgood.shortage', [
