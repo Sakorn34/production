@@ -82,6 +82,10 @@ function line_settings_form_defaults(): array
         // API ของ setupsystem — production ไม่ได้คำนวณยอดที่ต้องผลิตเพิ่มเอง
         'finishgood_shortage_api_url' => (string)($cfg['finishgood_shortage_api_url'] ?? ''),
         'has_shortage_token'    => trim((string)($cfg['finishgood_shortage_api_token'] ?? '')) !== '',
+        // bot ทดสอบ — เปิดสวิตช์แล้วทุกการแจ้งเตือนวิ่งเข้าห้องนี้แทนกลุ่มจริง
+        'test_mode'             => !empty($cfg['test_mode']),
+        'test_recipient_id'     => (string)($cfg['test_recipient_id'] ?? ''),
+        'has_test_token'        => trim((string)($cfg['test_channel_access_token'] ?? '')) !== '',
     ];
 }
 
@@ -121,6 +125,10 @@ function line_settings_parse_post(array $post): array
     if ($secret === '' || $secret === LINE_SETTINGS_TOKEN_PLACEHOLDER) {
         $secret = (string)($existing['channel_secret'] ?? '');
     }
+    $testToken = trim((string)($post['test_channel_access_token'] ?? ''));
+    if ($testToken === '' || $testToken === LINE_SETTINGS_TOKEN_PLACEHOLDER) {
+        $testToken = (string)($existing['test_channel_access_token'] ?? '');
+    }
     $shortageToken = trim((string)($post['finishgood_shortage_api_token'] ?? ''));
     if ($shortageToken === '' || $shortageToken === LINE_SETTINGS_TOKEN_PLACEHOLDER) {
         $shortageToken = (string)($existing['finishgood_shortage_api_token'] ?? '');
@@ -139,6 +147,9 @@ function line_settings_parse_post(array $post): array
         'schedules'             => $schedules,
         'finishgood_shortage_api_url'   => trim((string)($post['finishgood_shortage_api_url'] ?? '')),
         'finishgood_shortage_api_token' => $shortageToken,
+        'test_mode'             => !empty($post['test_mode']),
+        'test_channel_access_token' => $testToken,
+        'test_recipient_id'     => trim((string)($post['test_recipient_id'] ?? '')),
     ];
 }
 
@@ -151,6 +162,11 @@ function line_settings_parse_post(array $post): array
 function line_settings_validate(array $cfg): array
 {
     $errors = [];
+    if (!empty($cfg['test_mode'])
+        && (trim((string)($cfg['test_channel_access_token'] ?? '')) === ''
+            || trim((string)($cfg['test_recipient_id'] ?? '')) === '')) {
+        $errors[] = 'เปิดโหมดทดสอบต้องกรอก Token กับ ID ผู้รับของ bot ทดสอบให้ครบ';
+    }
     if (empty($cfg['line_secrets_path'])) {
         $errors[] = 'กรุณาระบุ path ไฟล์ line.secrets.php';
     }
@@ -188,6 +204,9 @@ function line_settings_build_secrets_php(array $cfg): string
         'schedules'             => (array)($cfg['schedules'] ?? []),
         'finishgood_shortage_api_url'   => (string)($cfg['finishgood_shortage_api_url'] ?? ''),
         'finishgood_shortage_api_token' => (string)($cfg['finishgood_shortage_api_token'] ?? ''),
+        'test_mode'             => !empty($cfg['test_mode']),
+        'test_channel_access_token' => (string)($cfg['test_channel_access_token'] ?? ''),
+        'test_recipient_id'     => (string)($cfg['test_recipient_id'] ?? ''),
     ];
 
     // คีย์อื่นที่มีอยู่เดิมต้องคงไว้ — เดิมฟังก์ชันนี้สร้างไฟล์จากรายการตายตัว
@@ -242,13 +261,17 @@ function line_settings_save(array $cfg): array
  */
 function line_settings_test_push(array $cfg): array
 {
-    $token = trim((string)($cfg['channel_access_token'] ?? ''));
-    $recipient = trim((string)($cfg['default_recipient_id'] ?? ''));
+    // เปิดโหมดทดสอบอยู่ ให้ตรวจของ bot ทดสอบแทน ไม่งั้นจะบ่นว่าไม่มี token
+    // ทั้งที่ปลายทางจริงคือห้องทดสอบ
+    $useTest = !empty($cfg['test_mode']);
+    $token = trim((string)($cfg[$useTest ? 'test_channel_access_token' : 'channel_access_token'] ?? ''));
+    $recipient = trim((string)($cfg[$useTest ? 'test_recipient_id' : 'default_recipient_id'] ?? ''));
+    $who = $useTest ? ' (bot ทดสอบ)' : '';
     if ($token === '') {
-        return ['ok' => false, 'message' => 'ไม่มี Channel Access Token'];
+        return ['ok' => false, 'message' => 'ไม่มี Channel Access Token' . $who];
     }
     if ($recipient === '') {
-        return ['ok' => false, 'message' => 'ไม่มี Recipient ID'];
+        return ['ok' => false, 'message' => 'ไม่มี Recipient ID' . $who];
     }
 
     $tmpFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'line_secrets_test_' . bin2hex(random_bytes(4)) . '.php';

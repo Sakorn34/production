@@ -624,11 +624,29 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
 
 
+  <?php if (function_exists('line_notify_test_mode') && line_notify_test_mode()) { ?>
+
+  <div class="ln-testmode-on">
+
+    <b>โหมดทดสอบเปิดอยู่</b> — แจ้งเตือนทุกอย่างรวมทั้งงานตามเวลาถูกส่งเข้าห้องทดสอบ กลุ่มจริงจะไม่ได้รับ
+
+  </div>
+
+  <?php } ?>
+
   <label class="ln-form-check">
 
     <input type="checkbox" name="line_enabled" value="1" <?= !empty($form['enabled']) ? 'checked' : '' ?>>
 
     <span>เปิดใช้งานแจ้งเตือน LINE</span>
+
+  </label>
+
+  <label class="ln-form-check">
+
+    <input type="checkbox" name="test_mode" value="1" <?= !empty($form['test_mode']) ? 'checked' : '' ?>>
+
+    <span>โหมดทดสอบ — ส่งเข้าห้องทดสอบแทนกลุ่มจริงทั้งหมด</span>
 
   </label>
 
@@ -681,6 +699,18 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
     <label>Token API สินค้าที่ต้องผลิตเพิ่ม
 
       <input type="password" name="finishgood_shortage_api_token" value="<?= !empty($form['has_shortage_token']) ? h($tokenPh) : '' ?>" placeholder="ต้องตรงกับ FINISHGOOD_SHORTAGE_API_TOKEN ฝั่ง setupsystem" autocomplete="off">
+
+    </label>
+
+    <label>Channel Access Token (bot ทดสอบ)
+
+      <input type="password" name="test_channel_access_token" value="<?= !empty($form['has_test_token']) ? h($tokenPh) : '' ?>" placeholder="ของ bot อีกตัวที่ใช้ทดสอบ" autocomplete="off">
+
+    </label>
+
+    <label>Group / User ID ห้องทดสอบ
+
+      <input type="text" name="test_recipient_id" value="<?= h($form['test_recipient_id']) ?>" placeholder="ห้องที่ bot ทดสอบอยู่">
 
     </label>
 

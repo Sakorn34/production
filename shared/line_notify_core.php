@@ -65,6 +65,10 @@ function line_notify_config(bool $reload = false): array
         'channel_access_token'  => '',
         'channel_secret'        => '',
         'default_recipient_id'  => '',
+        // bot ตัวที่สองสำหรับทดสอบ — เปิด test_mode แล้วทุกอย่างวิ่งเข้าห้องนี้แทน
+        'test_mode'             => false,
+        'test_channel_access_token' => '',
+        'test_recipient_id'     => '',
         'enabled'               => false,
         'public_production_url' => '',
         'public_parts_url'      => '',
@@ -276,6 +280,7 @@ function line_notify_ensure_schema(): void
         event_key VARCHAR(64) NOT NULL,
         dedup_key VARCHAR(191) NOT NULL DEFAULT '',
         recipient_id VARCHAR(64) NOT NULL,
+        bot VARCHAR(8) NOT NULL DEFAULT 'main',
         payload_json LONGTEXT NOT NULL,
         status ENUM('pending','sent','failed','dead') NOT NULL DEFAULT 'pending',
         attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
@@ -286,6 +291,12 @@ function line_notify_ensure_schema(): void
         KEY idx_status_retry (status, next_retry_at),
         KEY idx_event_created (event_key, created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // ตารางที่สร้างไว้ก่อนมีโหมดทดสอบยังไม่มีคอลัมน์นี้
+    $hasBot = $db->query("SHOW COLUMNS FROM notification_outbox LIKE 'bot'");
+    if ($hasBot && $hasBot->num_rows === 0) {
+        $db->query("ALTER TABLE notification_outbox ADD COLUMN bot VARCHAR(8) NOT NULL DEFAULT 'main' AFTER recipient_id");
+    }
 
     $db->query("CREATE TABLE IF NOT EXISTS notification_log (
         id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -436,6 +447,47 @@ function line_notify_snapshot_cleanup(): void
 // ─ Dispatch / Outbox ─────────────────────────────────────────────────────────
 
 /**
+ * ตอนนี้อยู่โหมดทดสอบหรือไม่ — ต้องตั้งค่า bot ทดสอบครบถึงจะนับว่าเปิดจริง
+ * ไม่งั้นติ๊กสวิตช์ทิ้งไว้แล้วลืมกรอก จะกลายเป็นแจ้งเตือนหายเงียบ ๆ
+ *
+ * @return bool
+ */
+function line_notify_test_mode(): bool
+{
+    $cfg = line_notify_config();
+    if (empty($cfg['test_mode'])) {
+        return false;
+    }
+    return trim((string)($cfg['test_channel_access_token'] ?? '')) !== ''
+        && trim((string)($cfg['test_recipient_id'] ?? '')) !== '';
+}
+
+/**
+ * ชื่อ bot ที่ควรใช้ตอนนี้ — เก็บลง outbox ตอนเข้าคิว
+ *
+ * @return string 'test' | 'main'
+ */
+function line_notify_active_bot(): string
+{
+    return line_notify_test_mode() ? 'test' : 'main';
+}
+
+/**
+ * Channel access token ของ bot ตัวที่ระบุ
+ *
+ * @param  string $bot 'test' | 'main'
+ * @return string
+ */
+function line_notify_bot_token(string $bot = 'main'): string
+{
+    $cfg = line_notify_config();
+    if ($bot === 'test') {
+        return trim((string)($cfg['test_channel_access_token'] ?? ''));
+    }
+    return trim((string)($cfg['channel_access_token'] ?? ''));
+}
+
+/**
  * คืน recipient ID สำหรับ event
  *
  * @param string $eventKey
@@ -443,6 +495,12 @@ function line_notify_snapshot_cleanup(): void
  */
 function line_notify_recipient(string $eventKey): string
 {
+    // โหมดทดสอบเปลี่ยนปลายทางทั้งหมด ไม่ต้องไปดูผู้รับรายอีเวนต์
+    if (line_notify_test_mode()) {
+        $cfg = line_notify_config();
+        return trim((string)($cfg['test_recipient_id'] ?? ''));
+    }
+
     $db = line_notify_db();
     if ($db) {
         line_notify_ensure_schema();
@@ -508,13 +566,14 @@ function line_notify_dispatch(string $eventKey, array $payload, array $opts = []
     }
 
     $stmt = $db->prepare(
-        'INSERT INTO notification_outbox (event_key, dedup_key, recipient_id, payload_json, status, next_retry_at)
-         VALUES (?, ?, ?, ?, \'pending\', NOW())'
+        'INSERT INTO notification_outbox (event_key, dedup_key, recipient_id, bot, payload_json, status, next_retry_at)
+         VALUES (?, ?, ?, ?, ?, \'pending\', NOW())'
     );
     if (!$stmt) {
         return null;
     }
-    $stmt->bind_param('ssss', $eventKey, $dedupKey, $recipient, $json);
+    $bot = line_notify_active_bot();
+    $stmt->bind_param('sssss', $eventKey, $dedupKey, $recipient, $bot, $json);
     $ok = $stmt->execute();
     $id = $ok ? (int)$db->insert_id : null;
     $stmt->close();
@@ -548,7 +607,7 @@ function line_notify_process_outbox(int $limit = 20): array
     }
 
     $limit = max(1, min(100, $limit));
-    $sql = "SELECT id, event_key, recipient_id, payload_json, attempts
+    $sql = "SELECT id, event_key, recipient_id, bot, payload_json, attempts
             FROM notification_outbox
             WHERE status IN ('pending','failed')
               AND next_retry_at <= NOW()
@@ -591,7 +650,7 @@ function line_notify_process_outbox(int $limit = 20): array
         $lastError = null;
 
         foreach (array_chunk($pendingMessages, 5) as $chunk) {
-            $push = line_notify_push($recipient, $chunk);
+            $push = line_notify_push($recipient, $chunk, (string)($row['bot'] ?? 'main'));
             line_notify_log_send($id, $eventKey, $recipient, $push);
             if (!$push['ok']) {
                 $allOk = false;
@@ -787,12 +846,15 @@ function line_notify_apply_curl_ssl($ch): void
  * @param array<int,array>    $messages
  * @return array{ok:bool,http_status?:int,request_id?:string,error?:string,body?:string}
  */
-function line_notify_push(string $recipientId, array $messages): array
+function line_notify_push(string $recipientId, array $messages, string $bot = ''): array
 {
-    $cfg = line_notify_config();
-    $token = trim((string)($cfg['channel_access_token'] ?? ''));
+    // $bot ว่าง = ตัดสินจากโหมดปัจจุบัน · ระบุมา = ใช้ตามที่บันทึกไว้ในคิว
+    if ($bot === '') {
+        $bot = line_notify_active_bot();
+    }
+    $token = line_notify_bot_token($bot);
     if ($token === '') {
-        return ['ok' => false, 'error' => 'missing channel_access_token'];
+        return ['ok' => false, 'error' => 'missing channel_access_token (' . $bot . ')'];
     }
     if ($recipientId === '' || $messages === []) {
         return ['ok' => false, 'error' => 'missing recipient or messages'];

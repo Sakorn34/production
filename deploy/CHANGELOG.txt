@@ -2302,3 +2302,16 @@ Files:
   shared/line_flex_finishgood_shortage.php
   shared/line_flex_templates.php
 
+
+================================================================
+v2026-09-03_101216 | Patch | 2026-09-03 10:12:18
+From: 2026-09-03_095055  ->  To: 2bbbbc5  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/line_notify_settings.php
+  finishgoogs_ma_update/line_notify_settings.php
+  shared/line_notify_core.php
+

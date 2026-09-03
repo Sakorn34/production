@@ -1099,3 +1099,11 @@ a.kpi:hover { text-decoration: none; }
     padding-left: 0; padding-top: 16px;
   }
 }
+
+/* แถบเตือนเมื่อโหมดทดสอบ LINE เปิดอยู่ — ต้องเห็นชัดว่ากลุ่มจริงไม่ได้รับแจ้งเตือน */
+.ln-testmode-on {
+  margin: 0 0 14px; padding: 11px 14px; font-size: 13.5px;
+  border: 1px solid var(--warning); border-left-width: 3px;
+  background: var(--warning-soft); color: #7a4a05;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
