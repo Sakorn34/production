@@ -147,7 +147,7 @@ function production_bom_actual_qty_breakdown(int $assetId, string $assetCode, in
  * @param int    $assetId
  * @param int    $productId
  * @param string $assetCode
- * @return array{bom_match:string,bom_qty_ok:bool,bom_extra_parts:int,bom_missing_parts:int,expected:array<int,float>,actual:array<int,float>}
+ * @return array{bom_match:string,bom_qty_ok:bool,bom_extra_parts:int,bom_missing_parts:int,bom_actual_total:float,expected:array<int,float>,actual:array<int,float>}
  */
 function production_bom_match_status(int $assetId, int $productId, string $assetCode): array
 {
@@ -158,6 +158,7 @@ function production_bom_match_status(int $assetId, int $productId, string $asset
             'bom_qty_ok'        => true,
             'bom_extra_parts'   => 0,
             'bom_missing_parts' => 0,
+            'bom_actual_total'  => 0.0,
             'expected'          => [],
             'actual'            => [],
         ];
@@ -183,11 +184,17 @@ function production_bom_match_status(int $assetId, int $productId, string $asset
     } elseif ($missing > 0) {
         $bomMatch = 'missing';
     }
+    $actualTotal = array_sum($actual);
+    // หมายเหตุ: $actualTotal นับเฉพาะ mode ที่ production_bom_movement_modes() รู้จัก + Set
+    // เครื่องที่เบิกผลิตด้วย mode อื่น (เช่น 'เบิกผลิต' ที่กรอกเองจากฟอร์ม) จะไม่ถูกนับที่นี่
+    // ผู้เรียกที่เห็นรายการเบิกทั้งหมด (asset_parts_withdraw_summary) เป็นผู้ตัดสินว่าเครื่องนี้
+    // "ไม่เคยเบิกผลิตเลยจริง ๆ" หรือแค่เบิกด้วยคนละ mode — ฟังก์ชันนี้ไม่มีข้อมูลพอจะตัดสินเอง
     return [
         'bom_match'         => $bomMatch,
         'bom_qty_ok'        => $bomMatch === 'ok',
         'bom_extra_parts'   => $extra,
         'bom_missing_parts' => $missing,
+        'bom_actual_total'  => $actualTotal,
         'expected'          => $expected,
         'actual'            => $actual,
     ];

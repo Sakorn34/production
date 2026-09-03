@@ -1207,6 +1207,12 @@ a.kpi:hover { text-decoration: none; }
   background: var(--warning-soft); color: var(--warning);
 }
 .parts-meta-warn svg { flex: none; }
+/* เครื่องที่ไม่เคยเบิกผลิตตาม BOM เลย (ผลิตก่อนใช้ระบบนี้) ไม่ใช่ปัญหา — ป้ายสีกลาง ไม่มีไอคอนเตือน */
+.parts-meta-note {
+  display: inline-flex; align-items: center;
+  padding: 2px 9px; border-radius: 999px;
+  background: var(--surface-muted); color: var(--text-muted);
+}
 .parts-meta-doc {
   font-family: ui-monospace, "Consolas", monospace;
   font-size: calc(11px * var(--font-scale, 1));

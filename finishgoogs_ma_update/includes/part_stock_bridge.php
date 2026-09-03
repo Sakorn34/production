@@ -606,12 +606,14 @@ function asset_parts_withdraw_summary($assetId, $withBomQtyDetail = false) {
     $bomQtyOk = true;
     $bomExtraParts = 0;
     $bomMissingParts = 0;
+    $bomActualTotal = 0.0;
     if ($bomCount > 0 && $withBomQtyDetail && function_exists('production_bom_match_status')) {
         $bomSt = production_bom_match_status($assetId, (int) $asset['product_id'], $sn);
         $bomMatch = $bomSt['bom_match'];
         $bomQtyOk = (bool) $bomSt['bom_qty_ok'];
         $bomExtraParts = (int) $bomSt['bom_extra_parts'];
         $bomMissingParts = (int) $bomSt['bom_missing_parts'];
+        $bomActualTotal = (float) ($bomSt['bom_actual_total'] ?? 0.0);
     }
 
     $linkedOutCount = 0;
@@ -642,6 +644,23 @@ function asset_parts_withdraw_summary($assetId, $withBomQtyDetail = false) {
         );
         while ($r = $res->fetch_assoc()) {
             $movements[] = $r;
+        }
+    }
+
+    // เครื่องที่ "ไม่ครบ BOM" มีสองสาเหตุคนละเรื่องกัน: (1) เบิกผลิตจริงแต่เบิกไม่ครบ —
+    // ปัญหาจริงที่ต้องเตือน กับ (2) ไม่เคยมีรายการเบิกผลิต (label 'ผลิต') เลยสักแถว มีแต่เบิกซ่อม —
+    // มักเป็นเครื่องที่ผลิตไปก่อนมีระบบ BOM ไม่ใช่ปัญหา ต้องแยกออกจากกันตรงนี้เพราะ
+    // production_bom_match_status() เห็นแค่ยอด qty ที่นับตาม mode ที่มันรู้จัก ไม่เห็น label
+    if ($bomMatch === 'missing' && function_exists('part_movement_mode_label')) {
+        $hasProdWithdraw = false;
+        foreach ($movements as $mv) {
+            if (part_movement_mode_label($mv['mode'] ?? '') === 'ผลิต') {
+                $hasProdWithdraw = true;
+                break;
+            }
+        }
+        if (!$hasProdWithdraw) {
+            $bomMatch = 'never';
         }
     }
 
@@ -689,6 +708,7 @@ function asset_parts_withdraw_summary($assetId, $withBomQtyDetail = false) {
         'bom_qty_ok'         => $bomQtyOk,
         'bom_extra_parts'    => $bomExtraParts,
         'bom_missing_parts'  => $bomMissingParts,
+        'bom_actual_total'   => $bomActualTotal,
         'linked_out_count'   => $linkedOutCount,
         'withdraw_list_sync' => $outCount > 0
             ? asset_withdraw_list_sync_status_from_counts($outCount, $stockOutCount, $linkedOutCount)
@@ -1478,6 +1498,10 @@ if (is_file($__withdrawSyncPath)) {
 /**
  * ป้ายสถานะ BOM (qty-level) สำหรับแสดงใน UI
  *
+ * BOM ผูกกับ "เบิกผลิต" เท่านั้น (โหมดผลิต + Set) เครื่องที่ผลิตไปก่อนมีระบบนี้จะไม่มีเบิก
+ * ผลิตเลย มีแต่เบิกซ่อม — ไม่ใช่เครื่อง "เบิกไม่ครบ" แต่คือเครื่องที่ไม่เคยอยู่ในระบบ BOM มา
+ * ตั้งแต่ต้น ต้องแยกข้อความออกจากกัน ไม่งั้นดูเหมือนมีปัญหาทั้งที่เป็นปกติ (ดู bom_match='never')
+ *
  * @param array{bom_match:string,bom_count:int,bom_extra_parts:int,bom_missing_parts:int} $info
  * @return string
  */
@@ -1491,16 +1515,19 @@ function asset_bom_match_label(array $info): string
     if ($match === 'ok') {
         return 'BOM ตรง ' . $bomCount . '/' . $bomCount;
     }
+    if ($match === 'never') {
+        return 'ยังไม่มีเบิกผลิตตาม BOM (อาจผลิตก่อนใช้ระบบนี้)';
+    }
     if ($match === 'extra') {
         $n = (int) ($info['bom_extra_parts'] ?? 0);
-        return 'BOM ไม่ตรง (เกิน/ซ้ำ ' . $n . ' part)';
+        return 'เบิกผลิตเกิน BOM (เกิน/ซ้ำ ' . $n . ' part)';
     }
     if ($match === 'missing') {
         $n = (int) ($info['bom_missing_parts'] ?? 0);
-        return 'BOM ไม่ครบ (ขาด ' . $n . ' part)';
+        return 'เบิกผลิตไม่ครบ BOM (ขาด ' . $n . ' part)';
     }
     if ($match === 'mixed') {
-        return 'BOM ไม่ตรง (เกิน+ขาด)';
+        return 'เบิกผลิตไม่ตรง BOM (เกิน+ขาด)';
     }
     return 'ยังไม่เบิก BOM';
 }
@@ -1518,7 +1545,9 @@ function asset_needs_bom_sync(array $summary): bool
         return false;
     }
     $match = (string) ($summary['bom_match'] ?? 'none');
-    return $match !== 'ok' && $match !== 'none';
+    // 'never' = เครื่องที่ไม่เคยมีเบิกผลิตเลย (เช่นผลิตก่อนใช้ระบบ BOM) — ไม่ต้อง sync
+    // เพราะไม่มีอะไรให้ผูก จะมีก็แต่ "เพิ่มของทั้งชุดย้อนหลัง" ซึ่งไม่ใช่สิ่งที่ sync ควรทำเอง
+    return $match !== 'ok' && $match !== 'none' && $match !== 'never';
 }
 
 /**

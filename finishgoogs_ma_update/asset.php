@@ -364,7 +364,11 @@ page_header('เครื่อง ' . $a['asset_code'], false);
 // แต่วัดจาก 366 เครื่องที่มีรายการเบิกจริง ป้ายนั้นขึ้น "ตรง" ทุกตัวไม่มียกเว้น
 // เช่นเดียวกับสถานะ sync ที่เป็น synced ทุกตัว — เอาออกเพราะไม่ได้บอกอะไร
 // เหลือไว้เฉพาะผลตรวจ BOM ซึ่งไม่ตรงจริง 46% กับเลขอ้างอิงและลิงก์ที่ใช้ตามรอยต่อ
+//
+// BOM ผูกกับเบิกผลิตเท่านั้น เครื่องที่ผลิตก่อนมีระบบนี้จะไม่เคยมีเบิกผลิตเลย มีแต่เบิกซ่อม
+// ("never") กรณีนี้ไม่ใช่ปัญหาที่ต้องเตือน จึงใช้ป้ายสีกลาง ไม่ใช่ป้ายเตือนสีเหลือง/ไอคอน ⚠
 $bomWarn = '';
+$bomIsNeutral = ($partsSummary['bom_match'] ?? '') === 'never';
 if (($partsSummary['bom_count'] ?? 0) > 0 && ($partsSummary['bom_match'] ?? 'none') !== 'none'
     && ($partsSummary['bom_match'] ?? '') !== 'ok') {
     $bomWarn = asset_bom_match_label([
@@ -379,7 +383,9 @@ if (($partsSummary['bom_count'] ?? 0) > 0 && ($partsSummary['bom_match'] ?? 'non
 <div class="parts-head-row">
   <?= ui_heading('parts', 'อะไหล่ที่เบิกใช้กับเครื่องนี้', 'h2') ?>
 <div id="parts-withdraw" class="parts-meta">
-  <?php if ($bomWarn !== '') { ?>
+  <?php if ($bomWarn !== '' && $bomIsNeutral) { ?>
+  <span class="parts-meta-note"><?= h($bomWarn) ?></span>
+  <?php } elseif ($bomWarn !== '') { ?>
   <span class="parts-meta-warn"><?= ui_icon_html('alert', 13) ?><?= h($bomWarn) ?></span>
   <?php } ?>
 
