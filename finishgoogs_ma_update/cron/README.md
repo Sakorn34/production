@@ -64,3 +64,38 @@ schtasks /Create /TN "Production_LINE_Notify_Worker" /TR "`"$PhpExe`" `"$CronDir
 ## งาน CLI แยกตาม job
 
 ยังเรียก `--job=daily`, `weekly`, `monthly`, `low_stock_scan` ผ่าน `line_notify_scheduled.php` ได้ (manual/debug)
+
+---
+
+# Sync สถานะเครื่อง (ไม่เกี่ยวกับ LINE)
+
+`cron/sync_asset_status.php` — ไล่อัปเดต `assets.status` ทุกเครื่องจากระบบเช่า
+(`biton_leasing`) และการเบิกขาย (`biton_stockparts`)
+
+| ช่อง | ค่า |
+|------|-----|
+| Script | `production/finishgoogs_ma_update/cron/sync_asset_status.php` |
+| Plesk Run | Daily |
+
+**ต้องตั้ง task นี้ ไม่งั้นสถานะจะไม่ขยับเอง** — หน้า Dashboard แค่นับจากคอลัมน์
+`assets.status` ไม่ได้คำนวณสดจากระบบเช่า ส่วน sync ที่ทำงานตอนเปิดหน้าเครื่อง
+แก้ให้เฉพาะเครื่องที่เปิดดูทีละตัวเท่านั้น (หน้า Dashboard จงใจไม่รัน full sync
+เพราะ 18,000+ เครื่องเสี่ยง timeout)
+
+อาการเวลาลืมตั้ง: เพิ่มสถานะใหม่แล้วยอดขึ้น 0 ทั้งที่อัปไฟล์ครบ
+
+รันเองครั้งเดียวหลังเพิ่มสถานะใหม่ได้ที่ปุ่ม **Run Now** ใน Plesk — สคริปต์พิมพ์
+`{"ok":true,"changed":N,"total":M}` ออกมาให้ยืนยันว่าแก้ไปกี่รายการ
+
+## ทดสอบ / dry-run
+
+```bash
+# ดูว่าจะเปลี่ยนอะไรบ้าง ยังไม่เขียน
+/opt/plesk/php/8.2/bin/php .../database/tools/sync_asset_status.php
+
+# เขียนจริง
+/opt/plesk/php/8.2/bin/php .../database/tools/sync_asset_status.php --apply
+
+# เครื่องเดียว
+/opt/plesk/php/8.2/bin/php .../database/tools/sync_asset_status.php --apply --id=589
+```
