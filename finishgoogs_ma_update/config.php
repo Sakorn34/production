@@ -33,7 +33,7 @@ function app_base_url() {
 define('BASE_URL', app_base_url());
 define('APP_NAME', 'ระบบทะเบียนเครื่องและซ่อมบำรุง');
 /** รหัสชุด deploy — อัปเมื่อ build patch แล้วเทียบกับ server ว่าอัปครบหรือยัง */
-define('APP_RELEASE_VERSION', '2026-09-03_101216');
+define('APP_RELEASE_VERSION', '2026-09-03_104906');
 
 /**
  * โหลด secrets แบบ cache ต่อ request
@@ -883,12 +883,16 @@ function flash_get() { $f = isset($_SESSION['flash']) ? $_SESSION['flash'] : nul
 function img_url($p) {
     if (!$p) return null;
     if (preg_match('#^https?://#', $p)) return $p; // ลิงก์ AppSheet เดิม
+    // ใช้ app_uploads_public_base() ไม่ใช่ BASE_URL — BASE_URL เดามาจาก SCRIPT_NAME
+    // ตอนรันผ่านเว็บได้ค่าถูก แต่ตอน cron รันแบบ CLI เดาไม่ได้แล้วตกไปที่ '/production'
+    // ซึ่งขาดโฟลเดอร์แอป รูปในแจ้งเตือน LINE จึงกลายเป็น 404 ทั้งหมด
+    $base = function_exists('app_uploads_public_base') ? app_uploads_public_base() : BASE_URL . '/uploads/';
     $legacyFolders = ['Update_Images/', 'Parts_Images/', 'Menu Product_Images/', 'model appsheet_Images/',
                       'model_Images/', 'NamePart_Images/', 'Sub Menu_Images/', 'Sub Product_Images/', 'Thumbnail_Images/'];
     foreach ($legacyFolders as $lf) {
-        if (strpos($p, $lf) === 0) return BASE_URL . '/uploads/legacy/' . implode('/', array_map('rawurlencode', explode('/', $p)));
+        if (strpos($p, $lf) === 0) return $base . 'legacy/' . implode('/', array_map('rawurlencode', explode('/', $p)));
     }
-    return BASE_URL . '/uploads/' . implode('/', array_map('rawurlencode', explode('/', $p)));
+    return $base . implode('/', array_map('rawurlencode', explode('/', $p)));
 }
 /** แสดงรูปหรือกล่อง placeholder */
 function img_tag($path, $alt = '', $class = 'thumb') {

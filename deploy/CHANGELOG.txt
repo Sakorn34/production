@@ -2315,3 +2315,12 @@ Files:
   finishgoogs_ma_update/line_notify_settings.php
   shared/line_notify_core.php
 
+
+================================================================
+v2026-09-03_104906 | Patch | 2026-09-03 10:49:07
+From: 2026-09-03_101216  ->  To: c2386b6  |  Files: 1
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+
