@@ -69,6 +69,10 @@ function line_settings_form_defaults(): array
         'channel_access_token'  => '',
         'channel_secret'        => '',
         'default_recipient_id'  => (string)($cfg['default_recipient_id'] ?? ''),
+        // โดเมนสาธารณะ — ใช้แปลง path รูปที่อัปเองให้เป็น URL เต็มก่อนส่งให้ LINE
+        // cron รันแบบ CLI ไม่มี HTTP_HOST ให้เดา ถ้าไม่ตั้งค่านี้รูปที่อัปจะใช้ไม่ได้เลย
+        'public_site_host'      => (string)($cfg['public_site_host'] ?? ''),
+        'public_site_host'      => (string)($cfg['public_site_host'] ?? ''),
         'public_production_url' => (string)($cfg['public_production_url'] ?? ''),
         'public_parts_url'      => (string)($cfg['public_parts_url'] ?? ''),
         'events'                => $events,
@@ -128,6 +132,7 @@ function line_settings_parse_post(array $post): array
         'channel_access_token'  => $token,
         'channel_secret'        => $secret,
         'default_recipient_id'  => trim((string)($post['default_recipient_id'] ?? '')),
+        'public_site_host'      => rtrim(trim((string)($post['public_site_host'] ?? '')), '/'),
         'public_production_url' => trim((string)($post['public_production_url'] ?? '')),
         'public_parts_url'      => trim((string)($post['public_parts_url'] ?? '')),
         'events'                => $events,
@@ -173,6 +178,10 @@ function line_settings_build_secrets_php(array $cfg): string
         'channel_secret'        => (string)($cfg['channel_secret'] ?? ''),
         'default_recipient_id'  => (string)($cfg['default_recipient_id'] ?? ''),
         'enabled'               => !empty($cfg['enabled']),
+        // โดเมนสาธารณะ — ใช้แปลง path รูปที่อัปเองให้เป็น URL เต็มก่อนส่งให้ LINE
+        // cron รันแบบ CLI ไม่มี HTTP_HOST ให้เดา ถ้าไม่ตั้งค่านี้รูปที่อัปจะใช้ไม่ได้เลย
+        'public_site_host'      => (string)($cfg['public_site_host'] ?? ''),
+        'public_site_host'      => (string)($cfg['public_site_host'] ?? ''),
         'public_production_url' => (string)($cfg['public_production_url'] ?? ''),
         'public_parts_url'      => (string)($cfg['public_parts_url'] ?? ''),
         'events'                => (array)($cfg['events'] ?? []),

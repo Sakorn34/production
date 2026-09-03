@@ -2278,3 +2278,14 @@ Files:
   finishgoogs_ma_update/includes/line_notify_settings.php
   finishgoogs_ma_update/line_notify_settings.php
 
+
+================================================================
+v2026-09-03_093410 | Patch | 2026-09-03 09:34:12
+From: 2026-09-03_084815  ->  To: 0533ac9  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/line_notify_settings.php
+  finishgoogs_ma_update/line_notify_settings.php
+

@@ -654,6 +654,12 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
     </label>
 
+    <label>โดเมนสาธารณะของเว็บ (สำหรับรูปใน LINE)
+
+      <input type="url" name="public_site_host" value="<?= h($form['public_site_host']) ?>" placeholder="https://example.com — ต้องเป็น https ไม่งั้นรูปที่อัปเองจะไม่ขึ้น">
+
+    </label>
+
     <label>URL Production (deep link)
 
       <input type="url" name="public_production_url" value="<?= h($form['public_production_url']) ?>" placeholder="https://.../finishgoogs_ma_update">
