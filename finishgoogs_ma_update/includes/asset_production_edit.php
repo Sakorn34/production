@@ -550,12 +550,76 @@ function asset_head_row_html(string $label, string $valueHtml): string {
  * @param string $kind field_kind จาก config
  * @return bool
  */
-function asset_head_is_hw_manufacturer_field(string $name, string $kind = 'component'): bool
+/**
+ * kind ของชื่อฟิลด์ตามที่ตั้งไว้ในหลังบ้าน
+ *
+ * asset_components เก็บทุกฟิลด์ปนกันโดยไม่มี kind ติดมา ต้องย้อนไปดู product_field_config
+ * เอง และเทียบแบบไม่สนตัวพิมพ์ เพราะข้อมูลจริงมีทั้ง "Brand Camera" กับ "Brand camera"
+ * ซึ่งเป็นฟิลด์เดียวกัน
+ *
+ * ชื่อที่รุ่นนี้ไม่ได้ตั้งไว้ จะไปหาจากรุ่นอื่นที่ใช้ชื่อเดียวกัน — Main board, EXP, HUB
+ * ถูกตั้งเป็นผู้ผลิตไว้ในรุ่นอื่นอยู่แล้ว
+ *
+ * @param  string $name
+ * @param  int    $productId
+ * @return string|null kind ที่ตั้งไว้ · null = ไม่เคยตั้งที่ไหนเลย
+ */
+function asset_head_field_kind(string $name, int $productId): ?string
 {
-    if ($kind === 'ผู้ผลิต') {
-        return true;
+    static $byProduct = null;
+    static $anyProduct = null;
+
+    if ($byProduct === null) {
+        $byProduct = [];
+        $anyProduct = [];
+        try {
+            $res = db()->query(
+                "SELECT product_id, field_name, field_kind FROM product_field_config WHERE context='production'"
+            );
+            if ($res) {
+                while ($row = $res->fetch_assoc()) {
+                    $key = mb_strtolower(trim((string) $row['field_name']), 'UTF-8');
+                    if ($key === '') {
+                        continue;
+                    }
+                    $byProduct[(int) $row['product_id']][$key] = (string) $row['field_kind'];
+                    if (!isset($anyProduct[$key])) {
+                        $anyProduct[$key] = (string) $row['field_kind'];
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('[asset_head_field_kind] ' . $e->getMessage());
+        }
     }
-    return (bool) preg_match('/^Board\s+/ui', trim($name));
+
+    $key = mb_strtolower(trim($name), 'UTF-8');
+    if ($key === '') {
+        return null;
+    }
+    if (isset($byProduct[$productId][$key])) {
+        return $byProduct[$productId][$key];
+    }
+    return $anyProduct[$key] ?? null;
+}
+
+/**
+ * แถวนี้เป็นชิ้นส่วนฮาร์ดแวร์จริงหรือไม่ — ต้องตั้งไว้เป็น kind=component เท่านั้น
+ *
+ * ชื่อที่ไม่เคยตั้งค่าที่ไหนเลยก็ไม่แสดง เพราะข้อมูลกลุ่มนั้นเกือบทั้งหมดเป็นชื่อคน
+ * (EXP&HUB 1,409 แถว ค่าเป็น Yo / Jo / Tom / Ice & Tom)
+ * อยากให้ฟิลด์ไหนขึ้น ให้ไปตั้ง kind เป็นชิ้นส่วนฮาร์ดแวร์ที่หน้าตั้งค่ารุ่น
+ *
+ * @param  string $name
+ * @param  int    $productId
+ * @return bool
+ */
+function asset_head_is_hardware_field(string $name, int $productId): bool
+{
+    if (preg_match('/^Board\s+/ui', trim($name))) {
+        return false;
+    }
+    return asset_head_field_kind($name, $productId) === 'component';
 }
 
 
@@ -567,7 +631,7 @@ function asset_head_is_hw_manufacturer_field(string $name, string $kind = 'compo
  * @param array<int,array<string,mixed>> $componentRows จาก asset_components
  * @return array<int,array{name:string,value:string}>
  */
-function asset_head_hardware_field_rows(array $ctx, array $componentRows): array
+function asset_head_hardware_field_rows(array $ctx, array $componentRows, int $productId = 0): array
 {
     $rows = [];
     $seen = [];
@@ -578,7 +642,7 @@ function asset_head_hardware_field_rows(array $ctx, array $componentRows): array
             continue;
         }
         $name = (string)($f['name'] ?? '');
-        if ($name === '' || asset_head_is_hw_manufacturer_field($name, $kind)) {
+        if ($name === '' || preg_match('/^Board\s+/ui', trim($name))) {
             continue;
         }
         $val = trim((string)($f['value'] ?? ''));
@@ -589,9 +653,10 @@ function asset_head_hardware_field_rows(array $ctx, array $componentRows): array
         $seen[$name] = true;
     }
 
+    // แถวจาก asset_components ไม่มี kind ติดมา ต้องย้อนไปดูที่ตั้งค่าของรุ่น
     foreach ($componentRows as $c) {
         $name = (string)($c['component_name'] ?? '');
-        if ($name === '' || isset($seen[$name]) || asset_head_is_hw_manufacturer_field($name)) {
+        if ($name === '' || isset($seen[$name]) || !asset_head_is_hardware_field($name, $productId)) {
             continue;
         }
         $val = trim((string)($c['component_value'] ?? ''));
@@ -748,7 +813,7 @@ function asset_head_dl_html(array $assetRow, array $ctx, array $componentRows): 
 
 
 
-    $hwRows = asset_head_hardware_field_rows($ctx, $componentRows);
+    $hwRows = asset_head_hardware_field_rows($ctx, $componentRows, (int)($assetRow['product_id'] ?? 0));
 
     if ($hwRows) {
 
