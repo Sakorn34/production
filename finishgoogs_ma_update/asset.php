@@ -235,6 +235,10 @@ $leaseInfo = asset_leasing_info(
     (string) ($a['asset_code'] ?? ''),
     (string) ($a['factory_serial'] ?? '')
 );
+// ประวัติงาน MA ฝั่งระบบเช่าไปรวมใน timeline board เป็นคอลัมน์ของตัวเอง
+// ใช้ข้อมูลที่ asset_leasing_info() โหลดมาแล้ว ไม่ query ซ้ำ
+$tl = array_merge($tl, rent_leasing_ma_timeline_items($leaseInfo));
+
 // ประวัติซ่อมจากระบบ MA — อ่านอย่างเดียว ต่อฐานไม่ได้ก็ไม่ล้มทั้งหน้า
 $maRepairInfo = asset_maintenance_info((string) $a['asset_code']);
 // ปุ่มเพิ่มรายการเบิกย้ายไปอยู่แถบเครื่องมือ จึงต้องรู้ค่าพวกนี้ตั้งแต่ก่อนวาดแถบ
@@ -475,9 +479,6 @@ page_header('เครื่อง ' . $a['asset_code'], false);
 </div>
 <?php } ?>
 <?php } ?>
-
-<?php // ประวัติ MA ฝั่งระบบเช่า — คนละเล่มกับระบบซ่อม วางคู่กันเพื่อให้เห็นครบในที่เดียว ?>
-<?= asset_leasing_ma_section_html($leaseInfo) ?>
 
 <?= asset_maintenance_section_html($maRepairInfo) ?>
 

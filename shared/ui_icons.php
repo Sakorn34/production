@@ -471,6 +471,7 @@ function ui_timeline_type_html(string $key): string
         'update_hw'   => ['parts', 'อัปเดต Hardware'],
         'update'      => ['updates', 'อัปเดต'],
         'ma'          => ['ma', 'เข้า MA'],
+        'rent_ma'     => ['ma', 'MA (ระบบเช่า)'],
         'repair'      => ['repairs', 'งานซ่อม'],
         'stock_in'    => ['stock-in', 'เข้าคลัง'],
         'stock_out'   => ['stock-out-set', 'ออกจากคลัง'],
@@ -495,7 +496,7 @@ function ui_timeline_group_key(string $typeKey): string
     static $map = [
         'production' => 'production',
         'update_fw' => 'update', 'update_hw' => 'update', 'update' => 'update',
-        'ma' => 'ma', 'repair' => 'repair',
+        'ma' => 'ma', 'rent_ma' => 'rent_ma', 'repair' => 'repair',
         'stock_in' => 'stock', 'stock_out' => 'stock',
         'spare_loan' => 'spare',
         'part_out' => 'parts', 'part_in' => 'parts',
@@ -515,6 +516,7 @@ function ui_timeline_group_title_html(string $groupKey): string
         'production' => ['assets', 'บันทึกผลิต / QC'],
         'update'     => ['updates', 'อัปเดต FW/HW'],
         'ma'         => ['ma', 'เข้า MA'],
+        'rent_ma'    => ['ma', 'MA (ระบบเช่า)'],
         'parts'      => ['parts', 'เบิกอะไหล่ใช้กับเครื่องนี้'],
         'repair'     => ['repairs', 'งานซ่อม'],
         'stock'      => ['box', 'สถานะคลัง'],
@@ -533,7 +535,7 @@ function ui_timeline_group_title_html(string $groupKey): string
  */
 function ui_timeline_group_order(): array
 {
-    return ['production', 'update', 'ma', 'parts', 'repair', 'stock', 'spare'];
+    return ['production', 'update', 'ma', 'rent_ma', 'parts', 'repair', 'stock', 'spare'];
 }
 
 /**

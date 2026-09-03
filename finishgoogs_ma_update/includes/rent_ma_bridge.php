@@ -1194,7 +1194,7 @@ function rent_leasing_ma_history($serial)
         return [];
     }
     $q = rent_q_try(
-        'SELECT ma_date, ma_status, ma_remarks FROM tbl_product_ma
+        'SELECT ma_date, ma_status, ma_remarks, ma_user_add FROM tbl_product_ma
          WHERE ma_sn = ? ORDER BY ma_date DESC, ma_id DESC',
         's',
         [$serial]
@@ -1212,9 +1212,54 @@ function rent_leasing_ma_history($serial)
             'date' => trim((string) ($row['ma_date'] ?? '')),
             'status' => trim((string) ($row['ma_status'] ?? '')),
             'remarks' => $remarks,
+            'by' => trim((string) ($row['ma_user_add'] ?? '')),
         ];
     }
     return $rows;
+}
+
+/**
+ * แปลงประวัติ MA ระบบเช่าเป็นรายการ timeline — ไปรวมกับ board ของหน้าเครื่อง
+ *
+ * รับ $info ที่โหลดมาแล้ว ไม่ query ซ้ำ เพราะ asset.php เรียก asset_leasing_info()
+ * ไว้ตั้งแต่ต้นหน้าอยู่แล้ว
+ *
+ * @param array<string,mixed> $info จาก asset_leasing_info()
+ * @return array<int,array<string,mixed>>
+ */
+function rent_leasing_ma_timeline_items(array $info)
+{
+    $rows = is_array($info['ma_history'] ?? null) ? $info['ma_history'] : [];
+    if (!$rows) {
+        return [];
+    }
+    $items = [];
+    foreach ($rows as $r) {
+        $isRetire = trim((string) ($r['status'] ?? '')) === 'Asset Retirement';
+        $body = [];
+        $body[] = $isRetire
+            ? '<b class="tl-rent-ma-retire">ปลดระวาง (เสื่อมสภาพ)</b>'
+            : '<b>กลับเข้าคลัง</b>';
+        $parts = rent_leasing_ma_note_parts((string) ($r['remarks'] ?? ''));
+        if (count($parts) > 1) {
+            $body[] = '<ul class="tl-checklist"><li>' . implode('</li><li>', array_map('h', $parts)) . '</li></ul>';
+        } elseif ($parts) {
+            $body[] = h($parts[0]);
+        }
+        $by = trim((string) ($r['by'] ?? ''));
+        if ($by !== '') {
+            $body[] = 'โดย: ' . h($by);
+        }
+        $items[] = [
+            'd' => function_exists('timeline_dt') ? timeline_dt($r['date'] ?? '') : (string) ($r['date'] ?? ''),
+            'type_key' => 'rent_ma',
+            'type' => function_exists('ui_timeline_type_html') ? ui_timeline_type_html('rent_ma') : '',
+            'html' => implode('<br>', $body),
+            'kind' => 'rent_ma',
+            'rid' => 0,
+        ];
+    }
+    return $items;
 }
 
 /**
@@ -1231,6 +1276,25 @@ function rent_leasing_ma_retire_reason(array $history)
         }
     }
     return '';
+}
+
+/**
+ * คนบันทึกและวันที่ของแถวปลดระวาง — ใช้ต่อท้ายเหตุผลในการ์ด
+ *
+ * @param array<int,array<string,mixed>> $history จาก rent_leasing_ma_history()
+ * @return array{by:string,date:string}
+ */
+function rent_leasing_ma_retire_meta(array $history)
+{
+    foreach ($history as $row) {
+        if (trim((string) ($row['status'] ?? '')) === 'Asset Retirement') {
+            return [
+                'by' => trim((string) ($row['by'] ?? '')),
+                'date' => trim((string) ($row['date'] ?? '')),
+            ];
+        }
+    }
+    return ['by' => '', 'date' => ''];
 }
 
 /**
@@ -1669,43 +1733,6 @@ function rent_leasing_dl_row($label, $value)
 }
 
 /**
- * ส่วน「ประวัติงาน MA (ระบบเช่า)」เต็มความกว้าง — แยกจากการ์ดเพราะเป็นตาราง
- *
- * @param array<string,mixed> $info จาก asset_leasing_info()
- * @return string
- */
-function asset_leasing_ma_section_html(array $info)
-{
-    $rows = is_array($info['ma_history'] ?? null) ? $info['ma_history'] : [];
-    if (!$rows) {
-        return '';
-    }
-    $icon = function_exists('ui_icon_html') ? ui_icon_html('ma', 18) : '';
-    $out = '<section class="rent-ma-section">';
-    $out .= '<h2 class="h-with-icon">' . $icon . 'ประวัติงาน MA (ระบบเช่า)</h2>';
-    $out .= '<p class="muted rent-ma-sub">' . number_format(count($rows)) . ' รายการ · ใหม่ → เก่า</p>';
-    $out .= '<div class="table-wrap"><table class="list rent-ma-table">';
-    $out .= '<tr><th>วันที่</th><th>สถานะหลังงาน</th><th>สิ่งที่บันทึกไว้</th></tr>';
-    foreach ($rows as $r) {
-        $isRetire = trim((string) ($r['status'] ?? '')) === 'Asset Retirement';
-        $date = rent_leasing_valid_date($r['date'] ?? '') ? dthai($r['date']) : '—';
-        $badge = $isRetire
-            ? '<span class="badge st-retired">ปลดระวาง</span>'
-            : '<span class="badge st-new">กลับเข้าคลัง</span>';
-        $parts = rent_leasing_ma_note_parts((string) ($r['remarks'] ?? ''));
-        $body = count($parts) > 1
-            ? '<ul class="rent-ma-note-list"><li>' . implode('</li><li>', array_map('h', $parts)) . '</li></ul>'
-            : h($parts ? $parts[0] : '');
-        $out .= '<tr' . ($isRetire ? ' class="is-retire"' : '') . '>'
-            . '<td style="white-space:nowrap">' . h($date) . '</td>'
-            . '<td>' . $badge . '</td>'
-            . '<td>' . $body . '</td></tr>';
-    }
-    $out .= '</table></div></section>';
-    return $out;
-}
-
-/**
  * สร้าง HTML card「การเบิกเช่า」บนโปรไฟล์เครื่อง production
  *
  * @param array<string,mixed> $info จาก asset_leasing_info()
@@ -1775,6 +1802,19 @@ function asset_leasing_card_html(array $info)
         $val = count($parts) > 1
             ? '<ul class="rent-ma-note-list"><li>' . implode('</li><li>', array_map('h', $parts)) . '</li></ul>'
             : h($parts ? $parts[0] : '');
+        $meta = rent_leasing_ma_retire_meta(
+            is_array($info['ma_history'] ?? null) ? $info['ma_history'] : []
+        );
+        $tail = [];
+        if (rent_leasing_valid_date($meta['date'])) {
+            $tail[] = dthai($meta['date']);
+        }
+        if ($meta['by'] !== '') {
+            $tail[] = 'โดย ' . $meta['by'];
+        }
+        if ($tail) {
+            $val .= '<span class="rent-retire-meta muted">' . h(implode(' · ', $tail)) . '</span>';
+        }
         $out .= rent_leasing_dl_row('เหตุผลที่ปลดระวาง', '<span class="rent-retire-reason">' . $val . '</span>');
     }
     $faults = is_array($info['fault_notes'] ?? null) ? $info['fault_notes'] : [];
