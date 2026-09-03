@@ -375,6 +375,9 @@ if (($partsSummary['bom_count'] ?? 0) > 0 && ($partsSummary['bom_match'] ?? 'non
     ]);
 }
 ?>
+<?php // หัวข้อกับแถบข้อมูลอยู่แถวเดียวกัน ไม่ต้องกินสองบรรทัด ?>
+<div class="parts-head-row">
+  <?= ui_heading('parts', 'อะไหล่ที่เบิกใช้กับเครื่องนี้', 'h2') ?>
 <div id="parts-withdraw" class="parts-meta">
   <?php if ($bomWarn !== '') { ?>
   <span class="parts-meta-warn"><?= ui_icon_html('alert', 13) ?><?= h($bomWarn) ?></span>
@@ -416,9 +419,9 @@ if (($partsSummary['bom_count'] ?? 0) > 0 && ($partsSummary['bom_match'] ?? 'non
     </span>
   <?php } ?>
 </div>
+</div>
 
 <?php if ($partsSummary['out_count'] > 0) { ?>
-  <?= ui_heading('parts', 'อะไหล่ที่เบิกใช้กับเครื่องนี้', 'h2') ?>
 <div class="table-wrap">
 <table class="list" style="max-width:920px; margin-bottom:20px">
   <tr><th>อะไหล่</th><th style="text-align:right">จำนวน</th><th>ประเภท</th><th>วันเวลา</th><th>รหัส Stock</th><th></th></tr>
@@ -471,7 +474,6 @@ if (($partsSummary['bom_count'] ?? 0) > 0 && ($partsSummary['bom_match'] ?? 'non
         $stockCodeMap[$scRow['name']] = $scRow['stock_code'];
     }
 ?>
-<?= ui_heading('parts', 'อะไหล่ที่เบิกใช้กับเครื่องนี้', 'h2') ?>
 <div class="table-wrap">
 <table class="list" style="max-width:640px; margin-bottom:20px">
   <tr><th>อะไหล่</th><th style="text-align:right">จำนวนที่เบิกใช้</th><th>รหัส Stock</th></tr>
