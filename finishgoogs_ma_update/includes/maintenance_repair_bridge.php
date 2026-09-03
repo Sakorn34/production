@@ -714,3 +714,121 @@ function asset_maintenance_section_html(array $info): string
 
     return $out . '</section>';
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   วันเปลี่ยนอะไหล่สิ้นเปลือง (SD Card / Battery Backup RTC) จากงานซ่อม
+   ═══════════════════════════════════════════════════════════════════════════
+   การแจ้งเตือน "ถึงกำหนดเปลี่ยน" เดิมดูจาก ma_records ของ production อย่างเดียว
+   เครื่องที่เข้าศูนย์ซ่อมแล้วเปลี่ยนอะไหล่ไปจึงไม่ถูกนับ แล้วเตือนซ้ำทั้งที่เพิ่งเปลี่ยน
+
+   ระบบซ่อมเรียกชิ้นส่วนเดียวกันคนละชื่อตามรุ่น (ตรวจจากตาราง rate + ค่าที่ใช้จริง
+   194 แบบ) และมีรายการเหมารวม "MA เปลียนอะไหล่พื้นฐาน" ที่รวมทั้งสองอย่างไว้แล้ว
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * ชื่อรายการซ่อมที่ถือว่าเปลี่ยนอะไหล่สิ้นเปลืองแต่ละชนิด
+ *
+ * คีย์ต้องตรงกับ part_watch_catalog() ใน config.php
+ * ไม่รวม "battery 3.7v/320mA" กับ "batt." — เป็นแบตก้อนใหญ่ของเครื่อง คนละชิ้นกับถ่าน RTC
+ * และระวังอย่าใช้แค่ "ถ่าน" เพราะจะไปโดน "ขั้วถ่าน" (435 งาน) ซึ่งเป็นขั้วไม่ใช่ถ่าน
+ *
+ * @return array<string,array<int,string>>
+ */
+function ma_repair_part_aliases(): array
+{
+    return [
+        'SD Card' => [
+            'Micro SD', 'SD-Card', 'SD Card', 'SDcard',
+            'MA เปลียนอะไหล่พื้นฐาน',
+        ],
+        'Battery Backup RTC' => [
+            'ถ่าน BACKUP RTC', 'Battery Backup RTC', 'ถ่าน CR2032', 'CR2032',
+            'ถ่าน RTC', 'RTC DS3231', 'Module RTC', 'ถ่าน 3',
+            'MA เปลียนอะไหล่พื้นฐาน',
+        ],
+    ];
+}
+
+/**
+ * วันที่เปลี่ยนอะไหล่สิ้นเปลืองครั้งล่าสุดจากงานซ่อม
+ *
+ * นับเฉพาะงานที่ได้ลงมือซ่อมจริง — งานที่ลูกค้าไม่อนุมัติ (1,425 งาน) ไม่ได้เปลี่ยนอะไหล่
+ * วันที่ใช้วันซ่อมเสร็จ ถ้าไม่มีค่อยใช้วันรับเครื่อง
+ *
+ * ต่อฐานระบบซ่อมไม่ได้ → คืน array ว่าง ให้การแจ้งเตือนทำงานจาก ma_records ต่อไปได้
+ *
+ * @param  string $serial
+ * @return array<string,string> ชื่ออะไหล่ => วันที่ Y-m-d
+ */
+function asset_maintenance_part_replacements(string $serial): array
+{
+    $sn = trim($serial);
+    if ($sn === '' || !function_exists('dbMaintenance')) {
+        return [];
+    }
+    $sec = function_exists('db_secrets') ? db_secrets() : [];
+    if (empty($sec['maintenance']) || !is_array($sec['maintenance'])
+        || trim((string) ($sec['maintenance']['host'] ?? '')) === '') {
+        return [];
+    }
+    $db = dbMaintenance();
+    if ($db === null) {
+        return [];
+    }
+
+    $cols = [];
+    for ($i = 1; $i <= 10; $i++) {
+        $cols[] = 'trp_repair_no' . $i;
+    }
+    $sql = 'SELECT trp_status_firmma, trp_success_date, trp_receive_date, ' . implode(', ', $cols)
+        . ' FROM transac_repair WHERE UPPER(TRIM(trp_sn)) = UPPER(?) ORDER BY trp_id DESC';
+
+    $rows = [];
+    if ($st = $db->prepare($sql)) {
+        $st->bind_param('s', $sn);
+        if ($st->execute()) {
+            $res = $st->get_result();
+            while ($row = $res->fetch_assoc()) {
+                $rows[] = $row;
+            }
+        }
+        $st->close();
+    }
+    if (!$rows) {
+        return [];
+    }
+
+    $aliases = ma_repair_part_aliases();
+    $out = [];
+    foreach ($rows as $row) {
+        // ลูกค้าไม่อนุมัติ = ไม่ได้ลงมือเปลี่ยนอะไหล่
+        if (ma_job_is_declined($row['trp_status_firmma'] ?? null)) {
+            continue;
+        }
+        $date = ma_val($row['trp_success_date'] ?? null) ?? ma_val($row['trp_receive_date'] ?? null);
+        if ($date === null || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            continue;
+        }
+        $items = '';
+        for ($i = 1; $i <= 10; $i++) {
+            $v = ma_val($row['trp_repair_no' . $i] ?? null);
+            if ($v !== null) {
+                $items .= $v . '|';
+            }
+        }
+        if ($items === '') {
+            continue;
+        }
+        foreach ($aliases as $part => $pats) {
+            foreach ($pats as $p) {
+                if (mb_stripos($items, $p) !== false) {
+                    if (!isset($out[$part]) || strcmp($date, $out[$part]) > 0) {
+                        $out[$part] = $date;
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    return $out;
+}

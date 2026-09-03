@@ -33,7 +33,7 @@ function app_base_url() {
 define('BASE_URL', app_base_url());
 define('APP_NAME', 'ระบบทะเบียนเครื่องและซ่อมบำรุง');
 /** รหัสชุด deploy — อัปเมื่อ build patch แล้วเทียบกับ server ว่าอัปครบหรือยัง */
-define('APP_RELEASE_VERSION', '2026-09-03_111647');
+define('APP_RELEASE_VERSION', '2026-09-03_133516');
 
 /**
  * โหลด secrets แบบ cache ต่อ request
@@ -1129,6 +1129,23 @@ function part_watch_alerts($assetId, $producedAt, $productId = null) {
     $enabled = product_watch_alerts_enabled((int)$productId);
     $watch = part_watch_catalog();
     $out = [];
+
+    // วันเปลี่ยนอะไหล่จากงานซ่อมของระบบ MA — เครื่องที่เข้าศูนย์ซ่อมแล้วเปลี่ยนไป
+    // ไม่ได้ถูกบันทึกใน ma_records ถ้าไม่นับด้วยจะเตือนซ้ำทั้งที่เพิ่งเปลี่ยน
+    // fail-soft: ต่อฐานระบบซ่อมไม่ได้ก็ยังคำนวณจาก ma_records ได้ตามเดิม
+    $repairDates = [];
+    if ($assetId > 0) {
+        $ac = qr('SELECT asset_code FROM assets WHERE id=? LIMIT 1', 'i', [$assetId])->fetch_assoc();
+        $code = $ac ? trim((string)$ac['asset_code']) : '';
+        if ($code !== '') {
+            require_once __DIR__ . '/includes/maintenance_repair_bridge.php';
+            try {
+                $repairDates = asset_maintenance_part_replacements($code);
+            } catch (Throwable $e) {
+                error_log('[part_watch_alerts] repair lookup: ' . $e->getMessage());
+            }
+        }
+    }
     foreach ($watch as $name => $pats) {
         if (empty($enabled[$name])) {
             continue;
@@ -1143,13 +1160,27 @@ function part_watch_alerts($assetId, $producedAt, $productId = null) {
         $r = qr("SELECT MAX(visited_at) d FROM ma_records WHERE asset_id=? AND (" . implode(' OR ', $conds) . ")",
                 $types, $params)->fetch_assoc();
         if ($r && $r['d']) $base = $r['d'];
+
+        // งานซ่อมใหม่กว่าบันทึก MA ก็ให้ยึดวันซ่อม
+        $fromRepair = false;
+        if (!empty($repairDates[$name])) {
+            $rd = (string)$repairDates[$name];
+            if (!$base || strcmp(substr($rd, 0, 10), substr((string)$base, 0, 10)) > 0) {
+                $base = $rd;
+                $fromRepair = true;
+            }
+        }
         if (!$base) continue;
         try { $d1 = new DateTime($base); } catch (Exception $e) { continue; }
         $diff = $d1->diff(new DateTime('today'));
         $months = $diff->y * 12 + $diff->m;
         if ($months < 22) continue;
         $ageTxt = ($diff->y ? $diff->y . ' ปี ' : '') . $diff->m . ' เดือน';
-        $fromTxt = ($base !== $producedAt) ? 'นับจากเปลี่ยนล่าสุด ' . dthai($base) : 'นับจากวันผลิต ' . dthai($base);
+        if ($fromRepair) {
+            $fromTxt = 'นับจากงานซ่อม ' . dthai($base);
+        } else {
+            $fromTxt = ($base !== $producedAt) ? 'นับจากเปลี่ยนล่าสุด ' . dthai($base) : 'นับจากวันผลิต ' . dthai($base);
+        }
         if ($months >= 24) $out[] = ['level' => 'danger', 'html' => "🔴 <b>ถึงกำหนดเปลี่ยน $name แล้ว</b> — ใช้งาน $ageTxt ($fromTxt)"];
         else               $out[] = ['level' => 'warn',   'html' => "🟠 <b>ใกล้ถึงกำหนดเปลี่ยน $name</b> — ใช้งาน $ageTxt ($fromTxt)"];
     }
