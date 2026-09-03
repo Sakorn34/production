@@ -79,78 +79,84 @@ function line_flex_footer_btn(string $label, string $uri): array
 }
 
 /**
- * URL รูป product — ใช้ map จาก AppScript + fallback Google Drive (https)
+ * ไฟล์รูปแทน เมื่อรุ่นสินค้ายังไม่มีรูปในระบบ — อยู่บนเซิร์ฟเวอร์เรา
  *
- * @param string $model
- * @param string $imageUrl
+ * @var string
+ */
+const LINE_FLEX_FALLBACK_IMAGE = '/production/finishgoogs_ma_update/assets/line-production-icon.png';
+
+/**
+ * map ชื่อรุ่น → products.icon_path (รูปที่อัปในหน้าตั้งค่า → รุ่นสินค้า)
+ *
+ * โหลดครั้งเดียวต่อ request แล้ว cache ไว้ ไม่ query ต่อแถว
+ *
+ * @return array<string,string> ชื่อรุ่นตัวพิมพ์เล็ก => icon_path
+ */
+function line_flex_product_icon_map(): array
+{
+    static $map = null;
+    if ($map !== null) {
+        return $map;
+    }
+    $map = [];
+    if (!function_exists('db')) {
+        return $map;
+    }
+    try {
+        $res = db()->query("SELECT name, icon_path FROM products WHERE icon_path IS NOT NULL AND icon_path <> ''");
+        if ($res) {
+            while ($row = $res->fetch_assoc()) {
+                $name = trim((string) $row['name']);
+                if ($name !== '') {
+                    $map[mb_strtolower($name, 'UTF-8')] = (string) $row['icon_path'];
+                }
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('line_flex_product_icon_map failed: ' . $e->getMessage());
+    }
+    return $map;
+}
+
+/**
+ * URL รูปของรุ่นสินค้าสำหรับ LINE Flex — ใช้รูปบนเซิร์ฟเวอร์เราเท่านั้น
+ *
+ * ลำดับ: รูปที่อัปไว้กับรุ่นสินค้า → รูปแทนบนเซิร์ฟเวอร์
+ *
+ * เดิมมี map รูป Google Drive ฝังไว้ในโค้ดเป็นชั้นกลาง ทำให้เปลี่ยนรูปจากหลังบ้าน
+ * ไม่ได้และผูกกับบัญชี Drive ภายนอก — เอาออกแล้ว
+ *
+ * LINE ต้องโหลดรูปเองจากภายนอก URL จึงต้องเป็น https สาธารณะ ค่าที่ใช้ประกอบ
+ * โดเมนคือ public_site_host ในหน้าตั้งค่าแจ้งเตือน LINE (cron รันแบบ CLI
+ * ไม่มี HTTP_HOST ให้เดา ถ้าไม่ตั้งค่านั้นรูปจะโหลดไม่ขึ้น)
+ *
+ * @param string $model      ชื่อรุ่น
+ * @param string $imageUrl   URL ที่ส่งมากับข้อมูล (ยอมรับเฉพาะ https ของเราเอง)
  * @return string
  */
 function line_flex_product_image(string $model, string $imageUrl = ''): string
 {
-    if ($imageUrl !== '') {
-        $normalized = line_notify_normalize_public_url($imageUrl, '');
-        if ($normalized !== '' && preg_match('#^https://#i', $normalized)) {
-            return $normalized;
-        }
-    }
-    $map = line_flex_model_image_map();
-    $modelTrim = trim($model);
-    foreach ($map as $name => $url) {
-        if (strcasecmp($modelTrim, $name) === 0) {
+    // 1) รูปที่อัปไว้กับรุ่นสินค้า
+    $key = mb_strtolower(trim($model), 'UTF-8');
+    $map = line_flex_product_icon_map();
+    if ($key !== '' && isset($map[$key]) && function_exists('img_url')) {
+        $url = line_notify_normalize_public_url((string) img_url($map[$key]), '');
+        if (preg_match('#^https://#i', $url)) {
             return $url;
         }
     }
-    return 'https://drive.google.com/thumbnail?id=10fdOt4i3yf0AQI3ibojw0wv2Hh8qpjZJ&sz=w400';
-}
 
-/**
- * Map รูป product ต่อ model (port จาก Appscript.txt getImageUrl)
- *
- * @return array<string,string>
- */
-function line_flex_model_image_map(): array
-{
-    return [
-        'Adapter 12V'                     => 'https://drive.google.com/thumbnail?id=1E_Cf9bq4TQJ6SQSYXS5OkFEr23yRlzNt&sz=w400',
-        'Adapter 24V'                     => 'https://drive.google.com/thumbnail?id=1JvVQ-rGTV5nMC6g4OmNBc9eh2wA0wrfJ&sz=w400',
-        'A4 Camera'                       => 'https://drive.google.com/thumbnail?id=1rWS40WbqUX7IReAT4By2bzxDDtnBIhkV&sz=w400',
-        'bitVisitor Plus'                 => 'https://drive.google.com/thumbnail?id=1dH1j3qZ_uc7i9H4P2g1zGWLskmDCidP9&sz=w400',
-        'bitVisitor M'                    => 'https://drive.google.com/thumbnail?id=1AHh7CRA4D8DJBiYjBKjWFO0j7a_B3w7Q&sz=w400',
-        'bitVisitor S'                    => 'https://drive.google.com/thumbnail?id=1N_Qkb_o5xL1LesIqMDvZbDQa1Rv4GVpa&sz=w400',
-        'bitScan'                         => 'https://drive.google.com/thumbnail?id=1UM0FwFeJsR0NiGUuEYS94e8EZFTyc2y2&sz=w400',
-        'bitStamp Factory Single'         => 'https://drive.google.com/thumbnail?id=1wjMe8UkCdGYwYryZhL9VaozVLP2NAtjy&sz=w400',
-        'bitStamp Factory Dual'           => 'https://drive.google.com/thumbnail?id=1wjMe8UkCdGYwYryZhL9VaozVLP2NAtjy&sz=w400',
-        'bitStamp Guard'                  => 'https://drive.google.com/thumbnail?id=1wjMe8UkCdGYwYryZhL9VaozVLP2NAtjy&sz=w400',
-        'bitSupply 1203'                  => 'https://drive.google.com/thumbnail?id=17A0aZ8aPG7_fT1FIWTX-wE4FPCmv5UqJ&sz=w400',
-        'bitSupply 1206 Paperless'        => 'https://drive.google.com/thumbnail?id=1aykzHiUyPjffH3Gi8LjRcriwTCERacHY&sz=w400',
-        'bitSupply 1206 Printer'          => 'https://drive.google.com/thumbnail?id=1lpJwjj-UbsdAsqAQnwqlBl27PN7YQOMW&sz=w400',
-        'bitSupply 1206 Paperless Router' => 'https://drive.google.com/thumbnail?id=14EHysEX0459AFXOR5v0efs3l0AfRIG_3&sz=w400',
-        'bitSupply 1206 Printer Router'   => 'https://drive.google.com/thumbnail?id=1i6Wq5iydgpeG-5Zc7G0gknk1zTi--GLB&sz=w400',
-        'bitSupply 1212 Paperless'        => 'https://drive.google.com/thumbnail?id=1kfCLFBBqkj32TKcjHCa5Ti2gXVQgBJaP&sz=w400',
-        'bitSupply 1212 Printer'          => 'https://drive.google.com/thumbnail?id=1sAyhlX6A72xamZHytJb4WTy5j_baVOd8&sz=w400',
-        'bitSupply 1212 Paperless Router' => 'https://drive.google.com/thumbnail?id=1iosThVM0nnHv7zk67yeJLE9Y0j3wTIBS&sz=w400',
-        'bitSupply 1212 Printer Router'   => 'https://drive.google.com/thumbnail?id=1jxYn_ZJtjmEL3RJ_djEMHxdbcwagWnlt&sz=w400',
-        'bitQueue Control'                => 'https://drive.google.com/thumbnail?id=1Onc5PZSoD2ZYRTossuaGy8kLWmh5sQFU&sz=w400',
-        'bitQueue Monitor'                => 'https://drive.google.com/thumbnail?id=11YQ58yd9dYkk-1h8rwleK5to3HNCI_qs&sz=w400',
-        'bitRealtime Monitor'             => 'https://drive.google.com/thumbnail?id=11YQ58yd9dYkk-1h8rwleK5to3HNCI_qs&sz=w400',
-        'Consent Button'                  => 'https://drive.google.com/thumbnail?id=1mbouJIjVaZvCGyyVz_AA-pYgobolQ557&sz=w400',
-        'Magnetic Reader'                 => 'https://drive.google.com/thumbnail?id=16npmpl1gSodhlrEhrNlZhu1mKbfB3twz&sz=w400',
-        'Portable Printer'                => 'https://drive.google.com/thumbnail?id=10pL3Ka2EmpxzIWFK4hub3-bP2gWYu_wC&sz=w400',
-        'Router WIFI'                     => 'https://drive.google.com/thumbnail?id=118NBLbJ5pOcu819FOhss4TqvWyEtqyi-&sz=w400',
-        'Router 4G'                       => 'https://drive.google.com/thumbnail?id=1iM0-Vyta96QNmUvgNJlEyvq0-Jdpk8Jn&sz=w400',
-        'Printer 80mm.'                   => 'https://drive.google.com/thumbnail?id=1jhQezXLBdIj9PdiexsTs2S3HlzEFAuev&sz=w400',
-        'Scanner'                         => 'https://drive.google.com/thumbnail?id=1EIlrVtmxC6YPoT1SQg6ZqGF4C7W0MPyB&sz=w400',
-        'Scanner Wireless'                => 'https://drive.google.com/thumbnail?id=1DsqDh5l0Bh_PboaSk0QUIi0WWzPstPMg&sz=w400',
-        'Smart Card Reader'               => 'https://drive.google.com/thumbnail?id=1QWXb3yVI8LcddQkcragmVHE9WmgNEDjj&sz=w400',
-        'Smart Card Reader S'             => 'https://drive.google.com/thumbnail?id=1A48bZWsGI4MYv8VN_bsh33Lp6rZFPWG1&sz=w400',
-        'Card Camera'                     => 'https://drive.google.com/thumbnail?id=1QK_zQaeHvWdN4rnrw9sWUPvIrgtGMI3b&sz=w400',
-        'Indoor Camera'                   => 'https://drive.google.com/thumbnail?id=1qdduEo8XOjoC-ez4__JvVwzDSuQLeotC&sz=w400',
-        'Outdoor Camera'                  => 'https://drive.google.com/thumbnail?id=19XRQBuPMzPk7TQ-KLkDL8SdciiTWAgcH&sz=w400',
-    ];
-}
+    // 2) URL ที่ส่งมากับข้อมูล — รับเฉพาะที่เป็น https และไม่ใช่ของนอกบ้าน
+    if ($imageUrl !== '' && stripos($imageUrl, 'drive.google.com') === false) {
+        $url = line_notify_normalize_public_url($imageUrl, '');
+        if (preg_match('#^https://#i', $url)) {
+            return $url;
+        }
+    }
 
-/** @var string ไอคอน Production System ใน footer link */
-const LINE_FLEX_DEFAULT_PART_ICON = 'https://drive.google.com/thumbnail?id=10fdOt4i3yf0AQI3ibojw0wv2Hh8qpjZJ&sz=w100';
+    // 3) รูปแทนบนเซิร์ฟเวอร์เรา
+    return line_notify_normalize_public_url(LINE_FLEX_FALLBACK_IMAGE, '');
+}
 
 /** @var int จำนวนรายการอะไหล่ต่ำสูงสุดในการ์ดเดียว (ไม่แบ่ง carousel) */
 const LINE_FLEX_LOW_STOCK_SINGLE_CARD_MAX = 10;
@@ -249,11 +255,10 @@ function line_flex_low_stock_card_chunks(array $items): array
  */
 function line_flex_system_link_icon_url(): string
 {
-    $url = rtrim(line_notify_production_base_url(), '/') . '/assets/line-production-icon.png';
-    if (preg_match('#^https://#i', $url)) {
-        return $url;
-    }
-    return LINE_FLEX_DEFAULT_PART_ICON;
+    // ไฟล์อยู่ที่ finishgoogs_ma_update/assets/ ไม่ใช่ราก /production/
+    // เดิมประกอบจาก base url ของแอปแล้วได้ path ผิด ตอบ 404 — แต่ถูกบังไว้ด้วย
+    // รูปสำรองบน Google Drive จึงไม่มีใครเห็นว่าพัง
+    return line_notify_normalize_public_url(LINE_FLEX_FALLBACK_IMAGE, '');
 }
 
 /**

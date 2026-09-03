@@ -145,69 +145,18 @@ function line_flex_fg_metric_pill(string $label, string $breakdown, int $total, 
 }
 
 /**
- * map ชื่อรุ่น → icon_path ที่อัปไว้ในหน้า ตั้งค่า → รุ่นสินค้า (products.icon_path)
+ * URL รูปของรุ่นสินค้า — ใช้ตัวกลางใน line_flex_templates.php
  *
- * โหลดครั้งเดียวต่อ request แล้ว cache ไว้ ไม่ query ต่อแถว
- *
- * @return array<string,string> ชื่อรุ่นตัวพิมพ์เล็ก => icon_path
- */
-function line_flex_fg_product_icon_map(): array
-{
-    static $map = null;
-    if ($map !== null) {
-        return $map;
-    }
-    $map = [];
-
-    if (!function_exists('db')) {
-        return $map;
-    }
-    try {
-        $conn = db();
-        $res = $conn->query("SELECT name, icon_path FROM products WHERE icon_path IS NOT NULL AND icon_path <> ''");
-        if ($res) {
-            while ($row = $res->fetch_assoc()) {
-                $name = trim((string)$row['name']);
-                if ($name !== '') {
-                    $map[mb_strtolower($name, 'UTF-8')] = (string)$row['icon_path'];
-                }
-            }
-        }
-    } catch (Throwable $e) {
-        error_log('line_flex_fg_product_icon_map failed: ' . $e->getMessage());
-    }
-
-    return $map;
-}
-
-/**
- * URL รูปของรุ่นสินค้า
- *
- * ลำดับ: รูปที่อัปในหน้า ตั้งค่า → รุ่นสินค้า  →  map กลาง line_flex_model_image_map()  →  รูป default
- * ทำให้เปลี่ยนรูปได้จากหลังบ้านโดยไม่ต้องแก้โค้ด และไม่มี map ซ้ำอีกชุดที่ setupsystem
+ * เดิมไฟล์นี้มีตัวค้น icon_path กับรูป default ของตัวเอง ซึ่งซ้ำกับตัวกลาง
+ * ย้ายไปรวมที่เดียวแล้ว การ์ดรายงานผลิตจะได้ใช้รูปบนเซิร์ฟเวอร์เหมือนกัน
  *
  * @param string $productName ชื่อรุ่น
- * @param string $fallbackUrl URL ที่ส่งมากับข้อมูล (เผื่อกรณีเรียกใช้นอกระบบ production)
+ * @param string $fallbackUrl URL ที่ส่งมากับข้อมูล
  * @return string
  */
 function line_flex_fg_image_url(string $productName, string $fallbackUrl = ''): string
 {
-    $uploaded = '';
-    $key = mb_strtolower(trim($productName), 'UTF-8');
-    $iconMap = line_flex_fg_product_icon_map();
-    if ($key !== '' && isset($iconMap[$key]) && function_exists('img_url')) {
-        $uploaded = (string)img_url($iconMap[$key]);
-    }
-
-    if (function_exists('line_flex_product_image')) {
-        // ส่ง $uploaded เข้าไปให้ตัวกลางแปลงเป็น https สาธารณะ + ตกไป map กลางเองถ้าใช้ไม่ได้
-        return line_flex_product_image($productName, $uploaded !== '' ? $uploaded : $fallbackUrl);
-    }
-
-    if ($fallbackUrl !== '') {
-        return $fallbackUrl;
-    }
-    return 'https://drive.google.com/thumbnail?id=10fdOt4i3yf0AQI3ibojw0wv2Hh8qpjZJ&sz=w400';
+    return line_flex_product_image($productName, $fallbackUrl);
 }
 
 /**

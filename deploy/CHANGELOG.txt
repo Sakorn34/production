@@ -2289,3 +2289,16 @@ Files:
   finishgoogs_ma_update/includes/line_notify_settings.php
   finishgoogs_ma_update/line_notify_settings.php
 
+
+================================================================
+v2026-09-03_095055 | Patch | 2026-09-03 09:50:58
+From: 2026-09-03_084815  ->  To: 1eb1419  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/line_notify_settings.php
+  finishgoogs_ma_update/line_notify_settings.php
+  shared/line_flex_finishgood_shortage.php
+  shared/line_flex_templates.php
+
