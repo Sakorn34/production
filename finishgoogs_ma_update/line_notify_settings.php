@@ -34,6 +34,7 @@ $sendNowResult = null;
 
 $workerTestResult = null;
 
+require_once dirname(__DIR__) . '/shared/finishgood_shortage_filter.php';
 $catalog = line_notify_type_catalog();
 
 
@@ -772,7 +773,20 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
           </td>
 
-          <td><b><?= h($meta['label']) ?></b></td>
+          <td>
+
+            <b><?= h($meta['label']) ?></b>
+
+            <?php if ($eventKey === 'finishgood.shortage') {
+                // หน้าเลือกรุ่นอยู่คนละหน้าและไม่มีลิงก์ในเมนู — พาไปจากตรงนี้
+                $fgSkip = function_exists('fg_shortage_skipped_codes') ? fg_shortage_skipped_codes() : [];
+            ?>
+
+            <a class="ln-pick-models" href="<?= h(BASE_URL . '/finishgood_shortage_preview.php') ?>">เลือกรุ่นที่จะแจ้ง<?= $fgSkip ? ' (ปิดไว้ ' . count($fgSkip) . ' รุ่น)' : '' ?> &rarr;</a>
+
+            <?php } ?>
+
+          </td>
 
           <td>
 

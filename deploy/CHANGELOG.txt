@@ -2336,3 +2336,14 @@ Files:
   shared/finishgood_shortage_filter.php
   shared/line_notify_jobs.php
 
+
+================================================================
+v2026-09-03_111647 | Patch | 2026-09-03 11:16:49
+From: 2026-09-03_110541  ->  To: 210f3e0  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/line_notify_settings.php
+
