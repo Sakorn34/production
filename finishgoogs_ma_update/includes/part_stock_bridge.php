@@ -633,7 +633,7 @@ function asset_parts_withdraw_summary($assetId, $withBomQtyDetail = false) {
         $res = qr(
             "SELECT pm.id, pm.qty, pm.moved_at, pm.remark, pm.mode, pm.ma_record_id,
                     pm.tech_stock_out_id, pm.made_by,
-                    pt.name pname, pt.part_code, pt.unit, pt.stock_code
+                    pt.name pname, pt.part_code, pt.unit, pt.stock_code, pt.icon_path
              FROM part_movements pm
              JOIN parts pt ON pt.id=pm.part_id
              WHERE pm.ref_asset_id=? AND pm.direction='out'

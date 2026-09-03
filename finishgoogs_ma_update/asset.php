@@ -437,7 +437,25 @@ page_header('เครื่อง ' . $a['asset_code'], false);
       $editUrl = BASE_URL . '/parts.php?ajax=edit_move_form&id=' . (int)$mv['id'] . '&back=' . $assetPartsBackUrl;
   ?>
   <tr>
-    <td><?= h($mv['pname']) ?><?php if (!empty($mv['part_code']) && trim((string)$mv['part_code']) !== trim((string)$mv['pname'])) { ?><br><span class="muted" style="font-size:11px"><?= h($mv['part_code']) ?></span><?php } ?></td>
+    <td>
+      <?php // รูปอะไหล่ช่วยให้กวาดตาหาของที่ต้องการได้เร็วกว่าอ่านชื่อทีละบรรทัด
+           // อะไหล่ 79 จาก 146 รายการมีรูป ตัวที่ไม่มีก็เว้นช่องไว้ให้คอลัมน์ตรงกัน ?>
+      <div class="part-row-name">
+        <?php $mvIcon = img_url($mv['icon_path'] ?? null); ?>
+        <?php if ($mvIcon) { ?>
+          <img src="<?= h($mvIcon) ?>" alt="" class="thumb-sm" loading="lazy"
+            onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'thumb-sm part-row-noimg'}))">
+        <?php } else { ?>
+          <span class="thumb-sm part-row-noimg" aria-hidden="true"></span>
+        <?php } ?>
+        <span>
+          <?= h($mv['pname']) ?>
+          <?php if (!empty($mv['part_code']) && trim((string)$mv['part_code']) !== trim((string)$mv['pname'])) { ?>
+            <br><span class="muted" style="font-size:11px"><?= h($mv['part_code']) ?></span>
+          <?php } ?>
+        </span>
+      </div>
+    </td>
     <td style="text-align:right"><b><?= qty_fmt($mv['qty']) ?></b><?= !empty($mv['unit']) ? ' ' . h($mv['unit']) : '' ?></td>
     <td><span class="badge <?= h($modeClass) ?>"><?= h($modeLabel) ?></span></td>
     <td style="white-space:nowrap"><?= dthai_full($mv['moved_at']) ?></td>

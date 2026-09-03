@@ -1182,3 +1182,12 @@ a.kpi:hover { text-decoration: none; }
 }
 
 .asset-sales-badge-withdraw { background: var(--primary-soft); color: var(--primary-dark); border: 1px solid var(--border-strong); }
+
+/* ชื่ออะไหล่ในตารางเบิก — รูปซ้าย ชื่อขวา ช่องรูปกว้างเท่ากันทุกแถว
+   แม้อะไหล่ตัวนั้นจะไม่มีรูป คอลัมน์ชื่อจะได้เรียงตรงกัน */
+.part-row-name { display: flex; align-items: flex-start; gap: 9px; }
+.part-row-name > span { min-width: 0; }
+.part-row-noimg {
+  display: inline-block; flex: none;
+  background: var(--surface-muted); border: 1px dashed var(--border-strong);
+}
