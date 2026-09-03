@@ -156,7 +156,7 @@ function asset_status_sync_log(int $assetId, string $from, string $to, string $r
     q(
         'INSERT INTO stock_movements (asset_id,moved_at,direction,reason,made_by) VALUES (?,NOW(),?,?,?)',
         'isss',
-        [$assetId, $dir, 'Sync สถานะ: ' . $from . ' → ' . $to . ($reason !== '' ? ' (' . $reason . ')' : ''), $actor]
+        [$assetId, $dir, asset_status_sync_log_prefix() . $from . ' → ' . $to . ($reason !== '' ? ' (' . $reason . ')' : ''), $actor]
     );
 }
 

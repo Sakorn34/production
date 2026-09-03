@@ -208,7 +208,18 @@ function asset_timeline_items($id) {
         $body[] = 'สถานะงาน: ' . $stmap[$r['status']] . ($r['closed_at'] ? ' (ปิดงาน ' . dthai($r['closed_at']) . ')' : '');
         $tl[] = ['d' => timeline_dt($r['d']), 'type_key' => 'repair', 'type' => ui_timeline_type_html('repair'), 'html' => implode('<br>', $body)];
     }
-    $res = qr("SELECT moved_at d, direction, reason, made_by, remark FROM stock_movements WHERE asset_id=?", 'i', [$id]);
+    // ตัดแถวที่มาจากการ sync สถานะออก — ไม่ใช่การเคลื่อนไหวของเครื่องจริง แค่ระบบคำนวณ
+    // ป้ายสถานะใหม่ แต่เดิมมันขึ้นเป็น "เข้าคลัง/ออกจากคลัง" ตาม direction ที่เดามาว่า
+    // "ปลายทางไม่ใช่ new ก็ถือว่าออก" เครื่องที่แค่เปลี่ยนจากเช่าเป็นเสื่อมสภาพจึงขึ้นว่า
+    // ออกจากคลัง ทั้งที่ไม่ได้ไปไหน · 11,022 จาก 13,142 แถวเป็นแบบนี้
+    $syncPrefix = function_exists('asset_status_sync_log_prefix')
+        ? asset_status_sync_log_prefix() : 'Sync สถานะ: ';
+    $res = qr(
+        "SELECT moved_at d, direction, reason, made_by, remark FROM stock_movements
+         WHERE asset_id=? AND (reason IS NULL OR reason NOT LIKE ?)",
+        'is',
+        [$id, $syncPrefix . '%']
+    );
     while ($r = $res->fetch_assoc()) {
         $body = [];
         if ($r['reason']) $body[] = h($r['reason']);

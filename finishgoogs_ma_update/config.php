@@ -33,7 +33,7 @@ function app_base_url() {
 define('BASE_URL', app_base_url());
 define('APP_NAME', 'ระบบทะเบียนเครื่องและซ่อมบำรุง');
 /** รหัสชุด deploy — อัปเมื่อ build patch แล้วเทียบกับ server ว่าอัปครบหรือยัง */
-define('APP_RELEASE_VERSION', '2026-09-03_221036');
+define('APP_RELEASE_VERSION', '2026-09-03_235205');
 
 /**
  * โหลด secrets แบบ cache ต่อ request
@@ -401,6 +401,21 @@ function ensure_asset_status_sold_schema()
     } catch (\mysqli_sql_exception $e) {
         error_log('[ensure_asset_status_sold_schema] ' . $e->getMessage());
     }
+}
+
+/**
+ * คำนำหน้า reason ของแถว stock_movements ที่มาจากการ sync สถานะ
+ *
+ * การ sync ไม่ได้ขยับเครื่องเข้า/ออกคลังจริง แค่คำนวณป้ายสถานะใหม่ แต่มันเขียนลง
+ * ตารางเดียวกับการเคลื่อนไหวจริง (11,022 จาก 13,142 แถวเป็นของ sync) timeline จึงต้องมี
+ * ทางแยกแถวสองชนิดนี้ออกจากกัน — อยู่ใน config.php เพราะทั้งฝั่งเขียน (asset_status_sync.php)
+ * และฝั่งอ่าน (timeline.php) ต้องใช้ค่าเดียวกัน และ config โหลดก่อนทั้งคู่เสมอ
+ *
+ * @return string
+ */
+function asset_status_sync_log_prefix(): string
+{
+    return 'Sync สถานะ: ';
 }
 
 /**
