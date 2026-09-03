@@ -199,6 +199,54 @@ function asset_timeline_grouped_html(array $tl, $actionsFn = null, $assetId = 0)
 }
 
 /**
+ * เรียงรายการ timeline ตามเวลาจริง เก่า → ใหม่
+ *
+ * รายการที่ไม่มีวันที่ไปต่อท้ายสุด — วางในเส้นเวลาไม่ได้ ถ้าปล่อยให้สตริงว่างเรียงตามปกติ
+ * จะไปกองอยู่หัวแถวเหมือนเป็นเรื่องที่เกิดก่อนสุด ซึ่งไม่จริง
+ *
+ * @param array<int, array{d:string}> $items
+ * @return array<int, array{d:string}>
+ */
+function timeline_sort_items_asc(array $items) {
+    usort($items, function ($x, $y) {
+        $dx = trim((string) ($x['d'] ?? ''));
+        $dy = trim((string) ($y['d'] ?? ''));
+        if ($dx === '' || $dy === '') {
+            return ($dx === '' ? 1 : 0) - ($dy === '' ? 1 : 0);
+        }
+        return strcmp($dx, $dy);
+    });
+    return $items;
+}
+
+/**
+ * แสดง timeline รวมทุกประเภทเป็นเส้นเดียว เรียงตามเวลาบันทึก เก่า → ใหม่
+ *
+ * ต่างจาก board ตรงที่อ่านเป็นเรื่องราวของเครื่องตั้งแต่ผลิตจนถึงตอนนี้ได้ทีเดียว
+ * ไม่ต้องกวาดสายตาข้ามคอลัมน์แล้วประกอบลำดับเวลาเอง
+ *
+ * @param array<int, array{d:string, type:string, html:string}> $tl
+ * @param callable|null $actionsFn
+ * @param int $assetId
+ * @return void
+ */
+function asset_timeline_chrono_html(array $tl, $actionsFn = null, $assetId = 0) {
+    if (!$tl) {
+        echo '<p class="muted">ยังไม่มีประวัติ</p>';
+        return;
+    }
+    echo '<ul class="timeline tl-chrono">';
+    foreach (timeline_sort_items_asc($tl) as $e) {
+        $actions = ($actionsFn && is_callable($actionsFn)) ? $actionsFn($e, $assetId) : '';
+        $d = trim((string) ($e['d'] ?? ''));
+        echo '<li><div class="tl-date">' . ($d !== '' ? dthai_full($d) : '<span class="muted">ไม่ระบุวันที่</span>') . '</div>'
+           . '<div class="tl-type">' . $e['type'] . '</div>'
+           . '<div class="tl-body">' . $e['html'] . $actions . '</div></li>';
+    }
+    echo '</ul>';
+}
+
+/**
  * แสดง timeline แบบ board แนวนอน — แต่ละคอลัมน์เป็น 1 ประเภทงาน เรียงตาม timestamp ภายในกลุ่ม
  *
  * @param array<int, array{d:string, type:string, html:string}> $tl

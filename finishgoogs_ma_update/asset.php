@@ -482,9 +482,9 @@ page_header('เครื่อง ' . $a['asset_code'], false);
 
 <?= asset_maintenance_section_html($maRepairInfo) ?>
 
-<h2>ประวัติทั้งหมด (<?= count($tl) ?> รายการ) — จัดกลุ่มตามประเภท · เรียงตามวันที่ในแต่ละกลุ่ม</h2>
-<p class="muted" style="margin:-6px 0 12px; font-size:13px">เลื่อนแนวนอนเพื่อดูแต่ละประเภทงาน · รายการในแต่ละคอลัมน์เรียงจากใหม่ → เก่า</p>
-<?php asset_timeline_board_html($tl, 'asset_tl_actions', $id); ?>
+<h2>ประวัติทั้งหมด (<?= count($tl) ?> รายการ) — เรียงตามเวลาบันทึก</h2>
+<p class="muted" style="margin:-6px 0 12px; font-size:13px">ทุกประเภทงานอยู่ในเส้นเดียวกัน เรียงจากอดีต → ปัจจุบัน</p>
+<?php asset_timeline_chrono_html($tl, 'asset_tl_actions', $id); ?>
 
 <div id="asset-snippet-overlay" class="notif-overlay ma-sn-overlay" hidden>
   <div class="notif-box ma-sn-modal" role="dialog" aria-modal="true" aria-labelledby="asset-snippet-title">
