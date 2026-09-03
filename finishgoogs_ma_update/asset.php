@@ -329,7 +329,9 @@ page_header('เครื่อง ' . $a['asset_code'], false);
 <?php } ?>
 
 <details id="asset-edit-details" style="margin-bottom:16px" class="asset-edit-details">
-  <summary class="btn btn-line btn-sm btn-with-icon" style="list-style:none; cursor:pointer; display:inline-flex"><?= ui_btn_label('edit', 'แก้ไขข้อมูลเครื่อง') ?></summary>
+  <?php // ปุ่มเดิมถูกย้ายขึ้นไปบนแถบเครื่องมือแล้ว — ซ่อน summary ไว้เพราะ
+         // <details> ที่ไม่มี summary เบราว์เซอร์จะเติมคำว่า "Details" ให้เอง ?>
+  <summary hidden><?= ui_btn_label('edit', 'แก้ไขข้อมูลเครื่อง') ?></summary>
   <?= asset_production_edit_form_html($a, $assetEditCtx, $productList, $fwSuggest) ?>
   <div style="margin-top:16px;padding:12px 14px;border:1px solid #b91c1c;background:var(--danger-soft, #fee2e2);border-radius:8px">
     <b style="font-size:13px;color:#b91c1c">โซนอันตราย</b>
@@ -506,9 +508,6 @@ $addWithdrawModalUrl = BASE_URL . '/parts.php?ajax=add_move_form&asset_id=' . (i
   var box = document.getElementById('asset-edit-details');
   var btn = document.querySelector('.asset-edit-toggle');
   if (!box || !btn) { return; }
-
-  var sum = box.querySelector('summary');
-  if (sum) { sum.hidden = true; }
 
   function sync() {
     btn.setAttribute('aria-expanded', box.open ? 'true' : 'false');

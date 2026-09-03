@@ -1151,3 +1151,8 @@ a.kpi:hover { text-decoration: none; }
 .asset-sales-lines.asset-sales-stock-old-table td:nth-child(6) {
   white-space: normal; word-break: break-word; min-width: 110px;
 }
+
+/* หัวเรื่องบนแถบเครื่องมือเครื่อง — ล้าง margin ล่างที่ติดมาจาก .content h1
+   กฎนั้นจำเพาะกว่า (.content h1 = 0,1,1) จึงชนะ .asset-toolbar-title (0,1,0)
+   กล่องหัวเรื่องเลยสูงเกินจริง 16px แล้วกึ่งกลางไม่ตรงกับปุ่มที่อยู่แถวเดียวกัน */
+.asset-toolbar .asset-toolbar-title { margin: 0; }
