@@ -75,6 +75,9 @@ function line_settings_form_defaults(): array
         'schedules'             => line_notify_schedules(),
         'has_token'             => trim((string)($cfg['channel_access_token'] ?? '')) !== '',
         'has_secret'            => trim((string)($cfg['channel_secret'] ?? '')) !== '',
+        // API ของ setupsystem — production ไม่ได้คำนวณยอดที่ต้องผลิตเพิ่มเอง
+        'finishgood_shortage_api_url' => (string)($cfg['finishgood_shortage_api_url'] ?? ''),
+        'has_shortage_token'    => trim((string)($cfg['finishgood_shortage_api_token'] ?? '')) !== '',
     ];
 }
 
@@ -114,6 +117,10 @@ function line_settings_parse_post(array $post): array
     if ($secret === '' || $secret === LINE_SETTINGS_TOKEN_PLACEHOLDER) {
         $secret = (string)($existing['channel_secret'] ?? '');
     }
+    $shortageToken = trim((string)($post['finishgood_shortage_api_token'] ?? ''));
+    if ($shortageToken === '' || $shortageToken === LINE_SETTINGS_TOKEN_PLACEHOLDER) {
+        $shortageToken = (string)($existing['finishgood_shortage_api_token'] ?? '');
+    }
 
     return [
         'line_secrets_path'     => trim((string)($post['line_secrets_path'] ?? app_line_secrets_path())),
@@ -125,6 +132,8 @@ function line_settings_parse_post(array $post): array
         'public_parts_url'      => trim((string)($post['public_parts_url'] ?? '')),
         'events'                => $events,
         'schedules'             => $schedules,
+        'finishgood_shortage_api_url'   => trim((string)($post['finishgood_shortage_api_url'] ?? '')),
+        'finishgood_shortage_api_token' => $shortageToken,
     ];
 }
 
@@ -159,7 +168,7 @@ function line_settings_validate(array $cfg): array
  */
 function line_settings_build_secrets_php(array $cfg): string
 {
-    $export = var_export([
+    $out = [
         'channel_access_token'  => (string)($cfg['channel_access_token'] ?? ''),
         'channel_secret'        => (string)($cfg['channel_secret'] ?? ''),
         'default_recipient_id'  => (string)($cfg['default_recipient_id'] ?? ''),
@@ -168,7 +177,19 @@ function line_settings_build_secrets_php(array $cfg): string
         'public_parts_url'      => (string)($cfg['public_parts_url'] ?? ''),
         'events'                => (array)($cfg['events'] ?? []),
         'schedules'             => (array)($cfg['schedules'] ?? []),
-    ], true);
+        'finishgood_shortage_api_url'   => (string)($cfg['finishgood_shortage_api_url'] ?? ''),
+        'finishgood_shortage_api_token' => (string)($cfg['finishgood_shortage_api_token'] ?? ''),
+    ];
+
+    // คีย์อื่นที่มีอยู่เดิมต้องคงไว้ — เดิมฟังก์ชันนี้สร้างไฟล์จากรายการตายตัว
+    // คีย์ที่ใครใส่มือไว้จึงหายทุกครั้งที่มีคนกดบันทึกหน้านี้
+    foreach (line_notify_config() as $k => $v) {
+        if (!array_key_exists($k, $out)) {
+            $out[$k] = $v;
+        }
+    }
+
+    $export = var_export($out, true);
     return "<?php\n/** line.secrets.php — สร้างโดย line_notify_settings.php · อย่า commit */\nreturn {$export};\n";
 }
 

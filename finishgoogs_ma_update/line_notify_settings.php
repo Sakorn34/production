@@ -666,6 +666,18 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
     </label>
 
+    <label>URL API สินค้าที่ต้องผลิตเพิ่ม
+
+      <input type="url" name="finishgood_shortage_api_url" value="<?= h($form['finishgood_shortage_api_url']) ?>" placeholder="เว้นว่าง = ใช้ค่าตั้งต้นของระบบ">
+
+    </label>
+
+    <label>Token API สินค้าที่ต้องผลิตเพิ่ม
+
+      <input type="password" name="finishgood_shortage_api_token" value="<?= !empty($form['has_shortage_token']) ? h($tokenPh) : '' ?>" placeholder="ต้องตรงกับ FINISHGOOD_SHORTAGE_API_TOKEN ฝั่ง setupsystem" autocomplete="off">
+
+    </label>
+
   </div>
 
 
