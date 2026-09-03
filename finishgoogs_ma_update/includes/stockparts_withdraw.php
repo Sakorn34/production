@@ -1767,9 +1767,200 @@ function stockparts_withdraw_order_table_html(array $lines, int $matchedId = 0, 
 }
 
 /**
- * สร้าง HTML card แสดงการเบิกใช้งานขายบนโปรไฟล์เครื่อง
+ * ข้อมูลสรุปของการเบิก — รวมจากแหล่งไหนก็ได้ที่มี ให้เหลือชุดเดียว
  *
- * @param array<string,mixed> $info จาก asset_stockparts_withdraw_info()
+ * เดิมการ์ดแยกกล่องตาม "ตารางต้นทาง" ทุกกล่องจึงพก ลูกค้า / สินค้า / ผู้บันทึก /
+ * วันที่ ติดมาเองซ้ำ ๆ — ในการ์ดใบเดียวเลขคำสั่งเบิกโผล่ 5 ครั้ง ชื่อรุ่น 5 ครั้ง
+ * S/N 4 ครั้ง ทั้งที่ S/N กับรุ่นก็อยู่ในหัวเรื่องเหนือการ์ดอยู่แล้ว
+ *
+ * @param  array<string,mixed> $info
+ * @return array<string,mixed>
+ */
+function stockparts_withdraw_summary_fields(array $info): array
+{
+    $claim = is_array($info['claim'] ?? null) ? $info['claim'] : null;
+    $sale = is_array($info['individual_sale'] ?? null) ? $info['individual_sale'] : null;
+    $reg = is_array($info['registration'] ?? null) ? $info['registration'] : null;
+    $sum = is_array($info['summary'] ?? null) ? $info['summary'] : null;
+    $stock = is_array($info['stock'] ?? null) ? $info['stock'] : [];
+
+    if ($claim) {
+        $kind = 'เคลม';
+        $kindClass = 'claim';
+    } elseif ($sale) {
+        $kind = 'ขายแยกรายการ';
+        $kindClass = 'sale';
+    } elseif ($reg) {
+        $kind = 'ลงทะเบียนอุปกรณ์';
+        $kindClass = 'registration';
+    } else {
+        $kind = 'เบิกขาย';
+        $kindClass = 'withdraw';
+    }
+
+    $first = static function (array $vals) {
+        foreach ($vals as $v) {
+            $v = trim((string) $v);
+            if ($v !== '' && $v !== '-') {
+                return $v;
+            }
+        }
+        return '';
+    };
+
+    return [
+        'kind'       => $kind,
+        'kind_class' => $kindClass,
+        'customer'   => $first([
+            $reg['customer_name'] ?? '', $sale['customer_name'] ?? '',
+            $claim['customer_hint'] ?? '', $sum['order_customer_name'] ?? '',
+        ]),
+        'date'       => $first([
+            $reg['movement_date'] ?? '', $sale['movement_date'] ?? '',
+            $claim['movement_date'] ?? '', $stock['timestamp'] ?? '',
+        ]),
+        'ref'        => trim((string) ($info['setup_id'] ?? '')),
+        'by'         => $first([
+            $reg['created_by'] ?? '', $claim['created_by'] ?? '',
+            $sale['created_by'] ?? '', $stock['create_name'] ?? '',
+        ]),
+        'po'         => $first([$sale['po_no'] ?? '']),
+        'old_serial' => $first([$claim['old_serial'] ?? '']),
+        'notes'      => $first([$claim['notes'] ?? '', $sale['notes'] ?? '', $reg['notes'] ?? '']),
+        'set_name'   => $first([$sum['order_product_type'] ?? '']),
+    ];
+}
+
+/**
+ * บรรทัดสรุปหัวการ์ด — ตอบว่า "ขายให้ใคร เมื่อไหร่ อ้างอิงอะไร" ในที่เดียว
+ *
+ * @param  array<string,mixed> $f
+ * @return string
+ */
+function stockparts_withdraw_summary_html(array $f): string
+{
+    $bits = [];
+    if ($f['customer'] !== '') {
+        $bits[] = '<b class="asset-sales-cust">' . h(stockparts_fmt_field($f['customer'])) . '</b>';
+    }
+    if ($f['date'] !== '') {
+        $bits[] = '<span class="asset-sales-when">' . h(dthai($f['date'])) . '</span>';
+    }
+    if ($f['ref'] !== '') {
+        $bits[] = 'อ้างอิง <b class="asset-sales-setup-id">#' . h($f['ref']) . '</b>';
+    }
+
+    $out = '<div class="asset-sales-summary">'
+        . '<span class="asset-sales-badge asset-sales-badge-' . h($f['kind_class']) . '">'
+        . h($f['kind']) . '</span> '
+        . implode(' <span class="asset-sales-sep">·</span> ', $bits)
+        . '</div>';
+
+    // รายละเอียดที่มีเฉพาะบางแบบ — ไม่ต้องมีกล่องของตัวเอง
+    $extra = '';
+    if ($f['old_serial'] !== '') {
+        $extra .= stockparts_withdraw_dl_row('เปลี่ยนจาก S/N', '<b>' . h($f['old_serial']) . '</b>');
+    }
+    if ($f['po'] !== '') {
+        $extra .= stockparts_withdraw_dl_row('PO', h($f['po']));
+    }
+    if ($f['set_name'] !== '') {
+        $extra .= stockparts_withdraw_dl_row('ชุดสินค้า', h(stockparts_fmt_field($f['set_name'])));
+    }
+    if ($f['by'] !== '') {
+        $extra .= stockparts_withdraw_dl_row('ผู้บันทึก', h(stockparts_fmt_field($f['by'])));
+    }
+    if ($f['notes'] !== '') {
+        $extra .= stockparts_withdraw_dl_row('หมายเหตุ', nl2br(h($f['notes'])));
+    }
+    if ($extra !== '') {
+        $out .= '<dl class="asset-sales-dl asset-sales-dl-inline">' . $extra . '</dl>';
+    }
+    return $out;
+}
+
+/**
+ * ตอบว่า "ส่งมอบแล้วหรือยัง" — stock_old เก็บได้แถวเดียวต่อเครื่อง
+ * จึงเขียนเป็นบรรทัดสรุป ไม่ต้องเป็นตาราง 7 คอลัมน์
+ *
+ * @param  array<string,mixed> $info
+ * @return string
+ */
+function stockparts_withdraw_delivery_html(array $info): string
+{
+    $old = is_array($info['stock_old'] ?? null) ? $info['stock_old'] : null;
+    $hasOld = !empty($info['has_stock_old']) && $old;
+
+    if (!$hasOld) {
+        if (empty($info['serial_delivered'])) {
+            return '';
+        }
+        return '<div class="asset-sales-block"><div class="asset-sales-block-title">การส่งมอบ</div>'
+            . '<p class="asset-sales-delivered-line">'
+            . '<span class="asset-sales-badge asset-sales-badge-stock-old">ส่งมอบแล้ว</span>'
+            . ' <span class="muted">ไม่มีบันทึกไซต์งาน</span></p></div>';
+    }
+
+    $rows = '';
+    $site = trim((string) ($old['setup_id'] ?? ''));
+    $sec = trim((string) ($old['security_company'] ?? ''));
+    $when = trim((string) ($old['timestamp'] ?? ''));
+    if ($when !== '') {
+        $rows .= stockparts_withdraw_dl_row('วันที่ส่ง', h(dthai($when)));
+    }
+    if ($site !== '') {
+        $rows .= stockparts_withdraw_dl_row('ไซต์งาน', '<b>' . h($site) . '</b>');
+    }
+    if ($sec !== '') {
+        $rows .= stockparts_withdraw_dl_row('บริษัท รปภ.', h($sec));
+    }
+    $by = trim((string) ($old['create_name'] ?? ''));
+    if ($by !== '') {
+        $rows .= stockparts_withdraw_dl_row('ผู้บันทึก', h(stockparts_fmt_field($by)));
+    }
+
+    return '<div class="asset-sales-block"><div class="asset-sales-block-title">'
+        . '<span class="asset-sales-badge asset-sales-badge-stock-old">ส่งมอบแล้ว</span> การส่งมอบ</div>'
+        . '<dl class="asset-sales-dl asset-sales-dl-inline">' . $rows . '</dl></div>';
+}
+
+/**
+ * เชิงอรรถบอกที่มาของข้อมูล — เดิมเป็นแถวหัวการ์ดเทียบเท่าข้อมูลจริง
+ * ทั้งที่คนอ่านสนใจก็ต่อเมื่อสงสัยว่าตัวเลขมาจากไหน
+ *
+ * @param  array<string,mixed> $info
+ * @return string
+ */
+function stockparts_withdraw_provenance_html(array $info): string
+{
+    $bits = [];
+    $src = (string) ($info['resolve_source'] ?? '');
+    if ($src !== '' && $src !== 'setup_id') {
+        $bits[] = 'อ่านจาก ' . stockparts_resolve_source_label($src);
+    }
+    $stock = is_array($info['stock'] ?? null) ? $info['stock'] : [];
+    if (!empty($stock['timestamp'])) {
+        $bits[] = 'บันทึกใน stock ' . dthai_full($stock['timestamp']);
+    }
+    if (!empty($info['stock_synthetic'])) {
+        $bits[] = 'ไม่มีใน stock ปัจจุบัน';
+    }
+    if (isset($stock['active']) && (int) $stock['active'] !== 1) {
+        $bits[] = 'ไม่นับ stock';
+    }
+    if (!$bits) {
+        return '';
+    }
+    return '<p class="asset-sales-provenance muted">' . h(implode(' · ', $bits)) . '</p>';
+}
+
+/**
+ * การ์ด "การเบิกใช้งานขาย" บนหน้าโปรไฟล์เครื่อง
+ *
+ * จัดตามคำถามของคนอ่าน ไม่ใช่ตามตารางต้นทาง — ขายให้ใครเมื่อไหร่ / ส่งมอบหรือยัง /
+ * ในชุดมีอะไรบ้าง ส่วน S/N กับรุ่นไม่แสดงซ้ำ เพราะอยู่ในหัวเรื่องข้าง ๆ อยู่แล้ว
+ *
+ * @param  array<string,mixed> $info
  * @return string
  */
 function asset_stockparts_withdraw_card_html(array $info): string
@@ -1780,159 +1971,43 @@ function asset_stockparts_withdraw_card_html(array $info): string
     $out .= '<div class="asset-sales-card-body">';
 
     if (empty($info['ok'])) {
-        $out .= '<p class="muted asset-sales-empty">' . h((string) ($info['message'] ?? 'ไม่มีข้อมูล')) . '</p></div></div>';
-        return $out;
+        return $out . '<p class="muted asset-sales-empty">'
+            . h((string) ($info['message'] ?? 'ไม่มีข้อมูล')) . '</p></div></div>';
     }
 
     $hasWithdraw = !empty($info['has_withdraw']);
-    $stockOld = is_array($info['stock_old'] ?? null) ? $info['stock_old'] : null;
-    $hasStockOld = !empty($info['has_stock_old']) && $stockOld;
-
+    $hasStockOld = !empty($info['has_stock_old']) && !empty($info['stock_old']);
     if (!$hasWithdraw && !$hasStockOld) {
-        $out .= '<p class="muted asset-sales-empty">' . h((string) ($info['message'] ?? 'ยังไม่มีการเบิกใช้งานขาย')) . '</p></div></div>';
-        return $out;
+        return $out . '<p class="muted asset-sales-empty">'
+            . h((string) ($info['message'] ?? 'ยังไม่มีการเบิกใช้งานขาย')) . '</p></div></div>';
     }
 
+    // ① ขายให้ใคร เมื่อไหร่ อ้างอิงอะไร
     if ($hasWithdraw) {
-    $stock = $info['stock'] ?? [];
-    $setupId = trim((string) ($info['setup_id'] ?? ''));
-    $hasDetail = !empty($info['has_order_detail']) && !empty($info['summary']);
-    $sum = $hasDetail ? $info['summary'] : null;
-    $matched = $info['matched_line'] ?? null;
-    $lines = $info['order_lines'] ?? [];
-    $matchedId = (int) ($matched['id'] ?? 0);
-    $resolveSource = (string) ($info['resolve_source'] ?? 'setup_id');
-    $claim = is_array($info['claim'] ?? null) ? $info['claim'] : null;
-    $individualSale = is_array($info['individual_sale'] ?? null) ? $info['individual_sale'] : null;
-    $registration = is_array($info['registration'] ?? null) ? $info['registration'] : null;
-    $stockSynthetic = !empty($info['stock_synthetic']);
-    $serialDelivered = !empty($info['serial_delivered']);
-    $lineSerialMap = is_array($info['line_serial_map'] ?? null) ? $info['line_serial_map'] : [];
+        $out .= stockparts_withdraw_summary_html(stockparts_withdraw_summary_fields($info));
+    }
 
-    $out .= '<div class="asset-sales-ref-row"><dl class="asset-sales-dl asset-sales-dl-inline">';
-    $out .= stockparts_withdraw_dl_row(
-        'อ้างอิง',
-        'การเบิกใช้เครื่องจากระบบ stock · <b class="asset-sales-setup-id">#' . h($setupId) . '</b>'
-    );
-    if ($resolveSource !== 'setup_id') {
-        $out .= stockparts_withdraw_dl_row(
-            'แหล่งข้อมูล',
-            h(stockparts_resolve_source_label($resolveSource)) . ' <span class="muted">(setup_id ใน stock ยังว่าง)</span>'
+    // ② ส่งมอบแล้วหรือยัง
+    $out .= stockparts_withdraw_delivery_html($info);
+
+    // ③ ในชุดที่ขายมีอะไรบ้าง — แถวของเครื่องนี้ถูกไฮไลต์ในตาราง
+    //    จึงไม่ต้องมีกล่อง "รายการที่ตรงกับเครื่องนี้" ซ้ำอีกชุด
+    if ($hasWithdraw && !empty($info['has_order_detail']) && !empty($info['order_lines'])) {
+        $matched = is_array($info['matched_line'] ?? null) ? $info['matched_line'] : null;
+        $out .= stockparts_withdraw_order_table_html(
+            $info['order_lines'],
+            (int) ($matched['id'] ?? 0),
+            !empty($info['serial_delivered']),
+            is_array($info['line_serial_map'] ?? null) ? $info['line_serial_map'] : []
         );
-    }
-    $out .= '</dl></div>';
-
-    // ─ ทะเบียน stock ─
-    $out .= '<div class="asset-sales-section"><div class="asset-sales-section-title">ทะเบียน stock';
-    if ($stockSynthetic) {
-        $out .= ' <span class="muted asset-sales-resolve-hint">(ไม่มีใน stock ปัจจุบัน — อ่านจาก movement/order)</span>';
-    }
-    $out .= '</div>';
-    $out .= '<dl class="asset-sales-dl asset-sales-dl-inline">';
-    $out .= stockparts_withdraw_dl_row('S/N', '<b>' . h(stockparts_fmt_field($stock['serial_number'] ?? $info['serial'] ?? '')) . '</b>');
-    $out .= stockparts_withdraw_dl_row('รุ่น (model)', h(stockparts_fmt_field($stock['model'] ?? '')));
-    if (!empty($stock['create_name'])) {
-        $out .= stockparts_withdraw_dl_row('ผู้บันทึก', h(stockparts_fmt_field($stock['create_name'])));
-    }
-    if (!empty($stock['timestamp'])) {
-        $out .= stockparts_withdraw_dl_row('บันทึกใน stock', h(dthai_full($stock['timestamp'])));
-    }
-    if (isset($stock['active'])) {
-        $out .= stockparts_withdraw_dl_row('สถานะ Active', h((int) $stock['active'] === 1 ? 'ใช้งาน' : 'ไม่นับ stock'));
-    }
-    $out .= stockparts_withdraw_dl_row('Setup ID', '<b class="asset-sales-setup-id">#' . h($setupId) . '</b>');
-    $out .= '</dl></div>';
-
-    if ($claim) {
-        $out .= stockparts_withdraw_claim_section_html($claim, $stock, (string) ($info['serial'] ?? ''));
-    } elseif ($individualSale) {
-        $out .= stockparts_withdraw_individual_sale_section_html($individualSale, $stock, (string) ($info['serial'] ?? ''));
-    } elseif ($registration) {
-        $out .= stockparts_withdraw_registration_section_html($registration, $stock, (string) ($info['serial'] ?? ''));
-    }
-
-    // ─ คำสั่งเบิก ─
-    if ($hasDetail) {
-        $orderUpdated = '';
-        foreach ($lines as $line) {
-            $u = trim((string) ($line['updated_at'] ?? ''));
-            if ($u !== '' && ($orderUpdated === '' || strcmp($u, $orderUpdated) > 0)) {
-                $orderUpdated = $u;
-            }
-        }
-
-        $out .= '<div class="asset-sales-section"><div class="asset-sales-section-title">คำสั่งเบิก #' . h($setupId) . '</div>';
-        $out .= '<dl class="asset-sales-dl asset-sales-dl-inline">';
-        $out .= stockparts_withdraw_dl_row('ลูกค้า / โครงการ', '<b>' . h(stockparts_fmt_field($sum['order_customer_name'] ?? '')) . '</b>');
-        $out .= stockparts_withdraw_dl_row('ชุดสินค้า', h(stockparts_fmt_field($sum['order_product_type'] ?? '')));
-        if ($orderUpdated !== '') {
-            $out .= stockparts_withdraw_dl_row('อัปเดตล่าสุด', h(dthai_full($orderUpdated)));
-        }
-        $out .= '</dl></div>';
-
-        if ($matched) {
-            $statusRaw = trim((string) ($matched['status_product'] ?? ''));
-            $statusEmpty = ($statusRaw === '' || $statusRaw === '-');
-            $out .= '<div class="asset-sales-section asset-sales-section-match">';
-            $out .= '<div class="asset-sales-section-title">รายการที่ตรงกับเครื่องนี้</div>';
-            $out .= '<dl class="asset-sales-dl asset-sales-dl-inline">';
-            $out .= stockparts_withdraw_dl_row('รหัสอะไหล่', h(stockparts_fmt_field($matched['part_code'] ?? '')));
-            $out .= stockparts_withdraw_dl_row('ชื่อรายการ', '<b>' . h(stockparts_fmt_field($matched['part_name'] ?? '')) . '</b>');
-            $out .= stockparts_withdraw_dl_row('หมวด', h(stockparts_fmt_field($matched['category_name'] ?? '')));
-            $qty = (int) ($matched['quantity'] ?? 0);
-            if ($qty > 0) {
-                $out .= stockparts_withdraw_dl_row(
-                    'จำนวน',
-                    h(number_format($qty) . ' ' . stockparts_fmt_field($matched['unit'] ?? 'ชิ้น'))
-                );
-            }
-            $out .= stockparts_withdraw_dl_row(
-                'สถานะสินค้า',
-                '<span class="asset-sales-badge' . ($statusEmpty ? ' is-empty' : '') . '">'
-                    . h($statusEmpty ? 'ไม่ระบุ' : $statusRaw) . '</span>'
-            );
-            $matchedSn = ($matchedId > 0 && isset($lineSerialMap[$matchedId])) ? $lineSerialMap[$matchedId] : '';
-            $deliveredHtml = stockparts_line_delivery_cell_html(
-                $matched,
-                $lineSerialMap,
-                $serialDelivered,
-                true
-            );
-            $out .= stockparts_withdraw_dl_row('ส่งมอบ', $deliveredHtml);
-            if ($matchedSn !== '') {
-                $out .= stockparts_withdraw_dl_row('S/N ในชุด', '<b>' . h($matchedSn) . '</b>');
-            }
-            if (!empty($matched['created_at'])) {
-                $out .= stockparts_withdraw_dl_row('สร้างรายการ', h(dthai_full($matched['created_at'])));
-            }
-            if (!empty($matched['updated_at'])) {
-                $out .= stockparts_withdraw_dl_row('แก้ไขล่าสุด', h(dthai_full($matched['updated_at'])));
-            }
-            $out .= '</dl></div>';
-        }
-
-        $out .= stockparts_withdraw_order_table_html($lines, $matchedId, $serialDelivered, $lineSerialMap);
-    } elseif (!empty($stock['model']) && !$claim && !$individualSale && !$registration) {
-        $out .= '<div class="asset-sales-section"><dl class="asset-sales-dl">';
-        $out .= stockparts_withdraw_dl_row('รุ่น (stock)', h(stockparts_fmt_field($stock['model'])));
-        $out .= '</dl></div>';
-    }
-
-    if (!$hasDetail && !empty($info['message'])) {
-        $out .= '<p class="muted asset-sales-empty">' . h((string) $info['message']) . '</p>';
-    }
-    }
-
-    if ($hasStockOld) {
-        $out .= stockparts_withdraw_stock_old_section_html($stockOld);
-    }
-
-    if (!$hasWithdraw && !$hasStockOld && !empty($info['message'])) {
+    } elseif ($hasWithdraw && !empty($info['message'])) {
         $out .= '<p class="muted asset-sales-empty">' . h((string) $info['message']) . '</p>';
     }
 
-    $out .= '<p class="asset-sales-foot muted"><a href="' . h(BASE_URL . '/share.php?q=' . rawurlencode((string) $info['serial']))
+    $out .= stockparts_withdraw_provenance_html($info);
+    $out .= '<p class="asset-sales-foot muted"><a href="'
+        . h(BASE_URL . '/share.php?q=' . rawurlencode((string) $info['serial']))
         . '">ดูในทะเบียน stock →</a></p>';
-    $out .= '</div></div>';
-    return $out;
+
+    return $out . '</div></div>';
 }

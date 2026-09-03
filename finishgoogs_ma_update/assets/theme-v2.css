@@ -1156,3 +1156,29 @@ a.kpi:hover { text-decoration: none; }
    กฎนั้นจำเพาะกว่า (.content h1 = 0,1,1) จึงชนะ .asset-toolbar-title (0,1,0)
    กล่องหัวเรื่องเลยสูงเกินจริง 16px แล้วกึ่งกลางไม่ตรงกับปุ่มที่อยู่แถวเดียวกัน */
 .asset-toolbar .asset-toolbar-title { margin: 0; }
+
+/* ── การ์ดการเบิกใช้งานขาย: จัดตามคำถามคนอ่าน ────────────────────────────
+   เดิมแยกกล่องตามตารางต้นทาง ทุกกล่องจึงพก ลูกค้า/สินค้า/ผู้บันทึก/วันที่
+   ซ้ำกันเอง — ในการ์ดใบเดียวเลขคำสั่งเบิกโผล่ 5 ครั้ง ชื่อรุ่น 5 ครั้ง S/N 4 ครั้ง */
+.asset-sales-summary {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 8px;
+  font-size: calc(13px * var(--font-scale, 1)); line-height: 1.6;
+  padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid var(--border);
+}
+.asset-sales-summary .asset-sales-cust { color: var(--text); }
+.asset-sales-summary .asset-sales-when { color: var(--text-muted); }
+.asset-sales-sep { color: var(--text-faint); }
+
+.asset-sales-block { margin-bottom: 12px; }
+.asset-sales-block-title {
+  font-size: calc(12px * var(--font-scale, 1)); font-weight: 700;
+  color: var(--text-muted); margin-bottom: 6px;
+}
+.asset-sales-delivered-line { margin: 0; font-size: calc(12.5px * var(--font-scale, 1)); }
+
+.asset-sales-provenance {
+  margin: 10px 0 0; padding-top: 8px; border-top: 1px solid var(--border);
+  font-size: calc(11px * var(--font-scale, 1)); line-height: 1.6;
+}
+
+.asset-sales-badge-withdraw { background: var(--primary-soft); color: var(--primary-dark); border: 1px solid var(--border-strong); }
