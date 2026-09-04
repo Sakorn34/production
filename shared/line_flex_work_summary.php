@@ -3,14 +3,16 @@
  * shared/line_flex_work_summary.php — Flex สรุปงานรายคนต่อรอบเดือน
  *
  * ส่งเข้าไลน์ส่วนตัวของแต่ละคน ว่ารอบ 21 เดือนก่อน–20 เดือนนี้ เขาทำอะไรไปบ้าง
- * **แยกเป็นรายวัน** — เจ้าตัวอยากรู้ว่า "วันไหนทำอะไร" ไม่ใช่ยอดรวมทั้งรอบเฉย ๆ
+ * แยกเป็นรายวัน · ไม่บอกจำนวนครั้ง (ตัวเลขดูที่หน้าเว็บ) · มีรูปสินค้าประกอบทุกรายการ
  *
- * หนึ่งคนทำงานราว 16–20 วันต่อรอบ ใส่บับเบิลเดียวจะยาวเกินที่ LINE รับไหว จึงหั่นเป็น
- * carousel บับเบิลละ WORK_SUMMARY_FLEX_DAYS_PER_BUBBLE วัน
+ * ชั้นข้อมูล 3 ชั้นต้องแยกออกจากกันให้เห็นตั้งแต่เหลือบแรก ไม่งั้นอ่านเร็ว ๆ แล้วปนกัน:
+ *   วัน      = แถบสีทึบเต็มความกว้าง
+ *   หัวข้องาน = ตัวหนาเล็ก มีขีดสีนำหน้า
+ *   ของที่ทำ  = รูป + ชื่อรุ่น เยื้องเข้ามา
  */
 
-/** จำนวนวันต่อบับเบิล — 6 วันคือความยาวที่ยังเลื่อนอ่านในแชทได้สบาย */
-const WORK_SUMMARY_FLEX_DAYS_PER_BUBBLE = 6;
+/** จำนวนวันต่อบับเบิล (ค่าตั้งต้น) — ตัวจริงเฉลี่ยใหม่ให้ทุกใบสูงพอ ๆ กัน */
+const WORK_SUMMARY_FLEX_DAYS_PER_BUBBLE = 5;
 
 /** LINE รับ carousel ได้สูงสุด 12 บับเบิล */
 const WORK_SUMMARY_FLEX_MAX_BUBBLES = 12;
@@ -21,51 +23,110 @@ const WORK_SUMMARY_FLEX_MAX_BUBBLES = 12;
  */
 const WORK_SUMMARY_FLEX_BUDGET = 27000;
 
+/** ความสูงรูปสินค้าในรายการ */
+const WORK_SUMMARY_FLEX_THUMB = '38px';
+
 /**
- * แถวของหนึ่งวัน — หัวแถวเป็นวันที่ + ยอดรวมวันนั้น ใต้ลงมาเป็นงานที่ทำ
+ * ระดับความละเอียด ไล่จากเต็มที่สุดไปประหยัดที่สุด
  *
- * @param  array<string,mixed> $day   ['label'=>..,'cats'=>[['label'=>..,'detail'=>..]]]
- * @param  bool                $first แถวแรกของบับเบิลไม่ต้องมีเส้นคั่นข้างบน
+ * URL รูปยาวเส้นละ ~125 ตัวอักษร แถวที่มีรูปจึงกินราว 3 เท่าของแถวข้อความเปล่า
+ * คนที่ทำงานหลายด้านทุกวัน (เช่น 20 วัน × 4 หัวข้อ) ใส่รูปทุกแถวแล้วทะลุเพดาน 30KB
+ * ของ LINE แน่นอน — ลดความละเอียดทีละขั้นดีกว่าตัดวันทิ้ง เพราะ "ทำงานวันไหนบ้าง"
+ * คือแก่นของสรุปนี้ ส่วนรูปเป็นของแถม
+ *
+ * @return array<int,array{names:int,images:string}>
+ */
+function line_flex_work_summary_levels(): array
+{
+    return [
+        ['names' => 2, 'images' => 'all'],
+        ['names' => 1, 'images' => 'all'],
+        ['names' => 2, 'images' => 'first'],   // รูปเฉพาะหัวข้อแรกของวัน
+        ['names' => 1, 'images' => 'first'],
+        ['names' => 2, 'images' => 'none'],
+        ['names' => 1, 'images' => 'none'],
+    ];
+}
+
+/**
+ * หนึ่งรายการงาน — รูปสินค้า + ชื่อรุ่น (หรือชื่อเปล่าเมื่อประหยัดที่)
+ *
+ * @param  string $name    ชื่อรุ่น
+ * @param  bool   $withImg ใส่รูปไหม
+ * @return array<string,mixed>
+ */
+function line_flex_work_summary_item(string $name, bool $withImg): array
+{
+    $url = $withImg && function_exists('line_flex_product_image') ? line_flex_product_image($name) : '';
+    if ($url === '') {
+        // ไม่มีรูปก็ต้องยังเยื้องเข้ามาและมีจุดนำ ไม่งั้นอ่านปนกับหัวข้อ
+        return ['type' => 'text', 'text' => '·  ' . line_flex_text($name, 60), 'size' => 'sm',
+                'color' => '#1a1a1a', 'margin' => 'sm', 'wrap' => true, 'offsetStart' => '10px'];
+    }
+    return [
+        'type' => 'box', 'layout' => 'horizontal', 'margin' => 'sm',
+        'contents' => [
+            ['type' => 'image', 'url' => $url, 'size' => WORK_SUMMARY_FLEX_THUMB,
+             'aspectRatio' => '1:1', 'flex' => 0],
+            ['type' => 'text', 'text' => line_flex_text($name, 60), 'size' => 'sm',
+             'color' => '#1a1a1a', 'gravity' => 'center', 'wrap' => true, 'margin' => 'md'],
+        ],
+    ];
+}
+
+/**
+ * บล็อกของหนึ่งวัน — แถบวัน แล้วไล่หัวข้องานกับของที่ทำ
+ *
+ * @param  array<string,mixed>          $day ['label'=>..,'cats'=>[['label'=>..,'names'=>[..],'more'=>int]]]
+ * @param  array{names:int,images:string} $opt ระดับความละเอียด
  * @return array<int,array<string,mixed>>
  */
-function line_flex_work_summary_day(array $day, bool $first): array
+function line_flex_work_summary_day(array $day, array $opt): array
 {
-    $rows = [[
-        'type' => 'text', 'text' => line_flex_text((string) ($day['label'] ?? '-'), 24),
-        'size' => 'sm', 'weight' => 'bold', 'color' => '#0057b8',
+    $out = [[
+        // แถบวันเป็นพื้นทึบเต็มความกว้าง ทำหน้าที่เป็นตัวคั่นในตัว ไม่ต้องมี separator อีก
+        'type' => 'box', 'layout' => 'vertical', 'margin' => 'lg',
+        'backgroundColor' => '#0057b8', 'cornerRadius' => '4px',
+        'paddingAll' => '5px', 'paddingStart' => '10px',
+        'contents' => [[
+            'type' => 'text', 'text' => line_flex_text((string) ($day['label'] ?? '-'), 24),
+            'size' => 'sm', 'weight' => 'bold', 'color' => '#ffffff',
+        ]],
     ]];
-    // หัวข้องาน + ของที่ทำในหัวข้อนั้น — ไม่มีตัวเลขจำนวนครั้งตามที่ตกลง
-    // เคยลองยุบสองบรรทัดนี้เป็น text ก้อนเดียวแยกสีด้วย span แล้ว — JSON โตขึ้นราว 7%
-    // เพราะ span ก็เป็น node ที่มี key ของตัวเอง อย่ายุบอีก
-    foreach ((isset($day['cats']) && is_array($day['cats']) ? $day['cats'] : []) as $cat) {
-        $rows[] = ['type' => 'text', 'margin' => 'sm', 'size' => 'xs', 'color' => '#555555',
-                   'text' => line_flex_text((string) ($cat['label'] ?? '-'), 40)];
-        $detail = trim((string) ($cat['detail'] ?? ''));
-        if ($detail !== '') {
-            $rows[] = ['type' => 'text', 'size' => 'sm', 'color' => '#222222', 'wrap' => true,
-                       'text' => line_flex_text($detail, 220)];
-        }
-    }
 
-    $out = [];
-    if (!$first) {
-        $out[] = ['type' => 'separator', 'margin' => 'md', 'color' => '#eef2f7'];
+    $first = true;
+    foreach ((isset($day['cats']) && is_array($day['cats']) ? $day['cats'] : []) as $cat) {
+        // หัวข้องาน: ขีดนำหน้า + ตัวหนาสีน้ำเงินตัวเล็ก — ต่างจากชื่อรุ่นทั้งสี ขนาด และน้ำหนัก
+        $out[] = ['type' => 'text', 'margin' => 'md', 'size' => 'xs', 'weight' => 'bold',
+                  'color' => '#0057b8', 'wrap' => true,
+                  'text' => '▌ ' . line_flex_text((string) ($cat['label'] ?? '-'), 40)];
+
+        $withImg = $opt['images'] === 'all' || ($opt['images'] === 'first' && $first);
+        $names = isset($cat['names']) && is_array($cat['names']) ? $cat['names'] : [];
+        $shown = array_slice($names, 0, max(1, (int) $opt['names']));
+        foreach ($shown as $nm) {
+            $out[] = line_flex_work_summary_item((string) $nm, $withImg);
+        }
+        if ((int) ($cat['more'] ?? 0) > 0 || count($names) > count($shown)) {
+            $out[] = ['type' => 'text', 'text' => 'และอื่น ๆ', 'size' => 'xs',
+                      'color' => '#9aa4b2', 'margin' => 'sm', 'offsetStart' => '10px'];
+        }
+        $first = false;
     }
-    $out[] = ['type' => 'box', 'layout' => 'vertical', 'margin' => 'md', 'spacing' => 'xs',
-              'contents' => $rows];
     return $out;
 }
 
 /**
  * บับเบิลหนึ่งใบ (วันชุดหนึ่ง)
  *
- * @param  array<string,mixed>              $p     payload
- * @param  array<int,array<string,mixed>>   $days  วันของบับเบิลนี้
- * @param  int                              $page  หน้าที่เท่าไหร่ (เริ่มที่ 1)
- * @param  int                              $pages ทั้งหมดกี่หน้า
+ * @param  array<string,mixed>            $p       payload
+ * @param  array<int,array<string,mixed>> $days    วันของบับเบิลนี้
+ * @param  int                            $page    หน้าที่เท่าไหร่ (เริ่มที่ 1)
+ * @param  int                            $pages   ทั้งหมดกี่หน้า
+ * @param  int                            $omitted วันที่ใส่ไม่ลง
  * @return array<string,mixed>
  */
-function line_flex_work_summary_bubble(array $p, array $days, int $page, int $pages, int $omitted = 0): array
+function line_flex_work_summary_bubble(array $p, array $days, int $page, int $pages, int $omitted = 0, array $opt = ['names' => 2, 'images' => 'all']): array
 {
     $body = [];
     if ($page === 1) {
@@ -73,28 +134,27 @@ function line_flex_work_summary_bubble(array $p, array $days, int $page, int $pa
                    'size' => 'lg', 'weight' => 'bold', 'color' => '#111111'];
         $body[] = ['type' => 'text', 'text' => line_flex_text((string) ($p['cycle_label'] ?? ''), 60),
                    'size' => 'xs', 'color' => '#888888', 'margin' => 'xs'];
-        $body[] = ['type' => 'separator', 'margin' => 'lg'];
     } else {
-        $body[] = ['type' => 'text', 'text' => line_flex_text((string) ($p['person_name'] ?? '-'), 60) . ' (ต่อ)',
-                   'size' => 'sm', 'weight' => 'bold', 'color' => '#111111'];
-        $body[] = ['type' => 'separator', 'margin' => 'md'];
+        $body[] = ['type' => 'text', 'text' => line_flex_text((string) ($p['person_name'] ?? '-'), 60),
+                   'size' => 'sm', 'weight' => 'bold', 'color' => '#888888'];
     }
 
     if (!$days) {
         $body[] = ['type' => 'text', 'text' => 'ไม่มีงานที่บันทึกในรอบนี้',
-                   'size' => 'sm', 'color' => '#888888', 'margin' => 'md'];
+                   'size' => 'sm', 'color' => '#888888', 'margin' => 'lg'];
     }
-    $first = true;
     foreach ($days as $day) {
-        foreach (line_flex_work_summary_day($day, $first) as $node) {
+        foreach (line_flex_work_summary_day($day, $opt) as $node) {
             $body[] = $node;
         }
-        $first = false;
     }
     if ($omitted > 0) {
-        $body[] = ['type' => 'text', 'margin' => 'md', 'size' => 'xs', 'color' => '#888888', 'wrap' => true,
+        $body[] = ['type' => 'text', 'margin' => 'lg', 'size' => 'xs', 'color' => '#888888', 'wrap' => true,
                    'text' => 'ยังมีอีก ' . number_format($omitted) . ' วัน — กดปุ่มด้านล่างดูทั้งรอบในระบบ'];
     }
+    // ดันเนื้อขึ้นบน ที่ว่างไปกองอยู่ก้อนเดียวข้างล่าง บับเบิลที่เนื้อสั้นกว่าจะได้ไม่
+    // ถ่างระยะห่างของตัวเองจนดูคนละแบบกับใบอื่น (carousel ยืดทุกใบสูงเท่าใบที่สูงสุด)
+    $body[] = ['type' => 'filler'];
     $body[] = line_flex_system_branding();
 
     $title = '📋 สรุปงานของคุณรอบนี้';
@@ -110,7 +170,7 @@ function line_flex_work_summary_bubble(array $p, array $days, int $page, int $pa
                 'color' => '#ffffff', 'size' => 'sm', 'weight' => 'bold',
             ]],
         ],
-        'body' => ['type' => 'box', 'layout' => 'vertical', 'paddingAll' => '16px', 'contents' => $body],
+        'body' => ['type' => 'box', 'layout' => 'vertical', 'paddingAll' => '14px', 'contents' => $body],
     ];
 
     $url = trim((string) ($p['report_url'] ?? ''));
@@ -141,6 +201,37 @@ function line_flex_sanitize_uri_or_empty(string $uri): string
 }
 
 /**
+ * แบ่งวันลงบับเบิลให้แต่ละใบได้จำนวนใกล้เคียงกัน
+ *
+ * array_chunk() แบบตรง ๆ จะเหลือเศษไปกองที่ใบสุดท้าย (16 วัน → 5,5,5,1) ใบท้ายเลย
+ * โล่งผิดสังเกต — หารจำนวนใบก่อนแล้วค่อยเฉลี่ยจะได้ 4,4,4,4
+ *
+ * @param  array<int,array<string,mixed>> $days
+ * @param  int                            $per
+ * @return array<int,array<int,array<string,mixed>>>
+ */
+function line_flex_work_summary_chunks(array $days, int $per): array
+{
+    if (!$days) {
+        return [[]];
+    }
+    $n = count($days);
+    $bubbles = max(1, (int) ceil($n / max(1, $per)));
+    // array_chunk() ปัดขึ้นทุกก้อนแล้วเศษไปกองใบท้าย (21 วัน/5 ใบ → 5,5,5,5,1)
+    // กระจายเศษไปใบแรก ๆ แทนจะได้ 5,4,4,4,4 ทุกใบสูงพอ ๆ กัน
+    $base = intdiv($n, $bubbles);
+    $rem = $n % $bubbles;
+    $out = [];
+    $i = 0;
+    for ($b = 0; $b < $bubbles; $b++) {
+        $take = $base + ($b < $rem ? 1 : 0);
+        $out[] = array_slice($days, $i, $take);
+        $i += $take;
+    }
+    return $out;
+}
+
+/**
  * ข้อความทั้งชุดของ event work.summary.monthly
  *
  * @param  array<string,mixed> $payload
@@ -149,17 +240,35 @@ function line_flex_sanitize_uri_or_empty(string $uri): string
 function line_flex_work_summary_messages(array $payload): array
 {
     $days = isset($payload['days']) && is_array($payload['days']) ? array_values($payload['days']) : [];
-    $chunks = $days ? array_chunk($days, WORK_SUMMARY_FLEX_DAYS_PER_BUBBLE) : [[]];
-    if (count($chunks) > WORK_SUMMARY_FLEX_MAX_BUBBLES) {
-        $chunks = array_slice($chunks, 0, WORK_SUMMARY_FLEX_MAX_BUBBLES);
+    $allChunks = line_flex_work_summary_chunks($days, WORK_SUMMARY_FLEX_DAYS_PER_BUBBLE);
+    if (count($allChunks) > WORK_SUMMARY_FLEX_MAX_BUBBLES) {
+        $allChunks = array_slice($allChunks, 0, WORK_SUMMARY_FLEX_MAX_BUBBLES);
     }
-    // ลองสร้างดูก่อนว่ากี่บับเบิลถึงจะยังไม่เกินเพดาน — เกินแล้ว LINE ไม่ส่งให้ทั้งข้อความ
-    // ตัดที่ท้ายรอบ (วันเก่าสุดอยู่ต้น) แล้วบอกไว้ว่าเหลืออีกกี่วัน
+
+    // ไล่ลดความละเอียดจนกว่าทั้งรอบจะใส่ลงในเพดานได้ — เลือกระดับที่ละเอียดที่สุดที่ยังพอดี
+    $levels = line_flex_work_summary_levels();
+    $opt = end($levels);
+    foreach ($levels as $lv) {
+        $size = 0;
+        foreach ($allChunks as $i => $chunk) {
+            $size += strlen(json_encode(
+                line_flex_work_summary_bubble($payload, $chunk, $i + 1, count($allChunks), 0, $lv),
+                JSON_UNESCAPED_UNICODE
+            ));
+        }
+        if ($size <= WORK_SUMMARY_FLEX_BUDGET) {
+            $opt = $lv;
+            break;
+        }
+    }
+
+    // ประหยัดสุดแล้วยังไม่พอ (รอบที่ทำงานหนักมากจริง ๆ) ค่อยตัดวันท้าย ๆ ทิ้ง
+    $chunks = $allChunks;
     $fit = 0;
     $used = 0;
     foreach ($chunks as $i => $chunk) {
         $len = strlen(json_encode(
-            line_flex_work_summary_bubble($payload, $chunk, $i + 1, count($chunks)),
+            line_flex_work_summary_bubble($payload, $chunk, $i + 1, count($chunks), 0, $opt),
             JSON_UNESCAPED_UNICODE
         ));
         if ($fit > 0 && $used + $len > WORK_SUMMARY_FLEX_BUDGET) {
@@ -180,15 +289,13 @@ function line_flex_work_summary_messages(array $payload): array
     $bubbles = [];
     foreach ($chunks as $i => $chunk) {
         $bubbles[] = line_flex_work_summary_bubble(
-            $payload, $chunk, $i + 1, $pages, $i === $pages - 1 ? $omittedDays : 0
+            $payload, $chunk, $i + 1, $pages, $i === $pages - 1 ? $omittedDays : 0, $opt
         );
     }
 
-    $alt = 'สรุปงานของคุณ รอบ ' . (string) ($payload['cycle_label'] ?? '');
-
     return [[
         'type'     => 'flex',
-        'altText'  => $alt,
+        'altText'  => 'สรุปงานของคุณ รอบ ' . (string) ($payload['cycle_label'] ?? ''),
         'contents' => $pages > 1
             ? ['type' => 'carousel', 'contents' => $bubbles]
             : $bubbles[0],

@@ -9,8 +9,8 @@
 require_once __DIR__ . '/work_summary.php';
 require_once dirname(__DIR__, 2) . '/shared/line_notify_core.php';
 
-/** จำนวนชื่อของที่ยกมาต่อหัวข้อในไลน์ — มากกว่านี้ข้อความยาวเกินอ่านบนมือถือ */
-const WORK_SUMMARY_SEND_GROUPS = 5;
+/** จำนวนชื่อของที่ยกมาต่อหัวข้อในไลน์ — แต่ละชื่อมีรูปประกอบ มากกว่านี้การ์ดยาวเกิน */
+const WORK_SUMMARY_SEND_GROUPS = 3;
 
 /**
  * URL ฐานของแอปนี้สำหรับลิงก์ในไลน์
@@ -32,25 +32,23 @@ function work_summary_app_base_url(): string
 }
 
 /**
- * รายชื่อของที่ทำในหัวข้อหนึ่ง เป็นข้อความบรรทัดเดียว
+ * ชื่อของที่ทำในหัวข้อหนึ่ง — ตัดให้เหลือเท่าที่การ์ดรับไหว
  *
  * ไม่ใส่จำนวนครั้ง — ข้อความในไลน์ตอบว่า "ทำอะไร" ไม่ใช่ "ทำกี่ครั้ง"
- * ตัวเลขทั้งหมดยังดูได้ที่หน้าเว็บ
+ * ตัวเลขทั้งหมดยังดูได้ที่หน้าเว็บ · รูปสินค้าให้ฝั่ง Flex ไปหาเอาจากชื่อรุ่นเอง
+ * (แก้รูปในระบบแล้วข้อความที่ค้างอยู่ในคิวจะได้ใช้รูปใหม่)
  *
  * @param  array<int,array<string,mixed>> $groups เรียงจากมากไปน้อยมาแล้ว
  * @param  int                            $limit
- * @return string
+ * @return array{names:array<int,string>,more:int}
  */
-function work_summary_groups_text(array $groups, int $limit): string
+function work_summary_group_names(array $groups, int $limit): array
 {
-    $bits = [];
+    $names = [];
     foreach (array_slice($groups, 0, $limit) as $g) {
-        $bits[] = (string) $g['name'];
+        $names[] = (string) $g['name'];
     }
-    if (count($groups) > $limit) {
-        $bits[] = 'และอื่น ๆ';
-    }
-    return implode('  ·  ', $bits);
+    return ['names' => $names, 'more' => max(0, count($groups) - $limit)];
 }
 
 /**
@@ -94,9 +92,11 @@ function work_summary_send_cycle(array $cycle, ?int $onlyPerson = null, bool $fo
         foreach ($daily['days'] as $d) {
             $cats = [];
             foreach ($d['cats'] as $c) {
+                $g = work_summary_group_names($c['groups'], WORK_SUMMARY_SEND_GROUPS);
                 $cats[] = [
-                    'label'  => (string) $c['label'],
-                    'detail' => work_summary_groups_text($c['groups'], WORK_SUMMARY_SEND_GROUPS),
+                    'label' => (string) $c['label'],
+                    'names' => $g['names'],
+                    'more'  => $g['more'],
                 ];
             }
             // payload เก็บลง DB ด้วย จึงส่งเฉพาะข้อความที่ Flex ใช้จริง ไม่ยัดรายการดิบทั้งก้อน

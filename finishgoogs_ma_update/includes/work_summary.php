@@ -196,10 +196,37 @@ function work_summary_external_group($conn, string $table, string $actor): array
 }
 
 /**
+ * ลำดับความสำคัญของหมวด ตอนงานชิ้นเดียวถูกบันทึกไว้หลายที่
+ *
+ * เครื่องหนึ่งเครื่องในวันหนึ่งควรนับเป็นงานชิ้นเดียว — ผลิตเครื่องใหม่ 1 เครื่องทิ้งร่องรอย
+ * ไว้ทั้งใน production_records, part_movements (อะไหล่ที่เบิกไปประกอบ) และ
+ * stock_movements (เข้าคลัง) การนับทั้งสามทำให้ดูเหมือนทำงาน 3 ชิ้น
+ * เลขน้อย = สำคัญกว่า = เป็นตัวแทนของงานชิ้นนั้น
+ *
+ * @return array<string,int>
+ */
+function work_summary_cat_priority(): array
+{
+    return [
+        'production' => 1,   // ผลิตเครื่องใหม่ — ตัวงานจริง อะไหล่/คลังเป็นผลพลอยได้
+        'ma'         => 2,
+        'rp_fix'     => 3,
+        'update'     => 4,
+        'rp_receive' => 5,
+        'rp_rate'    => 6,
+        'rp_send'    => 7,
+        'rent_reg'   => 8,
+        'rent_ma'    => 9,
+        'part_out'   => 10,  // เบิกอะไหล่ให้เครื่องที่มีงานอื่นในวันเดียวกัน = งานเดียวกัน
+        'stock'      => 11,
+    ];
+}
+
+/**
  * รวมยอดงานรายคนของรอบหนึ่ง
  *
- * ยิง query ทีเดียวต่อแหล่ง (11 แหล่ง) แล้ว group ใน PHP — ไม่ยิงต่อคน เพราะ 30 คน × 11
- * แหล่งคือ 330 query ซึ่งช้าเกินไปสำหรับหน้าเว็บ
+ * ดึงรายแถว (ไม่ใช่ COUNT ในฐาน) เพราะต้องตัดเครื่องที่ซ้ำกันในวันเดียวออกก่อนนับ
+ * ซึ่งทำในฐานข้ามสามฐานไม่ได้ — และทำให้ตัวเลขหน้ารวมตรงกับหน้ารายคนเสมอ
  *
  * @param  string $from Y-m-d
  * @param  string $to   Y-m-d (รวมวันนี้ด้วย)
@@ -222,34 +249,22 @@ function work_summary_for_cycle(string $from, string $to): array
         ];
     }
 
-    $unmatched = [];
+    $fetched = work_summary_fetch_rows($from, $to, []);
+    $bucketed = work_summary_bucket($fetched['rows'], $aliasMap, null);
+
     $totals = [];
-
-    $bump = function (string $rawActor, string $catKey, int $n)
-        use (&$people, &$unmatched, &$totals, $aliasMap) {
-        foreach (work_people_split($rawActor) as $name) {
-            $key = work_people_norm($name);
-            if ($key === '') {
-                continue;
-            }
-            if (!isset($aliasMap[$key])) {
-                $unmatched[$name] = ($unmatched[$name] ?? 0) + $n;
-                continue;
-            }
-            $pid = $aliasMap[$key];
-            if (!isset($people[$pid])) {
-                continue;
-            }
-            $people[$pid]['counts'][$catKey] = ($people[$pid]['counts'][$catKey] ?? 0) + $n;
-            $people[$pid]['total'] += $n;
-            $totals[$catKey] = ($totals[$catKey] ?? 0) + $n;
+    foreach ($bucketed['people'] as $pid => $byDay) {
+        if (!isset($people[$pid])) {
+            continue;
         }
-    };
-
-    $collected = work_summary_collect($from, $to, false);
-    $errors = $collected['errors'];
-    foreach ($collected['rows'] as $r) {
-        $bump($r['actor'], $r['cat'], $r['n']);
+        foreach ($byDay as $byCat) {
+            foreach ($byCat as $cat => $items) {
+                $n = count($items);
+                $people[$pid]['counts'][$cat] = ($people[$pid]['counts'][$cat] ?? 0) + $n;
+                $people[$pid]['total'] += $n;
+                $totals[$cat] = ($totals[$cat] ?? 0) + $n;
+            }
+        }
     }
 
     $rows = array_values(array_filter($people, function ($p) {
@@ -258,88 +273,167 @@ function work_summary_for_cycle(string $from, string $to): array
     usort($rows, function ($a, $b) {
         return $b['total'] <=> $a['total'] ?: strcasecmp($a['name'], $b['name']);
     });
+    $unmatched = $bucketed['unmatched'];
     arsort($unmatched);
 
-    return ['rows' => $rows, 'totals' => $totals, 'unmatched' => $unmatched, 'errors' => $errors];
+    return ['rows' => $rows, 'totals' => $totals, 'unmatched' => $unmatched, 'errors' => $fetched['errors']];
 }
 
 /**
- * ยิง query ทุกแหล่งของช่วงวันหนึ่ง แล้วคืนเป็นแถวดิบ (ยังไม่จับคู่กับทะเบียนคน)
+ * ดึงงานรายแถวจากทุกแหล่งในช่วงวันหนึ่ง
  *
- * แยกออกมาเพราะทั้งสรุปรายรอบและสรุปรายวันใช้ query ชุดเดียวกัน ต่างแค่ GROUP BY
- * วันที่หรือไม่ — เขียนซ้ำสองที่แล้วเงื่อนไข (เช่น การตัดแถว sync) จะหลุดกันเอง
+ * $aliases ว่าง = เอาทุกคน (หน้ารวม) · ใส่มา = กรองในฐานให้เหลือเฉพาะคนนั้น (หน้ารายคน)
+ * ตัวกรองในฐานเป็นแค่ตัวย่อผลลัพธ์ ฝั่ง PHP ยังเช็คชื่อซ้ำอีกชั้นเสมอ
  *
- * @param  string $from  Y-m-d
- * @param  string $to    Y-m-d (รวมวันนี้)
- * @param  bool   $byDay true = แยกรายวันด้วย
- * @return array{rows:array<int,array{cat:string,actor:string,day:string,n:int}>,errors:array<int,string>}
+ * @param  string            $from Y-m-d
+ * @param  string            $to   Y-m-d
+ * @param  array<int,string> $aliases ชื่อที่ normalize แล้ว
+ * @return array{rows:array<int,array<string,mixed>>,errors:array<int,string>}
  */
-function work_summary_collect(string $from, string $to, bool $byDay): array
+function work_summary_fetch_rows(string $from, string $to, array $aliases): array
 {
     $rows = [];
     $errors = [];
+    $conns = ['prod' => db(), 'ma' => dbMaintenance(), 'lease' => dbLeasing()];
+    $labels = ['ma' => 'ระบบซ่อม', 'lease' => 'ระบบเช่า'];
+    $warned = [];
 
-    // ── production: วันที่เป็น datetime จริง เทียบด้วย >= / < วันถัดไป ──────────
-    foreach (work_summary_sources_production() as $src) {
-        $sel = $byDay ? ", DATE(`{$src['date']}`) d" : '';
-        $sql = "SELECT `{$src['actor']}` v{$sel}, COUNT(*) c FROM `{$src['table']}`
-                WHERE `{$src['date']}` >= ? AND `{$src['date']}` < DATE_ADD(?, INTERVAL 1 DAY)
-                  AND `{$src['actor']}` IS NOT NULL AND TRIM(`{$src['actor']}`) <> ''"
-             . (isset($src['where']) ? ' AND ' . $src['where'] : '')
-             . ' GROUP BY v' . ($byDay ? ', d' : '');
-        try {
-            $res = qr($sql, 'ss', [$from, $to]);
-            while ($row = $res->fetch_assoc()) {
-                $rows[] = ['cat' => $src['key'], 'actor' => (string) $row['v'],
-                           'day' => $byDay ? (string) $row['d'] : '', 'n' => (int) $row['c']];
-            }
-        } catch (\Throwable $e) {
-            $errors[] = $src['table'] . ': ' . $e->getMessage();
-        }
-    }
-
-    // ── ระบบซ่อม/เช่า: วันที่บางคอลัมน์เป็น varchar แต่เป็น ISO (YYYY-MM-DD)
-    //    เทียบสตริงตรง ๆ ได้ผลถูกเพราะ ISO เรียงตามพจนานุกรมเท่ากับเรียงตามเวลา
-    //    ค่าที่ไม่ใช่รูปแบบนี้ (ว่าง, '0000-00-00', '-') จะตกนอกช่วงไปเอง
-    //    LEFT(...,10) ตัดส่วนเวลาทิ้ง ใช้ได้ทั้งคอลัมน์ varchar และ datetime
-    $ext = [
-        [dbMaintenance(), work_summary_sources_maintenance(), 'ระบบซ่อม'],
-        [dbLeasing(),     work_summary_sources_leasing(),     'ระบบเช่า'],
-    ];
-    foreach ($ext as $spec) {
-        list($conn, $sources, $label) = $spec;
+    foreach (work_summary_detail_sources() as $src) {
+        $conn = isset($conns[$src['conn']]) ? $conns[$src['conn']] : null;
         if (!$conn) {
-            $errors[] = $label . ': เชื่อมต่อไม่ได้';
+            $name = isset($labels[$src['conn']]) ? $labels[$src['conn']] : $src['conn'];
+            if (empty($warned[$name])) {
+                $errors[] = $name . ': เชื่อมต่อไม่ได้';
+                $warned[$name] = true;
+            }
             continue;
         }
-        foreach ($sources as $src) {
-            $sel = $byDay ? ", LEFT(`{$src['date']}`, 10) d" : '';
-            $sql = "SELECT `{$src['actor']}` v{$sel}, COUNT(*) c FROM `{$src['table']}`
-                    WHERE `{$src['date']}` >= ? AND `{$src['date']}` <= ?
-                      AND `{$src['actor']}` IS NOT NULL AND TRIM(`{$src['actor']}`) <> ''
-                    GROUP BY v" . ($byDay ? ', d' : '');
-            try {
-                $st = $conn->prepare($sql);
-                if (!$st) {
-                    $errors[] = $label . ' ' . $src['table'] . ': prepare ไม่ผ่าน';
+        $isProd = $src['conn'] === 'prod';
+        // production เป็น datetime จริง ส่วนระบบซ่อม/เช่าเก็บวันที่เป็น varchar ISO
+        $dayExpr = $isProd ? "DATE({$src['date']})" : "LEFT({$src['date']}, 10)";
+        $range = $isProd
+            ? "{$src['date']} >= ? AND {$src['date']} < DATE_ADD(?, INTERVAL 1 DAY)"
+            : "{$src['date']} >= ? AND {$src['date']} <= ?";
+        // ระบบซ่อม/เช่าเป็นคนละฐาน join หา asset_id ตรง ๆ ไม่ได้ — ไว้ไปเทียบจาก SN ทีหลัง
+        $aid = isset($src['aid']) ? $src['aid'] : '0';
+
+        $args = [$from, $to];
+        $actorSql = '';
+        if ($aliases) {
+            list($actorSql, $actorArgs) = work_summary_actor_filter($src['actor'], $aliases);
+            $actorSql = ' AND ' . $actorSql;
+            $args = array_merge($args, $actorArgs);
+        }
+
+        $sql = "SELECT $dayExpr d, {$src['actor']} actor, {$src['nm']} nm, {$src['ref']} ref,
+                       {$src['ext']} ext, $aid aid
+                FROM {$src['from']}
+                WHERE $range AND {$src['actor']} IS NOT NULL AND TRIM({$src['actor']}) <> ''"
+             . $actorSql
+             . (isset($src['where']) ? ' AND ' . $src['where'] : '')
+             . ' ORDER BY d, nm';
+        try {
+            $st = $conn->prepare($sql);
+            if (!$st) {
+                $errors[] = $src['key'] . ': prepare ไม่ผ่าน';
+                continue;
+            }
+            $st->bind_param(str_repeat('s', count($args)), ...$args);
+            $st->execute();
+            $res = $st->get_result();
+            while ($row = $res->fetch_assoc()) {
+                $day = substr((string) $row['d'], 0, 10);
+                if ($day === '' || $day < $from || $day > $to) {
                     continue;
                 }
-                $st->bind_param('ss', $from, $to);
-                $st->execute();
-                $res = $st->get_result();
-                while ($row = $res->fetch_assoc()) {
-                    $rows[] = ['cat' => $src['key'], 'actor' => (string) $row['v'],
-                               'day' => $byDay ? (string) $row['d'] : '', 'n' => (int) $row['c']];
-                }
-                $st->close();
-            } catch (\Throwable $e) {
-                $errors[] = $label . ' ' . $src['table'] . ': ' . $e->getMessage();
+                $nm = trim((string) $row['nm']);
+                $rows[] = [
+                    'cat'      => $src['key'],
+                    'actor'    => (string) $row['actor'],
+                    'day'      => $day,
+                    'name'     => $nm !== '' ? $nm : '-',
+                    'ref'      => trim((string) (isset($row['ref']) ? $row['ref'] : '')),
+                    'extra'    => trim((string) (isset($row['ext']) ? $row['ext'] : '')),
+                    'asset_id' => (int) (isset($row['aid']) ? $row['aid'] : 0),
+                ];
             }
+            $st->close();
+        } catch (\Throwable $e) {
+            $errors[] = $src['key'] . ': ' . $e->getMessage();
         }
     }
+
+    work_summary_fill_asset_ids($rows);
 
     return ['rows' => $rows, 'errors' => $errors];
 }
+
+/**
+ * จัดแถวเข้าคน > วัน > หมวด พร้อมตัดเครื่องที่ซ้ำกันในวันเดียวออก
+ *
+ * เครื่องเดียวกันในวันเดียวกันเหลือรายการเดียว โดยเก็บหมวดที่สำคัญที่สุดไว้
+ * (ดู work_summary_cat_priority) แถวที่ไม่มีเลขเครื่องเลยถือเป็นคนละงานเสมอ
+ *
+ * @param  array<int,array<string,mixed>> $rows
+ * @param  array<string,int>              $aliasMap
+ * @param  int|null                       $onlyPid เอาเฉพาะคนนี้
+ * @return array{people:array<int,array<string,array<string,array<int,array<string,mixed>>>>>,unmatched:array<string,int>}
+ */
+function work_summary_bucket(array $rows, array $aliasMap, ?int $onlyPid): array
+{
+    $prio = work_summary_cat_priority();
+    $people = [];
+    $unmatched = [];
+    $seen = [];   // [pid][day][เลขเครื่อง] = ['cat'=>..,'prio'=>..]
+
+    foreach ($rows as $r) {
+        // เลขเครื่องใช้ asset_id ก่อน (แน่นอนกว่า) ไม่มีค่อยใช้ SN ที่เขียนไว้
+        $keyRef = $r['asset_id'] > 0 ? 'a' . $r['asset_id'] : ($r['ref'] !== '' ? 's' . $r['ref'] : '');
+        $p = isset($prio[$r['cat']]) ? $prio[$r['cat']] : 99;
+
+        foreach (work_people_split($r['actor']) as $rawName) {
+            $key = work_people_norm($rawName);
+            if ($key === '') {
+                continue;
+            }
+            if (!isset($aliasMap[$key])) {
+                $unmatched[$rawName] = ($unmatched[$rawName] ?? 0) + 1;
+                continue;
+            }
+            $pid = (int) $aliasMap[$key];
+            if ($onlyPid !== null && $pid !== $onlyPid) {
+                continue;
+            }
+            $day = $r['day'];
+
+            if ($keyRef !== '') {
+                if (isset($seen[$pid][$day][$keyRef])) {
+                    $old = $seen[$pid][$day][$keyRef];
+                    if ($p >= $old['prio']) {
+                        continue;   // มีตัวแทนที่สำคัญกว่าอยู่แล้ว
+                    }
+                    // เจอหมวดที่สำคัญกว่า — ถอนตัวเก่าออกแล้วใส่ตัวใหม่แทน
+                    unset($people[$pid][$day][$old['cat']][$old['idx']]);
+                    if (!$people[$pid][$day][$old['cat']]) {
+                        unset($people[$pid][$day][$old['cat']]);
+                    }
+                }
+                $seen[$pid][$day][$keyRef] = ['cat' => $r['cat'], 'prio' => $p, 'idx' => null];
+            }
+
+            $item = ['name' => $r['name'], 'ref' => $r['ref'],
+                     'extra' => $r['extra'], 'asset_id' => $r['asset_id']];
+            $people[$pid][$day][$r['cat']][] = $item;
+            if ($keyRef !== '') {
+                end($people[$pid][$day][$r['cat']]);
+                $seen[$pid][$day][$keyRef]['idx'] = key($people[$pid][$day][$r['cat']]);
+            }
+        }
+    }
+
+    return ['people' => $people, 'unmatched' => $unmatched];
+}
+
 
 /**
  * ป้ายวันแบบสั้นภาษาไทย — "พฤ 21 ส.ค."
@@ -458,8 +552,11 @@ function work_summary_actor_filter(string $actorExpr, array $aliases): array
     return ['(' . implode(' OR ', $parts) . ')', $args];
 }
 
+
 /**
- * งานของคนหนึ่งแบบละเอียด — รายวัน > หมวด > ของจริงที่ทำ
+ * งานของคนหนึ่งแบบละเอียด — รายวัน > หัวข้อ > ของจริงที่ทำ
+ *
+ * ใช้ทางเดินเดียวกับสรุปหน้ารวม (fetch_rows + bucket) ตัวเลขจึงตรงกันเสมอ
  *
  * @param  int    $personId
  * @param  string $from Y-m-d
@@ -469,151 +566,77 @@ function work_summary_actor_filter(string $actorExpr, array $aliases): array
 function work_summary_person_items(int $personId, string $from, string $to): array
 {
     work_people_ensure_schema();
+    $aliasMap = work_people_alias_map();
     $aliases = [];
-    foreach (work_people_alias_map() as $alias => $pid) {
+    foreach ($aliasMap as $alias => $pid) {
         if ((int) $pid === $personId) {
             $aliases[] = (string) $alias;
         }
     }
-    $cats = work_summary_categories();
-    $errors = [];
-    $bucket = [];   // [วัน][หมวด] = ['count'=>n,'groups'=>[ชื่อ=>n],'items'=>[]]
-    $total = 0;
-
-    $conns = ['prod' => db(), 'ma' => dbMaintenance(), 'lease' => dbLeasing()];
-    $labels = ['ma' => 'ระบบซ่อม', 'lease' => 'ระบบเช่า'];
-    $warned = [];
-
-    foreach (work_summary_detail_sources() as $src) {
-        $conn = isset($conns[$src['conn']]) ? $conns[$src['conn']] : null;
-        if (!$conn) {
-            $name = isset($labels[$src['conn']]) ? $labels[$src['conn']] : $src['conn'];
-            if (empty($warned[$name])) {
-                $errors[] = $name . ': เชื่อมต่อไม่ได้';
-                $warned[$name] = true;
-            }
-            continue;
-        }
-        list($actorSql, $actorArgs) = work_summary_actor_filter($src['actor'], $aliases);
-        $isProd = $src['conn'] === 'prod';
-        // production เป็น datetime จริง ส่วนระบบซ่อม/เช่าเก็บวันที่เป็น varchar ISO
-        $dayExpr = $isProd ? "DATE({$src['date']})" : "LEFT({$src['date']}, 10)";
-        $range = $isProd
-            ? "{$src['date']} >= ? AND {$src['date']} < DATE_ADD(?, INTERVAL 1 DAY)"
-            : "{$src['date']} >= ? AND {$src['date']} <= ?";
-
-        // ระบบซ่อม/เช่าเป็นคนละฐาน join หา asset_id ตรง ๆ ไม่ได้ — ไว้ไปเทียบจาก SN ทีหลัง
-        $aid = isset($src['aid']) ? $src['aid'] : '0';
-        $sql = "SELECT $dayExpr d, {$src['actor']} actor, {$src['nm']} nm, {$src['ref']} ref,
-                       {$src['ext']} ext, $aid aid
-                FROM {$src['from']}
-                WHERE $range AND {$src['actor']} IS NOT NULL AND TRIM({$src['actor']}) <> ''
-                  AND $actorSql"
-             . (isset($src['where']) ? ' AND ' . $src['where'] : '')
-             . ' ORDER BY d, nm';
-        try {
-            $st = $conn->prepare($sql);
-            if (!$st) {
-                $errors[] = $src['key'] . ': prepare ไม่ผ่าน';
-                continue;
-            }
-            $args = array_merge([$from, $to], $actorArgs);
-            $st->bind_param(str_repeat('s', count($args)), ...$args);
-            $st->execute();
-            $res = $st->get_result();
-            while ($row = $res->fetch_assoc()) {
-                // ยืนยันอีกชั้นด้วยกติกาเดียวกับสรุปรายรอบ — ตัวกรองใน SQL เป็นแค่ตัวย่อผลลัพธ์
-                $mine = false;
-                foreach (work_people_split((string) $row['actor']) as $n) {
-                    $k = work_people_norm($n);
-                    if ($k !== '' && in_array($k, $aliases, true)) {
-                        $mine = true;
-                        break;
-                    }
-                }
-                if (!$mine) {
-                    continue;
-                }
-                $day = substr((string) $row['d'], 0, 10);
-                if ($day === '' || $day < $from || $day > $to) {
-                    continue;
-                }
-                $nm = trim((string) $row['nm']);
-                if ($nm === '') {
-                    $nm = '-';
-                }
-                $cat = $src['key'];
-                if (!isset($bucket[$day][$cat])) {
-                    $bucket[$day][$cat] = ['count' => 0, 'groups' => [], 'items' => []];
-                }
-                $bucket[$day][$cat]['count']++;
-                $bucket[$day][$cat]['groups'][$nm] = (isset($bucket[$day][$cat]['groups'][$nm])
-                    ? $bucket[$day][$cat]['groups'][$nm] : 0) + 1;
-                $bucket[$day][$cat]['items'][] = [
-                    'name'     => $nm,
-                    'ref'      => trim((string) (isset($row['ref']) ? $row['ref'] : '')),
-                    'extra'    => trim((string) (isset($row['ext']) ? $row['ext'] : '')),
-                    'asset_id' => (int) (isset($row['aid']) ? $row['aid'] : 0),
-                ];
-                $total++;
-            }
-            $st->close();
-        } catch (\Throwable $e) {
-            $errors[] = $src['key'] . ': ' . $e->getMessage();
-        }
+    // ไม่มี alias = ไม่มีชื่อไหนในข้อมูลงานเป็นของคนนี้ — ต้องคืนว่าง ไม่ใช่ดึงมาทั้งระบบ
+    if (!$aliases) {
+        return ['days' => [], 'total' => 0, 'errors' => []];
     }
 
-    work_summary_fill_asset_ids($bucket);
+    $cats = work_summary_categories();
+    $fetched = work_summary_fetch_rows($from, $to, $aliases);
+    $bucketed = work_summary_bucket($fetched['rows'], $aliasMap, $personId);
+    $byDay = isset($bucketed['people'][$personId]) ? $bucketed['people'][$personId] : [];
+    ksort($byDay);
 
-    ksort($bucket);
     $days = [];
-    foreach ($bucket as $day => $byCat) {
-        // หมวดที่ทำเยอะสุดขึ้นก่อน — คนอ่านสนใจงานหลักของวันนั้น
-        uasort($byCat, function ($a, $b) { return $b['count'] <=> $a['count']; });
+    $total = 0;
+    foreach ($byDay as $day => $byCat) {
+        // หัวข้อที่ทำเยอะสุดขึ้นก่อน — คนอ่านสนใจงานหลักของวันนั้น
+        uasort($byCat, function ($a, $b) { return count($b) <=> count($a); });
         $catRows = [];
         $dayTotal = 0;
-        foreach ($byCat as $catKey => $c) {
-            arsort($c['groups']);
+        foreach ($byCat as $catKey => $items) {
+            $items = array_values($items);
             $groups = [];
-            foreach ($c['groups'] as $nm => $n) {
-                $groups[] = ['name' => (string) $nm, 'count' => (int) $n];
+            foreach ($items as $it) {
+                $groups[$it['name']] = (isset($groups[$it['name']]) ? $groups[$it['name']] : 0) + 1;
+            }
+            arsort($groups);
+            $g = [];
+            foreach ($groups as $nm => $n) {
+                $g[] = ['name' => (string) $nm, 'count' => (int) $n];
             }
             $catRows[] = [
                 'key'    => (string) $catKey,
                 'label'  => (string) (isset($cats[$catKey]) ? $cats[$catKey] : $catKey),
-                'count'  => (int) $c['count'],
-                'groups' => $groups,
-                'items'  => $c['items'],
+                'count'  => count($items),
+                'groups' => $g,
+                'items'  => $items,
             ];
-            $dayTotal += (int) $c['count'];
+            $dayTotal += count($items);
         }
         $days[] = ['date' => $day, 'label' => work_summary_day_label($day),
                    'total' => $dayTotal, 'cats' => $catRows];
+        $total += $dayTotal;
     }
 
-    return ['days' => $days, 'total' => $total, 'errors' => $errors];
+    return ['days' => $days, 'total' => $total, 'errors' => $fetched['errors']];
 }
 
 /**
- * เติม asset_id ให้รายการที่มาจากระบบซ่อม/เช่า โดยเทียบ SN กับทะเบียนเครื่องของเรา
+ * เติม asset_id ให้แถวที่มาจากระบบซ่อม/เช่า โดยเทียบ SN กับทะเบียนเครื่องของเรา
  *
  * สองระบบนั้นอยู่คนละฐาน join ตรง ๆ ไม่ได้ แต่เครื่องส่วนใหญ่เป็นเครื่องเดียวกับที่เรา
  * ผลิต จึงเทียบจาก asset_code / factory_serial ได้ — เทียบทีเดียวทั้งชุด ไม่ยิงรายแถว
- * เทียบไม่เจอก็ปล่อยเป็น 0 แล้วหน้าเว็บจะไม่ทำเป็นลิงก์ ดีกว่าพาไปหน้าที่ไม่มีอยู่
  *
- * @param  array<string,array<string,array<string,mixed>>> $bucket แก้ในตัว
+ * สำคัญกับการตัดของซ้ำด้วย ไม่ใช่แค่ทำลิงก์: เครื่องเดียวกันที่โผล่ทั้งฝั่งเราและฝั่ง
+ * ระบบซ่อมจะจับคู่กันได้ก็ต่อเมื่อรู้ asset_id ตรงกัน
+ *
+ * @param  array<int,array<string,mixed>> $rows แก้ในตัว
  * @return void
  */
-function work_summary_fill_asset_ids(array &$bucket): void
+function work_summary_fill_asset_ids(array &$rows): void
 {
     $refs = [];
-    foreach ($bucket as $byCat) {
-        foreach ($byCat as $c) {
-            foreach ($c['items'] as $it) {
-                if ((int) $it['asset_id'] <= 0 && $it['ref'] !== '') {
-                    $refs[$it['ref']] = true;
-                }
-            }
+    foreach ($rows as $r) {
+        if ((int) $r['asset_id'] <= 0 && $r['ref'] !== '') {
+            $refs[$r['ref']] = true;
         }
     }
     if (!$refs) {
@@ -621,9 +644,8 @@ function work_summary_fill_asset_ids(array &$bucket): void
     }
     $map = [];
     try {
-        $names = array_keys($refs);
         // ยิงเป็นก้อนละ 500 กัน query ยาวเกินขีดจำกัดของ MySQL
-        foreach (array_chunk($names, 500) as $chunk) {
+        foreach (array_chunk(array_keys($refs), 500) as $chunk) {
             $ph = implode(',', array_fill(0, count($chunk), '?'));
             $types = str_repeat('s', count($chunk) * 2);
             $res = qr(
@@ -648,13 +670,9 @@ function work_summary_fill_asset_ids(array &$bucket): void
     if (!$map) {
         return;
     }
-    foreach ($bucket as $day => $byCat) {
-        foreach ($byCat as $cat => $c) {
-            foreach ($c['items'] as $i => $it) {
-                if ((int) $it['asset_id'] <= 0 && isset($map[$it['ref']])) {
-                    $bucket[$day][$cat]['items'][$i]['asset_id'] = $map[$it['ref']];
-                }
-            }
+    foreach ($rows as $i => $r) {
+        if ((int) $r['asset_id'] <= 0 && isset($map[$r['ref']])) {
+            $rows[$i]['asset_id'] = $map[$r['ref']];
         }
     }
 }
