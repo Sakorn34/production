@@ -220,8 +220,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .status-legend-item:hover, .status-legend-item:focus-visible {
   background: var(--surface-muted); outline: none;
 }
+/* สี่เหลี่ยมมุมมน ขนาดเดียวกับ .dash-status-swatch ที่กราฟ "ภาพรวมการผลิตรายปี" ใช้
+   (12px, radius 3px) เดิมเป็นจุดกลม คนละทรงกับสวอตช์ของกราฟ ทั้งที่เป็นชุดสีเดียวกัน */
 .status-dot {
-  align-self: center; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  align-self: center; width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0;
 }
 .status-legend-label {
   font-size: calc(12px * var(--font-scale, 1)); color: var(--text-muted, #6b6480);
