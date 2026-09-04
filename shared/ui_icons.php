@@ -294,6 +294,7 @@ function ui_nav_items_finishgoogs(): array
         ['file' => 'ma.php',      'icon' => 'ma',        'label' => 'บันทึก MA'],
         ['file' => 'parts.php',   'icon' => 'parts',     'label' => 'อะไหล่ใช้ผลิต'],
         ['file' => 'repairs.php', 'icon' => 'repairs',   'label' => 'ประวัติซ่อม'],
+        ['file' => 'work_report.php', 'icon' => 'chart', 'label' => 'สรุปงานรายคน'],
         ['file' => 'scan.php',    'icon' => 'scan',      'label' => 'สแกน QR'],
     ];
 

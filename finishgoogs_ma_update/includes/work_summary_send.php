@@ -1,0 +1,89 @@
+<?php
+/**
+ * includes/work_summary_send.php — ส่งสรุปงานรายคนเข้าคิว LINE
+ *
+ * ใช้ท่อเดิมทั้งหมด: line_notify_dispatch() รับ recipient_id รายคนได้อยู่แล้ว และ
+ * notification_outbox เก็บผู้รับรายแถว จึงส่งแยกคนได้โดยไม่ต้องแก้อะไรในระบบแจ้งเตือน
+ */
+
+require_once __DIR__ . '/work_summary.php';
+require_once dirname(__DIR__, 2) . '/shared/line_notify_core.php';
+
+/**
+ * ส่งสรุปของรอบหนึ่งให้ผู้รับที่เข้าเงื่อนไข
+ *
+ * @param  array<string,mixed> $cycle    จาก work_summary_cycle()
+ * @param  int|null            $onlyPerson ส่งเฉพาะคนนี้ (ใช้ตอนกดส่งทดสอบ)
+ * @return array{queued:int,skipped_no_line:int,skipped_no_work:int,dedup:int,errors:array<int,string>}
+ */
+function work_summary_send_cycle(array $cycle, ?int $onlyPerson = null): array
+{
+    $out = ['queued' => 0, 'skipped_no_line' => 0, 'skipped_no_work' => 0, 'dedup' => 0, 'errors' => []];
+
+    $summary = work_summary_for_cycle((string) $cycle['from'], (string) $cycle['to']);
+    if ($summary['errors']) {
+        // ดึงบางระบบไม่ได้ = ตัวเลขไม่ครบ ส่งไปจะเป็นสรุปที่ผิด — หยุดดีกว่า
+        $out['errors'] = $summary['errors'];
+        return $out;
+    }
+    $cats = work_summary_categories();
+
+    // งานรายคนของรอบนี้ (คนที่ไม่มีงานเลยจะไม่อยู่ใน rows)
+    $work = [];
+    foreach ($summary['rows'] as $row) {
+        $work[(int) $row['id']] = $row;
+    }
+
+    foreach (work_people_recipients() as $person) {
+        $pid = (int) $person['id'];
+        if ($onlyPerson !== null && $pid !== $onlyPerson) {
+            continue;
+        }
+        if (empty($work[$pid]) || (int) $work[$pid]['total'] <= 0) {
+            $out['skipped_no_work']++;
+            continue;
+        }
+        $row = $work[$pid];
+        $items = [];
+        foreach ($row['counts'] as $key => $n) {
+            if ($n > 0) {
+                $items[] = ['label' => (string) ($cats[$key] ?? $key), 'count' => (int) $n];
+            }
+        }
+        // มากไปน้อย — คนอ่านสนใจว่าทำอะไรเยอะสุดก่อน
+        usort($items, function ($a, $b) { return $b['count'] <=> $a['count']; });
+
+        $payload = [
+            'person_name' => (string) $row['name'],
+            'cycle_label' => (string) $cycle['label'],
+            'cycle_key'   => (string) $cycle['key'],
+            'cycle_from'  => (string) $cycle['from'],
+            'cycle_to'    => (string) $cycle['to'],
+            'total'       => (int) $row['total'],
+            'items'       => $items,
+            'report_url'  => rtrim(line_notify_production_base_url(), '/') . '/work_report.php?c=' . rawurlencode((string) $cycle['to']),
+        ];
+
+        $id = line_notify_dispatch('work.summary.monthly', $payload, [
+            'recipient_id' => (string) $person['line_user_id'],
+            // กันส่งซ้ำถ้า cron รันซ้ำรอบเดิม — ผูกกับคน+รอบ
+            'dedup_key'    => 'work.summary.monthly:' . $pid . ':' . $cycle['key'],
+            'dedup_ttl'    => 60 * 86400,
+        ]);
+        if ($id === null) {
+            $out['dedup']++;
+        } else {
+            $out['queued']++;
+        }
+    }
+
+    if ($onlyPerson === null) {
+        foreach (work_people_all() as $p) {
+            if ((int) ($p['notify_enabled'] ?? 1) === 1 && (int) ($p['is_active'] ?? 1) === 1
+                && empty($p['line_user_id'])) {
+                $out['skipped_no_line']++;
+            }
+        }
+    }
+    return $out;
+}

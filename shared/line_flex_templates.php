@@ -526,6 +526,9 @@ function line_flex_build_messages(string $eventKey, array $payload): array
             require_once __DIR__ . '/line_flex_finishgood_shortage.php';
             $items = isset($payload['items']) && is_array($payload['items']) ? $payload['items'] : [];
             return line_flex_finishgood_shortage_messages($items, (string)($payload['timestamp'] ?? date('d/m/Y H:i') . ' น.'));
+        case 'work.summary.monthly':
+            require_once __DIR__ . '/line_flex_work_summary.php';
+            return line_flex_work_summary_messages($payload);
         case 'line.test':
             return [['type' => 'text', 'text' => line_flex_text((string)($payload['message'] ?? 'ทดสอบ LINE ✅'), 500)]];
         default:
