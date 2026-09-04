@@ -746,6 +746,47 @@ $partsBase = ui_parts_base_url();
       el.classList.toggle('is-active-filter', active !== null && st === active);
       el.classList.toggle('is-dimmed-filter', active !== null && st !== active);
     });
+    applyToBars();
+  }
+
+  // แท่งกราฟรายปี/รายเดือน: ตอนกรอง ตัวเลขหัวแท่งกับความสูงต้องเป็นของสถานะที่เลือก
+  // ไม่ใช่ยอดรวมทุกสถานะ ไม่งั้นตัวเลขจะไม่ตรงกับสิ่งที่ไฮไลต์อยู่
+  //
+  // จำนวนของแต่ละสถานะอ่านจาก flex-grow ของ segment ได้เลย (ฝั่ง PHP ใส่ค่า count ลงไป
+  // ตรง ๆ) จึงไม่ต้องยิงขอข้อมูลใหม่ · ความสูงคิดเป็นสัดส่วนจากของเดิม (origH × count/total)
+  // แกน Y เลยยังอ่านค่าได้ถูกเหมือนเดิม ไม่ต้องคำนวณสเกลใหม่
+  function applyToBars() {
+    document.querySelectorAll('.dash-bar-col').forEach(function (col) {
+      var area = col.querySelector('.dash-bar-area');
+      var totalEl = col.querySelector('.dash-bar-total');
+      var segs = col.querySelectorAll('.dash-bar-seg[data-status]');
+      if (!area || !segs.length) { return; }
+
+      if (!area.hasAttribute('data-orig-h')) {
+        area.setAttribute('data-orig-h', area.style.height || '');
+        if (totalEl) { totalEl.setAttribute('data-orig-num', totalEl.textContent); }
+      }
+      var origH = parseFloat(area.getAttribute('data-orig-h')) || 0;
+
+      if (active === null) {
+        area.style.height = area.getAttribute('data-orig-h');
+        if (totalEl) { totalEl.textContent = totalEl.getAttribute('data-orig-num'); }
+        segs.forEach(function (s) { s.hidden = false; });
+        return;
+      }
+
+      var total = 0;
+      var picked = 0;
+      segs.forEach(function (s) {
+        var n = parseFloat(s.style.flexGrow || s.style.flex) || 0;
+        total += n;
+        if (s.getAttribute('data-status') === active) { picked = n; }
+        // ซ่อนสถานะอื่นไปเลย ไม่ใช่แค่ทำจาง เพราะแท่งย่อลงมาเหลือเฉพาะสถานะที่เลือกแล้ว
+        s.hidden = s.getAttribute('data-status') !== active;
+      });
+      area.style.height = (total > 0 ? origH * (picked / total) : 0) + '%';
+      if (totalEl) { totalEl.textContent = picked.toLocaleString('en-US'); }
+    });
   }
 
   function toggle(st) {

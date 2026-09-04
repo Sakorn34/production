@@ -378,6 +378,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .dash-prod-stacked.dash-stacked-chart-compact .dash-chart-body {
   min-height: 240px;
 }
+/* แท่งมีความกว้างขั้นต่ำ (--dash-bar-min-w) เพื่อให้ตัวเลขบนหัวแท่งอ่านออก พอจอแคบ
+   6 แท่งจึงกว้างเกินที่มี แล้วดันทั้งหน้าให้เลื่อนขวางตามไปด้วย — ให้เลื่อนอยู่ในกราฟเอง
+   เหมือนตารางกว้าง ๆ ที่อื่นในระบบ
+   หมายเหตุ: อย่าใส่ flex/min-width ให้ .dash-chart-plot เพื่อยืดเส้นกริดให้สุดความกว้าง
+   ที่เลื่อนได้ — ลองแล้วจอใหญ่แท่งจะค้างที่ความกว้างขั้นต่ำแทนที่จะขยายเต็ม ไม่คุ้มกัน */
+.dash-prod-stacked .dash-chart-body { overflow-x: auto; }
 .dash-prod-stacked.dash-stacked-chart-compact .dash-chart-bars {
   min-height: 210px;
 }
@@ -463,9 +469,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .model-card-name { font-size: calc(13px * var(--font-scale, 1)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px; }
 .model-card-bar { height: 6px; background: var(--surface-soft); border-radius: 999px; overflow: hidden; margin-bottom: 4px; }
 /* แถบในการ์ดรุ่นเป็น stack แยกสถานะ ใช้สีชุดเดียวกับกราฟผลิตด้านบน
-   เดิมเป็นสีเดียวสุ่มจาก palette ซึ่งไม่ได้สื่ออะไร */
-.model-card-fill { height: 100%; border-radius: 999px; display: flex; overflow: hidden; }
-.model-card-seg { height: 100%; min-width: 2px; }
+   เดิมเป็นสีเดียวสุ่มจาก palette ซึ่งไม่ได้สื่ออะไร
+   บล็อกแยกมีช่องไฟ ค่าเดียวกับการ์ด "เครื่องทั้งหมด" และกราฟรายปี (gap 3px, มุมมน 8px) */
+.model-card-fill { height: 100%; display: flex; gap: 3px; }
+.model-card-seg { height: 100%; min-width: 4px; border-radius: var(--radius-sm, 8px); }
 .model-card-num { font-size: calc(12px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); font-weight: 600; }
 .model-card-num .text-warn { color: var(--warning, #a16207); font-weight: 600; }
 .model-card-num .text-danger { color: var(--danger, #dc2626); font-weight: 600; }
