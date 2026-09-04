@@ -24,28 +24,22 @@ const WORK_SUMMARY_FLEX_BUDGET = 27000;
 /**
  * แถวของหนึ่งวัน — หัวแถวเป็นวันที่ + ยอดรวมวันนั้น ใต้ลงมาเป็นงานที่ทำ
  *
- * @param  array<string,mixed> $day   ['label'=>..,'total'=>..,'items'=>[['label'=>..,'count'=>..]]]
+ * @param  array<string,mixed> $day   ['label'=>..,'cats'=>[['label'=>..,'detail'=>..]]]
  * @param  bool                $first แถวแรกของบับเบิลไม่ต้องมีเส้นคั่นข้างบน
  * @return array<int,array<string,mixed>>
  */
 function line_flex_work_summary_day(array $day, bool $first): array
 {
     $rows = [[
-        'type' => 'box', 'layout' => 'horizontal',
-        'contents' => [
-            ['type' => 'text', 'text' => line_flex_text((string) ($day['label'] ?? '-'), 24),
-             'size' => 'sm', 'weight' => 'bold', 'color' => '#0057b8', 'flex' => 0],
-            ['type' => 'text', 'text' => number_format((int) ($day['total'] ?? 0)) . ' รายการ',
-             'size' => 'xs', 'color' => '#999999', 'align' => 'end'],
-        ],
+        'type' => 'text', 'text' => line_flex_text((string) ($day['label'] ?? '-'), 24),
+        'size' => 'sm', 'weight' => 'bold', 'color' => '#0057b8',
     ]];
-    // หมวดงาน + ของจริงที่ทำในหมวดนั้น (ฝั่ง PHP ย่อมาให้แล้วใน 'detail')
+    // หัวข้องาน + ของที่ทำในหัวข้อนั้น — ไม่มีตัวเลขจำนวนครั้งตามที่ตกลง
     // เคยลองยุบสองบรรทัดนี้เป็น text ก้อนเดียวแยกสีด้วย span แล้ว — JSON โตขึ้นราว 7%
     // เพราะ span ก็เป็น node ที่มี key ของตัวเอง อย่ายุบอีก
     foreach ((isset($day['cats']) && is_array($day['cats']) ? $day['cats'] : []) as $cat) {
         $rows[] = ['type' => 'text', 'margin' => 'sm', 'size' => 'xs', 'color' => '#555555',
-                   'text' => line_flex_text((string) ($cat['label'] ?? '-'), 40)
-                             . '  ' . number_format((int) ($cat['count'] ?? 0))];
+                   'text' => line_flex_text((string) ($cat['label'] ?? '-'), 40)];
         $detail = trim((string) ($cat['detail'] ?? ''));
         if ($detail !== '') {
             $rows[] = ['type' => 'text', 'size' => 'sm', 'color' => '#222222', 'wrap' => true,
@@ -79,15 +73,6 @@ function line_flex_work_summary_bubble(array $p, array $days, int $page, int $pa
                    'size' => 'lg', 'weight' => 'bold', 'color' => '#111111'];
         $body[] = ['type' => 'text', 'text' => line_flex_text((string) ($p['cycle_label'] ?? ''), 60),
                    'size' => 'xs', 'color' => '#888888', 'margin' => 'xs'];
-        $body[] = [
-            'type' => 'box', 'layout' => 'baseline', 'margin' => 'lg',
-            'contents' => [
-                ['type' => 'text', 'text' => number_format((int) ($p['total'] ?? 0)),
-                 'size' => 'xxl', 'weight' => 'bold', 'color' => '#0057b8', 'flex' => 0],
-                ['type' => 'text', 'size' => 'sm', 'color' => '#888888',
-                 'text' => '  รายการ · ' . number_format((int) ($p['day_count'] ?? count($days))) . ' วัน'],
-            ],
-        ];
         $body[] = ['type' => 'separator', 'margin' => 'lg'];
     } else {
         $body[] = ['type' => 'text', 'text' => line_flex_text((string) ($p['person_name'] ?? '-'), 60) . ' (ต่อ)',
@@ -199,9 +184,7 @@ function line_flex_work_summary_messages(array $payload): array
         );
     }
 
-    $alt = 'สรุปงานรอบ ' . (string) ($payload['cycle_label'] ?? '') . ' — '
-         . number_format((int) ($payload['total'] ?? 0)) . ' รายการ ใน '
-         . number_format(count($days)) . ' วัน';
+    $alt = 'สรุปงานของคุณ รอบ ' . (string) ($payload['cycle_label'] ?? '');
 
     return [[
         'type'     => 'flex',

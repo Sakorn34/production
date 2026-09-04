@@ -93,10 +93,31 @@ function work_summary_sources_production(): array
         ['key' => 'production', 'label' => 'บันทึกผลิต / QC', 'table' => 'production_records', 'actor' => 'made_by',   'date' => 'recorded_at'],
         ['key' => 'ma',         'label' => 'บันทึก MA',        'table' => 'ma_records',         'actor' => 'done_by',   'date' => 'visited_at'],
         ['key' => 'update',     'label' => 'อัปเดต FW/HW',     'table' => 'update_logs',        'actor' => 'made_by',   'date' => 'updated_at'],
-        ['key' => 'part_out',   'label' => 'เบิกอะไหล่',       'table' => 'part_movements',     'actor' => 'made_by',   'date' => 'moved_at'],
+        ['key' => 'part_out',   'label' => 'เบิกอะไหล่ (นอกงานผลิต)', 'table' => 'part_movements', 'actor' => 'made_by', 'date' => 'moved_at',
+         'where' => work_summary_part_nonproduction_sql('mode')],
         ['key' => 'stock',      'label' => 'เคลื่อนไหวคลัง',   'table' => 'stock_movements',    'actor' => 'made_by',   'date' => 'moved_at',
          'where' => "reason NOT LIKE '{$esc}%'"],
     ];
+}
+
+/**
+ * เงื่อนไขตัด "เบิกอะไหล่เพื่อผลิต" ออกจากหมวดเบิกอะไหล่
+ *
+ * เครื่องผลิตใหม่หนึ่งเครื่องถูกนับที่ "บันทึกผลิต / QC" อยู่แล้ว อะไหล่ที่เบิกไปประกอบ
+ * เครื่องนั้นเป็นส่วนหนึ่งของงานเดียวกัน ไม่ใช่งานคนละชิ้น การนับซ้ำทำให้ดูเหมือน
+ * ทำงานเยอะกว่าจริงและอ่านแล้วสับสนว่าเบิกไปทำอะไร
+ *
+ * เกณฑ์เดียวกับ part_movement_mode_label() ที่ตีความว่า mode ไหนคือ "ผลิต"
+ * (เบิกผลิต 471 แถว · เบิกอัตโนมัติ (ชุดอะไหล่รุ่น) 802 แถว) — แก้ที่นั่นต้องแก้ที่นี่ด้วย
+ *
+ * @param  string $col ชื่อคอลัมน์ mode (ใส่ prefix ตารางมาได้)
+ * @return string
+ */
+function work_summary_part_nonproduction_sql(string $col): string
+{
+    return "COALESCE($col, '') NOT LIKE '%ผลิต%'
+            AND COALESCE($col, '') NOT LIKE '%BOM%'
+            AND COALESCE($col, '') NOT LIKE '%ชุดอะไหล่%'";
 }
 
 /**
@@ -378,7 +399,8 @@ function work_summary_detail_sources(): array
          'nm'  => "COALESCE(NULLIF(pr.name,''), 'ไม่ระบุอะไหล่')",
          'ref' => "COALESCE(NULLIF(a.asset_code,''), NULLIF(a.factory_serial,''), '')",
          'aid' => 't.ref_asset_id',
-         'ext' => "CONCAT_WS(' · ', NULLIF(t.mode,''), CONCAT(FORMAT(t.qty, 0), ' ', COALESCE(pr.unit,'')))"],
+         'ext' => "CONCAT_WS(' · ', NULLIF(t.mode,''), CONCAT(FORMAT(t.qty, 0), ' ', COALESCE(pr.unit,'')))",
+         'where' => work_summary_part_nonproduction_sql('t.mode')],
 
         ['key' => 'stock', 'conn' => 'prod', 'date' => 't.moved_at', 'actor' => 't.made_by',
          'from' => "stock_movements t $asset", 'nm' => $model, 'ref' => $ref, 'aid' => 't.asset_id',

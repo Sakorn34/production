@@ -9,8 +9,8 @@
 require_once __DIR__ . '/work_summary.php';
 require_once dirname(__DIR__, 2) . '/shared/line_notify_core.php';
 
-/** จำนวนรายการที่ยกตัวอย่างต่อหมวดในไลน์ — มากกว่านี้ข้อความยาวเกินอ่านบนมือถือ */
-const WORK_SUMMARY_SEND_GROUPS = 3;
+/** จำนวนชื่อของที่ยกมาต่อหัวข้อในไลน์ — มากกว่านี้ข้อความยาวเกินอ่านบนมือถือ */
+const WORK_SUMMARY_SEND_GROUPS = 5;
 
 /**
  * URL ฐานของแอปนี้สำหรับลิงก์ในไลน์
@@ -32,7 +32,10 @@ function work_summary_app_base_url(): string
 }
 
 /**
- * ย่อรายการ "ทำอะไรบ้าง" ของหมวดหนึ่งเป็นข้อความบรรทัดเดียว
+ * รายชื่อของที่ทำในหัวข้อหนึ่ง เป็นข้อความบรรทัดเดียว
+ *
+ * ไม่ใส่จำนวนครั้ง — ข้อความในไลน์ตอบว่า "ทำอะไร" ไม่ใช่ "ทำกี่ครั้ง"
+ * ตัวเลขทั้งหมดยังดูได้ที่หน้าเว็บ
  *
  * @param  array<int,array<string,mixed>> $groups เรียงจากมากไปน้อยมาแล้ว
  * @param  int                            $limit
@@ -42,11 +45,10 @@ function work_summary_groups_text(array $groups, int $limit): string
 {
     $bits = [];
     foreach (array_slice($groups, 0, $limit) as $g) {
-        $bits[] = (string) $g['name'] . ' ' . number_format((int) $g['count']);
+        $bits[] = (string) $g['name'];
     }
-    $rest = count($groups) - $limit;
-    if ($rest > 0) {
-        $bits[] = 'และอีก ' . number_format($rest) . ' อย่าง';
+    if (count($groups) > $limit) {
+        $bits[] = 'และอื่น ๆ';
     }
     return implode('  ·  ', $bits);
 }
@@ -94,12 +96,11 @@ function work_summary_send_cycle(array $cycle, ?int $onlyPerson = null, bool $fo
             foreach ($d['cats'] as $c) {
                 $cats[] = [
                     'label'  => (string) $c['label'],
-                    'count'  => (int) $c['count'],
                     'detail' => work_summary_groups_text($c['groups'], WORK_SUMMARY_SEND_GROUPS),
                 ];
             }
             // payload เก็บลง DB ด้วย จึงส่งเฉพาะข้อความที่ Flex ใช้จริง ไม่ยัดรายการดิบทั้งก้อน
-            $days[] = ['label' => (string) $d['label'], 'total' => (int) $d['total'], 'cats' => $cats];
+            $days[] = ['label' => (string) $d['label'], 'cats' => $cats];
         }
 
         $payload = [
@@ -108,8 +109,8 @@ function work_summary_send_cycle(array $cycle, ?int $onlyPerson = null, bool $fo
             'cycle_key'   => (string) $cycle['key'],
             'cycle_from'  => (string) $cycle['from'],
             'cycle_to'    => (string) $cycle['to'],
+            // total เก็บไว้ดูตอนไล่ปัญหาใน outbox — ตัว Flex ไม่ได้แสดงจำนวนแล้ว
             'total'       => (int) $row['total'],
-            'day_count'   => count($days),
             'days'        => $days,
             // ลิงก์ไปหน้าของเจ้าตัวโดยเฉพาะ พร้อมโทเคนประจำตัว — คนทำงานส่วนใหญ่ไม่มี
             // บัญชีในระบบ ถ้าให้ไปหน้ารวมที่ต้อง login เท่ากับกดแล้วดูอะไรไม่ได้
