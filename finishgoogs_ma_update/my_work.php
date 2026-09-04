@@ -144,8 +144,12 @@ page_head_html('สรุปงานของ ' . $person['display_name']);
       // เพิ่ม เพราะข้อมูลทั้งรอบก็ดึงมาครบแล้วตั้งแต่แรก ?>
 <div id="mw-days" hidden>
   <?php foreach ($detail['days'] as $day) { ?>
+  <?php // เวลาที่บันทึก — ตัวเดียวกับที่ขึ้นในไลน์ คนเอาไปกรอกใบล่วงเวลาต่อได้จากหน้านี้เลย
+        $tm = $day['time_from'] === '' ? ''
+            : ' · ' . ($day['time_from'] === $day['time_to']
+                       ? $day['time_from'] : $day['time_from'] . '–' . $day['time_to']); ?>
   <div id="mw-d-<?= h($day['date']) ?>" data-title="<?= h($day['label']) ?>"
-       data-sub="<?= number_format($day['total']) ?> รายการ">
+       data-sub="<?= number_format($day['total']) ?> รายการ<?= h($tm) ?>">
     <?php foreach ($day['cats'] as $cat) { ?>
     <div class="mw-cat">
       <h2 class="mw-cat-h"><?= h($cat['label']) ?> <span><?= number_format($cat['count']) ?></span></h2>

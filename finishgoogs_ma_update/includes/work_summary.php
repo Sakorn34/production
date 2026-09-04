@@ -325,7 +325,10 @@ function work_summary_fetch_rows(string $from, string $to, array $aliases): arra
             $args = array_merge($args, $actorArgs);
         }
 
-        $sql = "SELECT $dayExpr d, {$src['actor']} actor, {$src['nm']} nm, {$src['ref']} ref,
+        // เวลาที่บันทึก — มีเฉพาะฝั่ง production ที่คอลัมน์เป็น datetime จริง
+        // ระบบซ่อม/เช่าเก็บแค่วันที่ จึงไม่มีเวลาให้เอามาแสดง
+        $timeExpr = $isProd ? "TIME({$src['date']})" : "NULL";
+        $sql = "SELECT $dayExpr d, $timeExpr tm, {$src['actor']} actor, {$src['nm']} nm, {$src['ref']} ref,
                        {$src['ext']} ext, $aid aid
                 FROM {$src['from']}
                 WHERE $range AND {$src['actor']} IS NOT NULL AND TRIM({$src['actor']}) <> ''"
@@ -347,10 +350,13 @@ function work_summary_fetch_rows(string $from, string $to, array $aliases): arra
                     continue;
                 }
                 $nm = trim((string) $row['nm']);
+                // 00:00:00 = ข้อมูลเก่าที่นำเข้ามาแบบมีแต่วันที่ ไม่ใช่ "บันทึกตอนเที่ยงคืน"
+                $tm = (string) ($row['tm'] ?? '');
                 $rows[] = [
                     'cat'      => $src['key'],
                     'actor'    => (string) $row['actor'],
                     'day'      => $day,
+                    'time'     => ($tm !== '' && $tm !== '00:00:00') ? substr($tm, 0, 5) : '',
                     'name'     => $nm !== '' ? $nm : '-',
                     'ref'      => trim((string) (isset($row['ref']) ? $row['ref'] : '')),
                     'extra'    => trim((string) (isset($row['ext']) ? $row['ext'] : '')),
@@ -385,6 +391,9 @@ function work_summary_bucket(array $rows, array $aliasMap, ?int $onlyPid): array
     $people = [];
     $unmatched = [];
     $seen = [];   // [pid][day][เลขเครื่อง] = ['cat'=>..,'prio'=>..]
+    // ช่วงเวลาบันทึกของแต่ละวัน — เก็บจากทุกแถวก่อนตัดของซ้ำ เพราะแถวที่ถูกยุบทิ้ง
+    // (เช่น เคลื่อนไหวคลังของเครื่องที่ผลิตวันเดียวกัน) มักเป็นแถวที่มีเวลาจริง
+    $times = [];
 
     foreach ($rows as $r) {
         // เลขเครื่องใช้ asset_id ก่อน (แน่นอนกว่า) ไม่มีค่อยใช้ SN ที่เขียนไว้
@@ -405,6 +414,15 @@ function work_summary_bucket(array $rows, array $aliasMap, ?int $onlyPid): array
                 continue;
             }
             $day = $r['day'];
+            $tm = (string) ($r['time'] ?? '');
+            if ($tm !== '') {
+                if (!isset($times[$pid][$day])) {
+                    $times[$pid][$day] = ['from' => $tm, 'to' => $tm];
+                } else {
+                    if ($tm < $times[$pid][$day]['from']) { $times[$pid][$day]['from'] = $tm; }
+                    if ($tm > $times[$pid][$day]['to'])   { $times[$pid][$day]['to'] = $tm; }
+                }
+            }
 
             if ($keyRef !== '') {
                 if (isset($seen[$pid][$day][$keyRef])) {
@@ -431,7 +449,7 @@ function work_summary_bucket(array $rows, array $aliasMap, ?int $onlyPid): array
         }
     }
 
-    return ['people' => $people, 'unmatched' => $unmatched];
+    return ['people' => $people, 'unmatched' => $unmatched, 'times' => $times];
 }
 
 
@@ -611,8 +629,12 @@ function work_summary_person_items(int $personId, string $from, string $to): arr
             ];
             $dayTotal += count($items);
         }
+        $tm = isset($bucketed['times'][$personId][$day]) ? $bucketed['times'][$personId][$day] : null;
         $days[] = ['date' => $day, 'label' => work_summary_day_label($day),
-                   'total' => $dayTotal, 'cats' => $catRows];
+                   'total' => $dayTotal, 'cats' => $catRows,
+                   // ช่วงเวลา "ที่บันทึกข้อมูล" ไม่ใช่เวลาเข้า–ออกงาน — ระบบซ่อม/เช่าไม่มีเวลาเลย
+                   'time_from' => $tm ? $tm['from'] : '',
+                   'time_to'   => $tm ? $tm['to'] : ''];
         $total += $dayTotal;
     }
 

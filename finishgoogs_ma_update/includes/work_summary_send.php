@@ -9,8 +9,8 @@
 require_once __DIR__ . '/work_summary.php';
 require_once dirname(__DIR__, 2) . '/shared/line_notify_core.php';
 
-/** จำนวนชื่อของที่ยกมาต่อหัวข้อในไลน์ — แต่ละชื่อมีรูปประกอบ มากกว่านี้การ์ดยาวเกิน */
-const WORK_SUMMARY_SEND_GROUPS = 3;
+/** จำนวนหัวข้องานที่เขียนต่อวันในไลน์ — เกินนี้ยุบเป็น "และอื่น ๆ" */
+const WORK_SUMMARY_SEND_CATS = 3;
 
 /**
  * bot ที่ใช้ส่งสรุปงานรายคน — "bot สำรอง" (ในโค้ดเดิมเรียก test)
@@ -43,23 +43,41 @@ function work_summary_app_base_url(): string
 }
 
 /**
- * ชื่อของที่ทำในหัวข้อหนึ่ง — ตัดให้เหลือเท่าที่การ์ดรับไหว
+ * ย่อ 1 วันให้เหลือเท่าที่การ์ดต้องใช้
  *
- * ไม่ใส่จำนวนครั้ง — ข้อความในไลน์ตอบว่า "ทำอะไร" ไม่ใช่ "ทำกี่ครั้ง"
- * ตัวเลขทั้งหมดยังดูได้ที่หน้าเว็บ · รูปสินค้าให้ฝั่ง Flex ไปหาเอาจากชื่อรุ่นเอง
- * (แก้รูปในระบบแล้วข้อความที่ค้างอยู่ในคิวจะได้ใช้รูปใหม่)
+ * การ์ดตอบคำถามเดียว: "เดือนนี้ทำงานวันไหน เวลาไหน งานอะไร" — เอาไว้กรอกใบ OT
+ * ตัวเลขและรายชื่อเครื่องทั้งหมดอยู่ที่หน้าเว็บ
  *
- * @param  array<int,array<string,mixed>> $groups เรียงจากมากไปน้อยมาแล้ว
- * @param  int                            $limit
- * @return array{names:array<int,string>,more:int}
+ * เวลาเป็น "เวลาที่บันทึกข้อมูล" ไม่ใช่เวลาเข้า–ออกงาน และมีเฉพาะงานฝั่ง production
+ * (ระบบซ่อม/เช่าเก็บแค่วันที่) วันที่ไม่มีเวลาจึงเว้นไว้ ไม่เดาให้
+ *
+ * @param  array<string,mixed> $d จาก work_summary_person_items()
+ * @return array<string,mixed>
  */
-function work_summary_group_names(array $groups, int $limit): array
+function work_summary_send_day(array $d): array
 {
-    $names = [];
-    foreach (array_slice($groups, 0, $limit) as $g) {
-        $names[] = (string) $g['name'];
+    $labels = [];
+    foreach ($d['cats'] as $c) {
+        $labels[] = (string) $c['label'];
     }
-    return ['names' => $names, 'more' => max(0, count($groups) - $limit)];
+    $work = implode('  ·  ', array_slice($labels, 0, WORK_SUMMARY_SEND_CATS));
+    if (count($labels) > WORK_SUMMARY_SEND_CATS) {
+        $work .= '  ·  และอื่น ๆ';
+    }
+
+    $from = (string) $d['time_from'];
+    $to = (string) $d['time_to'];
+    $time = $from === '' ? '' : ($from === $to ? $from : $from . '–' . $to);
+
+    // รูปประกอบใช้ของชิ้นแรกของหัวข้อแรก — หัวข้อเรียงจากงานที่ทำเยอะสุดมาแล้ว
+    $lead = ['name' => '', 'key' => ''];
+    if (!empty($d['cats'][0]['groups'][0]['name'])) {
+        $lead = ['name' => (string) $d['cats'][0]['groups'][0]['name'],
+                 'key'  => (string) $d['cats'][0]['key']];
+    }
+
+    return ['date' => (string) $d['date'], 'label' => (string) $d['label'],
+            'time' => $time, 'work' => $work, 'lead' => $lead];
 }
 
 /**
@@ -99,22 +117,10 @@ function work_summary_send_cycle(array $cycle, ?int $onlyPerson = null, bool $fo
         // เจ้าตัวอยากรู้ว่า "วันไหนทำอะไร" ไม่ใช่ยอดรวมทั้งรอบ — ส่งเป็นไทม์ไลน์รายวัน
         // พร้อมของจริงที่ทำ (รุ่นที่ผลิต / อะไหล่ที่เบิก / รุ่นที่ซ่อม)
         $daily = work_summary_person_items($pid, (string) $cycle['from'], (string) $cycle['to']);
+        // payload เก็บลง DB ด้วย จึงส่งเฉพาะข้อความที่ Flex ใช้จริง ไม่ยัดรายการดิบทั้งก้อน
         $days = [];
         foreach ($daily['days'] as $d) {
-            $cats = [];
-            foreach ($d['cats'] as $c) {
-                $g = work_summary_group_names($c['groups'], WORK_SUMMARY_SEND_GROUPS);
-                $cats[] = [
-                    // key ไปบอกฝั่ง Flex ว่าจะหารูปจากตารางไหน (อะไหล่ ≠ รุ่นเครื่อง)
-                    'key'   => (string) $c['key'],
-                    'label' => (string) $c['label'],
-                    'names' => $g['names'],
-                    'more'  => $g['more'],
-                ];
-            }
-            // payload เก็บลง DB ด้วย จึงส่งเฉพาะข้อความที่ Flex ใช้จริง ไม่ยัดรายการดิบทั้งก้อน
-            // date ใช้วาดปฏิทินในการ์ด ส่วน label ใช้เขียนหัววัน
-            $days[] = ['date' => (string) $d['date'], 'label' => (string) $d['label'], 'cats' => $cats];
+            $days[] = work_summary_send_day($d);
         }
 
         $payload = [
