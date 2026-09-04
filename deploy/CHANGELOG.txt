@@ -2695,3 +2695,75 @@ Files:
   finishgoogs_ma_update/includes/part_stock_bridge.php
   shared/ui_icons.php
 
+
+================================================================
+v2026-09-04_122132 | Patch | 2026-09-04 12:21:33
+From: 2026-09-04_094357  ->  To: 25df9c1  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-09-04_124645 | Patch | 2026-09-04 12:46:47
+From: 2026-09-04_094357  ->  To: e014e69  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-09-04_125745 | Patch | 2026-09-04 12:57:46
+From: 2026-09-04_094357  ->  To: 9d6b256  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-09-04_130051 | Patch | 2026-09-04 13:00:53
+From: 2026-09-04_094357  ->  To: 397f105  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/dashboard_chart.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-09-04_131646 | Patch | 2026-09-04 13:16:48
+From: 2026-09-04_094357  ->  To: 2b64aec  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/dashboard_chart.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-09-04_132216 | Patch | 2026-09-04 13:22:18
+From: 2026-09-04_094357  ->  To: dc10d0e  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/dashboard_chart.php
+  finishgoogs_ma_update/index.php
+
