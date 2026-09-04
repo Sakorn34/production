@@ -2965,3 +2965,13 @@ Files:
   finishgoogs_ma_update/work_report.php
   shared/line_notify_core.php
 
+
+================================================================
+v2026-09-04_232036 | Patch | 2026-09-04 23:20:37
+From: 2026-09-04_224909  ->  To: 7cf52f8  |  Files: 2
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/work_report.php
+
