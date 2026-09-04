@@ -2,101 +2,111 @@
 /**
  * shared/line_flex_work_summary.php — Flex สรุปงานรายคนต่อรอบเดือน
  *
- * ส่งเข้าไลน์ส่วนตัวของแต่ละคน ว่ารอบ 21 เดือนก่อน–20 เดือนนี้ เขาบันทึกอะไรไปบ้าง
- * ทุกระบบรวมกัน · วัดจากข้อมูลจริงแล้วคนหนึ่งมีงานหลักร้อยรายการต่อรอบ จึงสรุปเป็น
- * ตัวเลขต่อหมวด ไม่ลิสต์ทีละงาน
+ * ส่งเข้าไลน์ส่วนตัวของแต่ละคน ว่ารอบ 21 เดือนก่อน–20 เดือนนี้ เขาทำอะไรไปบ้าง
+ * **แยกเป็นรายวัน** — เจ้าตัวอยากรู้ว่า "วันไหนทำอะไร" ไม่ใช่ยอดรวมทั้งรอบเฉย ๆ
+ *
+ * หนึ่งคนทำงานราว 16–20 วันต่อรอบ ใส่บับเบิลเดียวจะยาวเกินที่ LINE รับไหว จึงหั่นเป็น
+ * carousel บับเบิลละ WORK_SUMMARY_FLEX_DAYS_PER_BUBBLE วัน
  */
 
+/** จำนวนวันต่อบับเบิล — 8 วันคือความยาวที่ยังเลื่อนอ่านในแชทได้สบาย */
+const WORK_SUMMARY_FLEX_DAYS_PER_BUBBLE = 8;
+
+/** LINE รับ carousel ได้สูงสุด 12 บับเบิล */
+const WORK_SUMMARY_FLEX_MAX_BUBBLES = 12;
+
 /**
- * แถวหมวดงาน — ชื่อหมวดซ้าย จำนวนขวา พร้อมแถบสัดส่วนบาง ๆ ให้เห็นว่าหมวดไหนหนัก
+ * แถวของหนึ่งวัน — หัวแถวเป็นวันที่ + ยอดรวมวันนั้น ใต้ลงมาเป็นงานที่ทำ
  *
- * @param  array<string,mixed> $item  ['label'=>..,'count'=>..]
- * @param  int                 $max   จำนวนของหมวดที่เยอะสุด (ไว้คิดความยาวแถบ)
- * @return array<string,mixed>
+ * @param  array<string,mixed> $day   ['label'=>..,'total'=>..,'items'=>[['label'=>..,'count'=>..]]]
+ * @param  bool                $first แถวแรกของบับเบิลไม่ต้องมีเส้นคั่นข้างบน
+ * @return array<int,array<string,mixed>>
  */
-function line_flex_work_summary_row(array $item, int $max): array
+function line_flex_work_summary_day(array $day, bool $first): array
 {
-    $count = (int) ($item['count'] ?? 0);
-    $pct = $max > 0 ? max(4, (int) round($count / $max * 100)) : 4;
-    return [
+    $bits = [];
+    foreach ((isset($day['items']) && is_array($day['items']) ? $day['items'] : []) as $it) {
+        $bits[] = (string) ($it['label'] ?? '-') . ' ' . number_format((int) ($it['count'] ?? 0));
+    }
+    $out = [];
+    if (!$first) {
+        $out[] = ['type' => 'separator', 'margin' => 'md', 'color' => '#eef2f7'];
+    }
+    $out[] = [
         'type' => 'box', 'layout' => 'vertical', 'margin' => 'md', 'spacing' => 'xs',
         'contents' => [
             [
                 'type' => 'box', 'layout' => 'horizontal',
                 'contents' => [
-                    ['type' => 'text', 'text' => line_flex_text((string) ($item['label'] ?? '-'), 40),
-                     'size' => 'sm', 'color' => '#333333', 'flex' => 7, 'wrap' => true],
-                    ['type' => 'text', 'text' => number_format($count), 'size' => 'sm', 'weight' => 'bold',
-                     'color' => '#0057b8', 'flex' => 3, 'align' => 'end'],
+                    ['type' => 'text', 'text' => line_flex_text((string) ($day['label'] ?? '-'), 24),
+                     'size' => 'sm', 'weight' => 'bold', 'color' => '#0057b8', 'flex' => 0],
+                    ['type' => 'text', 'text' => number_format((int) ($day['total'] ?? 0)) . ' รายการ',
+                     'size' => 'xs', 'color' => '#999999', 'align' => 'end'],
                 ],
             ],
-            [
-                'type' => 'box', 'layout' => 'vertical', 'height' => '5px',
-                'backgroundColor' => '#eef2f7', 'cornerRadius' => '3px',
-                'contents' => [[
-                    'type' => 'box', 'layout' => 'vertical', 'height' => '5px',
-                    'width' => $pct . '%', 'backgroundColor' => '#4a90d9', 'cornerRadius' => '3px',
-                    'contents' => [['type' => 'filler']],
-                ]],
-            ],
+            ['type' => 'text', 'text' => line_flex_text(implode('  ·  ', $bits), 300),
+             'size' => 'sm', 'color' => '#333333', 'wrap' => true],
         ],
     ];
+    return $out;
 }
 
 /**
- * บับเบิลสรุปของคนหนึ่ง
+ * บับเบิลหนึ่งใบ (วันชุดหนึ่ง)
  *
- * @param  array<string,mixed> $p payload จาก work_summary_send_cycle()
+ * @param  array<string,mixed>              $p     payload
+ * @param  array<int,array<string,mixed>>   $days  วันของบับเบิลนี้
+ * @param  int                              $page  หน้าที่เท่าไหร่ (เริ่มที่ 1)
+ * @param  int                              $pages ทั้งหมดกี่หน้า
  * @return array<string,mixed>
  */
-function line_flex_work_summary_bubble(array $p): array
+function line_flex_work_summary_bubble(array $p, array $days, int $page, int $pages): array
 {
-    $items = isset($p['items']) && is_array($p['items']) ? $p['items'] : [];
-    $max = 0;
-    foreach ($items as $it) {
-        $max = max($max, (int) ($it['count'] ?? 0));
-    }
-    // จำกัดจำนวนแถวกัน bubble ยาวเกินที่ LINE รับไหว — ที่เหลือยุบเป็นบรรทัดเดียว
-    $showLimit = 8;
-    $rows = [];
-    foreach (array_slice($items, 0, $showLimit) as $it) {
-        $rows[] = line_flex_work_summary_row($it, $max);
-    }
-    $rest = count($items) - $showLimit;
-    if ($rest > 0) {
-        $restSum = 0;
-        foreach (array_slice($items, $showLimit) as $it) {
-            $restSum += (int) ($it['count'] ?? 0);
-        }
-        $rows[] = ['type' => 'text', 'margin' => 'md', 'size' => 'xs', 'color' => '#888888',
-                   'text' => 'และอีก ' . $rest . ' หมวด รวม ' . number_format($restSum) . ' รายการ'];
-    }
-    if (!$rows) {
-        $rows[] = ['type' => 'text', 'text' => 'ไม่มีงานที่บันทึกในรอบนี้', 'size' => 'sm', 'color' => '#888888', 'margin' => 'md'];
-    }
-
-    $body = array_merge([
-        ['type' => 'text', 'text' => line_flex_text((string) ($p['person_name'] ?? '-'), 60),
-         'size' => 'lg', 'weight' => 'bold', 'color' => '#111111'],
-        ['type' => 'text', 'text' => line_flex_text((string) ($p['cycle_label'] ?? ''), 60),
-         'size' => 'xs', 'color' => '#888888', 'margin' => 'xs'],
-        [
+    $body = [];
+    if ($page === 1) {
+        $body[] = ['type' => 'text', 'text' => line_flex_text((string) ($p['person_name'] ?? '-'), 60),
+                   'size' => 'lg', 'weight' => 'bold', 'color' => '#111111'];
+        $body[] = ['type' => 'text', 'text' => line_flex_text((string) ($p['cycle_label'] ?? ''), 60),
+                   'size' => 'xs', 'color' => '#888888', 'margin' => 'xs'];
+        $body[] = [
             'type' => 'box', 'layout' => 'baseline', 'margin' => 'lg',
             'contents' => [
                 ['type' => 'text', 'text' => number_format((int) ($p['total'] ?? 0)),
                  'size' => 'xxl', 'weight' => 'bold', 'color' => '#0057b8', 'flex' => 0],
-                ['type' => 'text', 'text' => '  รายการ', 'size' => 'sm', 'color' => '#888888'],
+                ['type' => 'text', 'size' => 'sm', 'color' => '#888888',
+                 'text' => '  รายการ · ' . number_format((int) ($p['day_count'] ?? count($days))) . ' วัน'],
             ],
-        ],
-        ['type' => 'separator', 'margin' => 'lg'],
-    ], $rows, [line_flex_system_branding()]);
+        ];
+        $body[] = ['type' => 'separator', 'margin' => 'lg'];
+    } else {
+        $body[] = ['type' => 'text', 'text' => line_flex_text((string) ($p['person_name'] ?? '-'), 60) . ' (ต่อ)',
+                   'size' => 'sm', 'weight' => 'bold', 'color' => '#111111'];
+        $body[] = ['type' => 'separator', 'margin' => 'md'];
+    }
 
+    if (!$days) {
+        $body[] = ['type' => 'text', 'text' => 'ไม่มีงานที่บันทึกในรอบนี้',
+                   'size' => 'sm', 'color' => '#888888', 'margin' => 'md'];
+    }
+    $first = true;
+    foreach ($days as $day) {
+        foreach (line_flex_work_summary_day($day, $first) as $node) {
+            $body[] = $node;
+        }
+        $first = false;
+    }
+    $body[] = line_flex_system_branding();
+
+    $title = '📋 สรุปงานของคุณรอบนี้';
+    if ($pages > 1) {
+        $title .= '  (' . $page . '/' . $pages . ')';
+    }
     $bubble = [
         'type' => 'bubble',
         'header' => [
             'type' => 'box', 'layout' => 'vertical', 'backgroundColor' => '#0057b8', 'paddingAll' => '12px',
             'contents' => [[
-                'type' => 'text', 'text' => '📋 สรุปงานของคุณรอบนี้',
+                'type' => 'text', 'text' => $title,
                 'color' => '#ffffff', 'size' => 'sm', 'weight' => 'bold',
             ]],
         ],
@@ -138,10 +148,27 @@ function line_flex_sanitize_uri_or_empty(string $uri): string
  */
 function line_flex_work_summary_messages(array $payload): array
 {
+    $days = isset($payload['days']) && is_array($payload['days']) ? array_values($payload['days']) : [];
+    $chunks = $days ? array_chunk($days, WORK_SUMMARY_FLEX_DAYS_PER_BUBBLE) : [[]];
+    if (count($chunks) > WORK_SUMMARY_FLEX_MAX_BUBBLES) {
+        $chunks = array_slice($chunks, 0, WORK_SUMMARY_FLEX_MAX_BUBBLES);
+    }
+    $pages = count($chunks);
+
+    $bubbles = [];
+    foreach ($chunks as $i => $chunk) {
+        $bubbles[] = line_flex_work_summary_bubble($payload, $chunk, $i + 1, $pages);
+    }
+
+    $alt = 'สรุปงานรอบ ' . (string) ($payload['cycle_label'] ?? '') . ' — '
+         . number_format((int) ($payload['total'] ?? 0)) . ' รายการ ใน '
+         . number_format(count($days)) . ' วัน';
+
     return [[
-        'type' => 'flex',
-        'altText' => 'สรุปงานรอบ ' . (string) ($payload['cycle_label'] ?? '') . ' — '
-                     . number_format((int) ($payload['total'] ?? 0)) . ' รายการ',
-        'contents' => line_flex_work_summary_bubble($payload),
+        'type'     => 'flex',
+        'altText'  => $alt,
+        'contents' => $pages > 1
+            ? ['type' => 'carousel', 'contents' => $bubbles]
+            : $bubbles[0],
     ]];
 }

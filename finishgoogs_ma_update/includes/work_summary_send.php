@@ -27,8 +27,6 @@ function work_summary_send_cycle(array $cycle, ?int $onlyPerson = null, bool $fo
         $out['errors'] = $summary['errors'];
         return $out;
     }
-    $cats = work_summary_categories();
-
     // งานรายคนของรอบนี้ (คนที่ไม่มีงานเลยจะไม่อยู่ใน rows)
     $work = [];
     foreach ($summary['rows'] as $row) {
@@ -45,14 +43,17 @@ function work_summary_send_cycle(array $cycle, ?int $onlyPerson = null, bool $fo
             continue;
         }
         $row = $work[$pid];
-        $items = [];
-        foreach ($row['counts'] as $key => $n) {
-            if ($n > 0) {
-                $items[] = ['label' => (string) ($cats[$key] ?? $key), 'count' => (int) $n];
+        // เจ้าตัวอยากรู้ว่า "วันไหนทำอะไร" ไม่ใช่ยอดรวมทั้งรอบ — ส่งเป็นไทม์ไลน์รายวัน
+        $daily = work_summary_person_daily($pid, (string) $cycle['from'], (string) $cycle['to']);
+        $days = [];
+        foreach ($daily['days'] as $d) {
+            $items = [];
+            foreach ($d['items'] as $it) {
+                $items[] = ['label' => (string) $it['label'], 'count' => (int) $it['count']];
             }
+            // payload เก็บลง DB ด้วย จึงตัดฟิลด์ที่ Flex ไม่ได้ใช้ทิ้ง
+            $days[] = ['label' => (string) $d['label'], 'total' => (int) $d['total'], 'items' => $items];
         }
-        // มากไปน้อย — คนอ่านสนใจว่าทำอะไรเยอะสุดก่อน
-        usort($items, function ($a, $b) { return $b['count'] <=> $a['count']; });
 
         $payload = [
             'person_name' => (string) $row['name'],
@@ -61,8 +62,10 @@ function work_summary_send_cycle(array $cycle, ?int $onlyPerson = null, bool $fo
             'cycle_from'  => (string) $cycle['from'],
             'cycle_to'    => (string) $cycle['to'],
             'total'       => (int) $row['total'],
-            'items'       => $items,
-            'report_url'  => rtrim(line_notify_production_base_url(), '/') . '/work_report.php?c=' . rawurlencode((string) $cycle['to']),
+            'day_count'   => count($days),
+            'days'        => $days,
+            'report_url'  => rtrim(line_notify_production_base_url(), '/') . '/work_report.php?c='
+                             . rawurlencode((string) $cycle['to']) . '&p=' . $pid,
         ];
 
         $id = line_notify_dispatch('work.summary.monthly', $payload, [

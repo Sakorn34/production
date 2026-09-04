@@ -82,6 +82,23 @@ $people = work_people_all();
 $linked = array_filter($people, function ($p) { return !empty($p['line_user_id']); });
 $willSend = work_people_recipients();
 
+// ── รายละเอียดรายวันของคนที่กดเลือก (?p=) ───────────────────────────────────
+// ปุ่มใน Flex ที่ส่งเข้าไลน์ก็ลิงก์มาที่นี่ เจ้าตัวจะได้เห็นของตัวเองเต็ม ๆ ทันที
+$focusId = (int) (isset($_GET['p']) ? $_GET['p'] : 0);
+$focusName = '';
+$daily = null;
+if ($focusId > 0) {
+    foreach ($people as $p) {
+        if ((int) $p['id'] === $focusId) {
+            $focusName = (string) $p['display_name'];
+            break;
+        }
+    }
+    if ($focusName !== '') {
+        $daily = work_summary_person_daily($focusId, $cycle['from'], $cycle['to']);
+    }
+}
+
 page_header('สรุปงานรายคน', true, $cycle['label'] . ' · รวมงานจาก production · ซ่อม · เช่า');
 ?>
 <div class="wr-cyclebar">
@@ -102,6 +119,35 @@ page_header('สรุปงานรายคน', true, $cycle['label'] . ' ·
 <p class="muted wr-warn"><?= ui_icon_html('alert', 13) ?> ดึงข้อมูลบางส่วนไม่ได้: <?= h(implode(' · ', $summary['errors'])) ?> — ตัวเลขที่เห็นจึงยังไม่ครบทุกระบบ</p>
 <?php } ?>
 
+<?php if ($daily !== null) { ?>
+<div class="wr-detail">
+  <div class="wr-detail-head">
+    <b><?= h($focusName) ?></b>
+    <span class="muted"><?= h($cycle['label']) ?> · <?= number_format($daily['total']) ?> รายการ ·
+      <?= number_format(count($daily['days'])) ?> วันที่มีงาน</span>
+    <a class="btn btn-sm btn-line wr-detail-close"
+       href="<?= $B ?>/work_report.php?c=<?= h($cycle['to']) ?>">ปิดรายละเอียด</a>
+  </div>
+  <?php if (!$daily['days']) { ?>
+  <p class="muted wr-hint">ไม่มีงานที่บันทึกในรอบนี้</p>
+  <?php } else { ?>
+  <div class="table-wrap">
+  <table class="list wr-daily">
+    <tr><th>วันที่</th><th>งานที่ทำ</th><th class="wr-num">รวม</th></tr>
+    <?php foreach ($daily['days'] as $d) { ?>
+    <tr>
+      <td class="wr-day"><?= h($d['label']) ?></td>
+      <td><?php foreach ($d['items'] as $it) { ?><span class="wr-chip"><?= h($it['label']) ?>
+        <b><?= number_format($it['count']) ?></b></span><?php } ?></td>
+      <td class="wr-num"><b><?= number_format($d['total']) ?></b></td>
+    </tr>
+    <?php } ?>
+  </table>
+  </div>
+  <?php } ?>
+</div>
+<?php } ?>
+
 <?php if (!$summary['rows']) { ?>
 <p class="muted">ยังไม่มีงานที่บันทึกในรอบนี้</p>
 <?php } else { ?>
@@ -115,7 +161,8 @@ page_header('สรุปงานรายคน', true, $cycle['label'] . ' ·
   <?php foreach ($summary['rows'] as $p) { ?>
   <tr>
     <td>
-      <b><?= h($p['name']) ?></b>
+      <a class="wr-person" title="ดูว่าวันไหนทำอะไรบ้าง"
+         href="<?= $B ?>/work_report.php?c=<?= h($cycle['to']) ?>&amp;p=<?= (int) $p['id'] ?>"><?= h($p['name']) ?></a>
       <?php if ($p['line_user_id'] === '') { ?><span class="wr-tag wr-tag-off">ยังไม่ผูก LINE</span>
       <?php } elseif (!$p['notify']) { ?><span class="wr-tag wr-tag-mute">ปิดส่ง</span>
       <?php } else { ?><span class="wr-tag wr-tag-on">ส่ง</span><?php } ?>

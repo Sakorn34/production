@@ -202,7 +202,6 @@ function work_summary_for_cycle(string $from, string $to): array
     }
 
     $unmatched = [];
-    $errors = [];
     $totals = [];
 
     $bump = function (string $rawActor, string $catKey, int $n)
@@ -226,58 +225,10 @@ function work_summary_for_cycle(string $from, string $to): array
         }
     };
 
-    // ── production: วันที่เป็น datetime จริง เทียบด้วย >= / < วันถัดไป ──────────
-    foreach (work_summary_sources_production() as $src) {
-        $sql = "SELECT `{$src['actor']}` v, COUNT(*) c FROM `{$src['table']}`
-                WHERE `{$src['date']}` >= ? AND `{$src['date']}` < DATE_ADD(?, INTERVAL 1 DAY)
-                  AND `{$src['actor']}` IS NOT NULL AND TRIM(`{$src['actor']}`) <> ''"
-             . (isset($src['where']) ? ' AND ' . $src['where'] : '')
-             . ' GROUP BY v';
-        try {
-            $res = qr($sql, 'ss', [$from, $to]);
-            while ($row = $res->fetch_assoc()) {
-                $bump((string) $row['v'], $src['key'], (int) $row['c']);
-            }
-        } catch (\Throwable $e) {
-            $errors[] = $src['table'] . ': ' . $e->getMessage();
-        }
-    }
-
-    // ── ระบบซ่อม/เช่า: วันที่บางคอลัมน์เป็น varchar แต่เป็น ISO (YYYY-MM-DD)
-    //    เทียบสตริงตรง ๆ ได้ผลถูกเพราะ ISO เรียงตามพจนานุกรมเท่ากับเรียงตามเวลา
-    //    ค่าที่ไม่ใช่รูปแบบนี้ (ว่าง, '0000-00-00', '-') จะตกนอกช่วงไปเอง
-    $ext = [
-        [dbMaintenance(), work_summary_sources_maintenance(), 'ระบบซ่อม'],
-        [dbLeasing(),     work_summary_sources_leasing(),     'ระบบเช่า'],
-    ];
-    foreach ($ext as $spec) {
-        list($conn, $sources, $label) = $spec;
-        if (!$conn) {
-            $errors[] = $label . ': เชื่อมต่อไม่ได้';
-            continue;
-        }
-        foreach ($sources as $src) {
-            $sql = "SELECT `{$src['actor']}` v, COUNT(*) c FROM `{$src['table']}`
-                    WHERE `{$src['date']}` >= ? AND `{$src['date']}` <= ?
-                      AND `{$src['actor']}` IS NOT NULL AND TRIM(`{$src['actor']}`) <> ''
-                    GROUP BY v";
-            try {
-                $st = $conn->prepare($sql);
-                if (!$st) {
-                    $errors[] = $label . ' ' . $src['table'] . ': prepare ไม่ผ่าน';
-                    continue;
-                }
-                $st->bind_param('ss', $from, $to);
-                $st->execute();
-                $res = $st->get_result();
-                while ($row = $res->fetch_assoc()) {
-                    $bump((string) $row['v'], $src['key'], (int) $row['c']);
-                }
-                $st->close();
-            } catch (\Throwable $e) {
-                $errors[] = $label . ' ' . $src['table'] . ': ' . $e->getMessage();
-            }
-        }
+    $collected = work_summary_collect($from, $to, false);
+    $errors = $collected['errors'];
+    foreach ($collected['rows'] as $r) {
+        $bump($r['actor'], $r['cat'], $r['n']);
     }
 
     $rows = array_values(array_filter($people, function ($p) {
@@ -289,4 +240,151 @@ function work_summary_for_cycle(string $from, string $to): array
     arsort($unmatched);
 
     return ['rows' => $rows, 'totals' => $totals, 'unmatched' => $unmatched, 'errors' => $errors];
+}
+
+/**
+ * ยิง query ทุกแหล่งของช่วงวันหนึ่ง แล้วคืนเป็นแถวดิบ (ยังไม่จับคู่กับทะเบียนคน)
+ *
+ * แยกออกมาเพราะทั้งสรุปรายรอบและสรุปรายวันใช้ query ชุดเดียวกัน ต่างแค่ GROUP BY
+ * วันที่หรือไม่ — เขียนซ้ำสองที่แล้วเงื่อนไข (เช่น การตัดแถว sync) จะหลุดกันเอง
+ *
+ * @param  string $from  Y-m-d
+ * @param  string $to    Y-m-d (รวมวันนี้)
+ * @param  bool   $byDay true = แยกรายวันด้วย
+ * @return array{rows:array<int,array{cat:string,actor:string,day:string,n:int}>,errors:array<int,string>}
+ */
+function work_summary_collect(string $from, string $to, bool $byDay): array
+{
+    $rows = [];
+    $errors = [];
+
+    // ── production: วันที่เป็น datetime จริง เทียบด้วย >= / < วันถัดไป ──────────
+    foreach (work_summary_sources_production() as $src) {
+        $sel = $byDay ? ", DATE(`{$src['date']}`) d" : '';
+        $sql = "SELECT `{$src['actor']}` v{$sel}, COUNT(*) c FROM `{$src['table']}`
+                WHERE `{$src['date']}` >= ? AND `{$src['date']}` < DATE_ADD(?, INTERVAL 1 DAY)
+                  AND `{$src['actor']}` IS NOT NULL AND TRIM(`{$src['actor']}`) <> ''"
+             . (isset($src['where']) ? ' AND ' . $src['where'] : '')
+             . ' GROUP BY v' . ($byDay ? ', d' : '');
+        try {
+            $res = qr($sql, 'ss', [$from, $to]);
+            while ($row = $res->fetch_assoc()) {
+                $rows[] = ['cat' => $src['key'], 'actor' => (string) $row['v'],
+                           'day' => $byDay ? (string) $row['d'] : '', 'n' => (int) $row['c']];
+            }
+        } catch (\Throwable $e) {
+            $errors[] = $src['table'] . ': ' . $e->getMessage();
+        }
+    }
+
+    // ── ระบบซ่อม/เช่า: วันที่บางคอลัมน์เป็น varchar แต่เป็น ISO (YYYY-MM-DD)
+    //    เทียบสตริงตรง ๆ ได้ผลถูกเพราะ ISO เรียงตามพจนานุกรมเท่ากับเรียงตามเวลา
+    //    ค่าที่ไม่ใช่รูปแบบนี้ (ว่าง, '0000-00-00', '-') จะตกนอกช่วงไปเอง
+    //    LEFT(...,10) ตัดส่วนเวลาทิ้ง ใช้ได้ทั้งคอลัมน์ varchar และ datetime
+    $ext = [
+        [dbMaintenance(), work_summary_sources_maintenance(), 'ระบบซ่อม'],
+        [dbLeasing(),     work_summary_sources_leasing(),     'ระบบเช่า'],
+    ];
+    foreach ($ext as $spec) {
+        list($conn, $sources, $label) = $spec;
+        if (!$conn) {
+            $errors[] = $label . ': เชื่อมต่อไม่ได้';
+            continue;
+        }
+        foreach ($sources as $src) {
+            $sel = $byDay ? ", LEFT(`{$src['date']}`, 10) d" : '';
+            $sql = "SELECT `{$src['actor']}` v{$sel}, COUNT(*) c FROM `{$src['table']}`
+                    WHERE `{$src['date']}` >= ? AND `{$src['date']}` <= ?
+                      AND `{$src['actor']}` IS NOT NULL AND TRIM(`{$src['actor']}`) <> ''
+                    GROUP BY v" . ($byDay ? ', d' : '');
+            try {
+                $st = $conn->prepare($sql);
+                if (!$st) {
+                    $errors[] = $label . ' ' . $src['table'] . ': prepare ไม่ผ่าน';
+                    continue;
+                }
+                $st->bind_param('ss', $from, $to);
+                $st->execute();
+                $res = $st->get_result();
+                while ($row = $res->fetch_assoc()) {
+                    $rows[] = ['cat' => $src['key'], 'actor' => (string) $row['v'],
+                               'day' => $byDay ? (string) $row['d'] : '', 'n' => (int) $row['c']];
+                }
+                $st->close();
+            } catch (\Throwable $e) {
+                $errors[] = $label . ' ' . $src['table'] . ': ' . $e->getMessage();
+            }
+        }
+    }
+
+    return ['rows' => $rows, 'errors' => $errors];
+}
+
+/**
+ * ป้ายวันแบบสั้นภาษาไทย — "พฤ 21 ส.ค."
+ *
+ * @param  string $ymd Y-m-d
+ * @return string
+ */
+function work_summary_day_label(string $ymd): string
+{
+    static $dow = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+    $ts = strtotime($ymd);
+    if ($ts === false) {
+        return $ymd;
+    }
+    return $dow[(int) date('w', $ts)] . ' ' . (int) date('j', $ts) . ' ' . thai_month_short(date('Y-m', $ts));
+}
+
+/**
+ * งานของคนหนึ่ง แยกรายวันตลอดรอบ — ใช้ทั้งใน Flex และหน้ารายละเอียดรายคน
+ *
+ * เรียงจากวันแรกของรอบไปวันท้าย และตัดวันที่ไม่มีงานออก (คนไม่ได้ทำงานทุกวัน
+ * การโชว์วันว่างเปล่ายาว ๆ ทำให้อ่านยากโดยไม่ได้ข้อมูลเพิ่ม)
+ *
+ * @param  int    $personId
+ * @param  string $from Y-m-d
+ * @param  string $to   Y-m-d
+ * @return array{days:array<int,array<string,mixed>>,total:int,errors:array<int,string>}
+ */
+function work_summary_person_daily(int $personId, string $from, string $to): array
+{
+    work_people_ensure_schema();
+    $aliasMap = work_people_alias_map();
+    $cats = work_summary_categories();
+    $collected = work_summary_collect($from, $to, true);
+
+    $byDay = [];
+    $total = 0;
+    foreach ($collected['rows'] as $r) {
+        $day = substr($r['day'], 0, 10);
+        if ($day === '') {
+            continue;
+        }
+        // ชื่อเดียวอาจมีหลายคนคั่นด้วย comma — นับให้ทุกคนในแถวนั้น เหมือนสรุปรายรอบ
+        foreach (work_people_split($r['actor']) as $name) {
+            $key = work_people_norm($name);
+            if ($key === '' || !isset($aliasMap[$key]) || $aliasMap[$key] !== $personId) {
+                continue;
+            }
+            $byDay[$day][$r['cat']] = ($byDay[$day][$r['cat']] ?? 0) + $r['n'];
+            $total += $r['n'];
+            break; // คนคนเดียวโผล่ซ้ำในแถวเดียวไม่ควรนับสองรอบ
+        }
+    }
+    ksort($byDay);
+
+    $days = [];
+    foreach ($byDay as $day => $counts) {
+        arsort($counts);
+        $items = [];
+        $dayTotal = 0;
+        foreach ($counts as $k => $n) {
+            $items[] = ['key' => $k, 'label' => (string) ($cats[$k] ?? $k), 'count' => (int) $n];
+            $dayTotal += (int) $n;
+        }
+        $days[] = ['date' => $day, 'label' => work_summary_day_label($day), 'total' => $dayTotal, 'items' => $items];
+    }
+
+    return ['days' => $days, 'total' => $total, 'errors' => $collected['errors']];
 }
