@@ -33,7 +33,7 @@ function app_base_url() {
 define('BASE_URL', app_base_url());
 define('APP_NAME', 'ระบบทะเบียนเครื่องและซ่อมบำรุง');
 /** รหัสชุด deploy — อัปเมื่อ build patch แล้วเทียบกับ server ว่าอัปครบหรือยัง */
-define('APP_RELEASE_VERSION', '2026-09-04_180950');
+define('APP_RELEASE_VERSION', '2026-09-04_181602');
 
 /**
  * โหลด secrets แบบ cache ต่อ request
@@ -626,6 +626,7 @@ function nav_default() {
         ['ma.php',         'ma',        'บันทึก MA',         true],
         ['parts.php',      'parts',     'อะไหล่',            true],
         ['repairs.php',    'repairs',   'ประวัติซ่อม',        true],
+        ['work_report.php','chart',     'สรุปงานรายคน',      true],
         ['scan.php',       'scan',      'สแกน QR',           true],
         ['settings.php',   'settings',  'ระบบหลังบ้าน',      true],
     ];
