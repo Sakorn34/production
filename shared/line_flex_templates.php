@@ -119,6 +119,57 @@ function line_flex_product_icon_map(): array
 }
 
 /**
+ * ชื่ออะไหล่ → ไฟล์รูป (ตาราง parts คนละตารางกับรุ่นสินค้า)
+ *
+ * รายการในหมวด "เบิกอะไหล่" เป็นชื่ออะไหล่ ไม่ใช่ชื่อรุ่นเครื่อง ถ้าเอาไปหาใน
+ * products จะไม่เจอแล้วตกไปใช้รูปแทนทั้งหมด — คนอ่านเห็นรูปไม่ตรงของ
+ *
+ * @return array<string,string> key = ชื่อตัวพิมพ์เล็ก
+ */
+function line_flex_part_icon_map(): array
+{
+    static $map = null;
+    if ($map !== null) {
+        return $map;
+    }
+    $map = [];
+    if (!function_exists('db')) {
+        return $map;
+    }
+    try {
+        $res = db()->query("SELECT name, icon_path FROM parts WHERE icon_path IS NOT NULL AND icon_path <> ''");
+        if ($res) {
+            while ($row = $res->fetch_assoc()) {
+                $name = trim((string) $row['name']);
+                if ($name !== '') {
+                    $map[mb_strtolower($name, 'UTF-8')] = (string) $row['icon_path'];
+                }
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('line_flex_part_icon_map failed: ' . $e->getMessage());
+    }
+    return $map;
+}
+
+/**
+ * URL รูปของอะไหล่สำหรับ LINE Flex — ไม่เจอก็คืนว่าง ให้ผู้เรียกตัดสินใจเอง
+ *
+ * @param  string $partName
+ * @return string
+ */
+function line_flex_part_image(string $partName): string
+{
+    $key = mb_strtolower(trim($partName), 'UTF-8');
+    $map = line_flex_part_icon_map();
+    if ($key === '' || !isset($map[$key]) || !function_exists('img_url')) {
+        return '';
+    }
+    $url = line_notify_normalize_public_url((string) img_url($map[$key]), '');
+    return preg_match('#^https://#i', $url) ? $url : '';
+}
+
+/**
  * URL รูปของรุ่นสินค้าสำหรับ LINE Flex — ใช้รูปบนเซิร์ฟเวอร์เราเท่านั้น
  *
  * ลำดับ: รูปที่อัปไว้กับรุ่นสินค้า → รูปแทนบนเซิร์ฟเวอร์

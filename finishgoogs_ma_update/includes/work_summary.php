@@ -676,3 +676,42 @@ function work_summary_fill_asset_ids(array &$rows): void
         }
     }
 }
+
+/**
+ * ตารางปฏิทินของรอบ — แถวละ 7 ช่อง เริ่มวันอาทิตย์
+ *
+ * ช่องที่อยู่นอกรอบเป็น null (เว้นว่างไว้) รอบนี้คร่อมสองเดือนจึงใช้ปฏิทินเดือนเดียวไม่ได้
+ * หน้าเว็บกับการ์ดในไลน์วางตารางเหมือนกัน คนอ่านจะได้เห็นภาพเดียวกันทั้งสองที่
+ *
+ * @param  string $from Y-m-d
+ * @param  string $to   Y-m-d
+ * @return array<int,array<int,?string>>
+ */
+function work_summary_calendar_weeks(string $from, string $to): array
+{
+    $fromTs = strtotime($from);
+    $toTs = strtotime($to);
+    if ($fromTs === false || $toTs === false || $toTs < $fromTs) {
+        return [];
+    }
+    $cur = strtotime('-' . (int) date('w', $fromTs) . ' day', $fromTs);
+    $weeks = [];
+    $week = [];
+    $guard = 0;
+    while ($cur <= $toTs && $guard++ < 70) {
+        $ymd = date('Y-m-d', $cur);
+        $week[] = ($ymd >= $from && $ymd <= $to) ? $ymd : null;
+        if (count($week) === 7) {
+            $weeks[] = $week;
+            $week = [];
+        }
+        $cur = strtotime('+1 day', $cur);
+    }
+    if ($week) {
+        while (count($week) < 7) {
+            $week[] = null;
+        }
+        $weeks[] = $week;
+    }
+    return $weeks;
+}

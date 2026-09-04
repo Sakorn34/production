@@ -94,13 +94,16 @@ function work_summary_send_cycle(array $cycle, ?int $onlyPerson = null, bool $fo
             foreach ($d['cats'] as $c) {
                 $g = work_summary_group_names($c['groups'], WORK_SUMMARY_SEND_GROUPS);
                 $cats[] = [
+                    // key ไปบอกฝั่ง Flex ว่าจะหารูปจากตารางไหน (อะไหล่ ≠ รุ่นเครื่อง)
+                    'key'   => (string) $c['key'],
                     'label' => (string) $c['label'],
                     'names' => $g['names'],
                     'more'  => $g['more'],
                 ];
             }
             // payload เก็บลง DB ด้วย จึงส่งเฉพาะข้อความที่ Flex ใช้จริง ไม่ยัดรายการดิบทั้งก้อน
-            $days[] = ['label' => (string) $d['label'], 'cats' => $cats];
+            // date ใช้วาดปฏิทินในการ์ด ส่วน label ใช้เขียนหัววัน
+            $days[] = ['date' => (string) $d['date'], 'label' => (string) $d['label'], 'cats' => $cats];
         }
 
         $payload = [
