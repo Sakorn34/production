@@ -257,6 +257,8 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
 .ln-form-help { font-size: calc(12.5px * var(--font-scale, 1)); margin: 0 0 10px; line-height: 1.5; }
 
+.ln-hint { font-size: calc(12px * var(--font-scale, 1)); line-height: 1.45; }
+
 .ln-types .tbl { width: 100%; border-collapse: collapse; font-size: calc(13px * var(--font-scale, 1)); }
 
 .ln-types .tbl th { background: #eef1f6; text-align: left; padding: 8px 10px; font-size: calc(13px * var(--font-scale, 1)); color: var(--text-muted, #45506a); font-weight: 600; white-space: nowrap; border-bottom: 1px solid var(--border, #dfe4ec); }
@@ -604,134 +606,88 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
 
 <form method="post" class="panel ln-form" style="margin-bottom:16px">
-
   <?= csrf_field() ?>
-
   <input type="hidden" name="action" value="save">
 
-
-
-  <h3>การเชื่อมต่อ LINE</h3>
-
-
-
-  <div class="ln-form-field">
-
-    <label for="line_secrets_path">Path ไฟล์ line.secrets.php</label>
-
-    <input type="text" id="line_secrets_path" name="line_secrets_path" value="<?= h($form['line_secrets_path']) ?>" required>
-
-  </div>
-
-
-
   <?php if (function_exists('line_notify_test_mode') && line_notify_test_mode()) { ?>
-
   <div class="ln-testmode-on">
-
     <b>โหมดทดสอบเปิดอยู่</b> — แจ้งเตือนทุกอย่างรวมทั้งงานตามเวลาถูกส่งเข้าห้องทดสอบ กลุ่มจริงจะไม่ได้รับ
-
   </div>
-
   <?php } ?>
 
+  <?php // แยกเป็นหมวดตาม "ของใคร/ใช้ทำอะไร" — เดิมกอง token ของ bot สองตัว, URL ของเว็บ
+        // และ token ของระบบอื่นไว้ในลิสต์เดียวกัน หาแล้วไม่รู้ว่าช่องไหนของอะไร ?>
+  <h3>ตั้งค่าระบบ</h3>
+  <div class="ln-form-field">
+    <label for="line_secrets_path">Path ไฟล์ line.secrets.php</label>
+    <input type="text" id="line_secrets_path" name="line_secrets_path" value="<?= h($form['line_secrets_path']) ?>" required>
+  </div>
   <label class="ln-form-check">
-
     <input type="checkbox" name="line_enabled" value="1" <?= !empty($form['enabled']) ? 'checked' : '' ?>>
-
     <span>เปิดใช้งานแจ้งเตือน LINE</span>
-
   </label>
 
-  <label class="ln-form-check">
-
-    <input type="checkbox" name="test_mode" value="1" <?= !empty($form['test_mode']) ? 'checked' : '' ?>>
-
-    <span>โหมดทดสอบ — ส่งเข้าห้องทดสอบแทนกลุ่มจริงทั้งหมด</span>
-
-  </label>
-
-
-
+  <h3 class="ln-form-section">bot ตัวจริง — ส่งเข้ากลุ่ม</h3>
+  <p class="muted ln-form-help">ใช้ส่งแจ้งเตือนทุกประเภทเข้ากลุ่มงาน · ไม่ได้เปิด webhook</p>
   <div class="ln-form-grid">
-
     <label>Channel Access Token
-
       <input type="password" name="channel_access_token" value="<?= !empty($form['has_token']) ? h($tokenPh) : '' ?>" placeholder="วาง token ใหม่ หรือเว้นว่างถ้าไม่เปลี่ยน" autocomplete="off">
-
     </label>
-
     <label>Channel Secret
-
       <input type="password" name="channel_secret" value="<?= !empty($form['has_secret']) ? h($tokenPh) : '' ?>" placeholder="ไม่บังคับ" autocomplete="off">
-
-      <span class="muted" style="font-size:12px">bot ตัวจริงส่งเข้ากลุ่มอย่างเดียว ไม่ได้ใช้ webhook
-        — การผูกไลน์รายคนย้ายไปใช้ Channel Secret ของ bot สำรองด้านล่างแล้ว</span>
-
+      <span class="muted ln-hint">ไม่ได้ใช้ — การผูกไลน์รายคนใช้ Channel Secret ของ bot สำรองแทน</span>
     </label>
-
     <label>Group / User ID ผู้รับหลัก
-
       <input type="text" name="default_recipient_id" value="<?= h($form['default_recipient_id']) ?>" placeholder="Cxxxxxxxx..." required>
-
     </label>
-
-    <label>โดเมนสาธารณะของเว็บ (สำหรับรูปใน LINE)
-
-      <input type="url" name="public_site_host" value="<?= h($form['public_site_host']) ?>" placeholder="https://example.com — ต้องเป็น https ไม่งั้นรูปที่อัปเองจะไม่ขึ้น">
-
-    </label>
-
-    <label>URL Production (deep link)
-
-      <input type="url" name="public_production_url" value="<?= h($form['public_production_url']) ?>" placeholder="https://.../finishgoogs_ma_update">
-
-    </label>
-
-    <label>URL Parts (deep link)
-
-      <input type="url" name="public_parts_url" value="<?= h($form['public_parts_url']) ?>" placeholder="https://.../parts">
-
-    </label>
-
-    <label>URL API สินค้าที่ต้องผลิตเพิ่ม
-
-      <input type="url" name="finishgood_shortage_api_url" value="<?= h($form['finishgood_shortage_api_url']) ?>" placeholder="เว้นว่าง = ใช้ค่าตั้งต้นของระบบ">
-
-    </label>
-
-    <label>Token API สินค้าที่ต้องผลิตเพิ่ม
-
-      <input type="password" name="finishgood_shortage_api_token" value="<?= !empty($form['has_shortage_token']) ? h($tokenPh) : '' ?>" placeholder="ต้องตรงกับ FINISHGOOD_SHORTAGE_API_TOKEN ฝั่ง setupsystem" autocomplete="off">
-
-    </label>
-
-    <label>Channel Access Token (bot สำรอง)
-
-      <input type="password" name="test_channel_access_token" value="<?= !empty($form['has_test_token']) ? h($tokenPh) : '' ?>" placeholder="ของ bot อีกตัวที่ใช้ส่งหาไลน์ส่วนตัว" autocomplete="off">
-
-      <span class="muted" style="font-size:12px">bot สำรองทำ 2 หน้าที่ — ห้องปลายทางตอนเปิดโหมดทดสอบ
-        และเป็นตัวส่ง "สรุปงานรายคน" เข้าไลน์ส่วนตัวเสมอ เพราะ bot ตัวจริงใช้ในกลุ่มอย่างเดียว</span>
-
-    </label>
-
-    <label>Channel Secret (bot สำรอง)
-
-      <input type="password" name="test_channel_secret" value="<?= !empty($form['has_test_secret']) ? h($tokenPh) : '' ?>" placeholder="ต้องใส่ถ้าจะให้พนักงานผูกไลน์เอง" autocomplete="off">
-
-      <span class="muted" style="font-size:12px">ใช้ตรวจลายเซ็น webhook ตอนพนักงานทักรหัสมาผูกไลน์
-        — Webhook URL ต้องตั้งที่ channel ของ bot สำรอง ไม่ใช่ตัวจริง</span>
-
-    </label>
-
-    <label>Group / User ID ห้องทดสอบ
-
-      <input type="text" name="test_recipient_id" value="<?= h($form['test_recipient_id']) ?>" placeholder="ห้องที่ bot สำรองอยู่">
-
-    </label>
-
   </div>
 
+  <h3 class="ln-form-section">bot สำรอง — ส่งหาไลน์ส่วนตัว</h3>
+  <p class="muted ln-form-help">ทำ 2 หน้าที่ — ส่ง "สรุปงานรายคน" เข้าไลน์ส่วนตัวเสมอ (bot ตัวจริงใช้ในกลุ่มอย่างเดียว)
+    และเป็นห้องปลายทางตอนเปิดโหมดทดสอบ</p>
+  <div class="ln-form-grid">
+    <label>Channel Access Token
+      <input type="password" name="test_channel_access_token" value="<?= !empty($form['has_test_token']) ? h($tokenPh) : '' ?>" placeholder="ของ bot อีกตัวที่ใช้ส่งหาไลน์ส่วนตัว" autocomplete="off">
+    </label>
+    <label>Channel Secret
+      <input type="password" name="test_channel_secret" value="<?= !empty($form['has_test_secret']) ? h($tokenPh) : '' ?>" placeholder="ต้องใส่ถ้าจะให้พนักงานผูกไลน์เอง" autocomplete="off">
+      <span class="muted ln-hint">ใช้ตรวจลายเซ็น webhook ตอนพนักงานทักรหัสมาผูกไลน์
+        — Webhook URL ต้องตั้งที่ channel ของ bot สำรอง ไม่ใช่ตัวจริง</span>
+    </label>
+    <label>Group / User ID ห้องทดสอบ
+      <input type="text" name="test_recipient_id" value="<?= h($form['test_recipient_id']) ?>" placeholder="ห้องที่ bot สำรองอยู่">
+    </label>
+  </div>
+  <label class="ln-form-check">
+    <input type="checkbox" name="test_mode" value="1" <?= !empty($form['test_mode']) ? 'checked' : '' ?>>
+    <span>โหมดทดสอบ — ส่งเข้าห้องทดสอบแทนกลุ่มจริงทั้งหมด</span>
+  </label>
+
+  <h3 class="ln-form-section">ลิงก์และรูปในข้อความ</h3>
+  <p class="muted ln-form-help">งานตามเวลารันแบบ CLI ไม่มีชื่อโดเมนให้เดา ถ้าไม่ตั้งค่าตรงนี้
+    รูปที่อัปเองจะไม่ขึ้นและปุ่มในข้อความจะกดไม่ได้</p>
+  <div class="ln-form-grid">
+    <label>โดเมนสาธารณะของเว็บ (สำหรับรูปใน LINE)
+      <input type="url" name="public_site_host" value="<?= h($form['public_site_host']) ?>" placeholder="https://example.com — ต้องเป็น https ไม่งั้นรูปที่อัปเองจะไม่ขึ้น">
+    </label>
+    <label>URL Production (deep link)
+      <input type="url" name="public_production_url" value="<?= h($form['public_production_url']) ?>" placeholder="https://.../finishgoogs_ma_update">
+    </label>
+    <label>URL Parts (deep link)
+      <input type="url" name="public_parts_url" value="<?= h($form['public_parts_url']) ?>" placeholder="https://.../parts">
+    </label>
+  </div>
+
+  <h3 class="ln-form-section">เชื่อมต่อระบบอื่น</h3>
+  <p class="muted ln-form-help">ดึงยอดสินค้าที่ต้องผลิตเพิ่มมาจาก setupsystem — production ไม่ได้คำนวณเอง</p>
+  <div class="ln-form-grid">
+    <label>URL API สินค้าที่ต้องผลิตเพิ่ม
+      <input type="url" name="finishgood_shortage_api_url" value="<?= h($form['finishgood_shortage_api_url']) ?>" placeholder="เว้นว่าง = ใช้ค่าตั้งต้นของระบบ">
+    </label>
+    <label>Token API สินค้าที่ต้องผลิตเพิ่ม
+      <input type="password" name="finishgood_shortage_api_token" value="<?= !empty($form['has_shortage_token']) ? h($tokenPh) : '' ?>" placeholder="ต้องตรงกับ FINISHGOOD_SHORTAGE_API_TOKEN ฝั่ง setupsystem" autocomplete="off">
+    </label>
+  </div>
 
 
   <h3 class="ln-form-section">ประเภทแจ้งเตือน · วิธีส่ง · Plesk</h3>
