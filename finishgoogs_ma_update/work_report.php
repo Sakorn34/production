@@ -190,17 +190,23 @@ page_header('สรุปงานรายคน', true, $cycle['label'] . ' ·
     <td><b><?= h($p['display_name']) ?></b></td>
     <td class="muted wr-alias"><?= h((string) ($p['aliases'] ?? '')) ?></td>
     <td>
-      <?php if ($hasLine && !$linkedOk($p)) { ?>
+      <?php // สถานะการผูก กับรหัสที่ออกค้างไว้ เป็นคนละเรื่องกัน — คนที่ผูกกับ bot เดิม
+            // ก็ออกรหัสใหม่ได้ ต้องโชว์ทั้งคู่ ไม่ใช่ให้สถานะบังรหัสจนหาไม่เจอ
+            $pending = !empty($p['link_code'])
+                && strtotime((string) $p['link_code_expires_at']) > time();
+      if ($hasLine && !$linkedOk($p)) { ?>
         <span class="wr-tag wr-tag-mute">ผูกกับ bot เดิม</span>
-        <span class="muted">ต้องออกรหัสให้ผูกใหม่</span>
       <?php } elseif ($hasLine) { ?>
         <span class="wr-tag wr-tag-on">ผูกแล้ว</span>
         <?php if (!empty($p['line_display_name'])) { ?><span class="muted"><?= h($p['line_display_name']) ?></span><?php } ?>
-      <?php } elseif (!empty($p['link_code']) && strtotime((string) $p['link_code_expires_at']) > time()) { ?>
+      <?php } ?>
+      <?php if ($pending) { ?>
         <code class="wr-code"><?= h($p['link_code']) ?></code>
         <span class="muted">รอทักบอต · หมดอายุ <?= h(date('H:i', strtotime((string) $p['link_code_expires_at']))) ?></span>
-      <?php } else { ?>
+      <?php } elseif (!$hasLine) { ?>
         <span class="muted">ยังไม่ผูก</span>
+      <?php } elseif (!$linkedOk($p)) { ?>
+        <span class="muted">ต้องออกรหัสให้ผูกใหม่</span>
       <?php } ?>
     </td>
     <td class="wr-num">
