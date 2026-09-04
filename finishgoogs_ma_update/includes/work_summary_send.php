@@ -14,9 +14,10 @@ require_once dirname(__DIR__, 2) . '/shared/line_notify_core.php';
  *
  * @param  array<string,mixed> $cycle    จาก work_summary_cycle()
  * @param  int|null            $onlyPerson ส่งเฉพาะคนนี้ (ใช้ตอนกดส่งทดสอบ)
+ * @param  bool                $force      ข้าม dedup — สำหรับการกดส่งเองที่ต้องได้ส่งจริงทุกครั้ง
  * @return array{queued:int,skipped_no_line:int,skipped_no_work:int,dedup:int,errors:array<int,string>}
  */
-function work_summary_send_cycle(array $cycle, ?int $onlyPerson = null): array
+function work_summary_send_cycle(array $cycle, ?int $onlyPerson = null, bool $force = false): array
 {
     $out = ['queued' => 0, 'skipped_no_line' => 0, 'skipped_no_work' => 0, 'dedup' => 0, 'errors' => []];
 
@@ -69,6 +70,7 @@ function work_summary_send_cycle(array $cycle, ?int $onlyPerson = null): array
             // กันส่งซ้ำถ้า cron รันซ้ำรอบเดิม — ผูกกับคน+รอบ
             'dedup_key'    => 'work.summary.monthly:' . $pid . ':' . $cycle['key'],
             'dedup_ttl'    => 60 * 86400,
+            'skip_dedup'   => $force,
         ]);
         if ($id === null) {
             $out['dedup']++;

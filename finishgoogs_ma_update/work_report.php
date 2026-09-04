@@ -49,13 +49,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['send_summary'])) {
         require_once __DIR__ . '/includes/work_summary_send.php';
         $only = (int) ($_POST['only_person'] ?? 0);
-        $res = work_summary_send_cycle($cycle, $only > 0 ? $only : null);
+        // กดส่งทีละคน ("ส่งทดสอบ") = สั่งเอง ต้องได้ส่งจริงทุกครั้ง ไม่ให้ dedup บล็อก
+        $res = work_summary_send_cycle($cycle, $only > 0 ? $only : null, $only > 0);
+        // เข้าคิวแล้วต้องรีดคิวออกตรงนี้เลย ไม่งั้นข้อความค้างรอ worker รอบถัดไป
+        // (หน้าตั้งค่า LINE ก็ทำแบบเดียวกันหลังกดส่งทดสอบ)
+        $sent = line_notify_process_outbox(60);
         $msg = 'ส่งเข้าคิว ' . number_format($res['queued']) . ' คน';
+        if ($sent['sent'] > 0)   { $msg .= ' · ส่งถึงไลน์แล้ว ' . $sent['sent']; }
+        if ($sent['failed'] > 0) { $msg .= ' · ส่งไม่ผ่าน ' . $sent['failed'] . ' (ระบบจะลองใหม่ให้)'; }
+        if ($sent['dead'] > 0)   { $msg .= ' · ส่งไม่สำเร็จถาวร ' . $sent['dead'] . ' — ดูสาเหตุที่หน้าตั้งค่า LINE'; }
         if ($res['skipped_no_line'] > 0) { $msg .= ' · ข้าม (ยังไม่ผูก LINE) ' . $res['skipped_no_line']; }
         if ($res['skipped_no_work'] > 0) { $msg .= ' · ข้าม (ไม่มีงานในรอบ) ' . $res['skipped_no_work']; }
-        if ($res['dedup'] > 0) { $msg .= ' · เคยส่งรอบนี้แล้ว ' . $res['dedup']; }
+        if ($res['dedup'] > 0) {
+            $msg .= ' · เคยส่งรอบนี้แล้ว ' . $res['dedup'];
+            if ($res['queued'] === 0 && $sent['sent'] === 0) {
+                $msg .= ' — ถ้าต้องการส่งซ้ำ ใช้ปุ่ม "ส่งทดสอบ" รายคนในตารางด้านล่าง';
+            }
+        }
         if (!empty($res['errors'])) { $msg .= ' · ปัญหา: ' . implode(' | ', $res['errors']); }
-        flash_set($msg, empty($res['errors']) ? 'ok' : 'err');
+        flash_set($msg, (empty($res['errors']) && $sent['dead'] === 0) ? 'ok' : 'err');
         header('Location: ' . $back); exit;
     }
 }
