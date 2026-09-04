@@ -273,31 +273,60 @@ $partsBase = ui_parts_base_url();
 ?>
 <div class="kpi-grid">
   <?php
-  kpi($total, 'เครื่องทั้งหมด', 'assets', 'primary', '',
-      modal_js('เครื่องทั้งหมด — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=all", "$B/assets.php"), 'เครื่อง', '', false, false, "$B/assets.php");
-  kpi($byStatus['new'], 'ใหม่ (คลัง)', 'box', 'success', pct_label($byStatus['new'], $total) . ' ของทั้งหมด',
-      modal_js('เครื่องใหม่ — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=new", "$B/assets.php?status=new"), 'เครื่อง', '', false, false, "$B/assets.php?status=new");
-  // ไอคอนอาคาร สื่อว่าเครื่องอยู่ที่ลูกค้า — เดิมยืม 'updates' มาใช้ ซึ่งไม่เกี่ยวกัน
-  kpi($byStatus['rental'], 'เครื่องเช่า', 'customers', 'info', pct_label($byStatus['rental'], $total) . ' ของทั้งหมด',
-      modal_js('เครื่องเช่า — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=rental", "$B/assets.php?status=rental"), 'เครื่อง', '', false, false, "$B/assets.php?status=rental");
-  kpi($byStatus['sold'], 'ขายแล้ว', 'stock-out-set', 'primary', pct_label($byStatus['sold'], $total) . ' ของทั้งหมด',
-      modal_js('ขายแล้ว — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=sold", "$B/assets.php?status=sold"), 'เครื่อง', '', false, false, "$B/assets.php?status=sold");
-  kpi($byStatus['spare'], 'เครื่องสำรอง', 'box', 'warning',
-      pct_label($byStatus['spare'], $total) . ' ของทั้งหมด<br>คลังเครื่องสำรอง — ทดแทนเครื่องเช่า',
-      modal_js('เครื่องสำรอง — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=spare", "$B/assets.php?status=spare"), 'เครื่อง',
-      '', true, false, "$B/assets.php?status=spare");
-  // สองใบนี้ sync มาจากระบบเช่า (Asset Retirement / Lost) ไม่ได้ตั้งเองในระบบนี้
-  kpi($byStatus['retired'], 'เสื่อมสภาพ', 'status-replace', 'muted',
-      pct_label($byStatus['retired'], $total) . ' ของทั้งหมด<br>ปลดระวางจากระบบเช่าแล้ว',
-      modal_js('เสื่อมสภาพ — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=retired", "$B/assets.php?status=retired"), 'เครื่อง',
-      '', true, false, "$B/assets.php?status=retired");
-  kpi($byStatus['lost'], 'สูญหาย', 'alert', 'danger',
-      pct_label($byStatus['lost'], $total) . ' ของทั้งหมด<br>ระบบเช่าแจ้งสูญหาย',
-      modal_js('สูญหาย — รายรุ่น', "$B/dashboard_data.php?type=asset_models&st=lost", "$B/assets.php?status=lost"), 'เครื่อง',
-      '', true, false, "$B/assets.php?status=lost");
+  // การ์ดรวมสถานะเครื่อง — เดิมแยกเป็น 7 ใบ (ทั้งหมด + 6 สถานะ) กินพื้นที่ทั้งแถวแรก
+  // ทั้งที่ตัวเลขชุดเดียวกันมีอยู่แล้วในกราฟ "ภาพรวมการผลิตรายปี" ถัดลงไปแค่จอเดียว
+  // รวมเป็นใบเดียว ใช้สีชุดเดียวกับกราฟนั้น (dash_chart_color) คนดูจะได้เห็นว่าเป็น
+  // ข้อมูลชุดเดียวกัน ไม่ใช่ตัวเลขคนละที่มา · สต็อกคงเหลือรวม (ผลรวมข้ามหน่วย ไม่มีความหมาย
+  // ให้ตัดสินใจอะไรได้) ตัดออกไปเลย ตัวเลขจริงแยกหน่วยดูได้จากตาราง "รายการอะไหล่" ด้านล่าง
+  $statusNote = [
+      'new'     => '',
+      'rental'  => '',
+      'spare'   => 'คลังเครื่องสำรอง — ทดแทนเครื่องเช่า',
+      'sold'    => '',
+      'retired' => 'ปลดระวางจากระบบเช่าแล้ว',
+      'lost'    => 'ระบบเช่าแจ้งสูญหาย',
+  ];
+  ?>
+  <div class="kpi kpi-primary kpi-status-overview">
+    <div class="kpi-top"><span class="kpi-ic"><?= ui_icon_html('assets', 14) ?></span> เครื่องทั้งหมด</div>
+    <b class="kpi-num"><?= number_format($total) ?></b>
+    <?php if ($total > 0) { ?>
+    <div class="status-bar" role="img" aria-label="สัดส่วนเครื่องแยกตามสถานะ">
+      <?php foreach (status_list() as $st):
+          $n = (int) ($byStatus[$st] ?? 0);
+          if ($n <= 0) { continue; }
+          $flex = max($n / $total * 100, 0.6); // ขั้นต่ำกันสถานะที่มีไม่กี่เครื่อง (เช่นสูญหาย) หายไปจากแท่งเลย
+          $modalTitle = status_th($st) . ' — รายรุ่น';
+          $dataUrl = "$B/dashboard_data.php?type=asset_models&st=$st";
+          $href = "$B/assets.php?status=$st";
+      ?>
+      <a class="status-bar-seg" style="flex:<?= $flex ?> 1 0; background:<?= h(dash_chart_color($st)) ?>"
+         href="<?= h($href) ?>"
+         onclick="if(event.ctrlKey||event.metaKey||event.shiftKey||event.button===1)return true;<?= h(modal_js($modalTitle, $dataUrl, $href)) ?>;return false;"
+         title="<?= h(status_th($st) . ': ' . number_format($n) . ' เครื่อง (' . pct_label($n, $total) . ')') ?>"></a>
+      <?php endforeach; ?>
+    </div>
+    <?php } ?>
+    <div class="status-legend">
+      <?php foreach (status_list() as $st):
+          $n = (int) ($byStatus[$st] ?? 0);
+          $modalTitle = status_th($st) . ' — รายรุ่น';
+          $dataUrl = "$B/dashboard_data.php?type=asset_models&st=$st";
+          $href = "$B/assets.php?status=$st";
+      ?>
+      <a class="status-legend-item" href="<?= h($href) ?>"
+         onclick="if(event.ctrlKey||event.metaKey||event.shiftKey||event.button===1)return true;<?= h(modal_js($modalTitle, $dataUrl, $href)) ?>;return false;"
+         <?= $statusNote[$st] !== '' ? 'title="' . h($statusNote[$st]) . '"' : '' ?>>
+        <i class="status-dot" style="background:<?= h(dash_chart_color($st)) ?>"></i>
+        <span class="status-legend-label"><?= h(status_th($st)) ?></span>
+        <b class="status-legend-num"><?= number_format($n) ?></b>
+        <span class="status-legend-pct"><?= h(pct_label($n, $total)) ?></span>
+      </a>
+      <?php endforeach; ?>
+    </div>
+  </div>
+  <?php
   if ($stock['ok']) {
-      kpi($stock['qty'], 'สต็อกคงเหลือรวม', 'parts', 'primary', number_format($stock['items']) . ' รายการ (ผลรวมดิบข้ามหน่วย ใช้อ้างอิงคร่าวๆ)',
-          '', 'อะไหล่', '', false, false, $partsBase . '/pages/products.php');
       kpi($stock['low'], 'อะไหล่ควรสั่งเพิ่ม', 'alert', $stock['low'] > 0 ? 'warning' : 'success', $stock['low'] > 0 ? '<span class="kpi-down">ต้องตรวจสอบ/สั่งซื้อ</span>' : 'ทุกรายการเพียงพอ',
           $stock['low'] > 0
               ? modal_js('อะไหล่ที่ควรสั่งเพิ่ม (' . number_format($stock['low']) . ' รายการ)', "$B/dashboard_data.php?type=low_stock", "$partsBase/pages/products.php")

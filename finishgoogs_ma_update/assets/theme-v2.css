@@ -185,6 +185,43 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .kpi-danger .kpi-ic { background: var(--danger-soft); color: var(--danger); }
 .kpi-danger .kpi-num { color: var(--danger); }
 
+/* ── การ์ดรวมสถานะเครื่อง — แทนที่การ์ดแยก 7 ใบเดิม (ทั้งหมด + 6 สถานะ) ──────
+   กินเต็มแถวของ kpi-grid เพราะมีลูกศิษย์ 2 ชั้น (แท่งสัดส่วน + legend คลิกได้)
+   สีตรงกับกราฟ "ภาพรวมการผลิตรายปี" ทุกเฉด (dash_chart_color) — คนละที่แต่ข้อมูลชุดเดียวกัน */
+.kpi-status-overview { grid-column: 1 / -1; padding-bottom: 14px; }
+.status-bar {
+  display: flex; height: 10px; border-radius: 999px; overflow: hidden;
+  margin-top: 12px; background: var(--surface-muted);
+}
+.status-bar-seg { display: block; min-width: 2px; transition: filter .12s; }
+.status-bar-seg:hover, .status-bar-seg:focus-visible { filter: brightness(0.92); }
+.status-legend {
+  display: flex; flex-wrap: wrap; gap: 4px 2px;
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+}
+.status-legend-item {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  padding: 5px 9px; border-radius: var(--radius-sm, 8px);
+  color: inherit; text-decoration: none;
+}
+.status-legend-item:hover, .status-legend-item:focus-visible {
+  background: var(--surface-muted); outline: none;
+}
+.status-dot {
+  align-self: center; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.status-legend-label {
+  font-size: calc(12px * var(--font-scale, 1)); color: var(--text-muted, #6b6480);
+}
+.status-legend-num {
+  font-size: calc(14px * var(--font-scale, 1)); font-variant-numeric: tabular-nums;
+  color: #211a2e;
+}
+.status-legend-pct {
+  font-size: calc(11px * var(--font-scale, 1)); color: var(--text-faint, #a49cc0);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Dashboard รวม: อะไหล่ใกล้หมด (modal / popup) ── */
 .dash-low-stock-empty { margin: 0; padding: 4px 0; }
 .low-stock-cards { display: flex; flex-direction: column; gap: 10px; }
