@@ -1464,6 +1464,14 @@ a.kpi:hover { text-decoration: none; }
 }
 .mw-items li:last-child { border-bottom: 0; }
 .mw-items .muted { font-size: calc(12px * var(--font-scale, 1)); margin-left: 4px; }
+/* ทั้งแถวเป็นเป้ากด — บนมือถือการเล็งเฉพาะตัวหนังสือสั้น ๆ พลาดง่าย */
+.mw-item { display: block; color: inherit; text-decoration: none; }
+a.mw-item.is-link:hover { background: var(--primary-soft); }
+a.mw-item.is-link:hover b { color: var(--primary); }
+a.mw-item.is-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+/* ลูกศรบอกว่ากดแล้วเปิดแท็บใหม่ — ไม่ใช่ทุกแถวที่เทียบเจอเครื่องในทะเบียน */
+a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size: 11px; }
+.mw-hint { font-size: calc(12px * var(--font-scale, 1)); margin: 0 0 10px; padding: 0 4px; }
 .mw-ref {
   font-family: ui-monospace, "Consolas", monospace; font-size: calc(12px * var(--font-scale, 1));
   background: var(--surface-muted); border: 1px solid var(--border);

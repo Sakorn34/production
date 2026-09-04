@@ -359,27 +359,29 @@ function work_summary_detail_sources(): array
 
     return [
         ['key' => 'production', 'conn' => 'prod', 'date' => 't.recorded_at', 'actor' => 't.made_by',
-         'from' => "production_records t $asset", 'nm' => $model, 'ref' => $ref,
+         'from' => "production_records t $asset", 'nm' => $model, 'ref' => $ref, 'aid' => 't.asset_id',
          'ext' => "CONCAT_WS(' · ', NULLIF(t.lot_label,''), NULLIF(t.fw_version,''))"],
 
         ['key' => 'ma', 'conn' => 'prod', 'date' => 't.visited_at', 'actor' => 't.done_by',
-         'from' => "ma_records t $asset", 'nm' => $model, 'ref' => $ref,
+         'from' => "ma_records t $asset", 'nm' => $model, 'ref' => $ref, 'aid' => 't.asset_id',
          'ext' => "CONCAT_WS(' · ', CONCAT('รอบ ', t.ma_round), NULLIF(t.result,''))"],
 
         ['key' => 'update', 'conn' => 'prod', 'date' => 't.updated_at', 'actor' => 't.made_by',
          'from' => "update_logs t $asset",
          'nm'  => "COALESCE(NULLIF(t.component_name,''), NULLIF(t.update_type,''), 'อัปเดต')",
-         'ref' => $ref, 'ext' => "CONCAT_WS(' → ', NULLIF(t.old_value,''), NULLIF(t.new_value,''))"],
+         'ref' => $ref, 'aid' => 't.asset_id',
+         'ext' => "CONCAT_WS(' → ', NULLIF(t.old_value,''), NULLIF(t.new_value,''))"],
 
         ['key' => 'part_out', 'conn' => 'prod', 'date' => 't.moved_at', 'actor' => 't.made_by',
          'from' => 'part_movements t LEFT JOIN parts pr ON pr.id = t.part_id
                     LEFT JOIN assets a ON a.id = t.ref_asset_id',
          'nm'  => "COALESCE(NULLIF(pr.name,''), 'ไม่ระบุอะไหล่')",
          'ref' => "COALESCE(NULLIF(a.asset_code,''), NULLIF(a.factory_serial,''), '')",
+         'aid' => 't.ref_asset_id',
          'ext' => "CONCAT_WS(' · ', NULLIF(t.mode,''), CONCAT(FORMAT(t.qty, 0), ' ', COALESCE(pr.unit,'')))"],
 
         ['key' => 'stock', 'conn' => 'prod', 'date' => 't.moved_at', 'actor' => 't.made_by',
-         'from' => "stock_movements t $asset", 'nm' => $model, 'ref' => $ref,
+         'from' => "stock_movements t $asset", 'nm' => $model, 'ref' => $ref, 'aid' => 't.asset_id',
          'ext' => "NULLIF(t.reason,'')", 'where' => "t.reason NOT LIKE '{$esc}%'"],
 
         ['key' => 'rp_receive', 'conn' => 'ma', 'date' => 't.trp_receive_date', 'actor' => 't.trp_user_recive_ma',
@@ -478,7 +480,10 @@ function work_summary_person_items(int $personId, string $from, string $to): arr
             ? "{$src['date']} >= ? AND {$src['date']} < DATE_ADD(?, INTERVAL 1 DAY)"
             : "{$src['date']} >= ? AND {$src['date']} <= ?";
 
-        $sql = "SELECT $dayExpr d, {$src['actor']} actor, {$src['nm']} nm, {$src['ref']} ref, {$src['ext']} ext
+        // ระบบซ่อม/เช่าเป็นคนละฐาน join หา asset_id ตรง ๆ ไม่ได้ — ไว้ไปเทียบจาก SN ทีหลัง
+        $aid = isset($src['aid']) ? $src['aid'] : '0';
+        $sql = "SELECT $dayExpr d, {$src['actor']} actor, {$src['nm']} nm, {$src['ref']} ref,
+                       {$src['ext']} ext, $aid aid
                 FROM {$src['from']}
                 WHERE $range AND {$src['actor']} IS NOT NULL AND TRIM({$src['actor']}) <> ''
                   AND $actorSql"
@@ -523,9 +528,10 @@ function work_summary_person_items(int $personId, string $from, string $to): arr
                 $bucket[$day][$cat]['groups'][$nm] = (isset($bucket[$day][$cat]['groups'][$nm])
                     ? $bucket[$day][$cat]['groups'][$nm] : 0) + 1;
                 $bucket[$day][$cat]['items'][] = [
-                    'name'  => $nm,
-                    'ref'   => trim((string) (isset($row['ref']) ? $row['ref'] : '')),
-                    'extra' => trim((string) (isset($row['ext']) ? $row['ext'] : '')),
+                    'name'     => $nm,
+                    'ref'      => trim((string) (isset($row['ref']) ? $row['ref'] : '')),
+                    'extra'    => trim((string) (isset($row['ext']) ? $row['ext'] : '')),
+                    'asset_id' => (int) (isset($row['aid']) ? $row['aid'] : 0),
                 ];
                 $total++;
             }
@@ -534,6 +540,8 @@ function work_summary_person_items(int $personId, string $from, string $to): arr
             $errors[] = $src['key'] . ': ' . $e->getMessage();
         }
     }
+
+    work_summary_fill_asset_ids($bucket);
 
     ksort($bucket);
     $days = [];
@@ -562,4 +570,69 @@ function work_summary_person_items(int $personId, string $from, string $to): arr
     }
 
     return ['days' => $days, 'total' => $total, 'errors' => $errors];
+}
+
+/**
+ * เติม asset_id ให้รายการที่มาจากระบบซ่อม/เช่า โดยเทียบ SN กับทะเบียนเครื่องของเรา
+ *
+ * สองระบบนั้นอยู่คนละฐาน join ตรง ๆ ไม่ได้ แต่เครื่องส่วนใหญ่เป็นเครื่องเดียวกับที่เรา
+ * ผลิต จึงเทียบจาก asset_code / factory_serial ได้ — เทียบทีเดียวทั้งชุด ไม่ยิงรายแถว
+ * เทียบไม่เจอก็ปล่อยเป็น 0 แล้วหน้าเว็บจะไม่ทำเป็นลิงก์ ดีกว่าพาไปหน้าที่ไม่มีอยู่
+ *
+ * @param  array<string,array<string,array<string,mixed>>> $bucket แก้ในตัว
+ * @return void
+ */
+function work_summary_fill_asset_ids(array &$bucket): void
+{
+    $refs = [];
+    foreach ($bucket as $byCat) {
+        foreach ($byCat as $c) {
+            foreach ($c['items'] as $it) {
+                if ((int) $it['asset_id'] <= 0 && $it['ref'] !== '') {
+                    $refs[$it['ref']] = true;
+                }
+            }
+        }
+    }
+    if (!$refs) {
+        return;
+    }
+    $map = [];
+    try {
+        $names = array_keys($refs);
+        // ยิงเป็นก้อนละ 500 กัน query ยาวเกินขีดจำกัดของ MySQL
+        foreach (array_chunk($names, 500) as $chunk) {
+            $ph = implode(',', array_fill(0, count($chunk), '?'));
+            $types = str_repeat('s', count($chunk) * 2);
+            $res = qr(
+                "SELECT id, asset_code, factory_serial FROM assets
+                 WHERE asset_code IN ($ph) OR factory_serial IN ($ph)",
+                $types,
+                array_merge($chunk, $chunk)
+            );
+            while ($row = $res->fetch_assoc()) {
+                foreach (['asset_code', 'factory_serial'] as $col) {
+                    $v = trim((string) $row[$col]);
+                    if ($v !== '' && !isset($map[$v])) {
+                        $map[$v] = (int) $row['id'];
+                    }
+                }
+            }
+        }
+    } catch (\Throwable $e) {
+        error_log('[work_summary_fill_asset_ids] ' . $e->getMessage());
+        return;
+    }
+    if (!$map) {
+        return;
+    }
+    foreach ($bucket as $day => $byCat) {
+        foreach ($byCat as $cat => $c) {
+            foreach ($c['items'] as $i => $it) {
+                if ((int) $it['asset_id'] <= 0 && isset($map[$it['ref']])) {
+                    $bucket[$day][$cat]['items'][$i]['asset_id'] = $map[$it['ref']];
+                }
+            }
+        }
+    }
 }

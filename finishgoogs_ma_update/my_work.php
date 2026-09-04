@@ -86,6 +86,10 @@ page_head_html('สรุปงานของ ' . $person['display_name']);
     </div>
   </div>
 
+  <?php if ($viaToken && $detail['days']) { ?>
+  <p class="muted mw-hint">แตะรายการงานเพื่อเปิดหน้าเครื่องในแท็บใหม่ — ต้องมีบัญชีผู้ใช้ของระบบถึงจะเปิดดูได้</p>
+  <?php } ?>
+
   <?php if ($detail['errors']) { ?>
   <p class="muted mw-warn">ดึงข้อมูลบางส่วนไม่ได้: <?= h(implode(' · ', $detail['errors'])) ?>
     — ตัวเลขที่เห็นจึงยังไม่ครบทุกระบบ</p>
@@ -110,11 +114,19 @@ page_head_html('สรุปงานของ ' . $person['display_name']);
     <div class="mw-cat">
       <h2 class="mw-cat-h"><?= h($cat['label']) ?> <span><?= number_format($cat['count']) ?></span></h2>
       <ul class="mw-items">
-        <?php foreach ($cat['items'] as $it) { ?>
+        <?php foreach ($cat['items'] as $it) {
+            // เครื่องที่เทียบกับทะเบียนของเราได้ กดเปิดหน้าเครื่องในแท็บใหม่ได้
+            // (เทียบไม่เจอ เช่น เครื่องลูกค้าที่เราไม่ได้ผลิต ก็เป็นข้อความเฉย ๆ)
+            $aid = (int) $it['asset_id'];
+            $tag = $aid > 0 ? 'a' : 'span'; ?>
         <li>
-          <b><?= h($it['name']) ?></b>
-          <?php if ($it['ref'] !== '') { ?><code class="mw-ref"><?= h($it['ref']) ?></code><?php } ?>
-          <?php if ($it['extra'] !== '') { ?><span class="muted"><?= h($it['extra']) ?></span><?php } ?>
+          <<?= $tag ?> class="mw-item<?= $aid > 0 ? ' is-link' : '' ?>"
+            <?php if ($aid > 0) { ?>href="<?= $B ?>/asset.php?id=<?= $aid ?>" target="_blank" rel="noopener"
+            title="เปิดหน้าเครื่องในแท็บใหม่"<?php } ?>>
+            <b><?= h($it['name']) ?></b>
+            <?php if ($it['ref'] !== '') { ?><code class="mw-ref"><?= h($it['ref']) ?></code><?php } ?>
+            <?php if ($it['extra'] !== '') { ?><span class="muted"><?= h($it['extra']) ?></span><?php } ?>
+          </<?= $tag ?>>
         </li>
         <?php } ?>
       </ul>
