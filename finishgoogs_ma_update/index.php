@@ -271,13 +271,18 @@ function modal_js($title, $dataUrl, $moreUrl = '') {
 $B = BASE_URL;
 $partsBase = ui_parts_base_url();
 ?>
-<div class="kpi-grid">
+<div class="dash-top-row">
   <?php
   // การ์ดรวมสถานะเครื่อง — เดิมแยกเป็น 7 ใบ (ทั้งหมด + 6 สถานะ) กินพื้นที่ทั้งแถวแรก
   // ทั้งที่ตัวเลขชุดเดียวกันมีอยู่แล้วในกราฟ "ภาพรวมการผลิตรายปี" ถัดลงไปแค่จอเดียว
   // รวมเป็นใบเดียว ใช้สีชุดเดียวกับกราฟนั้น (dash_chart_color) คนดูจะได้เห็นว่าเป็น
   // ข้อมูลชุดเดียวกัน ไม่ใช่ตัวเลขคนละที่มา · สต็อกคงเหลือรวม (ผลรวมข้ามหน่วย ไม่มีความหมาย
   // ให้ตัดสินใจอะไรได้) ตัดออกไปเลย ตัวเลขจริงแยกหน่วยดูได้จากตาราง "รายการอะไหล่" ด้านล่าง
+  //
+  // การ์ดนี้อยู่นอก .kpi-grid โดยตั้งใจ — ตอนอยู่ใน grid เดียวกับ 2 การ์ดอะไหล่ด้านล่าง
+  // grid ต้องแบ่งคอลัมน์ให้พอกับการ์ดนี้ (กว้างเต็มแถว) แต่ 2 การ์ดเล็กใช้แค่คอลัมน์ละ 1 ช่อง
+  // เหลือช่องว่างลอยข้าง ๆ เกือบครึ่งแถว จึงแยกเป็น 2 คอลัมน์ตายตัวแทน: การ์ดนี้ฝั่งซ้าย
+  // การ์ดอะไหล่ 2 ใบเรียงซ้อนกันฝั่งขวา ความสูงเท่ากันพอดีโดยไม่ต้องเดา
   $statusNote = [
       'new'     => '',
       'rental'  => '',
@@ -290,7 +295,11 @@ $partsBase = ui_parts_base_url();
   <div class="kpi kpi-primary kpi-status-overview">
     <div class="kpi-top"><span class="kpi-ic"><?= ui_icon_html('assets', 14) ?></span> เครื่องทั้งหมด</div>
     <b class="kpi-num"><?= number_format($total) ?></b>
-    <?php if ($total > 0) { ?>
+    <?php // status_th_chip() ให้ชื่อสั้น (ใหม่/เช่า/สำรอง…) — ใช้ตัวเดียวกับ legend ของกราฟ
+         // "ภาพรวมการผลิตรายปี" ด้านล่าง ให้สองการ์ดอ่านเป็นชุดเดียวกัน · status_th() (เต็ม
+         // "เครื่องใหม่") เก็บไว้ใช้เฉพาะหัว modal ที่กดเปิดดูรายรุ่น ซึ่งเป็นข้อความเดี่ยว
+         // ไม่ได้อยู่ติดกับตัวเลข จึงยังต้องการคำเต็มเพื่อความชัดเจน
+         if ($total > 0) { ?>
     <div class="status-bar" role="img" aria-label="สัดส่วนเครื่องแยกตามสถานะ">
       <?php foreach (status_list() as $st):
           $n = (int) ($byStatus[$st] ?? 0);
@@ -303,7 +312,7 @@ $partsBase = ui_parts_base_url();
       <a class="status-bar-seg" style="flex:<?= $flex ?> 1 0; background:<?= h(dash_chart_color($st)) ?>"
          href="<?= h($href) ?>"
          onclick="if(event.ctrlKey||event.metaKey||event.shiftKey||event.button===1)return true;<?= h(modal_js($modalTitle, $dataUrl, $href)) ?>;return false;"
-         title="<?= h(status_th($st) . ': ' . number_format($n) . ' เครื่อง (' . pct_label($n, $total) . ')') ?>"></a>
+         title="<?= h(status_th_chip($st) . ': ' . number_format($n) . ' เครื่อง (' . pct_label($n, $total) . ')') ?>"></a>
       <?php endforeach; ?>
     </div>
     <?php } ?>
@@ -318,28 +327,30 @@ $partsBase = ui_parts_base_url();
          onclick="if(event.ctrlKey||event.metaKey||event.shiftKey||event.button===1)return true;<?= h(modal_js($modalTitle, $dataUrl, $href)) ?>;return false;"
          <?= $statusNote[$st] !== '' ? 'title="' . h($statusNote[$st]) . '"' : '' ?>>
         <i class="status-dot" style="background:<?= h(dash_chart_color($st)) ?>"></i>
-        <span class="status-legend-label"><?= h(status_th($st)) ?></span>
+        <span class="status-legend-label"><?= h(status_th_chip($st)) ?></span>
         <b class="status-legend-num"><?= number_format($n) ?></b>
         <span class="status-legend-pct"><?= h(pct_label($n, $total)) ?></span>
       </a>
       <?php endforeach; ?>
     </div>
   </div>
-  <?php
-  if ($stock['ok']) {
-      kpi($stock['low'], 'อะไหล่ควรสั่งเพิ่ม', 'alert', $stock['low'] > 0 ? 'warning' : 'success', $stock['low'] > 0 ? '<span class="kpi-down">ต้องตรวจสอบ/สั่งซื้อ</span>' : 'ทุกรายการเพียงพอ',
-          $stock['low'] > 0
-              ? modal_js('อะไหล่ที่ควรสั่งเพิ่ม (' . number_format($stock['low']) . ' รายการ)', "$B/dashboard_data.php?type=low_stock", "$partsBase/pages/products.php")
-              : "location.href='" . h($partsBase) . "/pages/products.php'",
-          'อะไหล่', '', true, false, $partsBase . '/pages/products.php');
-      kpi(0, 'รับเข้า / เบิกออก', 'history', 'info', 'ความเคลื่อนไหววันนี้',
-          modal_js('รับเข้า / เบิกออกวันนี้', "$B/dashboard_data.php?type=stock_today", "$partsBase/pages/history.php"), 'วันนี้',
-          'รับเข้า ' . number_format($stock['in_today']) . ' ชิ้น · เบิกออก ' . number_format($stock['out_today']) . ' ชิ้น',
-          false, true, $partsBase . '/pages/history.php');
-  } else {
-      echo '<div class="kpi kpi-warning"><div class="kpi-top"><span class="kpi-ic">' . ui_icon_html('alert', 14) . '</span> สต็อกอะไหล่</div><b class="kpi-num">—</b><div class="kpi-sub">เชื่อมต่อระบบสต็อกไม่ได้</div></div>';
-  }
-  ?>
+  <div class="dash-side-kpis">
+    <?php
+    if ($stock['ok']) {
+        kpi($stock['low'], 'อะไหล่ควรสั่งเพิ่ม', 'alert', $stock['low'] > 0 ? 'warning' : 'success', $stock['low'] > 0 ? '<span class="kpi-down">ต้องตรวจสอบ/สั่งซื้อ</span>' : 'ทุกรายการเพียงพอ',
+            $stock['low'] > 0
+                ? modal_js('อะไหล่ที่ควรสั่งเพิ่ม (' . number_format($stock['low']) . ' รายการ)', "$B/dashboard_data.php?type=low_stock", "$partsBase/pages/products.php")
+                : "location.href='" . h($partsBase) . "/pages/products.php'",
+            'อะไหล่', '', true, false, $partsBase . '/pages/products.php');
+        kpi(0, 'รับเข้า / เบิกออก', 'history', 'info', 'ความเคลื่อนไหววันนี้',
+            modal_js('รับเข้า / เบิกออกวันนี้', "$B/dashboard_data.php?type=stock_today", "$partsBase/pages/history.php"), 'วันนี้',
+            'รับเข้า ' . number_format($stock['in_today']) . ' ชิ้น · เบิกออก ' . number_format($stock['out_today']) . ' ชิ้น',
+            false, true, $partsBase . '/pages/history.php');
+    } else {
+        echo '<div class="kpi kpi-warning"><div class="kpi-top"><span class="kpi-ic">' . ui_icon_html('alert', 14) . '</span> สต็อกอะไหล่</div><b class="kpi-num">—</b><div class="kpi-sub">เชื่อมต่อระบบสต็อกไม่ได้</div></div>';
+    }
+    ?>
+  </div>
 </div>
 
 <div class="panel dash-prod-chart" id="dash-prod-chart">
