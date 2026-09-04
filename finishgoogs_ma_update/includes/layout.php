@@ -148,8 +148,25 @@ function page_header($title, $showBack = true, $subtitle = '', $backUrl = '', $a
     $cur = basename($_SERVER['SCRIPT_NAME']);
     $nav = nav_effective();
     $flash = flash_get();
-    $fontCfg = theme_font_config();
     $backHref = page_back_url($backUrl);
+    page_head_html($title);
+    ?>
+<body>
+<?php
+$side = setting('sidebar_side', 'left');
+    page_header_body($title, $showBack, $subtitle, $backHref, $actionsHtml, $u, $cur, $nav, $flash, $side);
+}
+
+/**
+ * <head> ของหน้าเว็บ — แยกออกมาให้หน้าที่ไม่ใช้ sidebar (เช่น my_work.php ที่พนักงาน
+ * เปิดจากลิงก์ในไลน์โดยไม่ต้อง login) ใช้ธีม ฟอนต์ และตัวแปรสีชุดเดียวกันได้
+ * ถ้าปล่อยให้แต่ละหน้าก๊อป <head> ไปเอง ธีมจะเพี้ยนกันทันทีที่แก้ที่เดียว
+ *
+ * @param  string $title
+ * @return void
+ */
+function page_head_html($title) {
+    $fontCfg = theme_font_config();
     ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -201,10 +218,16 @@ function page_header($title, $showBack = true, $subtitle = '', $backUrl = '', $a
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/theme-v2.css?v=<?= @filemtime(__DIR__ . '/../assets/theme-v2.css') ?: time() ?>">
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/sidebar.css?v=<?= @filemtime(__DIR__ . '/../assets/sidebar.css') ?: time() ?>">
 </head>
-<body>
 <?php
-$side = setting('sidebar_side', 'left');
-$sideClass = $side === 'right' ? ' sidebar-right' : ($side === 'top' ? ' sidebar-top' : '');
+}
+
+/**
+ * ส่วน <body> ของหน้าที่มี sidebar — เนื้อเดิมของ page_header() ทั้งดุ้น
+ *
+ * @return void
+ */
+function page_header_body($title, $showBack, $subtitle, $backHref, $actionsHtml, $u, $cur, $nav, $flash, $side) {
+    $sideClass = $side === 'right' ? ' sidebar-right' : ($side === 'top' ? ' sidebar-top' : '');
 $dockClass = ($side === 'top') ? '' : ' nav-collapsed';
 $ubUser = ui_userbox_identity();
 $showName = $ubUser['name'] !== 'ผู้ใช้งาน' ? $ubUser['name'] : ($u ? $u['display_name'] : '-');

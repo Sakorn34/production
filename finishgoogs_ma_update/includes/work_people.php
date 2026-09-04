@@ -89,6 +89,14 @@ function work_people_ensure_schema(): void
         if ($col && $col->num_rows === 0) {
             db()->query('ALTER TABLE work_people ADD notify_enabled TINYINT(1) NOT NULL DEFAULT 1 AFTER is_active');
         }
+        // โทเคนเปิดหน้าสรุปงานของตัวเอง — คนทำงานส่วนใหญ่ไม่มีบัญชีในระบบ (30 ชื่อ มี
+        // บัญชีแค่ 9) กดปุ่มในไลน์แล้วเจอหน้า login ก็เท่ากับดูไม่ได้ จึงให้ลิงก์พกโทเคน
+        // ประจำตัวไปเอง เปิดได้เฉพาะสรุปงานของคนคนนั้น และเพิกถอนได้รายคน
+        $col = db()->query("SHOW COLUMNS FROM work_people LIKE 'view_token'");
+        if ($col && $col->num_rows === 0) {
+            db()->query('ALTER TABLE work_people ADD view_token CHAR(32) DEFAULT NULL AFTER notify_enabled');
+            db()->query('ALTER TABLE work_people ADD UNIQUE KEY uq_view_token (view_token)');
+        }
         // alias เป็น PK กันชื่อเดียวไปผูกสองคน — เก็บเป็นตัวพิมพ์เล็กที่ normalize แล้ว
         db()->query(
             "CREATE TABLE IF NOT EXISTS work_person_aliases (
@@ -272,6 +280,55 @@ function work_people_merge(int $fromId, int $intoId): bool
     } catch (\mysqli_sql_exception $e) {
         error_log('[work_people_merge] ' . $e->getMessage());
         return false;
+    }
+}
+
+/**
+ * โทเคนเปิดหน้าสรุปงานของคนนี้ — ไม่มีก็สร้างให้ครั้งแรกที่เรียก
+ *
+ * @param  int  $personId
+ * @param  bool $regenerate true = ออกใหม่ ลิงก์เก่าใช้ไม่ได้ทันที
+ * @return string '' ถ้าออกไม่สำเร็จ
+ */
+function work_people_view_token(int $personId, bool $regenerate = false): string
+{
+    work_people_ensure_schema();
+    try {
+        if (!$regenerate) {
+            $row = qr('SELECT view_token FROM work_people WHERE id=?', 'i', [$personId])->fetch_assoc();
+            if ($row && !empty($row['view_token'])) {
+                return (string) $row['view_token'];
+            }
+        }
+        $token = bin2hex(random_bytes(16));
+        q('UPDATE work_people SET view_token=? WHERE id=?', 'si', [$token, $personId]);
+        return $token;
+    } catch (\Throwable $e) {
+        error_log('[work_people_view_token] ' . $e->getMessage());
+        return '';
+    }
+}
+
+/**
+ * หาคนจากโทเคนในลิงก์
+ *
+ * @param  string $token
+ * @return array<string,mixed>|null
+ */
+function work_people_by_view_token(string $token): ?array
+{
+    $token = trim($token);
+    // กันโทเคนเปล่าไปแมตช์แถวที่ view_token ยังว่าง
+    if ($token === '' || !preg_match('/^[0-9a-f]{32}$/', $token)) {
+        return null;
+    }
+    work_people_ensure_schema();
+    try {
+        $row = qr('SELECT * FROM work_people WHERE view_token=? LIMIT 1', 's', [$token])->fetch_assoc();
+        return $row ?: null;
+    } catch (\Throwable $e) {
+        error_log('[work_people_by_view_token] ' . $e->getMessage());
+        return null;
     }
 }
 

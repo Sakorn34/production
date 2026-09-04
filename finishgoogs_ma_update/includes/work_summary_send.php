@@ -9,6 +9,48 @@
 require_once __DIR__ . '/work_summary.php';
 require_once dirname(__DIR__, 2) . '/shared/line_notify_core.php';
 
+/** จำนวนรายการที่ยกตัวอย่างต่อหมวดในไลน์ — มากกว่านี้ข้อความยาวเกินอ่านบนมือถือ */
+const WORK_SUMMARY_SEND_GROUPS = 3;
+
+/**
+ * URL ฐานของแอปนี้สำหรับลิงก์ในไลน์
+ *
+ * BASE_URL เดามาจาก SCRIPT_NAME ซึ่งตอนรันผ่าน cron (CLI) ไม่มีให้เดา เลยตกไปที่
+ * '/production' ที่ขาดโฟลเดอร์แอป — ปุ่มในไลน์ที่ส่งจาก cron จะกดแล้ว 404
+ * ทั้งที่กดจากหน้าเว็บแล้วปกติ เติมให้ตรงนี้เพื่อให้ทั้งสองทางได้ลิงก์เดียวกัน
+ *
+ * @return string ไม่มี / ปิดท้าย
+ */
+function work_summary_app_base_url(): string
+{
+    $base = rtrim(line_notify_production_base_url(), '/');
+    $dir = '/finishgoogs_ma_update';
+    if (substr($base, -strlen($dir)) !== $dir) {
+        $base .= $dir;
+    }
+    return $base;
+}
+
+/**
+ * ย่อรายการ "ทำอะไรบ้าง" ของหมวดหนึ่งเป็นข้อความบรรทัดเดียว
+ *
+ * @param  array<int,array<string,mixed>> $groups เรียงจากมากไปน้อยมาแล้ว
+ * @param  int                            $limit
+ * @return string
+ */
+function work_summary_groups_text(array $groups, int $limit): string
+{
+    $bits = [];
+    foreach (array_slice($groups, 0, $limit) as $g) {
+        $bits[] = (string) $g['name'] . ' ' . number_format((int) $g['count']);
+    }
+    $rest = count($groups) - $limit;
+    if ($rest > 0) {
+        $bits[] = 'และอีก ' . number_format($rest) . ' อย่าง';
+    }
+    return implode('  ·  ', $bits);
+}
+
 /**
  * ส่งสรุปของรอบหนึ่งให้ผู้รับที่เข้าเงื่อนไข
  *
@@ -44,15 +86,20 @@ function work_summary_send_cycle(array $cycle, ?int $onlyPerson = null, bool $fo
         }
         $row = $work[$pid];
         // เจ้าตัวอยากรู้ว่า "วันไหนทำอะไร" ไม่ใช่ยอดรวมทั้งรอบ — ส่งเป็นไทม์ไลน์รายวัน
-        $daily = work_summary_person_daily($pid, (string) $cycle['from'], (string) $cycle['to']);
+        // พร้อมของจริงที่ทำ (รุ่นที่ผลิต / อะไหล่ที่เบิก / รุ่นที่ซ่อม)
+        $daily = work_summary_person_items($pid, (string) $cycle['from'], (string) $cycle['to']);
         $days = [];
         foreach ($daily['days'] as $d) {
-            $items = [];
-            foreach ($d['items'] as $it) {
-                $items[] = ['label' => (string) $it['label'], 'count' => (int) $it['count']];
+            $cats = [];
+            foreach ($d['cats'] as $c) {
+                $cats[] = [
+                    'label'  => (string) $c['label'],
+                    'count'  => (int) $c['count'],
+                    'detail' => work_summary_groups_text($c['groups'], WORK_SUMMARY_SEND_GROUPS),
+                ];
             }
-            // payload เก็บลง DB ด้วย จึงตัดฟิลด์ที่ Flex ไม่ได้ใช้ทิ้ง
-            $days[] = ['label' => (string) $d['label'], 'total' => (int) $d['total'], 'items' => $items];
+            // payload เก็บลง DB ด้วย จึงส่งเฉพาะข้อความที่ Flex ใช้จริง ไม่ยัดรายการดิบทั้งก้อน
+            $days[] = ['label' => (string) $d['label'], 'total' => (int) $d['total'], 'cats' => $cats];
         }
 
         $payload = [
@@ -64,8 +111,11 @@ function work_summary_send_cycle(array $cycle, ?int $onlyPerson = null, bool $fo
             'total'       => (int) $row['total'],
             'day_count'   => count($days),
             'days'        => $days,
-            'report_url'  => rtrim(line_notify_production_base_url(), '/') . '/work_report.php?c='
-                             . rawurlencode((string) $cycle['to']) . '&p=' . $pid,
+            // ลิงก์ไปหน้าของเจ้าตัวโดยเฉพาะ พร้อมโทเคนประจำตัว — คนทำงานส่วนใหญ่ไม่มี
+            // บัญชีในระบบ ถ้าให้ไปหน้ารวมที่ต้อง login เท่ากับกดแล้วดูอะไรไม่ได้
+            'report_url'  => work_summary_app_base_url() . '/my_work.php?t='
+                             . rawurlencode(work_people_view_token($pid))
+                             . '&c=' . rawurlencode((string) $cycle['to']),
         ];
 
         $id = line_notify_dispatch('work.summary.monthly', $payload, [

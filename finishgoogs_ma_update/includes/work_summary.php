@@ -337,54 +337,229 @@ function work_summary_day_label(string $ymd): string
 }
 
 /**
- * งานของคนหนึ่ง แยกรายวันตลอดรอบ — ใช้ทั้งใน Flex และหน้ารายละเอียดรายคน
+ * แหล่งข้อมูลแบบ "รายละเอียด" — ดึงของจริงว่าทำอะไร ไม่ใช่แค่นับจำนวน
  *
- * เรียงจากวันแรกของรอบไปวันท้าย และตัดวันที่ไม่มีงานออก (คนไม่ได้ทำงานทุกวัน
- * การโชว์วันว่างเปล่ายาว ๆ ทำให้อ่านยากโดยไม่ได้ข้อมูลเพิ่ม)
+ * nm  = ของชิ้นนั้นคืออะไร (รุ่นสินค้า / ชื่ออะไหล่ / ชนิดการอัปเดต) ใช้จัดกลุ่มใน Flex
+ * ref = ตัวระบุชิ้นงาน (รหัสเครื่อง / SN) ใช้แสดงในหน้าเว็บ
+ * ext = ข้อมูลประกอบสั้น ๆ (เหตุผล / สถานะ / จำนวน)
+ *
+ * แยกจาก work_summary_sources_*() เพราะอันนั้น GROUP BY ในฐานเพื่อความเร็ว
+ * ส่วนอันนี้ดึงรายแถวของ "คนเดียว" จึงคุ้มที่จะ join หาชื่อรุ่น/ชื่ออะไหล่มาด้วย
+ *
+ * @return array<int,array<string,string>>
+ */
+function work_summary_detail_sources(): array
+{
+    $syncPrefix = function_exists('asset_status_sync_log_prefix')
+        ? asset_status_sync_log_prefix() : 'Sync สถานะ: ';
+    $esc = db()->real_escape_string($syncPrefix);
+    $asset = 'LEFT JOIN assets a ON a.id = t.asset_id LEFT JOIN products p ON p.id = a.product_id';
+    $ref   = "COALESCE(NULLIF(a.asset_code,''), NULLIF(a.factory_serial,''), '')";
+    $model = "COALESCE(NULLIF(p.name,''), 'ไม่ระบุรุ่น')";
+
+    return [
+        ['key' => 'production', 'conn' => 'prod', 'date' => 't.recorded_at', 'actor' => 't.made_by',
+         'from' => "production_records t $asset", 'nm' => $model, 'ref' => $ref,
+         'ext' => "CONCAT_WS(' · ', NULLIF(t.lot_label,''), NULLIF(t.fw_version,''))"],
+
+        ['key' => 'ma', 'conn' => 'prod', 'date' => 't.visited_at', 'actor' => 't.done_by',
+         'from' => "ma_records t $asset", 'nm' => $model, 'ref' => $ref,
+         'ext' => "CONCAT_WS(' · ', CONCAT('รอบ ', t.ma_round), NULLIF(t.result,''))"],
+
+        ['key' => 'update', 'conn' => 'prod', 'date' => 't.updated_at', 'actor' => 't.made_by',
+         'from' => "update_logs t $asset",
+         'nm'  => "COALESCE(NULLIF(t.component_name,''), NULLIF(t.update_type,''), 'อัปเดต')",
+         'ref' => $ref, 'ext' => "CONCAT_WS(' → ', NULLIF(t.old_value,''), NULLIF(t.new_value,''))"],
+
+        ['key' => 'part_out', 'conn' => 'prod', 'date' => 't.moved_at', 'actor' => 't.made_by',
+         'from' => 'part_movements t LEFT JOIN parts pr ON pr.id = t.part_id
+                    LEFT JOIN assets a ON a.id = t.ref_asset_id',
+         'nm'  => "COALESCE(NULLIF(pr.name,''), 'ไม่ระบุอะไหล่')",
+         'ref' => "COALESCE(NULLIF(a.asset_code,''), NULLIF(a.factory_serial,''), '')",
+         'ext' => "CONCAT_WS(' · ', NULLIF(t.mode,''), CONCAT(FORMAT(t.qty, 0), ' ', COALESCE(pr.unit,'')))"],
+
+        ['key' => 'stock', 'conn' => 'prod', 'date' => 't.moved_at', 'actor' => 't.made_by',
+         'from' => "stock_movements t $asset", 'nm' => $model, 'ref' => $ref,
+         'ext' => "NULLIF(t.reason,'')", 'where' => "t.reason NOT LIKE '{$esc}%'"],
+
+        ['key' => 'rp_receive', 'conn' => 'ma', 'date' => 't.trp_receive_date', 'actor' => 't.trp_user_recive_ma',
+         'from' => 'transac_repair t', 'nm' => "COALESCE(NULLIF(t.trp_product,''), 'ไม่ระบุรุ่น')",
+         'ref' => "COALESCE(t.trp_sn,'')", 'ext' => "NULLIF(t.trp_repair_inform,'')"],
+
+        ['key' => 'rp_rate', 'conn' => 'ma', 'date' => 't.trp_rate_date', 'actor' => 't.trp_user_rate',
+         'from' => 'transac_repair t', 'nm' => "COALESCE(NULLIF(t.trp_product,''), 'ไม่ระบุรุ่น')",
+         'ref' => "COALESCE(t.trp_sn,'')", 'ext' => "NULLIF(t.trp_qv_number,'')"],
+
+        ['key' => 'rp_fix', 'conn' => 'ma', 'date' => 't.trp_success_date', 'actor' => 't.trp_user_ma',
+         'from' => 'transac_repair t', 'nm' => "COALESCE(NULLIF(t.trp_product,''), 'ไม่ระบุรุ่น')",
+         'ref' => "COALESCE(t.trp_sn,'')", 'ext' => "NULLIF(t.trp_repair_no1,'')"],
+
+        ['key' => 'rp_send', 'conn' => 'ma', 'date' => 't.trp_send_date', 'actor' => 't.trp_sendby',
+         'from' => 'transac_repair t', 'nm' => "COALESCE(NULLIF(t.trp_product,''), 'ไม่ระบุรุ่น')",
+         'ref' => "COALESCE(t.trp_sn,'')", 'ext' => "NULLIF(t.trp_tracking,'')"],
+
+        ['key' => 'rent_reg', 'conn' => 'lease', 'date' => 't.pro_date', 'actor' => 't.pro_user_add',
+         'from' => 'tbl_product t', 'nm' => "COALESCE(NULLIF(t.pro_name,''), 'ไม่ระบุรุ่น')",
+         'ref' => "COALESCE(t.pro_sn,'')", 'ext' => "NULLIF(t.pro_status,'')"],
+
+        ['key' => 'rent_ma', 'conn' => 'lease', 'date' => 't.ma_date', 'actor' => 't.ma_user_add',
+         'from' => 'tbl_product_ma t', 'nm' => "COALESCE(NULLIF(t.ma_product,''), 'ไม่ระบุรุ่น')",
+         'ref' => "COALESCE(t.ma_sn,'')", 'ext' => "NULLIF(t.ma_status,'')"],
+    ];
+}
+
+/**
+ * เงื่อนไข SQL คัดเฉพาะแถวของคนคนหนึ่ง
+ *
+ * ช่องชื่อคนเก็บได้หลายคนคั่นด้วย , ; / จึงห่อด้วย comma แล้วเทียบทั้งก้อน
+ * เป็นแค่ตัวกรองหยาบให้ฐานส่งข้อมูลมาน้อยลง — ฝั่ง PHP ยังเช็คด้วยกติกาเดิมซ้ำอีกที
+ * ถ้ากรองหลวมไปก็ไม่ทำให้นับเกิน
+ *
+ * @param  string             $actorExpr คอลัมน์ชื่อคน (มี prefix ตารางแล้ว)
+ * @param  array<int,string>  $aliases   ชื่อที่ normalize แล้วของคนนี้
+ * @return array{0:string,1:array<int,string>} [SQL, ค่าที่ต้อง bind]
+ */
+function work_summary_actor_filter(string $actorExpr, array $aliases): array
+{
+    if (!$aliases) {
+        return ['0 = 1', []];
+    }
+    $norm = "CONCAT(',', REPLACE(REPLACE(REPLACE($actorExpr, ' ', ''), ';', ','), '/', ','), ',')";
+    $parts = [];
+    $args = [];
+    foreach ($aliases as $a) {
+        $parts[] = "$norm LIKE ?";
+        $args[] = '%,' . $a . ',%';
+    }
+    return ['(' . implode(' OR ', $parts) . ')', $args];
+}
+
+/**
+ * งานของคนหนึ่งแบบละเอียด — รายวัน > หมวด > ของจริงที่ทำ
  *
  * @param  int    $personId
  * @param  string $from Y-m-d
  * @param  string $to   Y-m-d
  * @return array{days:array<int,array<string,mixed>>,total:int,errors:array<int,string>}
  */
-function work_summary_person_daily(int $personId, string $from, string $to): array
+function work_summary_person_items(int $personId, string $from, string $to): array
 {
     work_people_ensure_schema();
-    $aliasMap = work_people_alias_map();
+    $aliases = [];
+    foreach (work_people_alias_map() as $alias => $pid) {
+        if ((int) $pid === $personId) {
+            $aliases[] = (string) $alias;
+        }
+    }
     $cats = work_summary_categories();
-    $collected = work_summary_collect($from, $to, true);
-
-    $byDay = [];
+    $errors = [];
+    $bucket = [];   // [วัน][หมวด] = ['count'=>n,'groups'=>[ชื่อ=>n],'items'=>[]]
     $total = 0;
-    foreach ($collected['rows'] as $r) {
-        $day = substr($r['day'], 0, 10);
-        if ($day === '') {
+
+    $conns = ['prod' => db(), 'ma' => dbMaintenance(), 'lease' => dbLeasing()];
+    $labels = ['ma' => 'ระบบซ่อม', 'lease' => 'ระบบเช่า'];
+    $warned = [];
+
+    foreach (work_summary_detail_sources() as $src) {
+        $conn = isset($conns[$src['conn']]) ? $conns[$src['conn']] : null;
+        if (!$conn) {
+            $name = isset($labels[$src['conn']]) ? $labels[$src['conn']] : $src['conn'];
+            if (empty($warned[$name])) {
+                $errors[] = $name . ': เชื่อมต่อไม่ได้';
+                $warned[$name] = true;
+            }
             continue;
         }
-        // ชื่อเดียวอาจมีหลายคนคั่นด้วย comma — นับให้ทุกคนในแถวนั้น เหมือนสรุปรายรอบ
-        foreach (work_people_split($r['actor']) as $name) {
-            $key = work_people_norm($name);
-            if ($key === '' || !isset($aliasMap[$key]) || $aliasMap[$key] !== $personId) {
+        list($actorSql, $actorArgs) = work_summary_actor_filter($src['actor'], $aliases);
+        $isProd = $src['conn'] === 'prod';
+        // production เป็น datetime จริง ส่วนระบบซ่อม/เช่าเก็บวันที่เป็น varchar ISO
+        $dayExpr = $isProd ? "DATE({$src['date']})" : "LEFT({$src['date']}, 10)";
+        $range = $isProd
+            ? "{$src['date']} >= ? AND {$src['date']} < DATE_ADD(?, INTERVAL 1 DAY)"
+            : "{$src['date']} >= ? AND {$src['date']} <= ?";
+
+        $sql = "SELECT $dayExpr d, {$src['actor']} actor, {$src['nm']} nm, {$src['ref']} ref, {$src['ext']} ext
+                FROM {$src['from']}
+                WHERE $range AND {$src['actor']} IS NOT NULL AND TRIM({$src['actor']}) <> ''
+                  AND $actorSql"
+             . (isset($src['where']) ? ' AND ' . $src['where'] : '')
+             . ' ORDER BY d, nm';
+        try {
+            $st = $conn->prepare($sql);
+            if (!$st) {
+                $errors[] = $src['key'] . ': prepare ไม่ผ่าน';
                 continue;
             }
-            $byDay[$day][$r['cat']] = ($byDay[$day][$r['cat']] ?? 0) + $r['n'];
-            $total += $r['n'];
-            break; // คนคนเดียวโผล่ซ้ำในแถวเดียวไม่ควรนับสองรอบ
+            $args = array_merge([$from, $to], $actorArgs);
+            $st->bind_param(str_repeat('s', count($args)), ...$args);
+            $st->execute();
+            $res = $st->get_result();
+            while ($row = $res->fetch_assoc()) {
+                // ยืนยันอีกชั้นด้วยกติกาเดียวกับสรุปรายรอบ — ตัวกรองใน SQL เป็นแค่ตัวย่อผลลัพธ์
+                $mine = false;
+                foreach (work_people_split((string) $row['actor']) as $n) {
+                    $k = work_people_norm($n);
+                    if ($k !== '' && in_array($k, $aliases, true)) {
+                        $mine = true;
+                        break;
+                    }
+                }
+                if (!$mine) {
+                    continue;
+                }
+                $day = substr((string) $row['d'], 0, 10);
+                if ($day === '' || $day < $from || $day > $to) {
+                    continue;
+                }
+                $nm = trim((string) $row['nm']);
+                if ($nm === '') {
+                    $nm = '-';
+                }
+                $cat = $src['key'];
+                if (!isset($bucket[$day][$cat])) {
+                    $bucket[$day][$cat] = ['count' => 0, 'groups' => [], 'items' => []];
+                }
+                $bucket[$day][$cat]['count']++;
+                $bucket[$day][$cat]['groups'][$nm] = (isset($bucket[$day][$cat]['groups'][$nm])
+                    ? $bucket[$day][$cat]['groups'][$nm] : 0) + 1;
+                $bucket[$day][$cat]['items'][] = [
+                    'name'  => $nm,
+                    'ref'   => trim((string) (isset($row['ref']) ? $row['ref'] : '')),
+                    'extra' => trim((string) (isset($row['ext']) ? $row['ext'] : '')),
+                ];
+                $total++;
+            }
+            $st->close();
+        } catch (\Throwable $e) {
+            $errors[] = $src['key'] . ': ' . $e->getMessage();
         }
     }
-    ksort($byDay);
 
+    ksort($bucket);
     $days = [];
-    foreach ($byDay as $day => $counts) {
-        arsort($counts);
-        $items = [];
+    foreach ($bucket as $day => $byCat) {
+        // หมวดที่ทำเยอะสุดขึ้นก่อน — คนอ่านสนใจงานหลักของวันนั้น
+        uasort($byCat, function ($a, $b) { return $b['count'] <=> $a['count']; });
+        $catRows = [];
         $dayTotal = 0;
-        foreach ($counts as $k => $n) {
-            $items[] = ['key' => $k, 'label' => (string) ($cats[$k] ?? $k), 'count' => (int) $n];
-            $dayTotal += (int) $n;
+        foreach ($byCat as $catKey => $c) {
+            arsort($c['groups']);
+            $groups = [];
+            foreach ($c['groups'] as $nm => $n) {
+                $groups[] = ['name' => (string) $nm, 'count' => (int) $n];
+            }
+            $catRows[] = [
+                'key'    => (string) $catKey,
+                'label'  => (string) (isset($cats[$catKey]) ? $cats[$catKey] : $catKey),
+                'count'  => (int) $c['count'],
+                'groups' => $groups,
+                'items'  => $c['items'],
+            ];
+            $dayTotal += (int) $c['count'];
         }
-        $days[] = ['date' => $day, 'label' => work_summary_day_label($day), 'total' => $dayTotal, 'items' => $items];
+        $days[] = ['date' => $day, 'label' => work_summary_day_label($day),
+                   'total' => $dayTotal, 'cats' => $catRows];
     }
 
-    return ['days' => $days, 'total' => $total, 'errors' => $collected['errors']];
+    return ['days' => $days, 'total' => $total, 'errors' => $errors];
 }
