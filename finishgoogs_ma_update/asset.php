@@ -222,8 +222,7 @@ require __DIR__ . '/includes/ma_snippets.php';
 $tlData = asset_timeline_items($id);
 $tl = $tlData["tl"];
 $partsUsed = $tlData["partsUsed"];
-// false: ไม่แสดงผลตรวจ BOM แล้ว (เอาออกจากหน้านี้) ไม่ต้องคำนวณ qty-level ที่ query ข้าม DB
-$partsSummary = asset_parts_withdraw_summary($id, false);
+$partsSummary = asset_parts_withdraw_summary($id);
 $showPartsWithdraw = !empty($partsSummary['show_section']);
 // มีตารางอะไหล่ด้านบนแล้ว — ไม่แสดงคอลัมน์เบิกอะไหล่ซ้ำใน timeline
 if ($showPartsWithdraw && ($partsSummary['out_count'] > 0 || $partsUsed)) {

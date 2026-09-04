@@ -45,36 +45,6 @@ function list_search_form(array $fields, $clearUrl = '', array $hidden = []) {
 }
 
 /**
- * จัดกลุ่ม timeline ตามประเภทการทำรายการ
- *
- * @param array<int, array{d:string, type:string, html:string}> $tl
- * @return array<string, array<int, array{d:string, type:string, html:string}>>
- */
-function timeline_group_by_type(array $tl) {
-    $groups = [];
-    foreach ($tl as $e) {
-        $key = isset($e['type_key']) ? ui_timeline_group_key($e['type_key']) : timeline_type_group_legacy($e['type'] ?? '');
-        if (!isset($groups[$key])) $groups[$key] = [];
-        $groups[$key][] = $e;
-    }
-    foreach ($groups as $g => $items) {
-        $groups[$g] = timeline_sort_items($items);
-    }
-    return $groups;
-}
-
-/**
- * เรียงรายการ timeline ตามวันที่ (ใหม่ → เก่า)
- *
- * @param array<int, array{d:string}> $items
- * @return array<int, array{d:string}>
- */
-function timeline_sort_items(array $items) {
-    usort($items, function ($x, $y) { return strcmp($y['d'], $x['d']); });
-    return $items;
-}
-
-/**
  * ตัดกลุ่มออกจาก timeline (เช่น ไม่แสดงเบิกอะไหล่ซ้ำเมื่อมีตารางด้านบนแล้ว)
  *
  * @param array<int, array<string,mixed>> $tl
@@ -90,15 +60,6 @@ function timeline_exclude_groups(array $tl, array $groupKeys) {
         $key = isset($e['type_key']) ? ui_timeline_group_key($e['type_key']) : timeline_type_group_legacy($e['type'] ?? '');
         return !isset($skip[$key]);
     }));
-}
-
-/**
- * ลำดับคอลัมน์กลุ่มประวัติมาตรฐาน
- *
- * @return array<int, string>
- */
-function timeline_group_order() {
-    return ui_timeline_group_order();
 }
 
 /**
@@ -122,80 +83,6 @@ function timeline_type_group_legacy($type) {
         '↩️ คืนอะไหล่' => 'parts',
     ];
     return isset($map[$type]) ? $map[$type] : 'other';
-}
-
-/** @deprecated ใช้ ui_timeline_group_key แทน */
-function timeline_type_group($type) {
-    return timeline_type_group_legacy($type);
-}
-
-/**
- * แสดงรายการใน 1 คอลัมน์ของ board ประวัติ
- *
- * @param string $title ชื่อกลุ่ม
- * @param array<int, array{d:string, type:string, html:string}> $items
- * @param callable|null $actionsFn ฟังก์ชันสร้างปุ่มแก้ไข/ลบ (รับ $e, $assetId)
- * @param int $assetId
- * @return void
- */
-function timeline_board_column($title, array $items, $actionsFn = null, $assetId = 0) {
-    echo '<div class="tl-col">';
-    $headHtml = (strpos($title, '<') !== false) ? $title : ui_timeline_group_title_html($title);
-    echo '<div class="tl-col-head">' . $headHtml . ' <span class="muted">(' . count($items) . ')</span></div>';
-    echo '<ul class="timeline tl-col-list">';
-    foreach ($items as $e) {
-        $actions = ($actionsFn && is_callable($actionsFn)) ? $actionsFn($e, $assetId) : '';
-        echo '<li><div class="tl-date">' . dthai_full($e['d']) . '</div>'
-           . '<div class="tl-type">' . $e['type'] . '</div>'
-           . '<div class="tl-body">' . $e['html'] . $actions . '</div></li>';
-    }
-    echo '</ul></div>';
-}
-
-/**
- * แสดง timeline แบบจัดกลุ่มตามประเภท (details/summary แนวตั้ง)
- *
- * @param array<int, array{d:string, type:string, html:string}> $tl
- * @param callable|null $actionsFn
- * @param int $assetId
- * @return void
- */
-function asset_timeline_grouped_html(array $tl, $actionsFn = null, $assetId = 0) {
-    if (!$tl) {
-        echo '<p class="muted">ยังไม่มีประวัติ</p>';
-        return;
-    }
-    $groups = timeline_group_by_type($tl);
-    $order = timeline_group_order();
-    $seen = [];
-    foreach ($order as $g) {
-        if (empty($groups[$g])) continue;
-        $seen[$g] = true;
-        $items = $groups[$g];
-        echo '<details class="tl-group" style="margin-bottom:10px" open>';
-        echo '<summary style="cursor:pointer; font-weight:600; padding:8px 0">' . ui_timeline_group_title_html($g) . ' <span class="muted">(' . count($items) . ')</span></summary>';
-        echo '<ul class="timeline" style="margin-top:6px">';
-        foreach ($items as $e) {
-            $actions = ($actionsFn && is_callable($actionsFn)) ? $actionsFn($e, $assetId) : '';
-            echo '<li><div class="tl-date">' . dthai_full($e['d']) . '</div>'
-               . '<div class="tl-type">' . $e['type'] . '</div>'
-               . '<div style="font-size:13.5px; margin-top:3px">' . $e['html'] . $actions . '</div></li>';
-        }
-        echo '</ul></details>';
-    }
-    foreach ($groups as $g => $items) {
-        if (isset($seen[$g])) continue;
-        echo '<details class="tl-group" style="margin-bottom:10px">';
-        echo '<summary style="cursor:pointer; font-weight:600; padding:8px 0">' . ui_timeline_group_title_html($g) . ' <span class="muted">(' . count($items) . ')</span></summary>';
-        echo '<ul class="timeline" style="margin-top:6px">';
-        foreach ($items as $e) {
-            $actions = ($actionsFn && is_callable($actionsFn)) ? $actionsFn($e, $assetId) : '';
-            echo '<li><div class="tl-date">' . dthai_full($e['d']) . '</div>'
-               . '<div class="tl-type">' . $e['type'] . '</div>'
-               . '<div style="font-size:13.5px; margin-top:3px">' . $e['html'] . $actions . '</div></li>';
-        }
-        echo '</ul></details>';
-    }
 }
 
 /**
@@ -244,33 +131,4 @@ function asset_timeline_chrono_html(array $tl, $actionsFn = null, $assetId = 0) 
            . '<div class="tl-body">' . $e['html'] . $actions . '</div></li>';
     }
     echo '</ul>';
-}
-
-/**
- * แสดง timeline แบบ board แนวนอน — แต่ละคอลัมน์เป็น 1 ประเภทงาน เรียงตาม timestamp ภายในกลุ่ม
- *
- * @param array<int, array{d:string, type:string, html:string}> $tl
- * @param callable|null $actionsFn
- * @param int $assetId
- * @return void
- */
-function asset_timeline_board_html(array $tl, $actionsFn = null, $assetId = 0) {
-    if (!$tl) {
-        echo '<p class="muted">ยังไม่มีประวัติ</p>';
-        return;
-    }
-    $groups = timeline_group_by_type($tl);
-    $order = timeline_group_order();
-    echo '<div class="tl-board">';
-    $seen = [];
-    foreach ($order as $g) {
-        if (empty($groups[$g])) continue;
-        $seen[$g] = true;
-        timeline_board_column($g, $groups[$g], $actionsFn, $assetId);
-    }
-    foreach ($groups as $g => $items) {
-        if (isset($seen[$g])) continue;
-        timeline_board_column($g, $items, $actionsFn, $assetId);
-    }
-    echo '</div>';
 }

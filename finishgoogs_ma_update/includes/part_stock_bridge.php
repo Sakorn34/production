@@ -555,10 +555,9 @@ function asset_parts_production_url(string $assetCode): string
  * sync_state: none | movement_only | stock_only | synced
  *
  * @param int  $assetId
- * @param bool $withBomQtyDetail  true = คำนวณ BOM qty-level (ช้า — ใช้เฉพาะหน้า asset เดี่ยว)
  * @return array<string,mixed>
  */
-function asset_parts_withdraw_summary($assetId, $withBomQtyDetail = false) {
+function asset_parts_withdraw_summary($assetId) {
     $assetId = (int)$assetId;
     $asset = qr('SELECT product_id, asset_code FROM assets WHERE id=?', 'i', [$assetId])->fetch_assoc();
     if (!$asset) {
@@ -567,8 +566,6 @@ function asset_parts_withdraw_summary($assetId, $withBomQtyDetail = false) {
             'status' => 'none', 'label' => '—', 'sync_state' => 'none',
             'movements' => [], 'stock_docs' => [], 'stock_out_count' => 0,
             'in_parts_history' => false, 'show_section' => false,
-            'bom_match' => 'none', 'bom_qty_ok' => true,
-            'bom_extra_parts' => 0, 'bom_missing_parts' => 0,
         ];
     }
 
@@ -602,20 +599,6 @@ function asset_parts_withdraw_summary($assetId, $withBomQtyDetail = false) {
 
     $rowStatus = asset_parts_withdraw_row_status($outCount, $stockOutCount, $bomCount, $bomWithdrawn);
 
-    $bomMatch = 'none';
-    $bomQtyOk = true;
-    $bomExtraParts = 0;
-    $bomMissingParts = 0;
-    $bomActualTotal = 0.0;
-    if ($bomCount > 0 && $withBomQtyDetail && function_exists('production_bom_match_status')) {
-        $bomSt = production_bom_match_status($assetId, (int) $asset['product_id'], $sn);
-        $bomMatch = $bomSt['bom_match'];
-        $bomQtyOk = (bool) $bomSt['bom_qty_ok'];
-        $bomExtraParts = (int) $bomSt['bom_extra_parts'];
-        $bomMissingParts = (int) $bomSt['bom_missing_parts'];
-        $bomActualTotal = (float) ($bomSt['bom_actual_total'] ?? 0.0);
-    }
-
     $linkedOutCount = 0;
     if ($outCount > 0) {
         $linkedOutCount = (int) qr(
@@ -647,22 +630,6 @@ function asset_parts_withdraw_summary($assetId, $withBomQtyDetail = false) {
         }
     }
 
-    // เครื่องที่ "ไม่ครบ BOM" มีสองสาเหตุคนละเรื่องกัน: (1) เบิกผลิตจริงแต่เบิกไม่ครบ —
-    // ปัญหาจริงที่ต้องเตือน กับ (2) ไม่เคยมีรายการเบิกผลิต (label 'ผลิต') เลยสักแถว มีแต่เบิกซ่อม —
-    // มักเป็นเครื่องที่ผลิตไปก่อนมีระบบ BOM ไม่ใช่ปัญหา ต้องแยกออกจากกันตรงนี้เพราะ
-    // production_bom_match_status() เห็นแค่ยอด qty ที่นับตาม mode ที่มันรู้จัก ไม่เห็น label
-    if ($bomMatch === 'missing' && function_exists('part_movement_mode_label')) {
-        $hasProdWithdraw = false;
-        foreach ($movements as $mv) {
-            if (part_movement_mode_label($mv['mode'] ?? '') === 'ผลิต') {
-                $hasProdWithdraw = true;
-                break;
-            }
-        }
-        if (!$hasProdWithdraw) {
-            $bomMatch = 'never';
-        }
-    }
 
     $stockDocs = [];
     $ids = [];
@@ -704,11 +671,6 @@ function asset_parts_withdraw_summary($assetId, $withBomQtyDetail = false) {
         'in_parts_history'   => $stockOutCount > 0,
         'show_section'       => $showSection,
         'production_url'     => asset_parts_production_url($sn),
-        'bom_match'          => $bomMatch,
-        'bom_qty_ok'         => $bomQtyOk,
-        'bom_extra_parts'    => $bomExtraParts,
-        'bom_missing_parts'  => $bomMissingParts,
-        'bom_actual_total'   => $bomActualTotal,
         'linked_out_count'   => $linkedOutCount,
         'withdraw_list_sync' => $outCount > 0
             ? asset_withdraw_list_sync_status_from_counts($outCount, $stockOutCount, $linkedOutCount)
@@ -1467,9 +1429,7 @@ function part_movement_mode_from_form(string $formValue): string
 {
     $v = trim($formValue);
     if ($v === 'ผลิต') {
-        if (function_exists('production_bom_movement_modes')) {
-            return production_bom_movement_modes()[0] ?? 'เบิกอัตโนมัติ (ชุดอะไหล่รุ่น)';
-        }
+        // ต้องตรงกับที่ asset_new.php เขียนตอนเบิกชุดอะไหล่อัตโนมัติของเครื่องผลิตใหม่
         return 'เบิกอัตโนมัติ (ชุดอะไหล่รุ่น)';
     }
     if ($v === 'ซ่อม') {
@@ -1485,221 +1445,9 @@ function part_movement_mode_from_form(string $formValue): string
     return $v !== '' ? $v : 'เบิกใช้';
 }
 
-$__bomSyncPath = dirname(__DIR__, 2) . '/parts/includes/production_bom_sync.php';
-if (is_file($__bomSyncPath)) {
-    require_once $__bomSyncPath;
-}
-
 $__withdrawSyncPath = dirname(__DIR__, 2) . '/parts/includes/production_asset_withdraw_sync.php';
 if (is_file($__withdrawSyncPath)) {
     require_once $__withdrawSyncPath;
-}
-
-/**
- * ป้ายสถานะ BOM (qty-level) สำหรับแสดงใน UI
- *
- * BOM ผูกกับ "เบิกผลิต" เท่านั้น (โหมดผลิต + Set) เครื่องที่ผลิตไปก่อนมีระบบนี้จะไม่มีเบิก
- * ผลิตเลย มีแต่เบิกซ่อม — ไม่ใช่เครื่อง "เบิกไม่ครบ" แต่คือเครื่องที่ไม่เคยอยู่ในระบบ BOM มา
- * ตั้งแต่ต้น ต้องแยกข้อความออกจากกัน ไม่งั้นดูเหมือนมีปัญหาทั้งที่เป็นปกติ (ดู bom_match='never')
- *
- * @param array{bom_match:string,bom_count:int,bom_extra_parts:int,bom_missing_parts:int} $info
- * @return string
- */
-function asset_bom_match_label(array $info): string
-{
-    $bomCount = (int) ($info['bom_count'] ?? 0);
-    if ($bomCount <= 0) {
-        return '—';
-    }
-    $match = (string) ($info['bom_match'] ?? 'none');
-    if ($match === 'ok') {
-        return 'BOM ตรง ' . $bomCount . '/' . $bomCount;
-    }
-    if ($match === 'never') {
-        return 'ยังไม่มีเบิกผลิตตาม BOM (อาจผลิตก่อนใช้ระบบนี้)';
-    }
-    if ($match === 'extra') {
-        $n = (int) ($info['bom_extra_parts'] ?? 0);
-        return 'เบิกผลิตเกิน BOM (เกิน/ซ้ำ ' . $n . ' part)';
-    }
-    if ($match === 'missing') {
-        $n = (int) ($info['bom_missing_parts'] ?? 0);
-        return 'เบิกผลิตไม่ครบ BOM (ขาด ' . $n . ' part)';
-    }
-    if ($match === 'mixed') {
-        return 'เบิกผลิตไม่ตรง BOM (เกิน+ขาด)';
-    }
-    return 'ยังไม่เบิก BOM';
-}
-
-/**
- * ตรวจว่าเครื่องควรมีปุ่ม Sync ตาม BOM
- *
- * @param array<string,mixed> $summary จาก asset_parts_withdraw_summary()
- * @return bool
- */
-function asset_needs_bom_sync(array $summary): bool
-{
-    $bomCount = (int) ($summary['bom_count'] ?? 0);
-    if ($bomCount <= 0) {
-        return false;
-    }
-    $match = (string) ($summary['bom_match'] ?? 'none');
-    // 'never' = เครื่องที่ไม่เคยมีเบิกผลิตเลย (เช่นผลิตก่อนใช้ระบบ BOM) — ไม่ต้อง sync
-    // เพราะไม่มีอะไรให้ผูก จะมีก็แต่ "เพิ่มของทั้งชุดย้อนหลัง" ซึ่งไม่ใช่สิ่งที่ sync ควรทำเอง
-    return $match !== 'ok' && $match !== 'none' && $match !== 'never';
-}
-
-/**
- * Sync ตาม BOM — reconcile แล้วผูก stock_out
- *
- * @param int    $assetId
- * @param string $actor
- * @return array{ok:bool,removed:int,adjusted:int,added:int,linked:int,created:int,errors:array<int,string>,message?:string}
- */
-function asset_reconcile_bom_to_stock(int $assetId, string $actor): array
-{
-    if (!function_exists('production_reconcile_asset_bom')) {
-        return [
-            'ok' => false, 'removed' => 0, 'adjusted' => 0, 'added' => 0,
-            'linked' => 0, 'created' => 0, 'errors' => ['ระบบ Sync BOM ไม่พร้อม'],
-            'message' => 'ระบบ Sync BOM ไม่พร้อม',
-        ];
-    }
-    return production_reconcile_asset_bom($assetId, $actor);
-}
-
-/**
- * SQL เงื่อนไขเครื่องที่ BOM ไม่ตรง (auto movement qty — ไม่รวม Set ข้าม DB)
- *
- * @return array{sql:string,types:string,params:array<int|string>}
- */
-function asset_bom_mismatch_sql(): array
-{
-    $mode = production_bom_movement_modes()[0] ?? 'เบิกอัตโนมัติ (ชุดอะไหล่รุ่น)';
-    return [
-        'sql' => ' AND EXISTS (SELECT 1 FROM bom_items b WHERE b.product_id = a.product_id)
-          AND (
-            EXISTS (
-              SELECT 1 FROM bom_items b
-              WHERE b.product_id = a.product_id
-              AND ABS(
-                (SELECT COALESCE(SUM(pm.qty), 0) FROM part_movements pm
-                 WHERE pm.ref_asset_id = a.id AND pm.direction = \'out\' AND pm.mode = ?
-                   AND pm.part_id = b.part_id) - b.qty_per_unit
-              ) > 0.0001
-            )
-            OR EXISTS (
-              SELECT 1 FROM part_movements pm
-              WHERE pm.ref_asset_id = a.id AND pm.direction = \'out\' AND pm.mode = ?
-                AND NOT EXISTS (
-                  SELECT 1 FROM bom_items b
-                  WHERE b.product_id = a.product_id AND b.part_id = pm.part_id
-                )
-            )
-          )',
-        'types' => 'ss',
-        'params' => [$mode, $mode],
-    ];
-}
-
-/**
- * นับเครื่องที่ BOM ไม่ตรง (query เดียว — ใช้แสดงปุ่ม bulk)
- *
- * @param string $whereSql
- * @param string $types
- * @param array<int|string> $params
- * @return int
- */
-function asset_bom_sync_pending_count_fast(string $whereSql, string $types, array $params): int
-{
-    $frag = asset_bom_mismatch_sql();
-    $row = qr(
-        "SELECT COUNT(*) c FROM assets a JOIN products p ON p.id = a.product_id
-         $whereSql {$frag['sql']}",
-        $types . $frag['types'],
-        array_merge($params, $frag['params'])
-    )->fetch_assoc();
-    return (int) ($row['c'] ?? 0);
-}
-
-/**
- * นับเครื่อง BOM ไม่ตรง (cache session 60 วิ — ลด load ซ้ำ)
- *
- * @param string $whereSql
- * @param string $types
- * @param array<int|string> $params
- * @return int
- */
-function asset_bom_sync_pending_count_cached(string $whereSql, string $types, array $params): int
-{
-    $key = 'bom_pending_' . md5($whereSql . '|' . $types . '|' . serialize($params));
-    $now = time();
-    if (isset($_SESSION[$key], $_SESSION[$key . '_t']) && ($now - (int) $_SESSION[$key . '_t']) < 60) {
-        return (int) $_SESSION[$key];
-    }
-    $cnt = asset_bom_sync_pending_count_fast($whereSql, $types, $params);
-    $_SESSION[$key] = $cnt;
-    $_SESSION[$key . '_t'] = $now;
-    return $cnt;
-}
-
-/**
- * รายการ asset.id ที่ BOM ไม่ตรง (query เดียว — ใช้ตอน bulk POST)
- *
- * @param string $whereSql
- * @param string $types
- * @param array<int|string> $params
- * @return array<int,int>
- */
-function asset_ids_needing_bom_sync(string $whereSql, string $types, array $params): array
-{
-    $frag = asset_bom_mismatch_sql();
-    $res = qr(
-        "SELECT a.id FROM assets a JOIN products p ON p.id = a.product_id
-         $whereSql {$frag['sql']}",
-        $types . $frag['types'],
-        array_merge($params, $frag['params'])
-    );
-    $ids = [];
-    while ($row = $res->fetch_assoc()) {
-        $ids[] = (int) $row['id'];
-    }
-    return $ids;
-}
-
-/**
- * Sync BOM หลายเครื่อง
- *
- * @param array<int,int> $assetIds
- * @param string         $actor
- * @return array{ok:bool,assets:int,removed:int,added:int,errors:array<int,string>,message?:string}
- */
-function asset_reconcile_bom_bulk(array $assetIds, string $actor): array
-{
-    $result = ['ok' => true, 'assets' => 0, 'removed' => 0, 'added' => 0, 'errors' => []];
-    foreach ($assetIds as $id) {
-        $id = (int) $id;
-        if ($id <= 0) {
-            continue;
-        }
-        $r = asset_reconcile_bom_to_stock($id, $actor);
-        $result['assets']++;
-        $result['removed'] += (int) ($r['removed'] ?? 0) + (int) ($r['adjusted'] ?? 0);
-        $result['added'] += (int) ($r['added'] ?? 0);
-        if (!empty($r['errors'])) {
-            foreach ($r['errors'] as $e) {
-                $result['errors'][] = "asset #{$id}: {$e}";
-            }
-        }
-        if (!($r['ok'] ?? true) && empty($r['removed']) && empty($r['added'])) {
-            $result['ok'] = false;
-        }
-    }
-    if ($result['assets'] > 0) {
-        $result['message'] = "Sync BOM {$result['assets']} เครื่อง · ลบ/ปรับ {$result['removed']} · เพิ่ม {$result['added']}";
-    }
-    return $result;
 }
 
 /**

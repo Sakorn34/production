@@ -505,40 +505,6 @@ function ui_timeline_group_key(string $typeKey): string
 }
 
 /**
- * ชื่อหัวคอลัมน์กลุ่ม timeline
- *
- * @param string $groupKey
- * @return string HTML
- */
-function ui_timeline_group_title_html(string $groupKey): string
-{
-    static $titles = [
-        'production' => ['assets', 'บันทึกผลิต / QC'],
-        'update'     => ['updates', 'อัปเดต FW/HW'],
-        'ma'         => ['ma', 'เข้า MA'],
-        'rent_ma'    => ['ma', 'MA (ระบบเช่า)'],
-        'parts'      => ['parts', 'เบิกอะไหล่ใช้กับเครื่องนี้'],
-        'repair'     => ['repairs', 'งานซ่อม'],
-        'stock'      => ['box', 'สถานะคลัง'],
-        'spare'      => ['refresh', 'เครื่องสำรอง'],
-    ];
-    $pair = $titles[$groupKey] ?? ['clipboard', $groupKey];
-    return '<span class="tl-type-label h-with-icon">'
-        . ui_icon_html($pair[0], 14, 'tl-svg')
-        . '<span>' . htmlspecialchars($pair[1], ENT_QUOTES, 'UTF-8') . '</span></span>';
-}
-
-/**
- * ลำดับกลุ่ม timeline มาตรฐาน
- *
- * @return array<int, string>
- */
-function ui_timeline_group_order(): array
-{
-    return ['production', 'update', 'ma', 'rent_ma', 'parts', 'repair', 'stock', 'spare'];
-}
-
-/**
  * รหัสชุด deploy สำหรับแสดงบนหน้าเว็บ
  *
  * แอปผลิตมี APP_RELEASE_VERSION จาก config.php อยู่แล้ว ส่วนแอปอะไหล่ใช้คนละ config
