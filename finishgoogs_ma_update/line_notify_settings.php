@@ -663,7 +663,10 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
     <label>Channel Secret
 
-      <input type="password" name="channel_secret" value="<?= !empty($form['has_secret']) ? h($tokenPh) : '' ?>" placeholder="ไม่บังคับ" autocomplete="off">
+      <input type="password" name="channel_secret" value="<?= !empty($form['has_secret']) ? h($tokenPh) : '' ?>" placeholder="ต้องใส่ถ้าจะให้พนักงานผูกไลน์เอง" autocomplete="off">
+
+      <span class="muted" style="font-size:12px">ใช้ตรวจลายเซ็น webhook ตอนพนักงานทักรหัสมาผูกไลน์
+        (หน้า "สรุปงานรายคน") — ไม่ใส่ = ผูกบัญชีไม่ได้ ส่วนแจ้งเตือนอื่นยังส่งปกติ</span>
 
     </label>
 
