@@ -194,16 +194,10 @@ function render_status_legend($activeSt = null)
     if ($activeSt !== null && in_array($activeSt, status_list(), true)) {
         $items = [$activeSt];
     }
-    // กดป้ายเพื่อ highlight เฉพาะสถานะนั้นในกราฟ (dashStatusFilter, index.php) — มีประโยชน์
-    // เฉพาะตอนเห็นครบ 6 ป้าย ให้เลือก ถ้าเหลือป้ายเดียว (มุมมองที่ filter มาแล้วจากที่อื่น
-    // เช่นใน modal) ก็ไม่มีอะไรให้สลับ จึงคงเป็น <span> ธรรมดาไม่ต้องดูเหมือนกดได้
-    $clickable = count($items) > 1;
     echo '<div class="dash-status-legend dash-status-legend-top">';
     foreach ($items as $st) {
-        $tag = $clickable ? 'button' : 'span';
-        $attr = $clickable ? ' type="button" data-status="' . h($st) . '"' : '';
-        echo '<' . $tag . ' class="dash-status-legend-item"' . $attr . '><i class="dash-status-swatch dash-swatch-' . h($st) . '"></i>'
-           . h(status_th_chip($st)) . '</' . $tag . '>';
+        echo '<span class="dash-status-legend-item"><i class="dash-status-swatch dash-swatch-' . h($st) . '"></i>'
+           . h(status_th_chip($st)) . '</span>';
     }
     echo '</div>';
 }
@@ -255,18 +249,25 @@ function render_dashboard_stacked_chart(array $points, $multiSeries = true, $fil
     }
 
     echo '<div class="' . $rootClass . '">';
-    echo '<div class="dash-chart-top">';
-    if (!$compact) {
-        echo '<div class="dash-chart-head">';
-        echo '<div class="dash-chart-total">' . number_format($grandTotal) . ' <span class="dash-chart-unit">เครื่อง</span>';
-        if ($periodLabel !== '') {
-            echo ' <span class="dash-chart-period muted">· ' . h($periodLabel) . '</span>';
+    // hide_legend: หน้า dashboard หลักมีการ์ด "เครื่องทั้งหมด" ที่เป็นคีย์สีอยู่แล้ว (มีตัวเลข
+    // กับ % ด้วย) legend ตรงนี้จะซ้ำชื่อสถานะชุดเดิมอีกรอบโดยไม่เพิ่มข้อมูลอะไร · ส่วนกราฟที่
+    // เปิดใน modal ไม่มีการ์ดนั้นให้ดู จึงยังต้องมี legend ของตัวเอง — ผู้เรียกเป็นคนบอก
+    $hideLegend = !empty($opts['hide_legend']);
+    if (!$compact || !$hideLegend) {
+        echo '<div class="dash-chart-top">';
+        if (!$compact) {
+            echo '<div class="dash-chart-head">';
+            echo '<div class="dash-chart-total">' . number_format($grandTotal) . ' <span class="dash-chart-unit">เครื่อง</span>';
+            if ($periodLabel !== '') {
+                echo ' <span class="dash-chart-period muted">· ' . h($periodLabel) . '</span>';
+            }
+            echo '</div></div>';
         }
-        echo '</div></div>';
+        if (!$hideLegend) {
+            render_status_legend($multiSeries ? null : $activeSt);
+        }
+        echo '</div>';
     }
-
-    render_status_legend($multiSeries ? null : $activeSt);
-    echo '</div>';
 
     echo '<div class="dash-chart-body">';
     echo '<div class="dash-chart-yaxis" aria-hidden="true">';

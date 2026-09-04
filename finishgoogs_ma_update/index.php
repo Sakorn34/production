@@ -371,7 +371,7 @@ $partsBase = ui_parts_base_url();
         true,
         null,
         '',
-        ['compact' => true, 'inline_drill' => true, 'root_class' => 'dash-prod-stacked', 'show_hint' => false]
+        ['compact' => true, 'inline_drill' => true, 'root_class' => 'dash-prod-stacked', 'show_hint' => false, 'hide_legend' => true]
     ); ?>
   </div>
   <div id="dash-prod-month-views" hidden>
@@ -382,7 +382,7 @@ $partsBase = ui_parts_base_url();
           true,
           null,
           'ปี ' . thai_buddhist_year((int) $y),
-          ['compact' => true, 'root_class' => 'dash-prod-stacked', 'show_hint' => false]
+          ['compact' => true, 'root_class' => 'dash-prod-stacked', 'show_hint' => false, 'hide_legend' => true]
       ); ?>
     </div>
     <?php } ?>
@@ -736,8 +736,8 @@ $partsBase = ui_parts_base_url();
   // สถานะนั้นในทั้งสองที่พร้อมกัน ไม่ใช่แค่การ์ดเดียว — ผูกด้วย [data-status] แบบเดียวกัน
   // ที่ฝังไว้ในทุกจุด (แถบสัดส่วน, legend การ์ด, legend กราฟ, แท่งกราฟรายปี/รายเดือน)
   // เป็น state บนหน้าเว็บล้วน ๆ ไม่ยิง request ใหม่ ตัวเลขที่ต้องใช้มีอยู่ใน DOM แล้ว
-  var TARGET_SEL = '.status-legend-item[data-status], .dash-status-legend-item[data-status],'
-    + ' .status-bar-seg[data-status], .dash-bar-seg[data-status]';
+  var TARGET_SEL = '.status-legend-item[data-status], .status-bar-seg[data-status],'
+    + ' .dash-bar-seg[data-status]';
   var active = null;
 
   function apply() {
@@ -753,12 +753,6 @@ $partsBase = ui_parts_base_url();
     apply();
   }
   window.dashStatusFilter = { toggle: toggle };
-
-  // ป้าย legend บนกราฟรายปีเป็น <button data-status> (เฉพาะตอนโชว์ครบ 6 ป้ายให้เลือก)
-  document.addEventListener('click', function (e) {
-    var btn = e.target.closest('.dash-status-legend-item[data-status]');
-    if (btn) { toggle(btn.getAttribute('data-status')); }
-  });
 })();
 </script>
 
