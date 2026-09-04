@@ -512,6 +512,35 @@ function ma_job_detail_html(array $j): string
 }
 
 /**
+ * ช่อง "สิ่งที่ทำกับเครื่อง" ในแถวตาราง — ย่อจากรายการเต็มที่อยู่ในส่วนกาง
+ *
+ * งาน 71%% มี 1-2 รายการ แต่มีถึง 10 รายการได้ ตัดโชว์แค่ 3 แล้วบอกจำนวนที่เหลือ
+ * กดกางแถวดูครบได้อยู่แล้ว · งานที่ไม่อนุมัติซ่อม (1,425 งาน) รายการพวกนั้นคือ
+ * สิ่งที่ "เสนอไป" ไม่ได้ทำจริง จึงใช้ชิปเส้นประให้ต่างจากงานที่ทำแล้ว
+ *
+ * @param  array<string,mixed> $j
+ * @param  bool $declined
+ * @return string HTML (escape แล้ว)
+ */
+function ma_job_items_cell_html(array $j, bool $declined): string
+{
+    $items = ma_repair_items($j);
+    if (!$items) {
+        return '<span class="muted">—</span>';
+    }
+    $cls = 'ma-cell-items' . ($declined ? ' is-proposed' : '');
+    $out = '<span class="' . $cls . '" title="' . h(implode(' · ', $items)) . '">';
+    foreach (array_slice($items, 0, 3) as $it) {
+        $out .= '<span>' . h($it) . '</span>';
+    }
+    $rest = count($items) - 3;
+    if ($rest > 0) {
+        $out .= '<span class="ma-cell-more">+' . $rest . '</span>';
+    }
+    return $out . '</span>';
+}
+
+/**
  * ตารางงานซ่อม
  *
  * @param  array<int,array<string,mixed>> $jobs
@@ -522,7 +551,8 @@ function ma_jobs_table_html(array $jobs): string
     $out = '<div class="ma-card"><div class="ma-tblscroll"><div class="ma-tbl">'
         . '<div class="ma-thead">'
         . '<span>เลขงาน</span><span>วันที่รับ</span><span>สถานะ</span>'
-        . '<span>อาการที่แจ้ง</span><span>วันที่เสร็จ</span><span></span>'
+        . '<span>อาการที่แจ้ง</span><span>สิ่งที่ทำกับเครื่อง</span>'
+        . '<span>วันที่เสร็จ</span><span></span>'
         . '</div>';
 
     foreach ($jobs as $j) {
@@ -545,6 +575,7 @@ function ma_jobs_table_html(array $jobs): string
             . '<span><span class="ma-pill ' . ($open ? 'ma-pill-open' : 'ma-pill-done') . '">'
             . h($status ?? 'ไม่ระบุ') . '</span></span>'
             . '<span>' . h(ma_val($j['trp_repair_inform'] ?? null) ?? '—') . $flags . '</span>'
+            . '<span>' . ma_job_items_cell_html($j, $declined) . '</span>'
             . '<span class="ma-mono">' . h(ma_date_iso($j['trp_success_date'] ?? null) ?? '—') . '</span>'
             . '<svg class="ma-chev" width="14" height="14" viewBox="0 0 24 24" fill="none"'
             . ' stroke="currentColor" stroke-width="2.5" stroke-linecap="round"'

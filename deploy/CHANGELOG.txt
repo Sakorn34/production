@@ -2680,3 +2680,18 @@ Files:
   finishgoogs_ma_update/includes/part_stock_bridge.php
   shared/ui_icons.php
 
+
+================================================================
+v2026-09-04_094357 | Patch | 2026-09-04 09:43:59
+From: 2026-09-04_001243  ->  To: acaceb8  |  Files: 7
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/list_search.php
+  finishgoogs_ma_update/includes/maintenance_repair_bridge.php
+  finishgoogs_ma_update/includes/part_stock_bridge.php
+  shared/ui_icons.php
+

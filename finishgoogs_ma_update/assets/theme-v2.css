@@ -948,16 +948,16 @@ a.kpi:hover { text-decoration: none; }
 }
 
 /* ── ตารางงานซ่อม: แถวกางได้ ───────────────────────────────────────────── */
-.ma-tbl { min-width: 660px; }
+.ma-tbl { min-width: 900px; }
 .ma-thead {
-  display: grid; grid-template-columns: 92px 96px 116px 1fr 96px 18px;
+  display: grid; grid-template-columns: 92px 96px 116px minmax(0, 1fr) minmax(0, 1fr) 96px 18px;
   gap: 10px; padding: 9px 10px; border-bottom: 1px solid var(--border);
   font-size: 12px; font-weight: 600; color: var(--text-muted);
 }
 .ma-jobrow { border-top: 1px solid var(--border); }
 .ma-jobrow:first-of-type { border-top: 0; }
 .ma-jobrow > summary {
-  display: grid; grid-template-columns: 92px 96px 116px 1fr 96px 18px;
+  display: grid; grid-template-columns: 92px 96px 116px minmax(0, 1fr) minmax(0, 1fr) 96px 18px;
   gap: 10px; align-items: baseline; padding: 10px; cursor: pointer;
   list-style: none; font-size: 13.5px;
 }
@@ -1285,3 +1285,21 @@ a.kpi:hover { text-decoration: none; }
 .tl-checklist-box[open] > .tl-checklist-toggle::before { transform: rotate(45deg); }
 .tl-checklist-toggle:hover { background: color-mix(in srgb, var(--primary) 8%, #fff); }
 .tl-checklist-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* ── ช่อง "สิ่งที่ทำกับเครื่อง" ในแถวตารางงานซ่อม ────────────────────────
+   ชิปเล็กกว่าในส่วนกาง เพราะต้องอยู่ในความสูงบรรทัดเดียวของแถว */
+.ma-cell-items { display: flex; flex-wrap: wrap; gap: 4px; }
+.ma-cell-items > span {
+  font-size: 11.5px; line-height: 1.5;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 5px; padding: 1px 7px;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* งานที่ไม่อนุมัติซ่อม — รายการคือสิ่งที่เสนอไป ไม่ได้ทำจริง เส้นประบอกความต่าง */
+.ma-cell-items.is-proposed > span {
+  background: var(--surface-muted); border-style: dashed; color: var(--text-muted);
+}
+.ma-cell-items .ma-cell-more {
+  background: transparent; border-color: transparent;
+  color: var(--text-faint); font-weight: 600; padding-left: 2px;
+}
