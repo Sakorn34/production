@@ -229,6 +229,10 @@ page_header('ระบบหลังบ้าน — ตั้งค่าร�
     <?= ui_icon_html('bell', 28, 'h-svg') ?>
     <div><b>แจ้งเตือน LINE</b><div class="muted">Token · Group ID · เปิด/ปิด event · ทดสอบส่ง · Outbox</div></div>
   </a>
+  <a class="card clickable" href="<?= BASE_URL ?>/work_report.php" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; min-width:auto">
+    <?= ui_icon_html('chart', 28, 'h-svg') ?>
+    <div><b>สรุปงานรายคน</b><div class="muted">งานรายคนต่อรอบเดือน · ทะเบียนคน · ผูกไลน์ · ส่งสรุป</div></div>
+  </a>
   <a class="card clickable" href="<?= BASE_URL ?>/server_config.php" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; min-width:auto">
     <?= ui_icon_html('settings', 28, 'h-svg') ?>
     <div><b>ตั้งค่า Server / Deploy</b><div class="muted">Path secrets · DB ทั้ง 3 ตัว · SSO · ทดสอบการเชื่อมต่อ</div></div>

@@ -294,7 +294,7 @@ function ui_nav_items_finishgoogs(): array
         ['file' => 'ma.php',      'icon' => 'ma',        'label' => 'บันทึก MA'],
         ['file' => 'parts.php',   'icon' => 'parts',     'label' => 'อะไหล่ใช้ผลิต'],
         ['file' => 'repairs.php', 'icon' => 'repairs',   'label' => 'ประวัติซ่อม'],
-        ['file' => 'work_report.php', 'icon' => 'chart', 'label' => 'สรุปงานรายคน'],
+        // สรุปงานรายคนย้ายเข้าระบบหลังบ้าน (settings.php) แล้ว จึงไม่อยู่ในเมนูงานหลัก
         ['file' => 'scan.php',    'icon' => 'scan',      'label' => 'สแกน QR'],
     ];
 

@@ -626,7 +626,6 @@ function nav_default() {
         ['ma.php',         'ma',        'บันทึก MA',         true],
         ['parts.php',      'parts',     'อะไหล่',            true],
         ['repairs.php',    'repairs',   'ประวัติซ่อม',        true],
-        ['work_report.php','chart',     'สรุปงานรายคน',      true],
         ['scan.php',       'scan',      'สแกน QR',           true],
         ['settings.php',   'settings',  'ระบบหลังบ้าน',      true],
     ];
