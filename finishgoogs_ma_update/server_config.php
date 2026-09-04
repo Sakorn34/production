@@ -93,7 +93,7 @@ page_header('ตั้งค่า Server / Deploy');
     <?php foreach ($health as $c) { ?>
       <div class="deploy-card <?= $c['ok'] ? 'ok' : 'fail' ?>">
         <b><?= h($c['label']) ?></b>
-        <span class="muted" style="font-size:12px; word-break:break-all"><?= h($c['detail']) ?></span>
+        <span class="muted" style="font-size:12px; overflow-wrap:anywhere"><?= h($c['detail']) ?></span>
       </div>
     <?php } ?>
   </div>

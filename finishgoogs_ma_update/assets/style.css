@@ -267,6 +267,41 @@ img.broken { visibility: hidden; }
 .notif-overlay[hidden] { display: none !important; }
 .notif-box { background: #fff; border-radius: var(--radius-sm, 8px); padding: 22px 26px; width: min(480px, 90vw); max-height: 70vh; overflow: auto; }
 
+/* กล่อง overlay สำหรับ "ฟอร์ม" — กว้างกว่ากล่องแจ้งเตือน และหัวเรื่องค้างอยู่ที่เดิม
+   ตอนเลื่อนดูฟอร์มยาว ๆ */
+.form-modal-box { width: min(660px, 94vw); max-height: 88vh; padding: 0; display: flex; flex-direction: column; }
+.form-modal-head {
+  display: flex; align-items: center; gap: 10px; padding: 14px 18px;
+  border-bottom: 1px solid var(--border, #dfe4ec);
+}
+.form-modal-head h2 { margin: 0; flex: 1; font-size: calc(16px * var(--font-scale, 1)); }
+.form-modal-body { overflow-y: auto; padding: 16px 18px; }
+/* ในกล่อง overlay ฟอร์มไม่ต้องมีกรอบของตัวเองอีก — ซ้อนกรอบสองชั้นดูแน่นและเบียด */
+.form-modal-body .formgrid { max-width: 100%; width: 100%; border: 0; padding: 0; background: none; }
+
+/* การ์ดทางลัดในระบบหลังบ้าน
+   เดิมเป็น flex-wrap ที่ให้ทุกใบกว้างตามเนื้อหา ขอบขวาจึงไม่ตรงกันสักใบและ
+   เหลือที่ว่างข้างขวาเป็นขั้นบันได — grid ทำให้ทุกใบกว้างเท่ากันและเรียงเป็นแถวจริง */
+.admin-cards {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 10px; margin-bottom: 16px;
+}
+.admin-cards .card {
+  display: flex; align-items: center; gap: 12px; margin: 0; min-width: 0;
+  text-decoration: none; color: inherit;
+}
+/* min-width:0 ทั้งสองชั้น ไม่งั้นข้อความยาวดันกล่องจนล้นออกนอกคอลัมน์ */
+.admin-cards .card > div { min-width: 0; }
+.admin-cards .card b { display: block; margin-bottom: 2px; }
+.admin-cards .card .muted { font-size: calc(12px * var(--font-scale, 1)); line-height: 1.4; }
+.admin-cards .h-svg { flex: none; }
+
+/* แถบเหนือรายการรุ่นสินค้า — ช่องค้นหายืดได้ ปุ่มเพิ่มอยู่ขวาสุดเสมอ */
+.prod-list-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.prod-list-bar #prod-list-search { flex: 1 1 240px; max-width: 360px; }
+.prod-list-bar button { margin-left: auto; }
+.form-modal-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+
 /* modal dashboard drill-down — ขยายเต็มจอ ไม่ scroll เมื่อเป็นกรaph */
 #list-overlay .list-modal-box {
   width: min(860px, 96vw);
@@ -908,6 +943,12 @@ button:active, .btn:active { transform: scale(.96); }
   .app.sidebar-top { flex-direction: column; }
   .app.sidebar-top .sidebar { display: flex; }
   .formgrid { grid-template-columns: 1fr; }
+  /* พอเหลือคอลัมน์เดียว ป้ายไปอยู่บนช่องกรอก การจำกัดช่องไว้ 280px จึงเหลือที่ว่าง
+     ข้างขวาครึ่งกล่อง ดูเหมือนกรอบเพี้ยน — คอลัมน์เดียวให้ช่องกว้างเต็มไปเลย */
+  .formgrid input[type=text]:not(.chip-dd-filter), .formgrid input[type=number],
+  .formgrid input[type=date], .formgrid input[type=datetime-local],
+  .formgrid input[type=url]:not(.chip-dd-filter), .formgrid input[type=password],
+  .formgrid select:not([multiple]) { max-width: 100%; }
   .asset-head { flex-direction: column; }
   .ppl-list { grid-template-columns: 1fr 1fr; }
 }

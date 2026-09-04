@@ -224,36 +224,36 @@ if ($pid) {
 }
 page_header('ระบบหลังบ้าน — ตั้งค่ารุ่นและฟิลด์');
 ?>
-<div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px">
-  <a class="card clickable" href="<?= BASE_URL ?>/line_notify_settings.php" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; min-width:auto">
+<div class="admin-cards">
+  <a class="card clickable" href="<?= BASE_URL ?>/line_notify_settings.php">
     <?= ui_icon_html('bell', 28, 'h-svg') ?>
     <div><b>แจ้งเตือน LINE</b><div class="muted">Token · Group ID · เปิด/ปิด event · ทดสอบส่ง · Outbox</div></div>
   </a>
-  <a class="card clickable" href="<?= BASE_URL ?>/work_report.php" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; min-width:auto">
+  <a class="card clickable" href="<?= BASE_URL ?>/work_report.php">
     <?= ui_icon_html('chart', 28, 'h-svg') ?>
     <div><b>สรุปงานรายคน</b><div class="muted">งานรายคนต่อรอบเดือน · ทะเบียนคน · ผูกไลน์ · ส่งสรุป</div></div>
   </a>
-  <a class="card clickable" href="<?= BASE_URL ?>/server_config.php" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; min-width:auto">
+  <a class="card clickable" href="<?= BASE_URL ?>/server_config.php">
     <?= ui_icon_html('settings', 28, 'h-svg') ?>
     <div><b>ตั้งค่า Server / Deploy</b><div class="muted">Path secrets · DB ทั้ง 3 ตัว · SSO · ทดสอบการเชื่อมต่อ</div></div>
   </a>
-  <a class="card clickable" href="<?= BASE_URL ?>/appearance.php" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; min-width:auto">
+  <a class="card clickable" href="<?= BASE_URL ?>/appearance.php">
     <?= ui_icon_html('palette', 28, 'h-svg') ?>
     <div><b>ปรับแต่งหน้าตาระบบ</b><div class="muted">ข้อความ · โลโก้ · สีธีม · เมนู (ไอคอน/ลำดับ/ตำแหน่ง)</div></div>
   </a>
-  <a class="card clickable" href="<?= BASE_URL ?>/share_admin.php" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; min-width:auto">
+  <a class="card clickable" href="<?= BASE_URL ?>/share_admin.php">
     <?= ui_icon_html('switch', 28, 'h-svg') ?>
     <div><b>เปรียบเทียบ assets ↔ stock</b><div class="muted">รายการไม่ตรงกัน · ค้นหา · แก้ไข · ลบ · Sync · Import</div></div>
   </a>
-  <a class="card clickable" href="<?= BASE_URL ?>/share.php" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; min-width:auto">
+  <a class="card clickable" href="<?= BASE_URL ?>/share.php">
     <?= ui_icon_html('clipboard', 28, 'h-svg') ?>
     <div><b>ทะเบียนสินค้า (stock)</b><div class="muted">ดู · ค้นหา · แก้ไข · ลบรายการประจำวัน</div></div>
   </a>
-  <a class="card clickable" href="<?= BASE_URL ?>/system_doc.php" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; min-width:auto">
+  <a class="card clickable" href="<?= BASE_URL ?>/system_doc.php">
     <?= ui_icon_html('book', 28, 'h-svg') ?>
     <div><b>หลักการทำงานของระบบ</b><div class="muted">DB · ตาราง · Data flow · ฟังก์ชัน · สิทธิ์ผู้ใช้</div></div>
   </a>
-  <a class="card clickable" href="<?= BASE_URL ?>/activity_logs.php" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; min-width:auto">
+  <a class="card clickable" href="<?= BASE_URL ?>/activity_logs.php">
     <?= ui_icon_html('history', 28, 'h-svg') ?>
     <div><b>Activity Log</b><div class="muted">ความเคลื่อนไหวผู้ใช้ · Production + Parts · Export CSV</div></div>
   </a>
@@ -280,8 +280,11 @@ page_header('ระบบหลังบ้าน — ตั้งค่าร�
 <?php if (!$product) {
     $rows = product_admin_list_query();
 ?>
-<div style="margin-bottom:12px">
-  <input type="text" id="prod-list-search" placeholder="ค้นหาชื่อรุ่น / รหัสสินค้า / prefix" style="width:min(360px,100%)">
+<div class="prod-list-bar">
+  <input type="text" id="prod-list-search" placeholder="ค้นหาชื่อรุ่น / รหัสสินค้า / prefix">
+  <button type="button" class="btn-with-icon" onclick="openOverlay('new-product-overlay')">
+    <?= ui_btn_label('plus', 'เพิ่มรุ่นสินค้า') ?>
+  </button>
 </div>
 <div class="grid-products" id="prod-list-grid" style="margin-bottom:24px">
 <?php while ($r = $rows->fetch_assoc()) { ?>
@@ -301,18 +304,39 @@ page_header('ระบบหลังบ้าน — ตั้งค่าร�
 <?php } ?>
 </div>
 
-<?= ui_heading('box', 'เพิ่มรุ่นสินค้าใหม่') ?>
-<form method="post" class="formgrid" enctype="multipart/form-data" id="form-new-product">
-  <?= csrf_field() ?><input type="hidden" name="new_product" value="1">
-  <label>รหัสสินค้า (PRD)</label><input type="text" name="product_code" required placeholder="เช่น PRD004" maxlength="20">
-  <label>ชื่อรุ่น</label><input type="text" name="name" required maxlength="150">
-  <label>หมวด</label><input type="text" name="category" placeholder="PRD / ACC / STK" maxlength="50">
-  <?php product_admin_code_fields(null, 'new'); ?>
-  <label>รูปสินค้า</label><input type="file" name="icon" accept="image/*">
-  <div class="full"><button type="submit" class="btn-with-icon"><?= ui_btn_label('plus', 'เพิ่มรุ่นสินค้า') ?></button></div>
-</form>
+<?php // ฟอร์มเพิ่มรุ่นอยู่ใน popup — เดิมกางเต็มความยาวหน้าอยู่ใต้รายการรุ่น ทั้งที่นาน ๆ
+      // ใช้ที ทำให้ต้องเลื่อนผ่านทุกครั้งกว่าจะถึงท้ายหน้า ?>
+<div id="new-product-overlay" class="notif-overlay" hidden>
+  <div class="notif-box form-modal-box" role="dialog" aria-modal="true" aria-labelledby="new-product-title">
+    <div class="form-modal-head">
+      <h2 id="new-product-title" class="h-with-icon"><?= ui_icon_html('box', 20, 'h-svg') ?><span>เพิ่มรุ่นสินค้าใหม่</span></h2>
+      <button type="button" class="btn-sm btn-line btn-icon-only" onclick="closeOverlay('new-product-overlay')"
+        aria-label="ปิด"><?= ui_icon_html('close', 16, 'btn-svg') ?></button>
+    </div>
+    <div class="form-modal-body">
+      <form method="post" class="formgrid" enctype="multipart/form-data" id="form-new-product">
+        <?= csrf_field() ?><input type="hidden" name="new_product" value="1">
+        <label>รหัสสินค้า (PRD)</label><input type="text" name="product_code" required placeholder="เช่น PRD004" maxlength="20">
+        <label>ชื่อรุ่น</label><input type="text" name="name" required maxlength="150">
+        <label>หมวด</label><input type="text" name="category" placeholder="PRD / ACC / STK" maxlength="50">
+        <?php product_admin_code_fields(null, 'new'); ?>
+        <label>รูปสินค้า</label><input type="file" name="icon" accept="image/*">
+        <div class="full form-modal-actions">
+          <button type="submit" class="btn-with-icon"><?= ui_btn_label('plus', 'เพิ่มรุ่นสินค้า') ?></button>
+          <button type="button" class="btn btn-line" onclick="closeOverlay('new-product-overlay')">ยกเลิก</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 <?php product_admin_code_script(); ?>
 <script>
+// เพิ่มรุ่นไม่ผ่าน validate จะเด้งกลับมาพร้อม ?new=1 — เปิด popup ค้างไว้ให้แก้ต่อ
+// ต้องรอ DOMContentLoaded เพราะ openOverlay() ถูกประกาศใน page_footer() ซึ่งอยู่ท้ายหน้า
+// เรียกตรงนี้เลยจะได้ ReferenceError แล้วสคริปต์ที่เหลือในบล็อกนี้ตายทั้งก้อน
+document.addEventListener('DOMContentLoaded', function () {
+  if (location.search.indexOf('new=1') !== -1) { openOverlay('new-product-overlay'); }
+});
 document.getElementById('prod-list-search').addEventListener('input', function(){
   var q = this.value.trim().toLowerCase();
   document.querySelectorAll('#prod-list-grid .pcard').forEach(function(el){

@@ -80,16 +80,19 @@ function product_admin_handle_post() {
         $name = trim((string)(isset($_POST['name']) ? $_POST['name'] : ''));
         if ($pcode === '' || $name === '') {
             flash_set('กรุณากรอกรหัสสินค้าและชื่อรุ่น', 'err');
-            return BASE_URL . '/settings.php';
+            // ?new=1 ให้หน้าเปิด popup เพิ่มรุ่นค้างไว้ ผู้ใช้จะได้แก้ต่อทันทีไม่ต้องกดเปิดใหม่
+            return BASE_URL . '/settings.php?new=1';
         }
         if ($code['code_mode'] === 'generated' && $code['code_use_prefix'] && $code['code_prefix'] === null) {
             flash_set('ติ๊กใช้ชื่อย่อแล้ว กรุณากรอกค่าชื่อย่อ', 'err');
-            return BASE_URL . '/settings.php';
+            // ?new=1 ให้หน้าเปิด popup เพิ่มรุ่นค้างไว้ ผู้ใช้จะได้แก้ต่อทันทีไม่ต้องกดเปิดใหม่
+            return BASE_URL . '/settings.php?new=1';
         }
         $dup = qr("SELECT id FROM products WHERE product_code=?", 's', [$pcode])->fetch_assoc();
         if ($dup) {
             flash_set('รหัสสินค้า "' . $pcode . '" มีอยู่ในระบบแล้ว', 'err');
-            return BASE_URL . '/settings.php';
+            // ?new=1 ให้หน้าเปิด popup เพิ่มรุ่นค้างไว้ ผู้ใช้จะได้แก้ต่อทันทีไม่ต้องกดเปิดใหม่
+            return BASE_URL . '/settings.php?new=1';
         }
         $icon = save_upload('icon', 'products');
         $cat = trim((string)(isset($_POST['category']) ? $_POST['category'] : ''));

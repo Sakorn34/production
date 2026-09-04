@@ -151,7 +151,7 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
 .ln-send-form { display:inline; margin:0; }
 
-.ln-plesk-path { font-family:Consolas,'Courier New',monospace; font-size:11px; word-break:break-all; color:var(--text, #374151); line-height:1.35; }
+.ln-plesk-path { font-family:Consolas,'Courier New',monospace; font-size:11px; overflow-wrap:anywhere; color:var(--text, #374151); line-height:1.35; }
 
 .ln-plesk-hint { font-size:11px; color:#6b7280; margin-top:2px; }
 
@@ -285,7 +285,7 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
     <b>ไฟล์ secrets</b>
 
-    <span class="muted" style="word-break:break-all; font-size:12px"><?= h($secretsPath) ?></span>
+    <span class="muted" style="overflow-wrap:anywhere; font-size:12px"><?= h($secretsPath) ?></span>
 
   </div>
 
@@ -329,7 +329,7 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
       <b>ไฟล์ log</b>
 
-      <span class="muted" style="word-break:break-all; font-size:11px"><?= h((string)$pleskDiag['log_path']) ?></span>
+      <span class="muted" style="overflow-wrap:anywhere; font-size:11px"><?= h((string)$pleskDiag['log_path']) ?></span>
 
       <?= !empty($pleskDiag['log_exists']) ? ' · พบแล้ว' : ' · ยังไม่มี' ?>
 
