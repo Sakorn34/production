@@ -67,9 +67,11 @@ function line_notify_config(bool $reload = false): array
         'channel_access_token'  => '',
         'channel_secret'        => '',
         'default_recipient_id'  => '',
-        // bot ตัวที่สองสำหรับทดสอบ — เปิด test_mode แล้วทุกอย่างวิ่งเข้าห้องนี้แทน
+        // bot ตัวที่สอง (bot สำรอง) — ใช้ 2 งาน: เปิด test_mode แล้วทุกอย่างวิ่งเข้าห้องนี้แทน
+        // และเป็นตัวส่งข้อความหาไลน์ส่วนตัวรายคน เพราะ bot ตัวจริงใช้ในกลุ่มอย่างเดียว
         'test_mode'             => false,
         'test_channel_access_token' => '',
+        'test_channel_secret'   => '',
         'test_recipient_id'     => '',
         'enabled'               => false,
         'public_production_url' => '',
@@ -574,7 +576,12 @@ function line_notify_dispatch(string $eventKey, array $payload, array $opts = []
     if (!$stmt) {
         return null;
     }
-    $bot = line_notify_active_bot();
+    // $opts['bot'] สำหรับอีเวนต์ที่ต้องส่งด้วย bot ตัวใดตัวหนึ่งเสมอ ไม่ว่าโหมดจะเป็นอะไร
+    // (เช่น สรุปงานรายคนที่ต้องส่งเข้าไลน์ส่วนตัว ซึ่ง bot ตัวจริงใช้ในกลุ่มอย่างเดียว)
+    $bot = trim((string)($opts['bot'] ?? ''));
+    if ($bot !== 'main' && $bot !== 'test') {
+        $bot = line_notify_active_bot();
+    }
     $stmt->bind_param('sssss', $eventKey, $dedupKey, $recipient, $bot, $json);
     $ok = $stmt->execute();
     $id = $ok ? (int)$db->insert_id : null;

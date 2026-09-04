@@ -14,6 +14,7 @@
 
 require __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/work_people.php';
+require_once __DIR__ . '/includes/work_summary_send.php';   // WORK_SUMMARY_LINE_BOT
 require_once dirname(__DIR__) . '/shared/line_notify_core.php';
 
 // LINE ถือว่า response ที่ไม่ใช่ 2xx = ส่งไม่สำเร็จ แล้วจะยิงซ้ำรัว ๆ
@@ -23,14 +24,14 @@ header('Content-Type: application/json; charset=utf-8');
 $raw = file_get_contents('php://input');
 $sig = isset($_SERVER['HTTP_X_LINE_SIGNATURE']) ? (string) $_SERVER['HTTP_X_LINE_SIGNATURE'] : '';
 
+// ผูกกับ bot สำรองเท่านั้น — bot ตัวจริงส่งเข้ากลุ่มอย่างเดียวและไม่ได้เปิด webhook
+// userId ของ LINE ผูกกับ channel ดังนั้นตัวที่ตรวจลายเซ็น ตัวที่ตอบ และตัวที่ส่งสรุป
+// ต้องเป็น bot เดียวกันทั้งหมด ไม่งั้นได้ userId ที่ส่งข้อความไม่ถึง
 $cfg = line_notify_config();
-$secret = '';
-foreach (['channel_secret', 'test_channel_secret'] as $k) {
-    if (!empty($cfg[$k])) { $secret = trim((string) $cfg[$k]); break; }
-}
+$secret = trim((string) ($cfg['test_channel_secret'] ?? ''));
 
 if ($secret === '') {
-    error_log('[line_webhook] ยังไม่ได้ตั้ง channel_secret — ปฏิเสธทุก request');
+    error_log('[line_webhook] ยังไม่ได้ตั้ง test_channel_secret (bot สำรอง) — ปฏิเสธทุก request');
     http_response_code(503);
     echo json_encode(['ok' => false, 'error' => 'no secret'], JSON_UNESCAPED_UNICODE);
     exit;
@@ -71,7 +72,7 @@ foreach ($events as $ev) {
     if (!preg_match('/\b([A-Za-z0-9]{8})\b/', $text, $m)) {
         continue;
     }
-    $res = work_people_consume_link_code($m[1], $userId, line_webhook_display_name($userId));
+    $res = work_people_consume_link_code($m[1], $userId, line_webhook_display_name($userId), WORK_SUMMARY_LINE_BOT);
     if (!empty($res['ok'])) {
         $replies[] = [$replyToken, 'ผูกบัญชีเรียบร้อย ✅' . "\n"
             . 'คุณ ' . (string) ($res['person']['display_name'] ?? '') . ' จะได้รับสรุปงานทุกวันที่ 21 ครับ'];
@@ -95,7 +96,7 @@ echo json_encode(['ok' => true, 'handled' => count($events)], JSON_UNESCAPED_UNI
  */
 function line_webhook_display_name(string $userId): string
 {
-    $token = line_notify_bot_token(line_notify_active_bot());
+    $token = line_notify_bot_token(WORK_SUMMARY_LINE_BOT);
     if ($token === '' || $userId === '') {
         return '';
     }
@@ -127,7 +128,7 @@ function line_webhook_display_name(string $userId): string
  */
 function line_webhook_reply(string $replyToken, string $text): void
 {
-    $token = line_notify_bot_token(line_notify_active_bot());
+    $token = line_notify_bot_token(WORK_SUMMARY_LINE_BOT);
     if ($replyToken === '' || $token === '') {
         return;
     }

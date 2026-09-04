@@ -663,10 +663,10 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
     <label>Channel Secret
 
-      <input type="password" name="channel_secret" value="<?= !empty($form['has_secret']) ? h($tokenPh) : '' ?>" placeholder="ต้องใส่ถ้าจะให้พนักงานผูกไลน์เอง" autocomplete="off">
+      <input type="password" name="channel_secret" value="<?= !empty($form['has_secret']) ? h($tokenPh) : '' ?>" placeholder="ไม่บังคับ" autocomplete="off">
 
-      <span class="muted" style="font-size:12px">ใช้ตรวจลายเซ็น webhook ตอนพนักงานทักรหัสมาผูกไลน์
-        (หน้า "สรุปงานรายคน") — ไม่ใส่ = ผูกบัญชีไม่ได้ ส่วนแจ้งเตือนอื่นยังส่งปกติ</span>
+      <span class="muted" style="font-size:12px">bot ตัวจริงส่งเข้ากลุ่มอย่างเดียว ไม่ได้ใช้ webhook
+        — การผูกไลน์รายคนย้ายไปใช้ Channel Secret ของ bot สำรองด้านล่างแล้ว</span>
 
     </label>
 
@@ -706,15 +706,27 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
     </label>
 
-    <label>Channel Access Token (bot ทดสอบ)
+    <label>Channel Access Token (bot สำรอง)
 
-      <input type="password" name="test_channel_access_token" value="<?= !empty($form['has_test_token']) ? h($tokenPh) : '' ?>" placeholder="ของ bot อีกตัวที่ใช้ทดสอบ" autocomplete="off">
+      <input type="password" name="test_channel_access_token" value="<?= !empty($form['has_test_token']) ? h($tokenPh) : '' ?>" placeholder="ของ bot อีกตัวที่ใช้ส่งหาไลน์ส่วนตัว" autocomplete="off">
+
+      <span class="muted" style="font-size:12px">bot สำรองทำ 2 หน้าที่ — ห้องปลายทางตอนเปิดโหมดทดสอบ
+        และเป็นตัวส่ง "สรุปงานรายคน" เข้าไลน์ส่วนตัวเสมอ เพราะ bot ตัวจริงใช้ในกลุ่มอย่างเดียว</span>
+
+    </label>
+
+    <label>Channel Secret (bot สำรอง)
+
+      <input type="password" name="test_channel_secret" value="<?= !empty($form['has_test_secret']) ? h($tokenPh) : '' ?>" placeholder="ต้องใส่ถ้าจะให้พนักงานผูกไลน์เอง" autocomplete="off">
+
+      <span class="muted" style="font-size:12px">ใช้ตรวจลายเซ็น webhook ตอนพนักงานทักรหัสมาผูกไลน์
+        — Webhook URL ต้องตั้งที่ channel ของ bot สำรอง ไม่ใช่ตัวจริง</span>
 
     </label>
 
     <label>Group / User ID ห้องทดสอบ
 
-      <input type="text" name="test_recipient_id" value="<?= h($form['test_recipient_id']) ?>" placeholder="ห้องที่ bot ทดสอบอยู่">
+      <input type="text" name="test_recipient_id" value="<?= h($form['test_recipient_id']) ?>" placeholder="ห้องที่ bot สำรองอยู่">
 
     </label>
 

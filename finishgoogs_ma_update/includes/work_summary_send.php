@@ -13,6 +13,17 @@ require_once dirname(__DIR__, 2) . '/shared/line_notify_core.php';
 const WORK_SUMMARY_SEND_GROUPS = 3;
 
 /**
+ * bot ที่ใช้ส่งสรุปงานรายคน — "bot สำรอง" (ในโค้ดเดิมเรียก test)
+ *
+ * bot ตัวจริงตั้งไว้ให้ทำงานในกลุ่มเท่านั้น จึงส่งหาไลน์ส่วนตัวไม่ได้ สรุปงานรายคน
+ * เลยต้องออกทาง bot สำรองเสมอ ไม่ว่าโหมดทดสอบจะเปิดหรือปิด
+ *
+ * ผลที่ตามมาที่ต้องรู้: userId ของ LINE **ผูกกับ channel** คนที่เคยผูกไว้กับ bot
+ * ตัวจริงจึงใช้กับ bot สำรองไม่ได้ ต้องผูกใหม่ผ่าน bot สำรอง (ดู work_people.line_user_bot)
+ */
+const WORK_SUMMARY_LINE_BOT = 'test';
+
+/**
  * URL ฐานของแอปนี้สำหรับลิงก์ในไลน์
  *
  * BASE_URL เดามาจาก SCRIPT_NAME ซึ่งตอนรันผ่าน cron (CLI) ไม่มีให้เดา เลยตกไปที่
@@ -75,7 +86,7 @@ function work_summary_send_cycle(array $cycle, ?int $onlyPerson = null, bool $fo
         $work[(int) $row['id']] = $row;
     }
 
-    foreach (work_people_recipients() as $person) {
+    foreach (work_people_recipients(WORK_SUMMARY_LINE_BOT) as $person) {
         $pid = (int) $person['id'];
         if ($onlyPerson !== null && $pid !== $onlyPerson) {
             continue;
@@ -124,6 +135,7 @@ function work_summary_send_cycle(array $cycle, ?int $onlyPerson = null, bool $fo
 
         $id = line_notify_dispatch('work.summary.monthly', $payload, [
             'recipient_id' => (string) $person['line_user_id'],
+            'bot'          => WORK_SUMMARY_LINE_BOT,
             // กันส่งซ้ำถ้า cron รันซ้ำรอบเดิม — ผูกกับคน+รอบ
             'dedup_key'    => 'work.summary.monthly:' . $pid . ':' . $cycle['key'],
             'dedup_ttl'    => 60 * 86400,

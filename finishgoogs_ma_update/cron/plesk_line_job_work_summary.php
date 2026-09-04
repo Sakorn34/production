@@ -41,7 +41,7 @@ if ($dryRun) {
         $work[(int) $r['id']] = (int) $r['total'];
     }
     $lines = [];
-    foreach (work_people_recipients() as $p) {
+    foreach (work_people_recipients(WORK_SUMMARY_LINE_BOT) as $p) {
         $n = $work[(int) $p['id']] ?? 0;
         $lines[] = sprintf('  %-14s %s', $p['display_name'], $n > 0 ? number_format($n) . ' รายการ' : '— ไม่มีงาน (ข้าม)');
     }

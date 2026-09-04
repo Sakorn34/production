@@ -97,6 +97,15 @@ function work_people_ensure_schema(): void
             db()->query('ALTER TABLE work_people ADD view_token CHAR(32) DEFAULT NULL AFTER notify_enabled');
             db()->query('ALTER TABLE work_people ADD UNIQUE KEY uq_view_token (view_token)');
         }
+        // userId ของ LINE ผูกกับ channel ไม่ใช่กับคน — ที่ได้มาจาก bot ตัวหนึ่งใช้ส่งด้วย
+        // bot อีกตัวไม่ได้ ต้องจำไว้ว่า userId นี้มาจาก bot ไหน ไม่งั้นวันที่ย้าย bot
+        // จะกลายเป็นส่งไม่ออกเงียบ ๆ โดยหน้าจอยังขึ้นว่า "ผูกแล้ว"
+        $col = db()->query("SHOW COLUMNS FROM work_people LIKE 'line_user_bot'");
+        if ($col && $col->num_rows === 0) {
+            db()->query("ALTER TABLE work_people ADD line_user_bot VARCHAR(10) DEFAULT NULL AFTER line_display_name");
+            // ที่ผูกไว้ก่อนหน้านี้มาจาก bot ตัวจริงทั้งหมด (webhook เดิมรับแต่ตัวนั้น)
+            db()->query("UPDATE work_people SET line_user_bot='main' WHERE line_user_id IS NOT NULL AND line_user_bot IS NULL");
+        }
         // alias เป็น PK กันชื่อเดียวไปผูกสองคน — เก็บเป็นตัวพิมพ์เล็กที่ normalize แล้ว
         db()->query(
             "CREATE TABLE IF NOT EXISTS work_person_aliases (
@@ -376,7 +385,7 @@ function work_people_issue_link_code(int $personId, int $ttlMinutes = 60): ?stri
  * @param  string $lineDisplayName
  * @return array{ok:bool,person?:array<string,mixed>,error?:string}
  */
-function work_people_consume_link_code(string $code, string $lineUserId, string $lineDisplayName = ''): array
+function work_people_consume_link_code(string $code, string $lineUserId, string $lineDisplayName = '', string $bot = 'main'): array
 {
     work_people_ensure_schema();
     $code = strtoupper(trim($code));
@@ -401,10 +410,11 @@ function work_people_consume_link_code(string $code, string $lineUserId, string 
         q('UPDATE work_people SET line_user_id=NULL, line_display_name=NULL WHERE line_user_id=? AND id<>?',
           'si', [$lineUserId, (int) $row['id']]);
         q(
-            'UPDATE work_people SET line_user_id=?, line_display_name=?, link_code=NULL, link_code_expires_at=NULL
+            'UPDATE work_people SET line_user_id=?, line_display_name=?, line_user_bot=?,
+                    link_code=NULL, link_code_expires_at=NULL
              WHERE id=?',
-            'ssi',
-            [$lineUserId, $lineDisplayName, (int) $row['id']]
+            'sssi',
+            [$lineUserId, $lineDisplayName, $bot, (int) $row['id']]
         );
         return ['ok' => true, 'person' => $row];
     } catch (\mysqli_sql_exception $e) {
@@ -438,21 +448,25 @@ function work_people_set_notify(int $personId, bool $on): void
  *
  * @return array<int,array<string,mixed>>
  */
-function work_people_recipients(): array
+function work_people_recipients(string $bot = 'main'): array
 {
     work_people_ensure_schema();
     $out = [];
     try {
-        $res = db()->query(
+        // เอาเฉพาะคนที่ผูกไว้กับ bot ตัวที่จะใช้ส่ง — userId จาก bot อื่นส่งไปก็ไม่ถึง
+        $res = qr(
             'SELECT id, display_name, line_user_id, line_display_name FROM work_people
              WHERE notify_enabled=1 AND is_active=1
                AND line_user_id IS NOT NULL AND TRIM(line_user_id) <> ""
-             ORDER BY display_name'
+               AND COALESCE(line_user_bot, "main") = ?
+             ORDER BY display_name',
+            's',
+            [$bot]
         );
         while ($row = $res->fetch_assoc()) {
             $out[] = $row;
         }
-    } catch (\mysqli_sql_exception $e) {
+    } catch (\Throwable $e) {
         error_log('[work_people_recipients] ' . $e->getMessage());
     }
     return $out;

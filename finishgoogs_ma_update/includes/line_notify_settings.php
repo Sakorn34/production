@@ -82,10 +82,12 @@ function line_settings_form_defaults(): array
         // API ของ setupsystem — production ไม่ได้คำนวณยอดที่ต้องผลิตเพิ่มเอง
         'finishgood_shortage_api_url' => (string)($cfg['finishgood_shortage_api_url'] ?? ''),
         'has_shortage_token'    => trim((string)($cfg['finishgood_shortage_api_token'] ?? '')) !== '',
-        // bot ทดสอบ — เปิดสวิตช์แล้วทุกการแจ้งเตือนวิ่งเข้าห้องนี้แทนกลุ่มจริง
+        // bot สำรอง — ใช้ 2 งาน: เปิดสวิตช์ทดสอบแล้วทุกการแจ้งเตือนวิ่งเข้าห้องนี้แทนกลุ่มจริง
+        // และเป็นตัวส่งสรุปงานเข้าไลน์ส่วนตัวรายคนเสมอ (bot ตัวจริงใช้ในกลุ่มอย่างเดียว)
         'test_mode'             => !empty($cfg['test_mode']),
         'test_recipient_id'     => (string)($cfg['test_recipient_id'] ?? ''),
         'has_test_token'        => trim((string)($cfg['test_channel_access_token'] ?? '')) !== '',
+        'has_test_secret'       => trim((string)($cfg['test_channel_secret'] ?? '')) !== '',
     ];
 }
 
@@ -129,6 +131,10 @@ function line_settings_parse_post(array $post): array
     if ($testToken === '' || $testToken === LINE_SETTINGS_TOKEN_PLACEHOLDER) {
         $testToken = (string)($existing['test_channel_access_token'] ?? '');
     }
+    $testSecret = trim((string)($post['test_channel_secret'] ?? ''));
+    if ($testSecret === '' || $testSecret === LINE_SETTINGS_TOKEN_PLACEHOLDER) {
+        $testSecret = (string)($existing['test_channel_secret'] ?? '');
+    }
     $shortageToken = trim((string)($post['finishgood_shortage_api_token'] ?? ''));
     if ($shortageToken === '' || $shortageToken === LINE_SETTINGS_TOKEN_PLACEHOLDER) {
         $shortageToken = (string)($existing['finishgood_shortage_api_token'] ?? '');
@@ -149,6 +155,7 @@ function line_settings_parse_post(array $post): array
         'finishgood_shortage_api_token' => $shortageToken,
         'test_mode'             => !empty($post['test_mode']),
         'test_channel_access_token' => $testToken,
+        'test_channel_secret'   => $testSecret,
         'test_recipient_id'     => trim((string)($post['test_recipient_id'] ?? '')),
     ];
 }
@@ -206,6 +213,7 @@ function line_settings_build_secrets_php(array $cfg): string
         'finishgood_shortage_api_token' => (string)($cfg['finishgood_shortage_api_token'] ?? ''),
         'test_mode'             => !empty($cfg['test_mode']),
         'test_channel_access_token' => (string)($cfg['test_channel_access_token'] ?? ''),
+        'test_channel_secret'   => (string)($cfg['test_channel_secret'] ?? ''),
         'test_recipient_id'     => (string)($cfg['test_recipient_id'] ?? ''),
     ];
 

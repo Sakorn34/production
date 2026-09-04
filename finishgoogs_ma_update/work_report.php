@@ -8,6 +8,7 @@
 require __DIR__ . '/config.php';
 require __DIR__ . '/includes/layout.php';
 require_once __DIR__ . '/includes/work_summary.php';
+require_once __DIR__ . '/includes/work_summary_send.php';
 require_login();
 
 $B = BASE_URL;
@@ -47,7 +48,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: ' . $back . '#people'); exit;
     }
     if (isset($_POST['send_summary'])) {
-        require_once __DIR__ . '/includes/work_summary_send.php';
         $only = (int) ($_POST['only_person'] ?? 0);
         // กดส่งทีละคน ("ส่งทดสอบ") = สั่งเอง ต้องได้ส่งจริงทุกครั้ง ไม่ให้ dedup บล็อก
         $res = work_summary_send_cycle($cycle, $only > 0 ? $only : null, $only > 0);
@@ -79,8 +79,20 @@ $activeCats = array_filter($cats, function ($label, $key) use ($summary) {
     return !empty($summary['totals'][$key]);
 }, ARRAY_FILTER_USE_BOTH);
 $people = work_people_all();
-$linked = array_filter($people, function ($p) { return !empty($p['line_user_id']); });
-$willSend = work_people_recipients();
+// นับเฉพาะที่ผูกไว้กับ bot ตัวที่ใช้ส่งจริง — userId จาก bot อื่นส่งไปไม่ถึง ต้องผูกใหม่
+$linkedOk = function ($p) {
+    return !empty($p['line_user_id'])
+        && (string) ($p['line_user_bot'] ?? 'main') === WORK_SUMMARY_LINE_BOT;
+};
+$linked = array_filter($people, $linkedOk);
+$stale = array_filter($people, function ($p) use ($linkedOk) {
+    return !empty($p['line_user_id']) && !$linkedOk($p);
+});
+$willSend = work_people_recipients(WORK_SUMMARY_LINE_BOT);
+$willSendIds = [];
+foreach ($willSend as $w) {
+    $willSendIds[(int) $w['id']] = true;
+}
 
 page_header('สรุปงานรายคน', true, $cycle['label'] . ' · รวมงานจาก production · ซ่อม · เช่า');
 ?>
@@ -117,8 +129,10 @@ page_header('สรุปงานรายคน', true, $cycle['label'] . ' ·
     <td>
       <a class="wr-person" title="เปิดหน้าสรุปงานของคนนี้ — ดูว่าวันไหนทำอะไรบ้าง"
          href="<?= $B ?>/my_work.php?p=<?= (int) $p['id'] ?>&amp;c=<?= h($cycle['to']) ?>"><?= h($p['name']) ?></a>
-      <?php if ($p['line_user_id'] === '') { ?><span class="wr-tag wr-tag-off">ยังไม่ผูก LINE</span>
+      <?php $ready = isset($willSendIds[(int) $p['id']]);
+      if ($p['line_user_id'] === '') { ?><span class="wr-tag wr-tag-off">ยังไม่ผูก LINE</span>
       <?php } elseif (!$p['notify']) { ?><span class="wr-tag wr-tag-mute">ปิดส่ง</span>
+      <?php } elseif (!$ready) { ?><span class="wr-tag wr-tag-mute">ต้องผูกใหม่</span>
       <?php } else { ?><span class="wr-tag wr-tag-on">ส่ง</span><?php } ?>
     </td>
     <?php foreach ($activeCats as $k => $label) {
@@ -152,7 +166,14 @@ page_header('สรุปงานรายคน', true, $cycle['label'] . ' ·
   <span class="muted wr-h2-meta"><?= count($linked) ?>/<?= count($people) ?> คนผูก LINE แล้ว · จะส่งจริง <?= count($willSend) ?> คน</span>
 </h2>
 <p class="muted wr-hint">ติ๊ก <b>ส่ง</b> เพื่อเลือกว่าจะส่งสรุปให้ใครบ้าง — คนที่ยังไม่ผูก LINE จะถูกข้ามแม้ติ๊กไว้
-  · วิธีผูก: กด "ออกรหัส" แล้วให้เจ้าตัวทักรหัสนั้นไปหาบอต LINE</p>
+  · วิธีผูก: กด "ออกรหัส" แล้วให้เจ้าตัวทักรหัสนั้นไปหา <b>bot สำรอง</b> (bot ตัวจริงใช้ในกลุ่มอย่างเดียว)</p>
+<?php if ($stale) { ?>
+<p class="muted wr-warn"><?= ui_icon_html('alert', 13) ?>
+  <?= count($stale) ?> คนผูกไว้กับ bot ตัวเดิม — LINE ให้ userId แยกตาม bot ของเดิมจึงส่งไม่ถึง
+  ต้องกด "ออกรหัส" ให้ผูกใหม่ผ่าน bot สำรอง:
+  <?= h(implode(' · ', array_map(function ($p) { return (string) $p['display_name']; }, $stale))) ?>
+</p>
+<?php } ?>
 <form method="post" class="wr-inline wr-sync">
   <?= csrf_field() ?>
   <button type="submit" name="sync_directory" value="1" class="btn btn-sm btn-line"><?= ui_btn_label('refresh', 'อัปเดตทะเบียนชื่อ') ?></button>
@@ -169,7 +190,10 @@ page_header('สรุปงานรายคน', true, $cycle['label'] . ' ·
     <td><b><?= h($p['display_name']) ?></b></td>
     <td class="muted wr-alias"><?= h((string) ($p['aliases'] ?? '')) ?></td>
     <td>
-      <?php if ($hasLine) { ?>
+      <?php if ($hasLine && !$linkedOk($p)) { ?>
+        <span class="wr-tag wr-tag-mute">ผูกกับ bot เดิม</span>
+        <span class="muted">ต้องออกรหัสให้ผูกใหม่</span>
+      <?php } elseif ($hasLine) { ?>
         <span class="wr-tag wr-tag-on">ผูกแล้ว</span>
         <?php if (!empty($p['line_display_name'])) { ?><span class="muted"><?= h($p['line_display_name']) ?></span><?php } ?>
       <?php } elseif (!empty($p['link_code']) && strtotime((string) $p['link_code_expires_at']) > time()) { ?>
@@ -194,14 +218,15 @@ page_header('สรุปงานรายคน', true, $cycle['label'] . ' ·
       <form method="post" class="wr-inline">
         <?= csrf_field() ?>
         <input type="hidden" name="person_id" value="<?= $pid ?>">
-        <?php if ($hasLine) { ?>
+        <?php // ผูกไว้กับ bot เดิมก็ยังต้องออกรหัสใหม่ได้ ไม่งั้นย้าย bot แล้วติดตาย
+        if ($hasLine && $linkedOk($p)) { ?>
         <button type="submit" name="unlink" value="1" class="btn btn-sm btn-line"
           onclick="return confirm('ถอดการผูก LINE ของ <?= h($p['display_name']) ?>?')">ถอด</button>
         <?php } else { ?>
         <button type="submit" name="issue_code" value="1" class="btn btn-sm btn-line">ออกรหัส</button>
         <?php } ?>
       </form>
-      <?php if ($hasLine && $on) { ?>
+      <?php if (isset($willSendIds[$pid]) && $on) { ?>
       <form method="post" class="wr-inline"
         onsubmit="return confirm('ส่งสรุปรอบนี้ให้ <?= h($p['display_name']) ?> คนเดียว?')">
         <?= csrf_field() ?>
