@@ -202,11 +202,17 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   .dash-top-row { grid-template-columns: 1fr; }
 }
 .kpi-status-overview { padding-bottom: 14px; }
+/* แท่งสัดส่วน — แยกเป็นบล็อกมีช่องไฟเหมือน .dash-bar-stack ของกราฟรายปี (gap 3px,
+   มุมมนเท่ากัน) เดิมเป็นแท่งเดียวยาวติดกัน คนละภาษาภาพกับกราฟทั้งที่เล่าเรื่องเดียวกัน */
 .status-bar {
-  display: flex; height: 10px; border-radius: 999px; overflow: hidden;
-  margin-top: 12px; background: var(--surface-muted);
+  display: flex; gap: 3px; height: 10px; margin-top: 12px;
 }
-.status-bar-seg { display: block; min-width: 2px; transition: filter .12s, opacity .15s; }
+/* min-width พอให้บล็อกเล็กสุดยังเห็น แต่ไม่กว้างจนสถานะที่ต่างกันสิบเท่า (เสื่อมสภาพ 390
+   กับสูญหาย 13) ถูกดันไปชนพื้นเท่ากันหมดจนอ่านสัดส่วนผิด */
+.status-bar-seg {
+  display: block; min-width: 4px; border-radius: var(--radius-sm, 8px);
+  transition: filter .12s, opacity .15s;
+}
 .status-bar-seg:hover, .status-bar-seg:focus-visible { filter: brightness(0.92); }
 .status-legend {
   display: flex; flex-wrap: wrap; gap: 4px 2px;
