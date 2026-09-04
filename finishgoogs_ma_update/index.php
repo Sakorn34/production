@@ -309,22 +309,23 @@ $partsBase = ui_parts_base_url();
           $dataUrl = "$B/dashboard_data.php?type=asset_models&st=$st";
           $href = "$B/assets.php?status=$st";
       ?>
-      <a class="status-bar-seg" style="flex:<?= $flex ?> 1 0; background:<?= h(dash_chart_color($st)) ?>"
+      <a class="status-bar-seg" data-status="<?= h($st) ?>" style="flex:<?= $flex ?> 1 0; background:<?= h(dash_chart_color($st)) ?>"
          href="<?= h($href) ?>"
          onclick="if(event.ctrlKey||event.metaKey||event.shiftKey||event.button===1)return true;<?= h(modal_js($modalTitle, $dataUrl, $href)) ?>;return false;"
          title="<?= h(status_th_chip($st) . ': ' . number_format($n) . ' เครื่อง (' . pct_label($n, $total) . ')') ?>"></a>
       <?php endforeach; ?>
     </div>
     <?php } ?>
+    <?php // กดที่ป้าย = filter ไฮไลต์เฉพาะสถานะนั้นทั้งการ์ดนี้และกราฟรายปีด้านล่าง (ดู
+         // dashStatusFilter ท้ายไฟล์) ไม่พาไปหน้าไหน — ปุ่ม modifier+คลิก (Ctrl/⌘/กลาง)
+         // ยังพาไปทะเบียนเครื่องกรองแล้วเหมือนเดิม สำหรับคนอยากได้รายชื่อเต็ม ?>
     <div class="status-legend">
       <?php foreach (status_list() as $st):
           $n = (int) ($byStatus[$st] ?? 0);
-          $modalTitle = status_th($st) . ' — รายรุ่น';
-          $dataUrl = "$B/dashboard_data.php?type=asset_models&st=$st";
           $href = "$B/assets.php?status=$st";
       ?>
-      <a class="status-legend-item" href="<?= h($href) ?>"
-         onclick="if(event.ctrlKey||event.metaKey||event.shiftKey||event.button===1)return true;<?= h(modal_js($modalTitle, $dataUrl, $href)) ?>;return false;"
+      <a class="status-legend-item" href="<?= h($href) ?>" data-status="<?= h($st) ?>"
+         onclick="if(event.ctrlKey||event.metaKey||event.shiftKey||event.button===1)return true;dashStatusFilter.toggle('<?= h($st) ?>');return false;"
          <?= $statusNote[$st] !== '' ? 'title="' . h($statusNote[$st]) . '"' : '' ?>>
         <i class="status-dot" style="background:<?= h(dash_chart_color($st)) ?>"></i>
         <span class="status-legend-label"><?= h(status_th_chip($st)) ?></span>
@@ -729,6 +730,35 @@ $partsBase = ui_parts_base_url();
   });
 
   if (backBtn) backBtn.addEventListener('click', showYearView);
+})();
+(function(){
+  // กดป้ายสถานะ (การ์ด "เครื่องทั้งหมด" หรือ legend บนกราฟรายปี) = highlight เฉพาะ
+  // สถานะนั้นในทั้งสองที่พร้อมกัน ไม่ใช่แค่การ์ดเดียว — ผูกด้วย [data-status] แบบเดียวกัน
+  // ที่ฝังไว้ในทุกจุด (แถบสัดส่วน, legend การ์ด, legend กราฟ, แท่งกราฟรายปี/รายเดือน)
+  // เป็น state บนหน้าเว็บล้วน ๆ ไม่ยิง request ใหม่ ตัวเลขที่ต้องใช้มีอยู่ใน DOM แล้ว
+  var TARGET_SEL = '.status-legend-item[data-status], .dash-status-legend-item[data-status],'
+    + ' .status-bar-seg[data-status], .dash-bar-seg[data-status]';
+  var active = null;
+
+  function apply() {
+    document.querySelectorAll(TARGET_SEL).forEach(function (el) {
+      var st = el.getAttribute('data-status');
+      el.classList.toggle('is-active-filter', active !== null && st === active);
+      el.classList.toggle('is-dimmed-filter', active !== null && st !== active);
+    });
+  }
+
+  function toggle(st) {
+    active = (active === st) ? null : st;
+    apply();
+  }
+  window.dashStatusFilter = { toggle: toggle };
+
+  // ป้าย legend บนกราฟรายปีเป็น <button data-status> (เฉพาะตอนโชว์ครบ 6 ป้ายให้เลือก)
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.dash-status-legend-item[data-status]');
+    if (btn) { toggle(btn.getAttribute('data-status')); }
+  });
 })();
 </script>
 

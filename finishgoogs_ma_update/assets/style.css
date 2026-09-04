@@ -556,7 +556,7 @@ img.broken { visibility: hidden; }
 .dash-bar-total-empty { cursor: default; color: var(--text-faint, #cbd5e1); margin-bottom: 6px; font-size: calc(12px * var(--font-scale, 1)); display: block; text-align: center; }
 .dash-bar-area { width: 100%; max-width: 40px; display: flex; align-items: flex-end; flex: 0 0 auto; min-height: 0; }
 .dash-bar-stack { display: flex; flex-direction: column-reverse; align-items: stretch; gap: 3px; width: 100%; height: 100%; }
-.dash-bar-seg { border-radius: var(--radius-sm, 8px); cursor: pointer; transition: filter .12s, transform .08s; min-height: 10px; border: 0; padding: 0; }
+.dash-bar-seg { border-radius: var(--radius-sm, 8px); cursor: pointer; transition: filter .12s, transform .08s, opacity .15s; min-height: 10px; border: 0; padding: 0; }
 .dash-stacked-chart .dash-bar-seg:focus,
 .dash-stacked-chart .dash-bar-seg:focus-visible,
 .dash-stacked-chart .dash-bar-seg:active {

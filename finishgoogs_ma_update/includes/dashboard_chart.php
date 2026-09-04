@@ -194,10 +194,16 @@ function render_status_legend($activeSt = null)
     if ($activeSt !== null && in_array($activeSt, status_list(), true)) {
         $items = [$activeSt];
     }
+    // กดป้ายเพื่อ highlight เฉพาะสถานะนั้นในกราฟ (dashStatusFilter, index.php) — มีประโยชน์
+    // เฉพาะตอนเห็นครบ 6 ป้าย ให้เลือก ถ้าเหลือป้ายเดียว (มุมมองที่ filter มาแล้วจากที่อื่น
+    // เช่นใน modal) ก็ไม่มีอะไรให้สลับ จึงคงเป็น <span> ธรรมดาไม่ต้องดูเหมือนกดได้
+    $clickable = count($items) > 1;
     echo '<div class="dash-status-legend dash-status-legend-top">';
     foreach ($items as $st) {
-        echo '<span class="dash-status-legend-item"><i class="dash-status-swatch dash-swatch-' . h($st) . '"></i>'
-           . h(status_th_chip($st)) . '</span>';
+        $tag = $clickable ? 'button' : 'span';
+        $attr = $clickable ? ' type="button" data-status="' . h($st) . '"' : '';
+        echo '<' . $tag . ' class="dash-status-legend-item"' . $attr . '><i class="dash-status-swatch dash-swatch-' . h($st) . '"></i>'
+           . h(status_th_chip($st)) . '</' . $tag . '>';
     }
     echo '</div>';
 }
@@ -321,7 +327,7 @@ function render_dashboard_stacked_chart(array $points, $multiSeries = true, $fil
                     continue;
                 }
                 $segOnclick = $drill['by_status'][$st] ?? '';
-                echo '<div class="dash-bar-seg dash-bar-seg-' . h($st) . '" style="flex:' . $c . ' 1 12px;background:' . h(dash_chart_color($st)) . '"';
+                echo '<div class="dash-bar-seg dash-bar-seg-' . h($st) . '" data-status="' . h($st) . '" style="flex:' . $c . ' 1 12px;background:' . h(dash_chart_color($st)) . '"';
                 if ($segOnclick !== '') {
                     echo ' onclick="' . $segOnclick . '" title="' . h(status_th_chip($st) . ' ' . number_format($c)) . '" role="button" tabindex="0"';
                 }
