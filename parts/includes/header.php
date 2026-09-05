@@ -31,6 +31,7 @@ $settingsActive = false;
           $sharedBase = rtrim(dirname($fgBase), '/\\') . '/shared'; ?>
     <link rel="stylesheet" href="<?= e($sharedBase) ?>/ui_table.css?v=<?= @filemtime(dirname(__DIR__, 2) . '/shared/ui_table.css') ?: time() ?>">
     <link rel="stylesheet" href="<?= e($sharedBase) ?>/ui_confirm.css?v=<?= @filemtime(dirname(__DIR__, 2) . '/shared/ui_confirm.css') ?: time() ?>">
+    <script src="<?= e($sharedBase) ?>/ui_table.js?v=<?= @filemtime(dirname(__DIR__, 2) . '/shared/ui_table.js') ?: time() ?>" defer></script>
     <script src="<?= e($sharedBase) ?>/ui_confirm.js?v=<?= @filemtime(dirname(__DIR__, 2) . '/shared/ui_confirm.js') ?: time() ?>" defer></script>
 </head>
 <body>

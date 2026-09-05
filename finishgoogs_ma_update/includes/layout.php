@@ -223,6 +223,7 @@ function page_head_html($title) {
 <?php $sharedBase = rtrim(dirname(BASE_URL), '/\\') . '/shared'; ?>
 <link rel="stylesheet" href="<?= h($sharedBase) ?>/ui_table.css?v=<?= @filemtime(dirname(__DIR__, 2) . '/shared/ui_table.css') ?: time() ?>">
 <link rel="stylesheet" href="<?= h($sharedBase) ?>/ui_confirm.css?v=<?= @filemtime(dirname(__DIR__, 2) . '/shared/ui_confirm.css') ?: time() ?>">
+<script src="<?= h($sharedBase) ?>/ui_table.js?v=<?= @filemtime(dirname(__DIR__, 2) . '/shared/ui_table.js') ?: time() ?>" defer></script>
 <script src="<?= h($sharedBase) ?>/ui_confirm.js?v=<?= @filemtime(dirname(__DIR__, 2) . '/shared/ui_confirm.js') ?: time() ?>" defer></script>
 </head>
 <?php
