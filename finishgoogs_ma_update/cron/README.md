@@ -138,3 +138,46 @@ php cron/plesk_line_job_work_summary.php --date=2026-07-20 --dry-run
 
 ส่งซ้ำรอบเดิมจะโดน dedup กันไว้ ไม่ส่งซ้ำให้คนเดิม · ถ้าดึงข้อมูลระบบซ่อม/เช่าไม่ได้
 สคริปต์จะ **ไม่ส่งเลย** แล้ว exit 1 เพราะตัวเลขไม่ครบ = สรุปผิด ส่งไปแล้วแก้ไม่ได้
+
+---
+
+## PHP รุ่นไหน — เจอ "unexpected '?'" ให้ดูตรงนี้
+
+โค้ดชุดนี้ต้องการ **PHP 7.1 ขึ้นไป** (ใช้ nullable type hint `?string`) และเว็บรันบน 8.2
+
+Plesk มี php หลายรุ่นในเครื่องเดียว ถ้า Scheduled Task ไม่ได้ระบุตัวแปลภาษา
+มันจะหยิบ php ของระบบซึ่งมักเก่ากว่า แล้วตายตั้งแต่ parse `config.php`:
+
+```
+PHP Parse error: syntax error, unexpected '?', expecting variable (T_VARIABLE)
+  in .../finishgoogs_ma_update/config.php on line 516
+```
+
+ไม่ใช่โค้ดพัง — เป็นเรื่องรุ่น PHP ล้วน ๆ แก้โดยตั้ง task เป็น **Run a command**
+แล้วระบุตัวแปลภาษาให้ชัด:
+
+```
+/opt/plesk/php/8.2/bin/php /var/www/vhosts/<domain>/httpdocs/production/finishgoogs_ma_update/cron/plesk_line_job_work_summary.php
+```
+
+หรือถ้าใช้ **Run a PHP script** ให้เลือกรุ่น PHP ในช่องของ task ให้ตรงกับ task ตัวอื่นที่รันได้อยู่แล้ว
+
+---
+
+## สรุปงานรายคน (รายเดือน)
+
+| ช่อง | ค่า |
+|------|-----|
+| Script | `production/finishgoogs_ma_update/cron/plesk_line_job_work_summary.php` |
+| Cron | `0 9 21 * *` |
+
+ยึด **เมื่อวาน** เป็นหลักในการคิดรอบ รันวันที่ 21 จึงได้รอบที่เพิ่งปิด (21 เดือนก่อน – 20 เดือนนี้)
+
+```bash
+# ดูว่าจะส่งถึงใครบ้าง ไม่ส่งจริง
+/opt/plesk/php/8.2/bin/php .../cron/plesk_line_job_work_summary.php --dry-run
+# ระบุรอบเอง
+/opt/plesk/php/8.2/bin/php .../cron/plesk_line_job_work_summary.php --date=2026-07-20
+```
+
+ดึงข้อมูลระบบไหนไม่ได้ = **ไม่ส่งเลย** แล้ว exit 1 — สรุปที่ตัวเลขขาดแย่กว่าไม่ส่ง

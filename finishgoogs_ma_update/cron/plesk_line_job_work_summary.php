@@ -11,15 +11,10 @@
  *   php cron/plesk_line_job_work_summary.php --dry-run  # ดูว่าจะส่งให้ใครบ้าง ไม่ส่งจริง
  */
 
-if (PHP_SAPI !== 'cli') {
-    http_response_code(403);
-    echo json_encode(['ok' => false, 'error' => 'CLI only'], JSON_UNESCAPED_UNICODE) . "\n";
-    exit(1);
-}
-
-$root = dirname(__DIR__);
-require $root . '/config.php';
-require_once $root . '/includes/work_summary_send.php';
+// ผ่าน _bootstrap.php เหมือน job LINE ตัวอื่น — ได้ทั้งกันเรียกผ่านเว็บ เช็ครุ่น PHP
+// และโหลด core/flex ชุดเดียวกับที่ job ซึ่งรันบนเซิร์ฟเวอร์อยู่แล้วใช้
+require __DIR__ . '/_bootstrap.php';
+require_once dirname(__DIR__) . '/includes/work_summary_send.php';
 
 $dryRun = in_array('--dry-run', $argv, true);
 $date = null;
