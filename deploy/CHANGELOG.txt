@@ -3159,3 +3159,20 @@ Files:
   shared/ui_table.css
   shared/ui_table.js
 
+
+================================================================
+v2026-09-05_160158 | Patch | 2026-09-05 16:02:00
+From: 2026-09-05_155302  ->  To: e89bd8e  |  Files: 9
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/parts.php
+  finishgoogs_ma_update/repairs.php
+  finishgoogs_ma_update/share.php
+  finishgoogs_ma_update/share_admin.php
+  finishgoogs_ma_update/updates.php
+  parts/pages/history.php
+  parts/pages/year-end-summary.php
+  shared/ui_table.js
+
