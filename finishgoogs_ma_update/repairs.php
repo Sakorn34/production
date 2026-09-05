@@ -52,25 +52,34 @@ page_header('ประวัติการซ่อม');
   <?php if ($custId || $search !== '') { ?><a class="btn btn-line" href="<?= BASE_URL ?>/repairs.php">ล้าง</a><?php } ?>
 </form>
 
-<div class="table-wrap">
+<div class="table-wrap table-wrap-fold">
 <table class="list">
+  <?php // data-pri = ลำดับความสำคัญของคอลัมน์ (shared/ui_table.css) ?>
+  <thead>
   <tr>
-    <th style="text-align:center">ครั้งที่</th><th>วันที่</th><th>รหัสเครื่อง</th><th>รุ่น</th>
-    <th>ลูกค้า</th><th>บริษัทผู้ดูแล</th><th>ปัญหาแจ้งมา</th><th>การประเมิน</th>
+    <th data-pri="3" style="text-align:center">ครั้งที่</th><th data-pri="2">วันที่</th>
+    <th data-pri="1">รหัสเครื่อง</th><th data-pri="2">รุ่น</th>
+    <th data-pri="1">ลูกค้า</th><th data-pri="3">บริษัทผู้ดูแล</th>
+    <th data-pri="2">ปัญหาแจ้งมา</th><th data-pri="3">การประเมิน</th>
   </tr>
+  </thead>
+  <tbody>
   <?php $n = 0; while ($r = $rows->fetch_assoc()) { $n++; ?>
   <tr>
-    <td style="text-align:center"><span class="badge" style="background:#eef1f5;color:#556072"><?= (int)$r['repair_no'] ?></span></td>
-    <td><?= dthai_full($r['opened_at']) ?></td>
-    <td><a href="<?= BASE_URL ?>/asset.php?id=<?= $r['asset_id'] ?>"><?= h($r['asset_code']) ?></a></td>
-    <td><?= h($r['pname']) ?></td>
-    <td><?php if ($r['customer_id']) { echo h($r['cust'] . ($r['site_label'] ? ' (' . $r['site_label'] . ')' : '')); } else echo '-'; ?></td>
-    <td><?= h($r['security_company'] ?: '-') ?></td>
-    <td style="max-width:240px"><?= h($r['reported_issue'] ?: '-') ?></td>
-    <td style="max-width:300px"><?= h($r['assessment'] ?: '-') ?></td>
+    <td data-pri="3" style="text-align:center"><span class="badge" style="background:#eef1f5;color:#556072"><?= (int)$r['repair_no'] ?></span></td>
+    <td data-pri="2" data-nowrap><?= dthai_full($r['opened_at']) ?></td>
+    <td data-pri="1"><a href="<?= BASE_URL ?>/asset.php?id=<?= $r['asset_id'] ?>"><?= h($r['asset_code']) ?></a>
+      <?php // บรรทัดรอง — โผล่เมื่อคอลัมน์ระดับ 2 ถูกยุบที่จอแคบ ?>
+      <span class="cell-sub"><?= h($r['pname']) ?> · <?= dthai_full($r['opened_at']) ?></span></td>
+    <td data-pri="2"><?= h($r['pname']) ?></td>
+    <td data-pri="1"><?php if ($r['customer_id']) { echo h($r['cust'] . ($r['site_label'] ? ' (' . $r['site_label'] . ')' : '')); } else echo '-'; ?></td>
+    <td data-pri="3"><?= h($r['security_company'] ?: '-') ?></td>
+    <td data-pri="2" style="max-width:240px"><?= h($r['reported_issue'] ?: '-') ?></td>
+    <td data-pri="3" style="max-width:300px"><?= h($r['assessment'] ?: '-') ?></td>
   </tr>
   <?php } ?>
   <?php if (!$n) { ?><tr><td colspan="8" class="muted" style="text-align:center; padding:20px">ไม่พบประวัติการซ่อม</td></tr><?php } ?>
+  </tbody>
 </table>
 </div>
 <?php page_footer();

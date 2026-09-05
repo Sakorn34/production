@@ -178,7 +178,7 @@ require_once __DIR__ . '/../includes/header.php';
     <?php if (empty($rows)): ?>
         <p class="empty-state">ไม่มีอะไหล่คงเหลือในคลัง</p>
     <?php else: ?>
-    <div class="table-wrap">
+    <div class="table-wrap table-wrap-fold">
         <table>
             <thead>
                 <tr>

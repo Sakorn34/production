@@ -17,6 +17,7 @@
 
   var MIN_H = 240;          /* เตี้ยกว่านี้แล้วเห็นไม่กี่แถว สู้เลื่อนทั้งหน้าไม่ได้ */
   var CARD_MODE_MAX = 760;  /* ต้องตรงกับ breakpoint การ์ดใน ui_table.css */
+  var SLACK = 12;           /* เศษที่ยอมให้เลื่อนได้ — ของตกแต่งแบบ absolute ไล่ตามไม่จบ */
 
   function apply() {
     var wraps = document.querySelectorAll('.table-wrap-fold');
@@ -39,10 +40,12 @@
       // เพราะแต่ละหน้ามีไม่เหมือนกัน — วัดส่วนที่ยังเกินจอแล้วหดกรอบลงเท่านั้น
       // ถ้าไม่ทำ หน้าจะยังเลื่อนได้อีกนิด แล้วหัวหน้ากับตัวกรองก็ลอยหายไปอยู่ดี
       // ทำซ้ำได้ไม่กี่รอบเพราะการหดกรอบทำให้ระยะขอบบางตัวยุบตามไปด้วย
-      // รอบเดียวจึงมักเหลือเศษไม่กี่ px
+      //
+      // ปล่อยเศษไม่เกิน SLACK ไว้: หน้าฝั่งทะเบียนเครื่องมีป้ายเวอร์ชันวางแบบ absolute
+      // ล้ำขอบล่างราว 8px ซึ่งหดกรอบเท่าไหร่ก็ไม่หาย ถ้าไล่ตามจะหดฟรีไปเรื่อย ๆ
       for (var pass = 0; pass < 3; pass++) {
         var over = document.documentElement.scrollHeight - window.innerHeight;
-        if (over <= 0) { break; }
+        if (over <= SLACK) { break; }
         avail -= over;
         w.style.maxHeight = Math.max(MIN_H, avail) + 'px';
       }
@@ -60,6 +63,10 @@
   } else {
     apply();
   }
+  // วัดซ้ำหลังรูป/ฟอนต์โหลดเสร็จ — ตอน DOMContentLoaded ความสูงบางส่วนยังไม่นิ่ง
+  // วัดรอบแรกจึงเหลือเศษไม่กี่ px ซึ่งพอให้หน้าเลื่อนได้และหัวหน้าหลุดขึ้นไป
+  window.addEventListener('load', schedule);
+  setTimeout(apply, 400);
   window.addEventListener('resize', schedule);
   // ปรับขนาดตัวอักษร/พับเมนู ทำให้หัวหน้าสูงเปลี่ยน — วัดใหม่เมื่อ layout ขยับ
   if (window.ResizeObserver) {

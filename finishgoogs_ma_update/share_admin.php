@@ -342,7 +342,7 @@ page_header('หลังบ้าน — เปรียบเทียบ asse
   <div id="rc-bulk-hidden"></div>
 </form>
 
-<div class="table-wrap">
+<div class="table-wrap table-wrap-fold">
 <table class="list" id="rc-table">
   <tr>
     <th style="width:32px"><input type="checkbox" id="rc-all" title="เลือกทั้งหน้า"></th>

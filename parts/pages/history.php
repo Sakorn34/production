@@ -60,7 +60,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'sn_basket') {
     $partIcons = parts_product_icon_map($iconProducts);
     ?>
     <p class="text-muted" style="margin-bottom:0.75rem">S/N: <strong><?= e($sn) ?></strong> — <?= count($basket) ?> ใบเบิก</p>
-    <div class="table-wrap">
+    <div class="table-wrap table-wrap-fold">
     <table class="parts-table">
         <thead>
             <tr>
@@ -526,7 +526,7 @@ parts_page_header($historyTabs[$tab]['icon'], 'ประวัติ — ' . $he
         </div>
         <?php endif; ?>
     </dl>
-    <div class="table-wrap">
+    <div class="table-wrap table-wrap-fold">
     <table class="parts-table">
         <thead>
             <tr>
@@ -572,7 +572,7 @@ parts_page_header($historyTabs[$tab]['icon'], 'ประวัติ — ' . $he
     <?php if (empty($history)): ?>
         <p class="empty-state">ยังไม่มีรายการในชนิดที่เลือก</p>
     <?php else: ?>
-    <div class="table-wrap">
+    <div class="table-wrap table-wrap-fold">
         <table class="parts-table">
             <thead>
                 <tr>
@@ -751,7 +751,7 @@ parts_page_header($historyTabs[$tab]['icon'], 'ประวัติ — ' . $he
         <button type="button" class="history-kind-filter badge history-note-badge history-note-ma" data-history-filter="ma">MA</button>
         <button type="button" class="history-kind-filter badge history-note-badge history-note-repair" data-history-filter="repair">เบิกซ่อม</button>
     </div>
-    <div class="table-wrap">
+    <div class="table-wrap table-wrap-fold">
     <table class="parts-table">
         <thead>
             <tr>

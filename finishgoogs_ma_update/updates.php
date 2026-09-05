@@ -169,16 +169,22 @@ page_header('อัปเดต FW/HW — ' . $product['name'] . ' (' . number_f
   <p class="muted" style="margin-bottom:10px">พบ <b><?= number_format($total) ?></b> รายการจากการค้นหา</p>
 <?php } ?>
 
-<div class="table-wrap">
+<div class="table-wrap table-wrap-fold">
 <table class="list">
-  <tr><th>วันเวลา</th><th>เครื่อง</th><th>ประเภท</th><th>รายละเอียด</th><th>รูป</th><th>โดย</th><th style="width:130px">จัดการ</th></tr>
+  <?php // data-pri = ลำดับความสำคัญของคอลัมน์ (shared/ui_table.css) ?>
+  <thead>
+  <tr><th data-pri="2">วันเวลา</th><th data-pri="1">เครื่อง</th><th data-pri="2">ประเภท</th><th data-pri="1">รายละเอียด</th><th data-pri="3">รูป</th><th data-pri="3">โดย</th><th data-pri="1" style="width:130px">จัดการ</th></tr>
+  </thead>
+  <tbody>
   <?php if ($total === 0) { ?>
   <tr><td colspan="7" class="muted" style="text-align:center;padding:20px"><?= ($searchSn !== '' || $searchDetail !== '') ? 'ไม่พบรายการตามเงื่อนไขค้นหา' : 'ยังไม่มีรายการอัปเดตของรุ่นนี้' ?></td></tr>
   <?php } else { while ($r = $rows->fetch_assoc()) { ?>
   <tr>
-    <td><?= dthai_full($r['updated_at']) ?></td>
-    <td><a href="<?= BASE_URL ?>/asset.php?id=<?= (int)$r['asset_id'] ?>"><?= h($r['asset_code']) ?></a></td>
-    <td><?= isset($typeMap[$r['update_type']]) ? $typeMap[$r['update_type']] : h($r['update_type']) ?></td>
+    <td data-pri="2" data-nowrap><?= dthai_full($r['updated_at']) ?></td>
+    <td data-pri="1"><a href="<?= BASE_URL ?>/asset.php?id=<?= (int)$r['asset_id'] ?>"><?= h($r['asset_code']) ?></a>
+      <?php // บรรทัดรอง — โผล่เมื่อคอลัมน์ระดับ 2 ถูกยุบที่จอแคบ ?>
+      <span class="cell-sub"><?= dthai_full($r['updated_at']) ?></span></td>
+    <td data-pri="2"><?= isset($typeMap[$r['update_type']]) ? $typeMap[$r['update_type']] : h($r['update_type']) ?></td>
     <?php
     // แยกเป็น 3 ชั้น: ชื่อชิ้นส่วน (ป้าย) · ค่าเดิม→ค่าใหม่ (ขีดฆ่าของเก่า เน้นของใหม่) · รายละเอียด (สีจาง)
     // เดิมทั้งสามส่วนต่อกันเป็นข้อความก้อนเดียว อ่านแล้วแยกไม่ออกว่าอะไรเป็นอะไร
@@ -186,7 +192,7 @@ page_header('อัปเดต FW/HW — ' . $product['name'] . ' (' . number_f
     $uNew = trim((string) $r['new_value']);
     $uDetail = trim((string) $r['detail']);
     ?>
-    <td style="max-width:360px">
+    <td data-pri="1" style="max-width:360px">
       <div class="upd-detail">
         <?php if (!empty($r['component_name'])) { ?>
           <span class="upd-detail-comp"><?= h($r['component_name']) ?></span>
@@ -226,6 +232,7 @@ page_header('อัปเดต FW/HW — ' . $product['name'] . ' (' . number_f
     </td>
   </tr>
   <?php } } ?>
+  </tbody>
 </table>
 </div>
 <?php if ($pages > 1) { ?>
