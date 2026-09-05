@@ -531,12 +531,12 @@ img.broken { visibility: hidden; }
 .dash-status-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
 /* ต้องตรงกับคอลัมน์ bar ใน status_palette() (shared/ui_status_palette.php) ที่ระบายแท่งกราฟ
    คนละที่กันเพราะ legend ใช้ class ส่วนแท่งกราฟใส่สี inline — แก้สีที่ palette แล้วต้องตามมาแก้ที่นี่ */
-.dash-swatch-new { background: #059669; }
-.dash-swatch-rental { background: #2563eb; }
-.dash-swatch-sold { background: #c2410c; }
-.dash-swatch-spare { background: #b45309; }
-.dash-swatch-retired { background: #64748b; }
-.dash-swatch-lost { background: #b91c1c; }
+.dash-swatch-new { background: #6ee7b7; }
+.dash-swatch-rental { background: #93c5fd; }
+.dash-swatch-sold { background: #fdba74; }
+.dash-swatch-spare { background: #fde68a; }
+.dash-swatch-retired { background: #cbd5e1; }
+.dash-swatch-lost { background: #fca5a5; }
 .dash-chart-body { display: flex; gap: 8px; min-height: 200px; }
 .dash-chart-yaxis { display: flex; flex-direction: column; justify-content: space-between; flex-shrink: 0; width: 36px; padding: 0 0 26px; font-size: calc(10px * var(--font-scale, 1)); color: #94a3b8; text-align: right; }
 .dash-chart-yaxis span { line-height: 1; }
