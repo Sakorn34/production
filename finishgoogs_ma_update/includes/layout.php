@@ -220,7 +220,10 @@ function page_head_html($title) {
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/sidebar.css?v=<?= @filemtime(__DIR__ . '/../assets/sidebar.css') ?: time() ?>">
 <?php // ตารางที่ยุบคอลัมน์ตามความกว้าง — ใช้ร่วมกับแอปอะไหล่ ต้องมาหลัง style.css
       // เพราะทับกฎ white-space ของ table.list ?>
-<link rel="stylesheet" href="<?= h(rtrim(dirname(BASE_URL), '/\\')) ?>/shared/ui_table.css?v=<?= @filemtime(dirname(__DIR__, 2) . '/shared/ui_table.css') ?: time() ?>">
+<?php $sharedBase = rtrim(dirname(BASE_URL), '/\\') . '/shared'; ?>
+<link rel="stylesheet" href="<?= h($sharedBase) ?>/ui_table.css?v=<?= @filemtime(dirname(__DIR__, 2) . '/shared/ui_table.css') ?: time() ?>">
+<link rel="stylesheet" href="<?= h($sharedBase) ?>/ui_confirm.css?v=<?= @filemtime(dirname(__DIR__, 2) . '/shared/ui_confirm.css') ?: time() ?>">
+<script src="<?= h($sharedBase) ?>/ui_confirm.js?v=<?= @filemtime(dirname(__DIR__, 2) . '/shared/ui_confirm.js') ?: time() ?>" defer></script>
 </head>
 <?php
 }

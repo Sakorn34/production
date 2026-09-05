@@ -165,7 +165,7 @@ function parts_sets_accordion_html(array $sets, array $partIcons, array $partPro
 
                 if ($manage) {
                     $out .= '<td class="col-actions">'
-                        . '<form method="POST" onsubmit="return confirm(\'ลบรายการนี้ออกจาก Set?\')">'
+                        . '<form method="POST"' . parts_confirm_attrs('เอาอะไหล่นี้ออกจาก Set?', 'เอาออกจาก Set') . '>'
                         . '<input type="hidden" name="action" value="remove_item">'
                         . '<input type="hidden" name="item_id" value="' . (int) $item['id'] . '">'
                         . actionIcon('delete', '', 'ลบออกจาก Set')
@@ -189,7 +189,7 @@ function parts_sets_accordion_html(array $sets, array $partIcons, array $partPro
                 . '<input type="text" id="set-desc-' . $setId . '" name="description" value="' . e((string) ($s['description'] ?? '')) . '" placeholder="รายละเอียด (ไม่บังคับ)">'
                 . '<button type="submit" class="btn btn-sm btn-success btn-with-icon">' . ui_btn_label('save', 'บันทึกชื่อ', 14) . '</button>'
                 . '</form>'
-                . '<form method="POST" class="set-delete-form" onsubmit="return confirm(\'ลบ Set ' . e($s['code']) . ' ทั้งชุด?\')">'
+                . '<form method="POST" class="set-delete-form"' . parts_confirm_attrs('ลบ Set ' . $s['code'] . ' ทั้งชุด?', 'ลบ Set นี้', [], 'อะไหล่ในชุดไม่ถูกลบ แต่ชุดนี้จะหายไปจากรายการเบิกแบบ Set') . '>'
                 . '<input type="hidden" name="action" value="delete_set">'
                 . '<input type="hidden" name="set_id" value="' . $setId . '">'
                 . '<button type="submit" class="btn btn-sm btn-danger btn-with-icon">' . ui_btn_label('trash', 'ลบ Set นี้', 14) . '</button>'

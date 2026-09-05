@@ -1,0 +1,69 @@
+/* shared/ui_confirm.css — หน้าตากล่องยืนยันของ ui_confirm.js
+   ใช้ตัวแปรธีมเดิมทั้งหมด ไม่ตั้งสีใหม่ นอกจากสีเตือน/สีอันตรายที่ระบบยังไม่มีตัวแปร */
+
+.cf-dialog {
+  border: 0;
+  border-radius: var(--radius, 12px);
+  padding: 22px 24px;
+  width: min(460px, 92vw);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, .3);
+  font-family: inherit;
+  font-size: calc(15px * var(--font-scale, 1));
+  color: var(--text, #1b1830);
+  background: var(--surface, #fff);
+}
+.cf-dialog::backdrop { background: rgba(15, 23, 42, .5); }
+
+.cf-dialog h2 {
+  margin: 0 0 8px;
+  font-size: calc(19px * var(--font-scale, 1));
+  line-height: 1.4;
+}
+
+.cf-warn {
+  margin: 0 0 14px;
+  padding: 11px 13px;
+  border-radius: var(--radius-sm, 8px);
+  background: var(--warning-soft, #fef3c7);
+  color: #713f12;
+  font-weight: 600;
+  line-height: 1.6;
+  font-size: calc(14px * var(--font-scale, 1));
+}
+
+.cf-impact {
+  background: var(--surface-muted, #eef1f6);
+  border-radius: var(--radius-sm, 8px);
+  padding: 12px 14px;
+  margin-bottom: 18px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.cf-label {
+  font-size: calc(11.5px * var(--font-scale, 1));
+  font-weight: 700;
+  letter-spacing: .06em;
+  color: var(--text-muted, #45506a);
+  margin-bottom: 8px;
+}
+.cf-row { display: flex; gap: 10px; align-items: baseline; margin-bottom: 7px; }
+.cf-row:last-child { margin-bottom: 0; }
+.cf-row span { flex: 1; min-width: 0; color: var(--text-muted, #45506a); }
+/* tabular-nums ให้หลักตัวเลขตรงกันทุกบรรทัด อ่านส่วนต่างได้เร็วกว่า */
+.cf-row b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cf-row i { font-style: normal; font-weight: 400; color: var(--text-faint, #9992ad); }
+
+.cf-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+.cf-actions button {
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: var(--radius-sm, 8px);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cf-actions .cf-btn-danger { border: 0; background: #991b1b; color: #fff; font-weight: 700; }
+.cf-actions .cf-btn-danger:hover { background: #7f1616; }
+.cf-actions .cf-btn-outline { border: 1px solid var(--border, #dfe4ec); background: var(--surface, #fff); color: inherit; }
+.cf-actions .cf-btn-outline:hover { background: var(--surface-muted, #eef1f6); }
+.cf-actions button:focus-visible { outline: 2px solid var(--primary, #e11d74); outline-offset: 2px; }

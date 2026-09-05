@@ -954,3 +954,63 @@ function parts_page_back_url(string $override = ''): string
     }
     return parts_page_back_url_default();
 }
+
+/**
+ * attribute ชุดกล่องยืนยัน (shared/ui_confirm.js) สำหรับติดบน <form>
+ *
+ * เดิมทุกจุดใช้ onsubmit="return confirm('...')" ซึ่งบอกได้แค่ประโยคเดียว
+ * ไม่บอกว่ายอดคงเหลือจะขยับเท่าไร คนกดจึงไม่มีทางรู้ผลก่อนตัดสินใจ
+ *
+ * @param  string                        $title  หัวกล่อง (คำถาม)
+ * @param  string                        $verb   ข้อความบนปุ่มยืนยัน — ใช้กริยาจริง ไม่ใช่ "ตกลง"
+ * @param  array<int,array<string,mixed>> $impact [['name'=>..,'from'=>int,'to'=>int]]
+ * @param  string                        $warn   คำเตือนแถบเหลือง (ถ้ามี)
+ * @return string
+ */
+function parts_confirm_attrs(string $title, string $verb, array $impact = [], string $warn = ''): string
+{
+    $out = ' data-confirm="' . e($title) . '" data-confirm-verb="' . e($verb) . '"';
+    if ($warn !== '') {
+        $out .= ' data-confirm-warn="' . e($warn) . '"';
+    }
+    if ($impact) {
+        $out .= ' data-confirm-impact="' . e(json_encode(array_values($impact), JSON_UNESCAPED_UNICODE)) . '"';
+    }
+    return $out;
+}
+
+/**
+ * ผลกระทบต่อยอดคงเหลือของการลบใบเบิกหนึ่งใบ
+ *
+ * ใบที่ stock_deducted=0 คือใบที่ sync ย้อนหลังเข้ามาโดยไม่เคยหักสต็อก (155 จาก 428 ใบ)
+ * StockService::deleteStockOut() รู้เรื่องนี้และไม่คืนของให้อยู่แล้ว กล่องยืนยันจึงต้อง
+ * พูดตรงกัน ไม่งั้นคนกดจะคาดว่ายอดเพิ่มแล้วไม่เพิ่ม
+ *
+ * @param  array<string,mixed> $detail จาก StockService::getStockOutDetail()
+ * @return array{impact:array<int,array<string,mixed>>,warn:string}
+ */
+function parts_stock_out_delete_impact(array $detail): array
+{
+    if (!function_exists('production_stock_out_was_deducted_row')) {
+        require_once __DIR__ . '/production_sync.php';
+    }
+    $deducted = production_stock_out_was_deducted_row($detail);
+
+    $impact = [];
+    foreach ((array) ($detail['items'] ?? []) as $it) {
+        $cur = (int) ($it['current_quantity'] ?? $it['quantity_after'] ?? -1);
+        if ($cur < 0) {
+            continue;   // ไม่รู้ยอดปัจจุบัน ก็อย่าเดา — ปล่อยให้กล่องแสดงแต่คำเตือน
+        }
+        $impact[] = [
+            'name' => trim((string) ($it['name'] ?? $it['code'] ?? '-')),
+            'from' => $cur,
+            'to'   => $deducted ? $cur + (int) $it['quantity'] : $cur,
+        ];
+    }
+
+    return [
+        'impact' => $impact,
+        'warn'   => $deducted ? '' : 'ใบนี้ไม่เคยตัดสต็อก — การลบจะไม่คืนของเข้าคลัง ยอดคงเหลือจะไม่เปลี่ยน',
+    ];
+}

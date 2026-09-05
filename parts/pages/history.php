@@ -353,7 +353,7 @@ function history_row_actions(array $h): string
     } else {
         $edit = actionIcon('edit', url('/pages/history.php?tab=set&edit_out=' . (int) $h['id']), 'แก้ไข');
     }
-    $delete = '<form method="POST" onsubmit="return confirm(\'ลบรายการเบิกนี้?\')">'
+    $delete = '<form method="POST"' . parts_confirm_attrs('ลบใบเบิกนี้?', 'ลบใบเบิก') . '>'
         . '<input type="hidden" name="delete_stock_out" value="1">'
         . '<input type="hidden" name="id" value="' . (int) $h['id'] . '">'
         . actionIcon('delete', '', 'ลบ')
@@ -557,7 +557,9 @@ parts_page_header($historyTabs[$tab]['icon'], 'ประวัติ — ' . $he
         <?php else: ?>
         <?= actionIcon('edit', url('/pages/history.php?tab=set&edit_out=' . (int) $detail['id']), 'แก้ไข', false) ?>
         <?php endif; ?>
-        <form method="POST" onsubmit="return confirm('ลบรายการเบิกนี้?')">
+        <?php $cf = parts_stock_out_delete_impact($detail); ?>
+        <form method="POST"<?= parts_confirm_attrs(
+            'ลบใบเบิก ' . ($detail['doc_no'] ?? '') . '?', 'ลบใบเบิกนี้', $cf['impact'], $cf['warn']) ?>>
             <input type="hidden" name="delete_stock_out" value="1">
             <input type="hidden" name="id" value="<?= (int) $detail['id'] ?>">
             <?= actionIcon('delete', '', 'ลบ', false) ?>
@@ -613,7 +615,11 @@ parts_page_header($historyTabs[$tab]['icon'], 'ประวัติ — ' . $he
                     <td class="col-actions">
                         <div class="table-actions">
                             <?= actionIcon('edit', $editUrl, 'แก้ไข') ?>
-                            <form method="POST" onsubmit="return confirm(<?= $isIn ? "'ลบรายการรับเข้านี้?'" : "'ลบรายการเบิกนี้? ข้อมูลในระบบทะเบียนเครื่องที่เกี่ยวข้องจะถูกปรับตามด้วย'" ?>)">
+                            <form method="POST"<?= $isIn
+                                ? parts_confirm_attrs('ลบรายการรับเข้านี้?', 'ลบรายการรับเข้า',
+                                    [], 'ยอดคงเหลือจะลดลงตามจำนวนที่รับเข้าไว้')
+                                : parts_confirm_attrs('ลบใบเบิกนี้?', 'ลบใบเบิก',
+                                    [], 'รายการที่ผูกไว้ในระบบทะเบียนเครื่องจะถูกปรับตามด้วย') ?>>
                                 <input type="hidden" name="<?= $isIn ? 'delete_stock_in' : 'delete_stock_out' ?>" value="1">
                                 <input type="hidden" name="id" value="<?= (int) ($isIn ? $h['row_id'] : $h['stock_out_id']) ?>">
                                 <?= actionIcon('delete', '', 'ลบ') ?>

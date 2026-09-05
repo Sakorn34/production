@@ -368,7 +368,9 @@ foreach ($sets as $s) {
                         <div class="table-actions">
                             <?= actionIcon('view', url('/pages/product-detail.php?id=' . (int) $p['id']), 'ดูรายละเอียด') ?>
                             <button type="button" class="btn btn-sm btn-icon btn-icon-edit" title="แก้ไขรายละเอียด"<?= parts_product_edit_data_attrs($p, $productsReturnTo) ?>><?= ui_icon_html('edit', 16, 'btn-svg') ?></button>
-                            <form method="POST" onsubmit="return confirm('ยืนยันการลบอะไหล่ <?= e(parts_display_name($p)) ?>?');">
+                            <form method="POST"<?= parts_confirm_attrs(
+                                'ลบอะไหล่ ' . parts_display_name($p) . '?', 'ลบอะไหล่นี้', [],
+                                'ประวัติรับเข้า/เบิกออก และรายการใน Set ของอะไหล่ตัวนี้จะถูกลบไปด้วยทั้งหมด') ?>>
                                 <input type="hidden" name="action" value="delete">
                                 <input type="hidden" name="product_id" value="<?= (int) $p['id'] ?>">
                                 <?= actionIcon('delete', '', 'ลบ') ?>

@@ -547,7 +547,9 @@ class StockService
         }
 
         $stmt = $this->db->prepare("
-            SELECT soi.*, p.code, p.name, p.unit
+            -- current_quantity = ยอดคงเหลือ 'ตอนนี้' ของอะไหล่ตัวนั้น (คนละอันกับ soi.quantity
+            -- ที่เป็นจำนวนในใบเบิก) กล่องยืนยันตอนลบใช้ตัวนี้คิดยอดก่อน → หลัง
+            SELECT soi.*, p.code, p.name, p.unit, p.quantity AS current_quantity
             FROM stock_out_items soi
             JOIN products p ON p.id = soi.product_id
             WHERE soi.stock_out_id = ?
