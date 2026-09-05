@@ -328,8 +328,9 @@ function work_summary_fetch_rows(string $from, string $to, array $aliases): arra
         // เวลาที่บันทึก — มีเฉพาะฝั่ง production ที่คอลัมน์เป็น datetime จริง
         // ระบบซ่อม/เช่าเก็บแค่วันที่ จึงไม่มีเวลาให้เอามาแสดง
         $timeExpr = $isProd ? "TIME({$src['date']})" : "NULL";
-        $sql = "SELECT $dayExpr d, $timeExpr tm, {$src['actor']} actor, {$src['nm']} nm, {$src['ref']} ref,
-                       {$src['ext']} ext, $aid aid
+        $modeExpr = isset($src['mode']) ? $src['mode'] : "''";
+        $sql = "SELECT $dayExpr d, $timeExpr tm, $modeExpr md, {$src['actor']} actor,
+                       {$src['nm']} nm, {$src['ref']} ref, {$src['ext']} ext, $aid aid
                 FROM {$src['from']}
                 WHERE $range AND {$src['actor']} IS NOT NULL AND TRIM({$src['actor']}) <> ''"
              . $actorSql
@@ -357,6 +358,7 @@ function work_summary_fetch_rows(string $from, string $to, array $aliases): arra
                     'actor'    => (string) $row['actor'],
                     'day'      => $day,
                     'time'     => ($tm !== '' && $tm !== '00:00:00') ? substr($tm, 0, 5) : '',
+                    'mode'     => (string) ($row['md'] ?? ''),
                     'name'     => $nm !== '' ? $nm : '-',
                     'ref'      => trim((string) (isset($row['ref']) ? $row['ref'] : '')),
                     'extra'    => trim((string) (isset($row['ext']) ? $row['ext'] : '')),
@@ -439,8 +441,8 @@ function work_summary_bucket(array $rows, array $aliasMap, ?int $onlyPid): array
                 $seen[$pid][$day][$keyRef] = ['cat' => $r['cat'], 'prio' => $p, 'idx' => null];
             }
 
-            $item = ['name' => $r['name'], 'ref' => $r['ref'],
-                     'extra' => $r['extra'], 'asset_id' => $r['asset_id']];
+            $item = ['name' => $r['name'], 'ref' => $r['ref'], 'extra' => $r['extra'],
+                     'asset_id' => $r['asset_id'], 'mode' => (string) ($r['mode'] ?? '')];
             $people[$pid][$day][$r['cat']][] = $item;
             if ($keyRef !== '') {
                 end($people[$pid][$day][$r['cat']]);
@@ -449,7 +451,52 @@ function work_summary_bucket(array $rows, array $aliasMap, ?int $onlyPid): array
         }
     }
 
+    work_summary_drop_side_jobs($people);
+
     return ['people' => $people, 'unmatched' => $unmatched, 'times' => $times];
+}
+
+/**
+ * ตัด "งานพ่วง" ออกจากวันที่มีงานหลักของมันอยู่แล้ว
+ *
+ * เบิกอะไหล่ไปทำ MA คืองานเดียวกับ MA ที่บันทึกวันนั้น ไม่ใช่งานอีกชิ้น การขึ้นเป็น
+ * หัวข้อแยกทำให้สรุปดูเหมือนทำงานหลายอย่างทั้งที่ทำงานเดียว
+ *
+ * (อะไหล่ที่เบิกไปผลิตถูกตัดตั้งแต่ชั้น query แล้ว — ดู work_summary_part_nonproduction_sql
+ * ส่วน checklist ของ QC ไม่ได้นับแยกอยู่แล้ว เพราะเป็นคอลัมน์ในแถวบันทึกผลิตแถวเดียวกัน)
+ *
+ * @param  array<int,array<string,array<string,array<int,array<string,mixed>>>>> $people แก้ในตัว
+ * @return void
+ */
+function work_summary_drop_side_jobs(array &$people): void
+{
+    // งานหลัก => คำในช่อง mode ของการเบิกอะไหล่ที่ถือว่าเป็นงานพ่วงของงานหลักนั้น
+    $pairs = ['ma' => 'MA'];
+
+    foreach ($people as $pid => $byDay) {
+        foreach ($byDay as $day => $byCat) {
+            if (empty($byCat['part_out'])) {
+                continue;
+            }
+            foreach ($pairs as $mainCat => $needle) {
+                if (empty($byCat[$mainCat])) {
+                    continue;
+                }
+                $keep = [];
+                foreach ($people[$pid][$day]['part_out'] as $it) {
+                    if (stripos((string) ($it['mode'] ?? ''), $needle) === false) {
+                        $keep[] = $it;
+                    }
+                }
+                if ($keep) {
+                    $people[$pid][$day]['part_out'] = $keep;
+                } else {
+                    unset($people[$pid][$day]['part_out']);
+                    break;
+                }
+            }
+        }
+    }
 }
 
 
@@ -510,7 +557,7 @@ function work_summary_detail_sources(): array
                     LEFT JOIN assets a ON a.id = t.ref_asset_id',
          'nm'  => "COALESCE(NULLIF(pr.name,''), 'ไม่ระบุอะไหล่')",
          'ref' => "COALESCE(NULLIF(a.asset_code,''), NULLIF(a.factory_serial,''), '')",
-         'aid' => 't.ref_asset_id',
+         'aid' => 't.ref_asset_id', 'mode' => "COALESCE(t.mode,'')",
          'ext' => "CONCAT_WS(' · ', NULLIF(t.mode,''), CONCAT(FORMAT(t.qty, 0), ' ', COALESCE(pr.unit,'')))",
          'where' => work_summary_part_nonproduction_sql('t.mode')],
 

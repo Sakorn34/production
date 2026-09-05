@@ -6,9 +6,8 @@
  * ปลายทางจริงของข้อความนี้คือเอาไปกรอกใบบันทึกงานล่วงเวลา คนอ่านจึงต้องการ
  * วันที่กับเวลาเป็นหลัก ส่วนรายละเอียดว่าเครื่องไหนบ้างอยู่ที่หน้าเว็บ
  *
- * โครงการ์ด:
- *   ปฏิทินทั้งรอบ  — เห็นภาพรวมว่าทำงานวันไหนบ้างในภาพเดียว
- *   รายการรายวัน   — วันที่ · ช่วงเวลาที่บันทึก · หัวข้องาน (+ รูปของที่ทำ)
+ * โครงการ์ด: รายการรายวัน — วันที่ · ช่วงเวลาที่บันทึก · หัวข้องาน (+ รูปของที่ทำ)
+ * ปฏิทินอยู่ที่หน้าเว็บอย่างเดียว ในแชทมันซ้ำกับรายการรายวันที่บอกครบอยู่แล้ว
  *
  * เวลาที่แสดงคือ "เวลาที่บันทึกข้อมูล" ไม่ใช่เวลาเข้า–ออกงาน และมีเฉพาะงานฝั่ง
  * production — ระบบซ่อม/เช่าเก็บแค่วันที่ วันที่ไม่มีเวลาจึงเว้นว่างไว้ ไม่เดาให้
@@ -103,76 +102,6 @@ function line_flex_work_summary_day(array $day, array $opt): array
 }
 
 /**
- * ปฏิทินของรอบ — ช่องทึบ = วันที่มีงาน
- *
- * รอบนี้คร่อมสองเดือน (21 ถึง 20) ปฏิทินเดือนเดียวจึงใช้ไม่ได้ — วางเป็นสัปดาห์
- * เริ่มอาทิตย์ ตั้งแต่สัปดาห์ที่มีวันเปิดรอบ ถึงสัปดาห์ที่มีวันปิดรอบ วันนอกรอบเว้นว่าง
- *
- * @param  string             $from Y-m-d
- * @param  string             $to   Y-m-d
- * @param  array<string,bool> $worked key = Y-m-d ที่มีงาน
- * @return array<int,array<string,mixed>>
- */
-function line_flex_work_summary_calendar(string $from, string $to, array $worked): array
-{
-    $fromTs = strtotime($from);
-    $toTs = strtotime($to);
-    if ($fromTs === false || $toTs === false || $toTs < $fromTs) {
-        return [];
-    }
-    // ถอยไปวันอาทิตย์ของสัปดาห์แรก แล้วเดินทีละวันจนพ้นวันปิดรอบ
-    $cur = strtotime('-' . (int) date('w', $fromTs) . ' day', $fromTs);
-    $rows = [];
-    $week = [];
-    $guard = 0;
-    while ($cur <= $toTs && $guard++ < 70) {
-        $ymd = date('Y-m-d', $cur);
-        $inCycle = $ymd >= $from && $ymd <= $to;
-        $hit = $inCycle && isset($worked[$ymd]);
-        $num = (string) ((int) date('j', $cur));
-        if (!$inCycle) {
-            $week[] = ['type' => 'filler'];
-        } elseif ($hit) {
-            // วันที่มีงานเป็นช่องทึบ — ตัวที่ต้องเห็นก่อนเพื่อน
-            $week[] = [
-                'type' => 'box', 'layout' => 'vertical', 'backgroundColor' => '#0057b8',
-                'cornerRadius' => '4px', 'paddingAll' => '4px',
-                'contents' => [['type' => 'text', 'text' => $num, 'size' => 'xxs',
-                                'align' => 'center', 'weight' => 'bold', 'color' => '#ffffff']],
-            ];
-        } else {
-            // วันว่างเป็นตัวเลขจาง ๆ ไม่ต้องมีกล่อง — ประหยัดที่ไปกว่าครึ่งต่อช่อง
-            $week[] = ['type' => 'text', 'text' => $num, 'size' => 'xxs', 'align' => 'center',
-                       'gravity' => 'center', 'color' => '#c8cfd8'];
-        }
-        if (count($week) === 7) {
-            $rows[] = ['type' => 'box', 'layout' => 'horizontal', 'spacing' => 'xs',
-                       'margin' => 'xs', 'contents' => $week];
-            $week = [];
-        }
-        $cur = strtotime('+1 day', $cur);
-    }
-    if ($week) {
-        while (count($week) < 7) {
-            $week[] = ['type' => 'filler'];
-        }
-        $rows[] = ['type' => 'box', 'layout' => 'horizontal', 'spacing' => 'xs',
-                   'margin' => 'xs', 'contents' => $week];
-    }
-    if (!$rows) {
-        return [];
-    }
-
-    $head = [];
-    foreach (['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'] as $d) {
-        $head[] = ['type' => 'text', 'text' => $d, 'size' => 'xxs', 'align' => 'center', 'color' => '#9aa4b2'];
-    }
-    array_unshift($rows, ['type' => 'box', 'layout' => 'horizontal', 'spacing' => 'xs', 'contents' => $head]);
-
-    return [['type' => 'box', 'layout' => 'vertical', 'margin' => 'lg', 'contents' => $rows]];
-}
-
-/**
  * การ์ดสรุป — ใบเดียวจบ
  *
  * @param  array<string,mixed>            $p       payload
@@ -191,19 +120,6 @@ function line_flex_work_summary_bubble(array $p, array $days, int $omitted = 0, 
                                      . '  ·  ทำงาน ' . number_format(count($all)) . ' วัน',
          'size' => 'xs', 'color' => '#888888', 'margin' => 'xs'],
     ];
-
-    // ปฏิทินเห็นทั้งรอบในภาพเดียว ต่อให้รายวันด้านล่างจะยกมาไม่ครบก็ยังรู้ว่าทำงานวันไหนบ้าง
-    $worked = [];
-    foreach ($all as $d) {
-        if (!empty($d['date'])) {
-            $worked[(string) $d['date']] = true;
-        }
-    }
-    foreach (line_flex_work_summary_calendar(
-        (string) ($p['cycle_from'] ?? ''), (string) ($p['cycle_to'] ?? ''), $worked
-    ) as $node) {
-        $body[] = $node;
-    }
 
     if (!$days) {
         $body[] = ['type' => 'text', 'text' => 'ไม่มีงานที่บันทึกในรอบนี้',
