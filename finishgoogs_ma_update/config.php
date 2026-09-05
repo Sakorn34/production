@@ -1004,16 +1004,20 @@ function theme_font_config() {
 }
 
 // ---------- สถานะ ----------
+// ชื่อและสีสถานะอยู่ที่ shared/ui_status_palette.php ที่เดียว — ทั้ง badge กราฟ
+// และแถบสัดส่วนอ่านจากที่นั่น เพื่อไม่ให้สถานะเดียวมีคนละสีในหน้าเดียวกันอีก
+require_once dirname(__DIR__) . '/shared/ui_status_palette.php';
+
 function status_th($s) {
-    $m = [
-        'new' => 'เครื่องใหม่', 'rental' => 'เครื่องเช่า', 'spare' => 'เครื่องสำรอง',
-        'sold' => 'ขายแล้ว', 'retired' => 'เสื่อมสภาพ', 'lost' => 'สูญหาย',
-    ];
-    return isset($m[$s]) ? $m[$s] : $s;
+    $e = status_palette_entry((string) $s);
+    return $e['th'];
 }
-function status_list() { return ['new', 'rental', 'spare', 'sold', 'retired', 'lost']; }
+function status_list() { return array_keys(status_palette()); }
 function status_badge($s) {
-    return '<span class="badge st-' . h($s) . '">' . h(status_th($s)) . '</span>';
+    // คง class st-<key> ไว้ให้ของเดิมที่ hook สีจากคลาสนี้ยังทำงาน — สีจริงมาจาก
+    // inline ซึ่งชนะคลาสอยู่แล้ว จึงไม่ต้องไล่แก้ทุกที่ที่เคยพิมพ์คลาสเอง
+    return '<span class="badge st-' . h($s) . '" style="' . h(status_badge_style((string) $s)) . '">'
+         . h(status_th($s)) . '</span>';
 }
 function role_th($r) {
     $m = ['admin' => 'ผู้ดูแลระบบ', 'qc' => 'ทีมผลิต/QC', 'technician' => 'ช่างเทคนิค', 'executive' => 'ผู้บริหาร'];

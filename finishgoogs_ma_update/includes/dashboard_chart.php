@@ -142,11 +142,9 @@ function dash_linechart_point($label, $title, array $counts, $titlePrefix, $base
  */
 function status_th_chip($st)
 {
-    $m = [
-        'new' => 'ใหม่', 'rental' => 'เช่า', 'spare' => 'สำรอง',
-        'sold' => 'ขายแล้ว', 'retired' => 'เสื่อมสภาพ', 'lost' => 'สูญหาย',
-    ];
-    return isset($m[$st]) ? $m[$st] : $st;
+    // ชื่อสั้นสำหรับกราฟ — มาจาก palette ชุดเดียวกับสี ไม่เก็บ map ซ้ำที่นี่
+    $e = status_palette_entry((string) $st);
+    return $e['chip'];
 }
 
 /**
@@ -157,12 +155,9 @@ function status_th_chip($st)
  */
 function dash_chart_color($st)
 {
-    // เสื่อมสภาพ/สูญหายใช้โทนเทา-แดงจาง ให้แยกจากสถานะที่ยังใช้งานได้ด้วยสายตา
-    $m = [
-        'new' => '#6ee7b7', 'rental' => '#93c5fd', 'sold' => '#fdba74', 'spare' => '#fde68a',
-        'retired' => '#cbd5e1', 'lost' => '#fca5a5',
-    ];
-    return isset($m[$st]) ? $m[$st] : '#cbd5e1';
+    // สีแท่งกราฟ = สี bar ของ palette ชุดเดียวกับ badge ในตาราง (hue เดียวกับตัวอักษร)
+    // เดิมเป็นพาสเทลคนละชุด ทำให้สถานะเดียวมีสองสีในหน้าเดียว
+    return status_bar_color((string) $st);
 }
 
 /**
