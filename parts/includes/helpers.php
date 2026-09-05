@@ -611,7 +611,7 @@ function parts_products_sort_href(string $column, array $sortState): string
  * @param string|null $extraClass
  * @return string
  */
-function parts_products_sort_th(string $label, string $column, array $sortState, ?string $extraClass = null): string
+function parts_products_sort_th(string $label, string $column, array $sortState, ?string $extraClass = null, ?string $pri = null): string
 {
     $isActive = $sortState['sort'] === $column;
     $classes = ['sortable-th'];
@@ -628,7 +628,9 @@ function parts_products_sort_th(string $label, string $column, array $sortState,
     }
     $href = parts_products_sort_href($column, $sortState);
     $arrow = '<span class="sort-indicator" aria-hidden="true"></span>';
-    return '<th class="' . e(implode(' ', $classes)) . '" aria-sort="' . e($ariaSort) . '">'
+    // data-pri = ลำดับความสำคัญของคอลัมน์ (shared/ui_table.css) — ต้องตรงกับ td ของคอลัมน์เดียวกัน
+    $priAttr = ($pri !== null && $pri !== '') ? ' data-pri="' . e($pri) . '"' : '';
+    return '<th class="' . e(implode(' ', $classes)) . '" aria-sort="' . e($ariaSort) . '"' . $priAttr . '>'
         . '<a class="sortable-th-link" href="' . e($href) . '">'
         . e($label) . ($isActive ? $arrow : '')
         . '</a></th>';

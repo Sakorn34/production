@@ -296,7 +296,18 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
 
 <div class="table-wrap">
 <table class="list">
-  <tr><th>ผลิตเมื่อ</th><th></th><th>รหัสเครื่อง</th><th>รุ่น</th><th>สถานะ</th><th>เบิกอะไหล่</th><th>ผู้บันทึกรายการ</th><th>FW</th><th>การเบิกใช้งาน</th></tr>
+  <?php // data-pri = ลำดับความสำคัญของคอลัมน์ (shared/ui_table.css)
+        // 1 เห็นทุกความกว้าง · 2 ยุบลงบรรทัดรองที่ < 900px · 3 ซ่อนที่ < 1100px ?>
+  <?php // ต้องมี <thead> จริง ไม่ใช่ <tr><th> ลอย ๆ — โหมดการ์ดบนมือถือซ่อนหัวตาราง
+        // ด้วย thead{display:none} เบราว์เซอร์เติม tbody ให้เอง แต่ไม่เติม thead ?>
+  <thead>
+  <tr>
+    <th data-pri="2">ผลิตเมื่อ</th><th data-pri="2"></th><th data-pri="1">รหัสเครื่อง</th>
+    <th data-pri="2">รุ่น</th><th data-pri="1">สถานะ</th><th data-pri="2">เบิกอะไหล่</th>
+    <th data-pri="3">ผู้บันทึกรายการ</th><th data-pri="3">FW</th><th data-pri="3">การเบิกใช้งาน</th>
+  </tr>
+  </thead>
+  <tbody>
   <?php if (!$assetRows) { ?>
   <tr><td colspan="9" class="muted" style="text-align:center;padding:20px">ไม่พบเครื่องที่ตรงกับเงื่อนไข</td></tr>
   <?php } ?>
@@ -317,12 +328,16 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
       $partsProdUrl = asset_parts_production_url($sn);
   ?>
   <tr>
-    <td style="white-space:nowrap"><?= dthai($r['produced_at']) ?></td>
-    <td style="width:56px"><?= img_tag($r['icon_path'], $r['pname']) ?></td>
-    <td><a href="<?= BASE_URL ?>/asset.php?id=<?= $r['id'] ?>"><b><?= h($r['asset_code']) ?></b></a></td>
-    <td><?= h($r['pname']) ?></td>
-    <td><?= status_badge($r['status']) ?></td>
-    <td>
+    <td data-pri="2" data-nowrap><?= dthai($r['produced_at']) ?></td>
+    <td data-pri="2" style="width:56px"><?= img_tag($r['icon_path'], $r['pname']) ?></td>
+    <td data-pri="1">
+      <a href="<?= BASE_URL ?>/asset.php?id=<?= $r['id'] ?>"><b><?= h($r['asset_code']) ?></b></a>
+      <?php // บรรทัดรอง — โผล่เองเมื่อคอลัมน์ระดับ 2 ถูกยุบที่จอแคบ ?>
+      <span class="cell-sub"><?= h($r['pname']) ?> · <?= dthai($r['produced_at']) ?></span>
+    </td>
+    <td data-pri="2"><?= h($r['pname']) ?></td>
+    <td data-pri="1"><?= status_badge($r['status']) ?></td>
+    <td data-pri="2">
       <?php if ($pStatus === 'none') { ?>
         <span class="muted">—</span>
       <?php } else { ?>
@@ -332,13 +347,13 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
         <?php } ?>
       <?php } ?>
     </td>
-    <td><?= h($r['recorder'] ?: '-') ?></td>
-    <td><?= h($r['current_fw_version'] ?: '-') ?></td>
+    <td data-pri="3"><?= h($r['recorder'] ?: '-') ?></td>
+    <td data-pri="3"><?= h($r['current_fw_version'] ?: '-') ?></td>
     <?php
       $lease = $leaseStatus[$r['asset_code']] ?? null;
       $sale = $saleStatus[$r['asset_code']] ?? null;
     ?>
-    <td style="white-space:nowrap">
+    <td data-pri="3" data-nowrap>
       <?php if (!empty($lease['found'])) { ?>
         <?= rent_leasing_list_status_html($lease) ?>
       <?php } elseif ($sale === null) { ?>
@@ -357,6 +372,7 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
       <?php } ?>
     </td>
   </tr>
+  </tbody>
   <?php } ?>
 </table>
 </div>

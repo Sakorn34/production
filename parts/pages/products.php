@@ -294,17 +294,19 @@ foreach ($sets as $s) {
     <div class="table-wrap">
         <table class="products-table" id="products-table">
             <thead>
+                <?php // data-pri = ลำดับความสำคัญของคอลัมน์ (shared/ui_table.css)
+                      // 1 เห็นทุกความกว้าง · 2 ยุบลงบรรทัดรองที่ < 900px · 3 ซ่อนที่ < 1100px ?>
                 <tr>
-                    <th class="col-img">รูป</th>
-                    <?= parts_products_sort_th('รหัส', 'code', $sortState) ?>
-                    <?= parts_products_sort_th('ชื่อ', 'name', $sortState) ?>
-                    <?= parts_products_sort_th('สถานะ', 'status', $sortState, 'col-status') ?>
-                    <?= parts_products_sort_th('ราคา', 'price', $sortState) ?>
-                    <?= parts_products_sort_th('ผู้จำหน่าย', 'link', $sortState) ?>
-                    <?= parts_products_sort_th('คงเหลือ', 'quantity', $sortState, 'text-right') ?>
-                    <?= parts_products_sort_th('หน่วย', 'unit', $sortState) ?>
-                    <?= parts_products_sort_th('ขั้นต่ำ', 'min_stock', $sortState, 'text-right') ?>
-                    <th class="col-actions">จัดการ</th>
+                    <th class="col-img" data-pri="2">รูป</th>
+                    <?= parts_products_sort_th('รหัส', 'code', $sortState, null, '2') ?>
+                    <?= parts_products_sort_th('ชื่อ', 'name', $sortState, null, '1') ?>
+                    <?= parts_products_sort_th('สถานะ', 'status', $sortState, 'col-status', '2') ?>
+                    <?= parts_products_sort_th('ราคา', 'price', $sortState, null, '3') ?>
+                    <?= parts_products_sort_th('ผู้จำหน่าย', 'link', $sortState, null, '2') ?>
+                    <?= parts_products_sort_th('คงเหลือ', 'quantity', $sortState, 'text-right', '1') ?>
+                    <?= parts_products_sort_th('หน่วย', 'unit', $sortState, null, '3') ?>
+                    <?= parts_products_sort_th('ขั้นต่ำ', 'min_stock', $sortState, 'text-right', '3') ?>
+                    <th class="col-actions" data-pri="1">จัดการ</th>
                 </tr>
             </thead>
             <tbody>
@@ -321,10 +323,12 @@ foreach ($sets as $s) {
                     ]))), 'UTF-8');
                 ?>
                 <tr class="<?= $isActive ? '' : 'row-inactive' ?>" data-search="<?= e($searchKey) ?>" data-supplier="<?= e(trim((string) ($p["supplier"] ?? ""))) ?>">
-                    <td class="col-img"><?= parts_product_img_cell($icon, $p, $productsReturnTo) ?></td>
-                    <td><?= e($p['code']) ?></td>
-                    <td><a href="<?= url('/pages/product-detail.php?id=' . (int) $p['id']) ?>" class="detail-link"><?= parts_product_name_html($p) ?></a></td>
-                    <td class="col-status">
+                    <td class="col-img" data-pri="2"><?= parts_product_img_cell($icon, $p, $productsReturnTo) ?></td>
+                    <td data-pri="2"><?= e($p['code']) ?></td>
+                    <td data-pri="1"><a href="<?= url('/pages/product-detail.php?id=' . (int) $p['id']) ?>" class="detail-link"><?= parts_product_name_html($p) ?></a>
+                        <?php // บรรทัดรอง — โผล่เมื่อคอลัมน์ระดับ 2 ถูกยุบที่จอแคบ ?>
+                        <span class="cell-sub"><?= e($p['code']) ?><?= !empty($p['supplier']) ? ' · ' . e($p['supplier']) : '' ?></span></td>
+                    <td class="col-status" data-pri="2">
                         <form method="POST" class="product-active-form">
                             <input type="hidden" name="action" value="toggle_active">
                             <input type="hidden" name="product_id" value="<?= (int) $p['id'] ?>">
@@ -335,7 +339,7 @@ foreach ($sets as $s) {
                             </label>
                         </form>
                     </td>
-                    <td class="col-price"><?= parts_product_price_cell($p, $productsReturnTo) ?></td>
+                    <td class="col-price" data-pri="3"><?= parts_product_price_cell($p, $productsReturnTo) ?></td>
                     <td>
                         <?php if (!empty($p['supplier'])): ?>
                             <div class="product-supplier-name"><?= e($p['supplier']) ?></div>
@@ -352,15 +356,15 @@ foreach ($sets as $s) {
                     $stStatus = stock_status_key((int) $p['quantity'], (int) $p['min_stock']);
                     $stMeta = stock_status_meta($stStatus);
                     ?>
-                    <td class="text-right">
+                    <td class="text-right" data-pri="1">
                         <span class="<?= stock_status_is_reorder($stStatus) ? 'qty-low' : 'qty-ok' ?>">
                             <?= formatNumber($p['quantity']) ?>
                         </span>
                         <br><span class="stock-status-tag <?= e($stMeta['tone']) ?>"><?= e($stMeta['label']) ?></span>
                     </td>
-                    <td><?= e($p['unit']) ?></td>
-                    <td class="text-right"><?= formatNumber($p['min_stock']) ?></td>
-                    <td class="col-actions">
+                    <td data-pri="3"><?= e($p['unit']) ?></td>
+                    <td class="text-right" data-pri="3"><?= formatNumber($p['min_stock']) ?></td>
+                    <td class="col-actions" data-pri="1">
                         <div class="table-actions">
                             <?= actionIcon('view', url('/pages/product-detail.php?id=' . (int) $p['id']), 'ดูรายละเอียด') ?>
                             <button type="button" class="btn btn-sm btn-icon btn-icon-edit" title="แก้ไขรายละเอียด"<?= parts_product_edit_data_attrs($p, $productsReturnTo) ?>><?= ui_icon_html('edit', 16, 'btn-svg') ?></button>

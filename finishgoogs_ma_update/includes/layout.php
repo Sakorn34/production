@@ -218,6 +218,9 @@ function page_head_html($title) {
 }</style>
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/theme-v2.css?v=<?= @filemtime(__DIR__ . '/../assets/theme-v2.css') ?: time() ?>">
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/sidebar.css?v=<?= @filemtime(__DIR__ . '/../assets/sidebar.css') ?: time() ?>">
+<?php // ตารางที่ยุบคอลัมน์ตามความกว้าง — ใช้ร่วมกับแอปอะไหล่ ต้องมาหลัง style.css
+      // เพราะทับกฎ white-space ของ table.list ?>
+<link rel="stylesheet" href="<?= h(rtrim(dirname(BASE_URL), '/\\')) ?>/shared/ui_table.css?v=<?= @filemtime(dirname(__DIR__, 2) . '/shared/ui_table.css') ?: time() ?>">
 </head>
 <?php
 }

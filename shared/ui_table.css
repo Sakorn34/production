@@ -1,0 +1,87 @@
+/* shared/ui_table.css — ตารางที่ไม่ล้นจอ ด้วยลำดับความสำคัญของคอลัมน์
+   ────────────────────────────────────────────────────────────────────────────
+   ทะเบียนเครื่องมี 9 คอลัมน์ สต็อกอะไหล่มี 10 หัวตารางตั้ง white-space:nowrap
+   และตารางอยู่ใน .table-wrap{overflow-x:auto} ผลคือไม่ตกบรรทัดแต่ไหลออกนอกจอ
+   บนโน้ตบุ๊ก 1366px ต้องเลื่อนซ้ายขวา พอเลื่อนแล้วคอลัมน์รหัสเครื่องหลุดสายตา
+   จึงอ่านผิดแถวได้ บนมือถือแทบใช้ไม่ได้
+
+   วิธีแก้: ติดป้าย data-pri="1|2|3" ที่ th และ td ให้ตรงคู่กันครั้งเดียว
+   แล้ว CSS ยุบตามความกว้างจริง ไม่ต้องมี JavaScript
+     1 = เห็นทุกความกว้าง        (ตัวระบุแถว + สถานะ + ปุ่มจัดการ)
+     2 = ต่ำกว่า 900px ยุบลงเป็นบรรทัดรอง .cell-sub ในเซลล์ระดับ 1
+     3 = ต่ำกว่า 1100px ซ่อน     (ดูได้ในหน้ารายละเอียด)
+
+   สองแอปตั้งชื่อคลาสตารางไม่เหมือนกัน (table.list ฝั่งทะเบียนเครื่อง
+   table.products-table ฝั่งอะไหล่) จึงต้องเขียน selector ทั้งคู่ทุกกฎ —
+   ใช้ :where() ย่อไม่ได้เพราะมันทำให้ specificity เป็นศูนย์ แล้วแพ้กฎเดิม
+
+   ไฟล์นี้ไม่มีผลกับตารางที่ยังไม่ติดป้าย จึงส่งขึ้น server ก่อนได้อย่างปลอดภัย
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* บรรทัดรองในเซลล์หลัก — ซ่อนไว้ตอนจอกว้างเพราะข้อมูลยังอยู่ในคอลัมน์ของตัวเอง */
+table.list .cell-sub,
+table.products-table .cell-sub {
+  display: none;
+  font-size: calc(12px * var(--font-scale, 1));
+  color: var(--text-muted, #45506a);
+  margin-top: 2px;
+}
+
+/* หัวตารางไทยยาวกว่าอังกฤษ การบังคับ nowrap ทำให้คอลัมน์กว้างเกินจำเป็น
+   ปล่อยให้ขึ้นบรรทัดได้ แล้วให้เซลล์ที่ห้ามตัดคำระบุ data-nowrap เอง */
+table.list th,
+table.products-table th { white-space: normal; }
+table.list td[data-nowrap],
+table.products-table td[data-nowrap] { white-space: nowrap; }
+
+/* หัวตารางตรึงไว้ตอนเลื่อนดูรายการยาว ๆ */
+.table-wrap { max-height: calc(100vh - 260px); }
+table.list th,
+table.products-table th { position: sticky; top: 0; z-index: 2; }
+
+/* ── < 1100px: ตัดระดับ 3 ── */
+@media (max-width: 1100px) {
+  table.list th[data-pri="3"], table.list td[data-pri="3"],
+  table.products-table th[data-pri="3"], table.products-table td[data-pri="3"] { display: none; }
+}
+
+/* ── < 900px: ตัดระดับ 2 แล้วโยนลงบรรทัดรอง ── */
+@media (max-width: 900px) {
+  table.list th[data-pri="2"], table.list td[data-pri="2"],
+  table.products-table th[data-pri="2"], table.products-table td[data-pri="2"] { display: none; }
+  table.list .cell-sub,
+  table.products-table .cell-sub { display: block; }
+}
+
+/* ── < 760px: หนึ่งแถว = หนึ่งการ์ด ──
+   ตารางแนวนอนบนมือถือใช้ไม่ได้จริง เหลือเฉพาะระดับ 1 แล้วอ่านเป็นการ์ดแทน */
+@media (max-width: 760px) {
+  .table-wrap { max-height: none; }
+  table.list thead,
+  table.products-table thead { display: none; }
+  table.list, table.list tbody, table.list tr,
+  table.products-table, table.products-table tbody, table.products-table tr {
+    display: block; width: 100%;
+  }
+  table.list,
+  table.products-table { border: 0; background: none; }
+  table.list tr,
+  table.products-table tr {
+    border: 1px solid var(--border, #dfe4ec);
+    border-radius: var(--radius-sm, 8px);
+    margin-bottom: 10px;
+    padding: 12px 14px;
+    background: var(--surface, #fff);
+  }
+  table.list td,
+  table.products-table td { display: block; border: 0; padding: 0; }
+  table.list td:not([data-pri="1"]),
+  table.products-table td:not([data-pri="1"]) { display: none; }
+  table.list .cell-sub,
+  table.products-table .cell-sub { display: block; }
+  /* เป้าแตะ 48px — นิ้วโป้งบนมือถือ ไม่ใช่เมาส์ */
+  table.list td a, table.list td button,
+  table.products-table td a, table.products-table td button {
+    min-height: 48px; display: inline-flex; align-items: center;
+  }
+}

@@ -27,6 +27,8 @@ $settingsActive = false;
     <style id="theme-vars"><?= parts_theme_css_block() ?></style>
     <link rel="stylesheet" href="<?= url('/assets/theme-v2.css') ?>?v=<?= @filemtime(__DIR__ . '/../assets/theme-v2.css') ?: time() ?>">
     <link rel="stylesheet" href="<?= e($fgBase) ?>/assets/sidebar.css?v=<?= @filemtime(dirname(__DIR__, 2) . '/finishgoogs_ma_update/assets/sidebar.css') ?: time() ?>">
+    <?php // ตารางที่ยุบคอลัมน์ตามความกว้าง — ไฟล์เดียวกับที่แอปทะเบียนเครื่องใช้ ?>
+    <link rel="stylesheet" href="<?= e(rtrim(dirname($fgBase), '/\\')) ?>/shared/ui_table.css?v=<?= @filemtime(dirname(__DIR__, 2) . '/shared/ui_table.css') ?: time() ?>">
 </head>
 <body>
 <div class="app nav-collapsed">
