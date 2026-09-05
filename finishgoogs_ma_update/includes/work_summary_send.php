@@ -105,6 +105,11 @@ function work_summary_send_cycle(array $cycle, ?int $onlyPerson = null, bool $fo
         $out['errors'] = $summary['errors'];
         return $out;
     }
+    // dedup มีไว้กัน cron รันซ้ำ "รอบที่ปิดแล้ว" — การกดส่งดูตอนรอบยังเดินอยู่เป็นแค่
+    // พรีวิว ไม่ควรกินโควตาครั้งเดียวต่อรอบไปด้วย ไม่งั้นทดสอบกลางเดือนทีเดียวแล้ว
+    // ของจริงวันที่ 21 จะถูกข้ามทั้งรอบ กว่าจะรู้ตัวก็เลยกำหนดส่งไปแล้ว
+    $cycleClosed = ((string) $cycle['to']) < date('Y-m-d');
+
     // งานรายคนของรอบนี้ (คนที่ไม่มีงานเลยจะไม่อยู่ใน rows)
     $work = [];
     foreach ($summary['rows'] as $row) {
@@ -152,7 +157,7 @@ function work_summary_send_cycle(array $cycle, ?int $onlyPerson = null, bool $fo
             // กันส่งซ้ำถ้า cron รันซ้ำรอบเดิม — ผูกกับคน+รอบ
             'dedup_key'    => 'work.summary.monthly:' . $pid . ':' . $cycle['key'],
             'dedup_ttl'    => 60 * 86400,
-            'skip_dedup'   => $force,
+            'skip_dedup'   => $force || !$cycleClosed,
         ]);
         if ($id === null) {
             $out['dedup']++;
