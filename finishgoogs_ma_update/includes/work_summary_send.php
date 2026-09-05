@@ -92,6 +92,13 @@ function work_summary_send_cycle(array $cycle, ?int $onlyPerson = null, bool $fo
 {
     $out = ['queued' => 0, 'skipped_no_line' => 0, 'skipped_no_work' => 0, 'dedup' => 0, 'errors' => []];
 
+    // line_notify_dispatch() คืน null ทั้งตอนโดน dedup และตอนอีเวนต์ถูกปิดไว้ ถ้าไม่ดัก
+    // ตรงนี้ หน้าจอจะขึ้นว่า "เคยส่งรอบนี้แล้ว" ทั้งที่จริงคือปิดสวิตช์ไว้ — ตามหากันไม่เจอ
+    if (!line_notify_is_enabled('work.summary.monthly')) {
+        $out['errors'][] = 'แจ้งเตือน "สรุปงานรายคน" ถูกปิดอยู่ในหน้าตั้งค่า LINE';
+        return $out;
+    }
+
     $summary = work_summary_for_cycle((string) $cycle['from'], (string) $cycle['to']);
     if ($summary['errors']) {
         // ดึงบางระบบไม่ได้ = ตัวเลขไม่ครบ ส่งไปจะเป็นสรุปที่ผิด — หยุดดีกว่า
