@@ -34,8 +34,24 @@ table.products-table th { white-space: normal; }
 table.list td[data-nowrap],
 table.products-table td[data-nowrap] { white-space: nowrap; }
 
-/* หัวตารางตรึงไว้ตอนเลื่อนดูรายการยาว ๆ */
-.table-wrap { max-height: calc(100vh - 260px); }
+/* หัวตารางตรึงไว้ตอนเลื่อนดูรายการยาว ๆ
+   position:sticky ยึดกับ "กล่องที่เลื่อน" ที่ใกล้ที่สุด — .table-wrap ตั้ง overflow-x:auto
+   ไว้ มันจึงเป็นกล่องเลื่อนเอง หัวตารางเลยติดอยู่แค่ในกล่องนั้น พอผู้ใช้เลื่อน "หน้า"
+   ทั้งกล่องก็ลอยหายไปพร้อมหัวตาราง (เคยลองใส่ max-height ให้กล่องเลื่อนในตัวเอง
+   ผลคือได้ scrollbar สองอันซ้อนกันแทน ยิ่งงง)
+
+   ตารางที่ติดป้าย data-pri แล้วไม่ล้นแนวนอนอีก จึงไม่ต้องมีกล่องเลื่อน — ปลด overflow
+   ออกให้หัวตารางยึดกับหน้าเว็บตรง ๆ หน้าไหนยังไม่ติดป้ายก็ไม่ต้องใส่คลาสนี้ */
+.table-wrap-fold { overflow: visible; max-height: none; }
+
+/* table.list ตั้ง overflow:hidden ไว้เพื่อให้มุมโค้งกินขอบหัวตาราง — แต่ ancestor ที่
+   overflow ไม่ใช่ visible ก็กลายเป็นกรอบอ้างอิงของ sticky เหมือนกัน ทั้งที่มันไม่เลื่อน
+   หัวตารางจึงติดอยู่กับตารางที่เลื่อนหายไปทั้งใบ · ปลด overflow แล้วคืนมุมโค้งที่เซลล์มุมแทน */
+.table-wrap-fold table.list,
+.table-wrap-fold table.products-table { overflow: visible; }
+.table-wrap-fold thead tr:first-child th:first-child { border-top-left-radius: var(--radius-sm, 8px); }
+.table-wrap-fold thead tr:first-child th:last-child { border-top-right-radius: var(--radius-sm, 8px); }
+
 table.list th,
 table.products-table th { position: sticky; top: 0; z-index: 2; }
 
@@ -56,7 +72,6 @@ table.products-table th { position: sticky; top: 0; z-index: 2; }
 /* ── < 760px: หนึ่งแถว = หนึ่งการ์ด ──
    ตารางแนวนอนบนมือถือใช้ไม่ได้จริง เหลือเฉพาะระดับ 1 แล้วอ่านเป็นการ์ดแทน */
 @media (max-width: 760px) {
-  .table-wrap { max-height: none; }
   table.list thead,
   table.products-table thead { display: none; }
   table.list, table.list tbody, table.list tr,

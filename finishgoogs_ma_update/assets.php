@@ -294,7 +294,7 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
 })();
 </script>
 
-<div class="table-wrap">
+<div class="table-wrap table-wrap-fold">
 <table class="list">
   <?php // data-pri = ลำดับความสำคัญของคอลัมน์ (shared/ui_table.css)
         // 1 เห็นทุกความกว้าง · 2 ยุบลงบรรทัดรองที่ < 900px · 3 ซ่อนที่ < 1100px ?>

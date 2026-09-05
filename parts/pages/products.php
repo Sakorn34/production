@@ -291,7 +291,7 @@ foreach ($sets as $s) {
             <?php endif; ?>
         </select>
     </div>
-    <div class="table-wrap">
+    <div class="table-wrap table-wrap-fold">
         <table class="products-table" id="products-table">
             <thead>
                 <?php // data-pri = ลำดับความสำคัญของคอลัมน์ (shared/ui_table.css)
