@@ -47,30 +47,55 @@ table.products-table td[data-nowrap] { white-space: nowrap; }
 
 /* table.list ตั้ง overflow:hidden ไว้เพื่อให้มุมโค้งกินขอบหัวตาราง — แต่ ancestor ที่
    overflow ไม่ใช่ visible ก็กลายเป็นกรอบอ้างอิงของ sticky เหมือนกัน หัวตารางจึงติด
-   อยู่กับตารางแทนที่จะติดกับกรอบ · ปลด overflow แล้วคืนมุมโค้งที่เซลล์มุมแทน */
-.table-wrap-fold table.list,
-.table-wrap-fold table.products-table { overflow: visible; }
+   อยู่กับตารางแทนที่จะติดกับกรอบ · ปลด overflow แล้วคืนมุมโค้งที่เซลล์มุมแทน
+
+   ตั้งแต่จุดนี้ลงไปอ้างถึงตารางในกรอบด้วย .table-wrap-fold table เฉย ๆ ไม่ระบุคลาส:
+   สองแอปใช้ชื่อคลาสตารางไม่ตรงกันอยู่แล้ว (list / products-table) และหน้าประวัติ
+   ฝั่งอะไหล่ยังใช้ parts-table อีกชื่อ ซึ่งเดิมตกหล่นจนหัวตารางไม่ถูกตรึงเลย */
+.table-wrap-fold table { overflow: visible; }
 .table-wrap-fold thead tr:first-child th:first-child { border-top-left-radius: var(--radius-sm, 8px); }
 .table-wrap-fold thead tr:first-child th:last-child { border-top-right-radius: var(--radius-sm, 8px); }
 
+/* ตารางที่ยังไม่ได้อยู่ในกรอบ (sets.php, activity_logs.php) เคยตรึงหัวตารางไว้กับ
+   หน้าเว็บ — คงไว้ตามเดิม ไม่งั้นเลื่อนหน้ายาว ๆ แล้วหัวตารางหายไปเลย */
 table.list th,
 table.products-table th { position: sticky; top: 0; z-index: 2; }
+.table-wrap-fold table th { position: sticky; top: 0; z-index: 2; }
 
-/* เส้นใต้หัวตารางเขียนเป็น border ไว้ แต่ในโมเดล border-collapse ตัวตารางเป็นคนวาด
-   ไม่ใช่ตัวเซลล์ พอหัวตารางลอยขึ้นมาติดขอบกรอบ เส้นจึงเลื่อนหนีไปกับตาราง ขอบบนสุด
-   ของแถวที่มุดอยู่ข้างหลังเลยดูเลอะ · เงาเป็นของเซลล์เอง ติดไปกับหัวตารางเสมอ
-   และเงาจาง ๆ ใต้เส้นยังบอกด้วยว่ายังมีรายการซ่อนอยู่ข้างบน */
-.table-wrap-fold table.list th,
-.table-wrap-fold table.products-table th {
+/* หัวตารางที่ตรึงไว้ยังมีเนื้อแถวลอดขึ้นมาทับ — สองข้อนี้แก้คนละชั้นของปัญหาเดียวกัน
+
+   หนึ่ง: border-collapse:collapse ทำให้ "ตาราง" เป็นคนวาดเส้นขอบและพื้นของเซลล์
+   ไม่ใช่ตัวเซลล์เอง เซลล์ที่ sticky จึงไม่ได้ชั้นวาดของตัวเอง z-index ที่ใส่ให้ th
+   เลยไม่มีผล (ลองถึง 9999 ก็ยังทับไม่มิด) · โหมด separate คืนการวาดให้เซลล์
+   ซึ่งเป็นทางแก้ที่ Chromium แนะนำสำหรับอาการนี้ · border-spacing ต้องเป็น 0
+   ไม่งั้นจะมีช่องว่างระหว่างเซลล์โผล่มาแทน และแถวแรกต้องตัดเส้นบนทิ้ง ไม่งั้น
+   จะซ้อนกับเส้นใต้หัวตารางเป็นเส้นหนาผิดปกติ — ต้องเจาะจง tbody:first-of-type
+   ด้วย เพราะ assets.php ปิด-เปิด <tbody> ทุกแถว (50 แถว = 50 tbody) ถ้าเขียนแค่
+   tbody tr:first-child จะไปตัดเส้นคั่นของทุกแถวทิ้งหมด
+
+   สอง: เส้นใต้หัวตารางย้ายจาก border มาเป็นเงา — เงาเป็นของเซลล์ ติดไปกับหัวตาราง
+   เสมอไม่ว่าโมเดลไหน และเงาจาง ๆ ใต้เส้นยังบอกด้วยว่ามีรายการซ่อนอยู่ข้างบน */
+.table-wrap-fold table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.table-wrap-fold table tbody:first-of-type tr:first-child > td { border-top: 0; }
+.table-wrap-fold table th {
+  border-bottom: 0;
   box-shadow: 0 1px 0 var(--border, #dfe4ec), 0 6px 10px -8px rgba(15, 23, 42, .28);
 }
+
+/* และกันไม่ให้มีแถวค้างอยู่ครึ่งใต้หัวตารางตั้งแต่แรก — หยุดเลื่อนเมื่อไหร่ ขอบแถว
+   จะมาพอดีกับขอบล่างของหัวตารางเสมอ ไม่มีแถวไหนถูกตัดครึ่ง · scroll-padding-top
+   คือความสูงหัวตารางจริง ตั้งจาก shared/ui_table.js เพราะแต่ละหน้าไม่เท่ากัน */
+.table-wrap-fold { scroll-snap-type: y proximity; }
+.table-wrap-fold tbody tr { scroll-snap-align: start; }
 
 /* ในกรอบรายการ ความสูงของแถวคือจำนวนแถวที่เห็นโดยตรง — ขอบบนล่าง 12px ถูกตั้งไว้
    ตอนที่หน้ายังเลื่อนทั้งหน้า จะเลื่อนอีกนิดก็เห็นแถวถัดไป พอมาอยู่ในกรอบความสูง
    คงที่ ทุก px ที่ตัดคือแถวที่ได้เพิ่ม · 8px ยังห่างพอให้แยกแถวออกจากกันด้วยตา
    ตารางนอกกรอบ (หน้ารายละเอียด ตารางตั้งค่า) ไม่โดน เพราะมีไม่กี่แถวอยู่แล้ว */
-.table-wrap-fold table.list td,
-.table-wrap-fold table.products-table td { padding-top: 8px; padding-bottom: 8px; }
+.table-wrap-fold table td { padding-top: 8px; padding-bottom: 8px; }
 
 /* ── < 1100px: ตัดระดับ 3 ── */
 @media (max-width: 1100px) {
