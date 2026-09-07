@@ -43,7 +43,45 @@ table.products-table td[data-nowrap] { white-space: nowrap; }
 
    ต้องเป็น overflow:auto ทั้งสองแกน — ตั้งแกนเดียวแล้วอีกแกนที่เป็น visible
    จะถูกเบราว์เซอร์บังคับเป็น auto ตามอยู่ดี เขียนให้ตรงกับที่เกิดขึ้นจริงดีกว่า */
-.table-wrap-fold { overflow: auto; max-height: calc(100vh - 260px); }
+.table-wrap-fold {
+  overflow: auto;
+  max-height: calc(100vh - 260px);
+  /* กรอบเป็นของ "กรอบ" ไม่ใช่ของตาราง — เดิมเส้นขอบกับมุมโค้งอยู่ที่ table.list
+     ซึ่งเลื่อนอยู่ข้างใน มุมโค้งเลยเลื่อนหนีไปกับตาราง: เลื่อนค้างกลางทางเห็นมุมฉาก
+     เลื่อนสุดบน/สุดล่างมุมโค้งค่อยโผล่กลับมา · ย้ายมาไว้ที่กรอบแล้วมุมอยู่กับที่เสมอ
+     และแถบเลื่อนถูกมุมโค้งตัดขอบไปด้วย จึงอยู่ในกรอบเดียวกันจริง ๆ
+     .table-wrap เดิมมี margin/padding แนวนอน 4px เผื่อ focus ring — พอมีเส้นขอบ
+     แล้วมันกลายเป็นช่องว่างระหว่างขอบกับตาราง ต้องล้างทิ้ง */
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border, #dfe4ec);
+  border-radius: var(--radius, 12px);
+  background: var(--surface, #fff);
+  box-shadow: 0 1px 2px rgba(20, 30, 60, .04);
+}
+/* แถบเลื่อนของกรอบ — บางและหัวมน ให้กลืนกับกรอบแทนที่จะเป็นแถบเทาเหลี่ยมของระบบ
+   ใช้เฉพาะ ::-webkit-scrollbar อย่างเดียว: Chrome รุ่นใหม่ถ้าเจอ scrollbar-width
+   หรือ scrollbar-color จะเมินกฎ webkit ทั้งชุด แล้วได้แถบมาตรฐานกลับมาแทน */
+.table-wrap-fold::-webkit-scrollbar { width: 11px; height: 11px; }
+.table-wrap-fold::-webkit-scrollbar-track { background: transparent; }
+.table-wrap-fold::-webkit-scrollbar-thumb {
+  background: var(--border-strong, #c9d2e0);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+.table-wrap-fold::-webkit-scrollbar-thumb:hover { background: var(--text-faint, #9992ad); background-clip: content-box; }
+.table-wrap-fold::-webkit-scrollbar-corner { background: transparent; }
+
+/* ฝั่งอะไหล่วางกรอบไว้ในการ์ดขาวอีกชั้น (products / history / สรุปยอดสิ้นปี)
+   ถ้ากรอบมีพื้นขาวกับเงาของตัวเองด้วยจะกลายเป็นกล่องขาวซ้อนกล่องขาว เห็นเป็นขอบ
+   ซ้อนกันสองชั้น · เหลือแค่เส้นขอบกับมุมโค้งไว้บอกว่าเลื่อนได้ถึงตรงไหน */
+.card > .table-wrap-fold,
+.pcard > .table-wrap-fold,
+.panel > .table-wrap-fold {
+  background: transparent;
+  box-shadow: none;
+}
 
 /* table.list ตั้ง overflow:hidden ไว้เพื่อให้มุมโค้งกินขอบหัวตาราง — แต่ ancestor ที่
    overflow ไม่ใช่ visible ก็กลายเป็นกรอบอ้างอิงของ sticky เหมือนกัน หัวตารางจึงติด
@@ -52,9 +90,14 @@ table.products-table td[data-nowrap] { white-space: nowrap; }
    ตั้งแต่จุดนี้ลงไปอ้างถึงตารางในกรอบด้วย .table-wrap-fold table เฉย ๆ ไม่ระบุคลาส:
    สองแอปใช้ชื่อคลาสตารางไม่ตรงกันอยู่แล้ว (list / products-table) และหน้าประวัติ
    ฝั่งอะไหล่ยังใช้ parts-table อีกชื่อ ซึ่งเดิมตกหล่นจนหัวตารางไม่ถูกตรึงเลย */
-.table-wrap-fold table { overflow: visible; }
-.table-wrap-fold thead tr:first-child th:first-child { border-top-left-radius: var(--radius-sm, 8px); }
-.table-wrap-fold thead tr:first-child th:last-child { border-top-right-radius: var(--radius-sm, 8px); }
+.table-wrap-fold table {
+  overflow: visible;
+  /* กรอบข้างนอกรับหน้าที่นี้ไปแล้ว ถ้าปล่อยไว้จะได้เส้นขอบสองชั้นและมุมโค้งสองชั้น */
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: none;
+}
 
 /* ตารางที่ยังไม่ได้อยู่ในกรอบ (sets.php, activity_logs.php) เคยตรึงหัวตารางไว้กับ
    หน้าเว็บ — คงไว้ตามเดิม ไม่งั้นเลื่อนหน้ายาว ๆ แล้วหัวตารางหายไปเลย */
@@ -115,8 +158,12 @@ table.products-table th { position: sticky; top: 0; z-index: 2; }
    ตารางแนวนอนบนมือถือใช้ไม่ได้จริง เหลือเฉพาะระดับ 1 แล้วอ่านเป็นการ์ดแทน */
 @media (max-width: 760px) {
   /* บนมือถือให้หน้าเลื่อนตามปกติ — กรอบเลื่อนซ้อนในจอเล็กใช้ยากกว่า
-     (ui_table.js ก็ไม่ตั้งความสูงให้ในโหมดนี้เช่นกัน) */
-  .table-wrap-fold { max-height: none; overflow: visible; }
+     (ui_table.js ก็ไม่ตั้งความสูงให้ในโหมดนี้เช่นกัน) · แต่ละแถวเป็นการ์ดที่มีขอบ
+     ของตัวเองอยู่แล้ว กรอบนอกอีกชั้นเลยกลายเป็นกล่องซ้อนกล่อง ต้องถอดออก */
+  .table-wrap-fold {
+    max-height: none; overflow: visible;
+    border: 0; border-radius: 0; background: none; box-shadow: none;
+  }
   table.list thead,
   table.products-table thead { display: none; }
   table.list, table.list tbody, table.list tr,
