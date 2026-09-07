@@ -420,7 +420,7 @@ img.broken { visibility: hidden; }
 }
 #list-overlay .dash-chart-yaxis {
   width: 38px;
-  padding: 0 0 var(--dash-chart-label-h);
+  padding: var(--dash-bar-total-h, 18px) 0 var(--dash-chart-label-h);
   justify-content: space-between;
   align-items: flex-end;
 }
@@ -429,7 +429,7 @@ img.broken { visibility: hidden; }
   min-height: 0;
 }
 #list-overlay .dash-chart-grid {
-  top: 0;
+  top: var(--dash-bar-total-h, 18px);
   bottom: var(--dash-chart-label-h);
   left: 0;
   right: 0;
@@ -540,11 +540,16 @@ img.broken { visibility: hidden; }
 .dash-swatch-spare { background: #fde68a; }
 .dash-swatch-retired { background: #cbd5e1; }
 .dash-swatch-lost { background: #fca5a5; }
+/* ตัวเลขยอดรวมวางอยู่เหนือหัวแท่งใน .dash-bar-slot ปีที่สูงสุดจึงเป็น 100% พอดี
+   แล้วตัวเลขไม่มีที่ยืน โดนตัดหายไปทั้งตัว (เจอที่ปี 2568 = 3,339 ซึ่งเท่ากับ
+   ค่าสูงสุดของแกน Y เป๊ะ) · กันแถบไว้ด้านบนหนึ่งบรรทัด แล้วเลื่อนทั้งเส้นกริดและ
+   ป้ายแกน Y ลงมาเท่ากัน หัวแท่ง 100% จึงยังตรงกับเส้นบนสุดเหมือนเดิม */
+.dash-stacked-chart { --dash-bar-total-h: 18px; }
 .dash-chart-body { display: flex; gap: 8px; min-height: 200px; }
-.dash-chart-yaxis { display: flex; flex-direction: column; justify-content: space-between; flex-shrink: 0; width: 36px; padding: 0 0 26px; font-size: calc(10px * var(--font-scale, 1)); color: #94a3b8; text-align: right; }
+.dash-chart-yaxis { display: flex; flex-direction: column; justify-content: space-between; flex-shrink: 0; width: 36px; padding: var(--dash-bar-total-h, 18px) 0 26px; font-size: calc(10px * var(--font-scale, 1)); color: #94a3b8; text-align: right; }
 .dash-chart-yaxis span { line-height: 1; }
 .dash-chart-plot { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: inherit; }
-.dash-chart-grid { position: absolute; left: 0; right: 0; top: 0; bottom: 26px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; z-index: 0; }
+.dash-chart-grid { position: absolute; left: 0; right: 0; top: var(--dash-bar-total-h, 18px); bottom: 26px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; z-index: 0; }
 .dash-chart-grid-line { border-top: 1px dashed var(--border, #e2e8f0); }
 .dash-chart-bars { position: relative; z-index: 1; flex: 1; display: flex; align-items: stretch; gap: 8px; padding: 0; min-height: 160px; }
 .dash-bar-col { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; height: 100%; max-width: 56px; margin: 0 auto; }
@@ -552,6 +557,7 @@ img.broken { visibility: hidden; }
   flex: 1 1 0;
   width: 100%;
   min-height: 0;
+  padding-top: var(--dash-bar-total-h, 18px);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
