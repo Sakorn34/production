@@ -56,6 +56,15 @@ table.products-table td[data-nowrap] { white-space: nowrap; }
 table.list th,
 table.products-table th { position: sticky; top: 0; z-index: 2; }
 
+/* เส้นใต้หัวตารางเขียนเป็น border ไว้ แต่ในโมเดล border-collapse ตัวตารางเป็นคนวาด
+   ไม่ใช่ตัวเซลล์ พอหัวตารางลอยขึ้นมาติดขอบกรอบ เส้นจึงเลื่อนหนีไปกับตาราง ขอบบนสุด
+   ของแถวที่มุดอยู่ข้างหลังเลยดูเลอะ · เงาเป็นของเซลล์เอง ติดไปกับหัวตารางเสมอ
+   และเงาจาง ๆ ใต้เส้นยังบอกด้วยว่ายังมีรายการซ่อนอยู่ข้างบน */
+.table-wrap-fold table.list th,
+.table-wrap-fold table.products-table th {
+  box-shadow: 0 1px 0 var(--border, #dfe4ec), 0 6px 10px -8px rgba(15, 23, 42, .28);
+}
+
 /* ── < 1100px: ตัดระดับ 3 ── */
 @media (max-width: 1100px) {
   table.list th[data-pri="3"], table.list td[data-pri="3"],

@@ -240,7 +240,7 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
-  margin-bottom: 18px;
+  margin-bottom: 10px;
 }
 .assets-filter > form { display: contents; }
 .assets-filter input[type=text],

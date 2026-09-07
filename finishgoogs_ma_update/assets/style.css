@@ -113,7 +113,7 @@ table.list tr:hover td { background: #f7f9fc; }
 .parts-status-stock_only { background: #fce7f3; color: #9d174d; }
 .parts-status:hover { opacity: 0.9; text-decoration: underline; }
 
-form.filter { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+form.filter { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; align-items: center; }
 input[type=text], input[type=date], input[type=datetime-local], input[type=password], input[type=number], select, textarea {
   padding: 8px 14px; border: 1px solid var(--border, #c9d2e0); border-radius: var(--radius-sm, 8px); font-family: inherit;
   font-size: calc(14px * var(--font-scale, 1)); color: var(--text); background: var(--surface, #fff);

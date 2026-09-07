@@ -32,7 +32,7 @@
       // ระยะจากขอบบน viewport ถึงหัวกรอบ + เผื่อขอบล่างไว้หายใจ
       var top = w.getBoundingClientRect().top + (window.pageYOffset || 0)
               - (document.documentElement.getBoundingClientRect().top + (window.pageYOffset || 0));
-      var avail = window.innerHeight - top - 20;
+      var avail = window.innerHeight - top - 14;
       w.style.maxHeight = Math.max(MIN_H, avail) + 'px';
       w.style.overflowY = 'auto';
 

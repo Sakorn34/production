@@ -138,13 +138,21 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .alert.h-with-icon .h-svg { margin-top: 2px; }
 
 /* ── Page header subtitle ── */
-.pagehead { align-items: flex-start; }
-.pagehead-titles { min-width: 0; }
+/* หัวหน้ากินที่แนวตั้งเกินจำเป็น: ชื่อหน้ากับจำนวนรายการอยู่คนละบรรทัด ทั้งที่
+   รวมเป็นบรรทัดเดียวได้สบาย ที่คืนมาตกไปเป็นความสูงของกรอบรายการ แปลว่าเห็น
+   แถวข้อมูลได้เพิ่มโดยไม่ต้องเลื่อน · จอแคบกว่า 640px ปล่อยให้ห่อบรรทัดตามเดิม
+   เพราะบีบให้อยู่บรรทัดเดียวแล้วชื่อหน้าจะถูกตัดจนอ่านไม่รู้เรื่อง */
+.pagehead { align-items: center; margin-bottom: 10px; }
+.pagehead-titles { min-width: 0; display: flex; align-items: baseline; gap: 2px 10px; flex-wrap: wrap; }
 /* ปุ่มการทำงานของหน้า ชิดขวา — คู่กับ .parts-page-actions ของแอปอะไหล่ */
 .pagehead-actions { margin-left: auto; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 @media (max-width: 640px) { .pagehead-actions { margin-left: 0; width: 100%; } }
-.pagehead-sub { margin: 2px 0 0; font-size: calc(13px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); font-weight: 400; }
+.pagehead-sub { margin: 0; font-size: calc(13px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); font-weight: 400; }
 .panel-meta { font-weight: 400; font-size: calc(12px * var(--font-scale, 1)); }
+/* ระยะขอบบนของเนื้อหาและช่องไฟใต้แถบกรอง — เดิม 22/18px ซึ่งกว้างกว่าที่ตาต้องการ
+   บนหน้ารายการ ทุก px ที่ตัดตรงนี้กลายเป็นความสูงของกรอบรายการพอดี */
+.content { padding-top: 14px; }
+.list-toolbar { margin-bottom: 10px; }
 
 /* ── Dashboard รวม: KPI การ์ดขาว + แถบสีความหมาย ── */
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); gap: 12px; margin-bottom: 16px; }
