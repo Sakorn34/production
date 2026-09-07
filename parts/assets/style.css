@@ -30,7 +30,7 @@ body {
     align-items: center;
     gap: 0.75rem;
     padding: 0 1.5rem 1.5rem;
-    font-size: 1rem;
+    font-size: calc(16px * var(--font-scale, 1));
     font-weight: 700;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     margin-bottom: 1rem;
@@ -47,7 +47,7 @@ body {
     color: var(--text-faint);
     text-decoration: none;
     transition: all var(--transition);
-    font-size: 0.92rem;
+    font-size: calc(14.5px * var(--font-scale, 1));
     border-left: 3px solid transparent;
 }
 
@@ -77,8 +77,6 @@ body {
 .nav-group-label {
     font-size: calc(10.5px * var(--font-scale, 1));
     font-weight: 700;
-    letter-spacing: .12em;
-    text-transform: uppercase;
     color: rgba(255, 255, 255, .45);
     padding: 14px 1.25rem 6px;
 }
@@ -136,7 +134,7 @@ body.modal-open {
 
 tr.history-group-head td {
     background: #f7f4fd;
-    font-size: 0.92rem;
+    font-size: calc(14.5px * var(--font-scale, 1));
     padding-top: 0.85rem;
     padding-bottom: 0.45rem;
     border-top: 2px solid #e7e0f5;
@@ -320,7 +318,7 @@ tr.history-sub-row td:first-child {
 }
 tr.history-sub-row td {
     background: #faf8fe;
-    font-size: 0.92rem;
+    font-size: calc(14.5px * var(--font-scale, 1));
 }
 
 /* ─ Modal ─────────────────────────────────────────────────────────────────── */
@@ -361,7 +359,7 @@ tr.history-sub-row td {
 }
 
 .modal-header h3 {
-    font-size: 1.05rem;
+    font-size: calc(17px * var(--font-scale, 1));
     font-weight: 700;
 }
 
@@ -371,7 +369,7 @@ tr.history-sub-row td {
     border: none;
     background: var(--surface-muted);
     border-radius: var(--radius-sm);
-    font-size: 1.4rem;
+    font-size: calc(22.5px * var(--font-scale, 1));
     line-height: 1;
     cursor: pointer;
     color: var(--text-muted);
@@ -437,7 +435,7 @@ tr.history-sub-row td {
 .page-header p {
     color: var(--text-muted);
     margin: 0;
-    font-size: 0.95rem;
+    font-size: calc(15px * var(--font-scale, 1));
 }
 
 /* ─ Stats & Cards ───────────────────────────────────────────────────────── */
@@ -469,14 +467,14 @@ tr.history-sub-row td {
 .stat-card.danger  { border-left-color: var(--danger); }
 
 .stat-card .label {
-    font-size: 0.82rem;
+    font-size: calc(13px * var(--font-scale, 1));
     color: var(--text-muted);
     margin-bottom: 0.45rem;
     font-weight: 500;
 }
 
 .stat-card .value {
-    font-size: 1.65rem;
+    font-size: calc(26.5px * var(--font-scale, 1));
     font-weight: 700;
     letter-spacing: -0.02em;
 }
@@ -494,7 +492,7 @@ tr.history-sub-row td {
 }
 
 .card h2 {
-    font-size: 1.05rem;
+    font-size: calc(17px * var(--font-scale, 1));
     font-weight: 700;
     margin-bottom: 1.15rem;
     padding-bottom: 0.75rem;
@@ -520,7 +518,7 @@ tr.history-sub-row td {
 table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.88rem;
+    font-size: calc(14px * var(--font-scale, 1));
 }
 
 /* uppercase + letter-spacing ไม่มีผลกับภาษาไทยนอกจากทำให้อ่านช้าลง (ตัวอักษรไทย
@@ -533,7 +531,7 @@ thead th {
     color: var(--text-muted);
     border-bottom: 2px solid var(--border);
     white-space: nowrap;
-    font-size: 0.8rem;
+    font-size: calc(13px * var(--font-scale, 1));
 }
 
 tbody td {
@@ -640,7 +638,7 @@ tbody td.col-actions {
     border-radius: var(--radius-sm);
     background: var(--card);
     font-family: inherit;
-    font-size: 0.9rem;
+    font-size: calc(14.5px * var(--font-scale, 1));
     color: var(--text);
     cursor: pointer;
     transition: border-color var(--transition), box-shadow var(--transition);
@@ -652,7 +650,7 @@ tbody td.col-actions {
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
 }
 .product-supplier-name { font-weight: 500; }
-.product-supplier-link { font-size: 0.82rem; }
+.product-supplier-link { font-size: calc(13px * var(--font-scale, 1)); }
 .products-search-bar::before {
     content: "";
     position: absolute;
@@ -687,7 +685,7 @@ tbody td.col-actions {
     border-radius: var(--radius-sm);
     background: var(--card);
     font-family: inherit;
-    font-size: 0.92rem;
+    font-size: calc(14.5px * var(--font-scale, 1));
     color: var(--text);
     transition: border-color var(--transition), box-shadow var(--transition);
 }
@@ -893,7 +891,7 @@ table .col-img {
 .set-row-code {
     flex: none;
     font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
-    font-size: 0.78rem;
+    font-size: calc(12.5px * var(--font-scale, 1));
     font-weight: 600;
     letter-spacing: .02em;
     color: var(--primary);
@@ -912,7 +910,7 @@ table .col-img {
 }
 .set-row-count {
     flex: none;
-    font-size: 0.82rem;
+    font-size: calc(13px * var(--font-scale, 1));
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
 }
@@ -921,15 +919,13 @@ table .col-img {
 .set-row-body { padding: 0.85rem 0.95rem 0.95rem; }
 .set-row-desc {
     margin: 0 0 0.75rem;
-    font-size: 0.88rem;
+    font-size: calc(14px * var(--font-scale, 1));
     padding-left: 10px;
     border-left: 2px solid var(--border);
 }
-.set-items-table { font-size: 0.9rem; }
+.set-items-table { font-size: calc(14.5px * var(--font-scale, 1)); }
 .set-items-table thead th {
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: .04em;
+    font-size: calc(12.5px * var(--font-scale, 1));
 }
 .set-item-short td { background: var(--danger-soft, #fee2e2); }
 
@@ -955,7 +951,7 @@ table .col-img {
     font-variant-numeric: tabular-nums;
 }
 .set-qty-unit {
-    font-size: 0.82rem;
+    font-size: calc(13px * var(--font-scale, 1));
     margin-left: 6px;
     vertical-align: middle;
 }
@@ -974,10 +970,8 @@ table .col-img {
 }
 .set-manage-title {
     flex: 1 0 100%;
-    font-size: 0.75rem;
+    font-size: calc(12px * var(--font-scale, 1));
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .06em;
     color: var(--text-muted);
     margin-bottom: 4px;
 }
@@ -993,7 +987,7 @@ table .col-img {
     min-width: 0;
     min-height: auto;
     padding: 6px 9px;
-    font-size: 0.88rem;
+    font-size: calc(14px * var(--font-scale, 1));
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm, 8px);
@@ -1101,7 +1095,7 @@ table .col-img {
     display: block;
     font-weight: 600;
     margin-bottom: 0.45rem;
-    font-size: 0.88rem;
+    font-size: calc(14px * var(--font-scale, 1));
     color: var(--text);
 }
 
@@ -1114,7 +1108,7 @@ table .col-img {
     padding: 0.62rem 0.9rem;
     border: 1.5px solid var(--border);
     border-radius: var(--radius-sm);
-    font-size: 0.92rem;
+    font-size: calc(14.5px * var(--font-scale, 1));
     font-family: inherit;
     color: var(--text);
     background: #fff;
@@ -1230,7 +1224,7 @@ a:focus-visible {
     border: 0;
     background: transparent;
     color: var(--text-faint);
-    font-size: 1.25rem;
+    font-size: calc(20px * var(--font-scale, 1));
     line-height: 1;
     padding: 0.15rem 0.35rem;
     cursor: pointer;
@@ -1303,7 +1297,7 @@ a:focus-visible {
 }
 
 .form-hint {
-    font-size: 0.8rem;
+    font-size: calc(13px * var(--font-scale, 1));
     color: var(--text-muted);
     margin-top: 0.35rem;
 }
@@ -1322,7 +1316,7 @@ a:focus-visible {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    font-size: 0.8rem;
+    font-size: calc(13px * var(--font-scale, 1));
     color: var(--text-muted);
     background: var(--primary-soft);
     padding: 0.35rem 0.7rem;
@@ -1341,7 +1335,7 @@ a:focus-visible {
     padding: 0.55rem 1.15rem;
     border: none;
     border-radius: var(--radius-sm);
-    font-size: 0.9rem;
+    font-size: calc(14.5px * var(--font-scale, 1));
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
@@ -1354,13 +1348,13 @@ a:focus-visible {
 .btn:active { transform: scale(0.98); }
 
 .btn-primary { background: var(--primary); color: #fff; }
-.btn-primary:hover { background: var(--primary-dark); box-shadow: 0 2px 8px rgba(46, 26, 90, .28); }
+.btn-primary:hover { background: var(--primary-dark); box-shadow: 0 2px 8px color-mix(in srgb, var(--sidebar-bg) 28%, transparent); }
 
 .btn-success { background: var(--success); color: #fff; }
-.btn-success:hover { background: #15803d; box-shadow: 0 2px 8px rgba(22, 163, 74, 0.3); }
+.btn-success:hover { background: color-mix(in srgb, var(--success) 84%, #000); box-shadow: 0 2px 8px color-mix(in srgb, var(--success) 30%, transparent); }
 
 .btn-danger { background: var(--danger); color: #fff; }
-.btn-danger:hover { background: #b91c1c; box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3); }
+.btn-danger:hover { background: color-mix(in srgb, var(--danger) 84%, #000); box-shadow: 0 2px 8px color-mix(in srgb, var(--danger) 30%, transparent); }
 
 .btn-outline {
     background: #fff;
@@ -1375,7 +1369,7 @@ a:focus-visible {
 .btn-sm {
     min-height: 34px;
     padding: 0.35rem 0.75rem;
-    font-size: 0.82rem;
+    font-size: calc(13px * var(--font-scale, 1));
 }
 
 /* Icon action buttons */
@@ -1388,7 +1382,7 @@ a:focus-visible {
     min-width: 36px;
     min-height: 36px;
     padding: 0;
-    font-size: 1.05rem;
+    font-size: calc(17px * var(--font-scale, 1));
     line-height: 1;
     border-radius: var(--radius-sm);
     border: 1.5px solid var(--border);
@@ -1403,7 +1397,7 @@ a:focus-visible {
     height: 32px;
     min-width: 32px;
     min-height: 32px;
-    font-size: 0.95rem;
+    font-size: calc(15px * var(--font-scale, 1));
 }
 
 .btn-icon:hover {
@@ -1477,7 +1471,7 @@ a:focus-visible {
     border-radius: var(--radius-sm);
     margin-bottom: 1.25rem;
     font-weight: 500;
-    font-size: 0.92rem;
+    font-size: calc(14.5px * var(--font-scale, 1));
     border: 1px solid transparent;
     transition: opacity 0.4s ease, transform 0.4s ease, margin 0.4s ease, padding 0.4s ease;
 }
@@ -1512,7 +1506,7 @@ a:focus-visible {
 
 .set-items-list li {
     padding: 0.3rem 0;
-    font-size: 0.85rem;
+    font-size: calc(13.5px * var(--font-scale, 1));
     color: var(--text-muted);
 }
 
@@ -1543,7 +1537,7 @@ a:focus-visible {
     text-align: center;
     padding: 2.5rem 1rem;
     color: var(--text-muted);
-    font-size: 0.92rem;
+    font-size: calc(14.5px * var(--font-scale, 1));
 }
 
 /* ─ Detail panel ──────────────────────────────────────────────────────────── */
@@ -1556,16 +1550,14 @@ a:focus-visible {
 }
 
 .detail-meta dt {
-    font-size: 0.78rem;
+    font-size: calc(12.5px * var(--font-scale, 1));
     font-weight: 600;
     color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
     margin-bottom: 0.2rem;
 }
 
 .detail-meta dd {
-    font-size: 0.95rem;
+    font-size: calc(15px * var(--font-scale, 1));
     font-weight: 500;
 }
 

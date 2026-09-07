@@ -70,6 +70,9 @@ function ui_tokens_css_block(array $t): string
   --surface-soft: color-mix(in srgb, var(--page-bg) 72%, #fff);
   --primary-soft: color-mix(in srgb, var(--primary) 12%, #fff);
   --focus-ring: color-mix(in srgb, var(--primary) 25%, transparent);
+  /* ตัวอักษรบนพื้นอ่อนของสีหลัก (ปุ่มเส้นขอบ) — ใช้สีหลักตรง ๆ ไม่ได้ ธีมที่สีหลักสว่าง
+     (ฟ้า/มินต์) จะได้ 1.7-2.0 คือมองไม่เห็น · ผสมดำเหลือ 55% ให้ 5.1+ ทุกชุด */
+  --primary-ink: color-mix(in srgb, var(--primary) 55%, #000);
 
   /* เงาย้อมสีเมนูแทนเทาอมฟ้า — บนพื้นม่วงอ่อนเงาเทาดูขุ่น · เดิมสองแอปใช้คนละสูตร
      (ทะเบียนเครื่อง rgba(15,23,42) · อะไหล่ rgba(46,26,90)) ทั้งที่วางซ้อนหน้าเดียวกัน */
@@ -81,7 +84,10 @@ function ui_tokens_css_block(array $t): string
   --surface: #ffffff;
   --text: #2a2440;
   --text-muted: #6b6480;
-  --text-faint: #9992ad;
+  /* ผูกกับสีข้อความ ไม่ใช่ค่าตายตัว: #9992ad เดิมได้คอนทราสต์ 2.70 บนพื้นอ่อน ซึ่งต่ำกว่า
+     เกณฑ์ตัวอักษรใหญ่ (3.0) ด้วยซ้ำ · 62% ให้ 4.21-4.31 ทุกชุดธีม และยังอ่อนกว่า
+     --text-muted (5.08-5.38) พอให้เห็นว่าเป็นคนละระดับ */
+  --text-faint: color-mix(in srgb, var(--text) 62%, var(--page-bg));
 
   /* ── สีความหมาย (คู่ เข้ม/อ่อน) ──
      ป้ายสถานะเครื่องไม่ได้ใช้ชุดนี้ — อยู่ที่ shared/ui_status_palette.php ที่เดียว */

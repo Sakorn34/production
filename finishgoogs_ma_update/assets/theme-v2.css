@@ -61,11 +61,11 @@ table.list tr:hover td { background: var(--surface-muted); }
 
 /* ── ปุ่ม ── */
 .btn, button { border-radius: var(--radius-sm); }
-.btn-line { color: var(--primary); border-color: var(--primary); }
+.btn-line { color: var(--primary-ink, var(--primary)); border-color: var(--primary); }
 .btn-line:hover { background: var(--primary-soft); }
-.btn-danger { background: #b91c1c; }
+.btn-danger { background: var(--danger); }
 /* ไม่งั้นปุ่มลบจะเปลี่ยนจากแดงเป็นชมพูตอน hover เพราะโดนกฎกลาง button:hover ทับ */
-.btn-danger:hover { background: #991b1b; }
+.btn-danger:hover { background: color-mix(in srgb, var(--danger) 84%, #000); }
 .btn-retire { background: #92400e; color: #fff; border: none; }
 .btn-retire:hover { background: #78350f; color: #fff; }
 .pager a:hover { background: var(--surface-soft); }
@@ -106,7 +106,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 
 /* ── Sidebar: กลุ่มเมนู 2 ระบบ ── */
 .nav-group-label {
-  font-size: calc(10.5px * var(--font-scale, 1)); font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  font-size: calc(10.5px * var(--font-scale, 1)); font-weight: 700;
   color: rgba(255, 255, 255, .45); padding: 14px 12px 5px;
 }
 .sidebar nav .nav-group-label:not(:first-child) { margin-top: 6px; border-top: 1px solid rgba(255, 255, 255, .12); padding-top: 12px; }
@@ -174,7 +174,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .kpi-sub-stack { line-height: 1.45; margin-top: 2px; }
 .kpi-num-stack { font-size: calc(15px * var(--font-scale, 1)); font-weight: 700; line-height: 1.4; }
 .kpi-sub .kpi-down { color: var(--danger); font-weight: 600; }
-.kpi-sys { position: absolute; top: 9px; right: 12px; font-size: calc(11.5px * var(--font-scale, 1)); font-weight: 700; letter-spacing: .08em; color: #a49dba; }
+/* ป้ายบอกที่มาของตัวเลขมุมการ์ด — ข้อความเป็นไทย letter-spacing เลยทำให้สระลอย
+   ห่างพยัญชนะโดยไม่ได้อะไรกลับมา (UX Audit F-11) */
+.kpi-sys { position: absolute; top: 9px; right: 12px; font-size: calc(11.5px * var(--font-scale, 1)); font-weight: 700; color: var(--text-faint); }
 .kpi-primary { border-left: 4px solid var(--primary); }
 .kpi-primary .kpi-ic { background: color-mix(in srgb, var(--primary) 10%, #fff); color: var(--primary); }
 .kpi-primary .kpi-num { color: var(--primary); }
@@ -818,8 +820,6 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .dash-parts-filter-label {
   font-size: calc(11px * var(--font-scale, 1));
   font-weight: 700;
-  letter-spacing: .04em;
-  text-transform: uppercase;
   color: #8b839c;
   padding-top: 9px;
   line-height: 1.2;
@@ -998,24 +998,24 @@ a.kpi:hover { text-decoration: none; }
    ขวา = ข้อเท็จจริงที่เปิดหาเป็นจุด ๆ คั่นด้วยเส้น
    ═══════════════════════════════════════════════════════════════════════════ */
 .ma-repair-section { margin-bottom: 26px; }
-.ma-hint { margin: -4px 0 12px; font-size: 12.5px; color: var(--text-muted); }
+.ma-hint { margin: -4px 0 12px; font-size: calc(12.5px * var(--font-scale, 1)); color: var(--text-muted); }
 .ma-faint { color: var(--text-faint); }
 .ma-muted { color: var(--text-muted); }
 .ma-mono {
   font-family: ui-monospace, "Consolas", monospace;
-  font-size: 12.5px; font-variant-numeric: tabular-nums;
+  font-size: calc(12.5px * var(--font-scale, 1)); font-variant-numeric: tabular-nums;
 }
-.ma-unavailable { font-size: 13px; margin: 0 0 18px; }
-.ma-subhead { margin: 22px 0 6px; font-size: 15px; font-weight: 600; color: var(--text); }
+.ma-unavailable { font-size: calc(13px * var(--font-scale, 1)); margin: 0 0 18px; }
+.ma-subhead { margin: 22px 0 6px; font-size: calc(15px * var(--font-scale, 1)); font-weight: 600; color: var(--text); }
 
 .ma-card {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); margin-bottom: 18px; overflow: hidden;
 }
 .ma-tblscroll { overflow-x: auto; }
-.ma-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.ma-table { width: 100%; border-collapse: collapse; font-size: calc(13.5px * var(--font-scale, 1)); }
 .ma-table th {
-  text-align: left; font-weight: 600; font-size: 12px; color: var(--text-muted);
+  text-align: left; font-weight: 600; font-size: calc(12px * var(--font-scale, 1)); color: var(--text-muted);
   padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap;
 }
 .ma-table td { padding: 9px 10px; border-top: 1px solid var(--border); vertical-align: top; }
@@ -1024,7 +1024,7 @@ a.kpi:hover { text-decoration: none; }
 /* ── ป้ายสถานะ ─────────────────────────────────────────────────────────── */
 .ma-pill {
   display: inline-block; padding: 2px 9px; border-radius: 999px;
-  font-size: 11.5px; font-weight: 600; white-space: nowrap; line-height: 1.6;
+  font-size: calc(11.5px * var(--font-scale, 1)); font-weight: 600; white-space: nowrap; line-height: 1.6;
 }
 .ma-pill-done { background: var(--success-soft); color: #15803d; }
 .ma-pill-open { background: var(--warning-soft); color: var(--warning); }
@@ -1040,14 +1040,14 @@ a.kpi:hover { text-decoration: none; }
 .ma-thead {
   display: grid; grid-template-columns: 92px 96px 116px minmax(0, 1fr) minmax(0, 1fr) 96px 18px;
   gap: 10px; padding: 9px 10px; border-bottom: 1px solid var(--border);
-  font-size: 12px; font-weight: 600; color: var(--text-muted);
+  font-size: calc(12px * var(--font-scale, 1)); font-weight: 600; color: var(--text-muted);
 }
 .ma-jobrow { border-top: 1px solid var(--border); }
 .ma-jobrow:first-of-type { border-top: 0; }
 .ma-jobrow > summary {
   display: grid; grid-template-columns: 92px 96px 116px minmax(0, 1fr) minmax(0, 1fr) 96px 18px;
   gap: 10px; align-items: baseline; padding: 10px; cursor: pointer;
-  list-style: none; font-size: 13.5px;
+  list-style: none; font-size: calc(13.5px * var(--font-scale, 1));
 }
 .ma-jobrow > summary::-webkit-details-marker { display: none; }
 .ma-jobrow > summary:hover,
@@ -1064,7 +1064,7 @@ a.kpi:hover { text-decoration: none; }
 /* ── แถบขั้นตอนงาน ─────────────────────────────────────────────────────── */
 .ma-stagewrap { margin-bottom: 18px; }
 .ma-caption {
-  font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  font-size: calc(10.5px * var(--font-scale, 1)); font-weight: 700;
   color: var(--text-faint); margin: 0 0 10px;
 }
 .ma-stages { display: flex; list-style: none; margin: 0; padding: 0 0 2px; overflow-x: auto; }
@@ -1080,12 +1080,12 @@ a.kpi:hover { text-decoration: none; }
 }
 .ma-stage:last-child::after { display: none; }
 .ma-lbl {
-  display: block; font-size: 11.5px; color: var(--text-muted);
+  display: block; font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-muted);
   margin: 8px 0 1px; padding-right: 12px;
 }
 .ma-dt {
   display: block; font-family: ui-monospace, "Consolas", monospace;
-  font-size: 11.5px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums;
+  font-size: calc(11.5px * var(--font-scale, 1)); font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums;
 }
 .ma-stage.is-done .ma-dot { background: var(--success); border-color: var(--success); }
 .ma-stage.is-done::after { background: color-mix(in srgb, var(--success) 45%, var(--surface)); }
@@ -1117,9 +1117,9 @@ a.kpi:hover { text-decoration: none; }
   border-left: 3px solid var(--success); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 .ma-decision.is-declined { border-left-color: var(--danger); }
-.ma-decision-label { font-size: 13px; font-weight: 700; color: var(--success); }
+.ma-decision-label { font-size: calc(13px * var(--font-scale, 1)); font-weight: 700; color: var(--success); }
 .ma-decision.is-declined .ma-decision-label { color: var(--danger); }
-.ma-decision-note { font-size: 13px; color: var(--text); }
+.ma-decision-note { font-size: calc(13px * var(--font-scale, 1)); color: var(--text); }
 
 /* ── ตัวงาน: เรื่องราว | ข้อเท็จจริง ───────────────────────────────────── */
 .ma-jobbody {
@@ -1134,7 +1134,7 @@ a.kpi:hover { text-decoration: none; }
   position: absolute; left: 0; top: 0;
   width: 20px; height: 20px; border-radius: 50%;
   background: var(--sidebar-bg); color: #fff;
-  font-size: 11px; font-weight: 700; line-height: 20px; text-align: center;
+  font-size: calc(11px * var(--font-scale, 1)); font-weight: 700; line-height: 20px; text-align: center;
 }
 .ma-step::after {
   content: ""; position: absolute; left: 9.5px; top: 24px; bottom: 3px; width: 1.5px;
@@ -1142,45 +1142,44 @@ a.kpi:hover { text-decoration: none; }
 }
 .ma-step:last-child::after { display: none; }
 .ma-step h4 {
-  margin: 0 0 7px; font-size: 13px; font-weight: 700; color: var(--text); line-height: 20px;
+  margin: 0 0 7px; font-size: calc(13px * var(--font-scale, 1)); font-weight: 700; color: var(--text); line-height: 20px;
 }
-.ma-by { font-weight: 400; font-size: 11.5px; color: var(--text-muted); margin-left: 7px; }
+.ma-by { font-weight: 400; font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-muted); margin-left: 7px; }
 
 .ma-facts { border-left: 1px solid var(--border); padding-left: 22px; }
 .ma-fgroup + .ma-fgroup { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--border); }
 .ma-fgroup h4 {
-  margin: 0 0 7px; font-size: 10.5px; font-weight: 700; letter-spacing: .09em;
-  text-transform: uppercase; color: var(--sidebar-bg);
+  margin: 0 0 7px; font-size: calc(10.5px * var(--font-scale, 1)); font-weight: 700; color: var(--sidebar-bg);
 }
 .ma-fgroup dl {
   display: grid; grid-template-columns: auto minmax(0, 1fr);
-  column-gap: 14px; margin: 0; font-size: 12.5px;
+  column-gap: 14px; margin: 0; font-size: calc(12.5px * var(--font-scale, 1));
 }
 .ma-fgroup dt { color: var(--text-muted); white-space: nowrap; padding: 4px 0; border-top: 1px solid var(--border); }
 .ma-fgroup dd { margin: 0; padding: 4px 0; border-top: 1px solid var(--border); }
 .ma-fgroup dl > *:nth-child(1), .ma-fgroup dl > *:nth-child(2) { border-top: 0; padding-top: 0; }
 
 .ma-longtext {
-  font-size: 12.5px; line-height: 1.7; background: var(--surface);
+  font-size: calc(12.5px * var(--font-scale, 1)); line-height: 1.7; background: var(--surface);
   border: 1px solid var(--border); border-left: 3px solid var(--border-strong);
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   padding: 8px 11px; white-space: pre-wrap; word-break: break-word; margin: 0;
 }
 .ma-items { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 5px; }
 .ma-items li {
-  font-size: 12px; background: var(--surface); border: 1px solid var(--border);
+  font-size: calc(12px * var(--font-scale, 1)); background: var(--surface); border: 1px solid var(--border);
   border-radius: 6px; padding: 3px 9px;
 }
-.ma-sublabel { font-size: 11px; font-weight: 600; color: var(--text-faint); margin: 11px 0 5px; }
+.ma-sublabel { font-size: calc(11px * var(--font-scale, 1)); font-weight: 600; color: var(--text-faint); margin: 11px 0 5px; }
 .ma-svcs { display: flex; flex-wrap: wrap; gap: 5px; }
 .ma-svcs span {
-  font-size: 11.5px; background: var(--surface-muted); border: 1px dashed var(--border-strong);
+  font-size: calc(11.5px * var(--font-scale, 1)); background: var(--surface-muted); border: 1px dashed var(--border-strong);
   color: var(--text-muted); border-radius: 6px; padding: 2px 8px;
 }
 
 /* ── กดกางดูเครื่องสำรองที่เหลือ ────────────────────────────────────────── */
 .ma-more > summary {
-  padding: 10px 14px; cursor: pointer; font-size: 13px; font-weight: 600;
+  padding: 10px 14px; cursor: pointer; font-size: calc(13px * var(--font-scale, 1)); font-weight: 600;
   color: var(--primary); border-top: 1px solid var(--border); list-style: none;
 }
 .ma-more > summary::-webkit-details-marker { display: none; }
@@ -1198,7 +1197,7 @@ a.kpi:hover { text-decoration: none; }
 
 /* แถบเตือนเมื่อโหมดทดสอบ LINE เปิดอยู่ — ต้องเห็นชัดว่ากลุ่มจริงไม่ได้รับแจ้งเตือน */
 .ln-testmode-on {
-  margin: 0 0 14px; padding: 11px 14px; font-size: 13.5px;
+  margin: 0 0 14px; padding: 11px 14px; font-size: calc(13.5px * var(--font-scale, 1));
   border: 1px solid var(--warning); border-left-width: 3px;
   background: var(--warning-soft); color: #7a4a05;
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
@@ -1207,7 +1206,7 @@ a.kpi:hover { text-decoration: none; }
 /* ลิงก์ไปหน้าเลือกรุ่นสินค้าที่จะแจ้งเตือน (ในตารางประเภทแจ้งเตือน) */
 .ln-pick-models {
   /* คอลัมน์แคบ ลิงก์ตกบรรทัดอยู่แล้ว จัดเป็นบรรทัดของตัวเองไปเลย ไม่ต้องเยื้อง */
-  display: block; margin: 3px 0 0; font-size: 12.5px; font-weight: 600;
+  display: block; margin: 3px 0 0; font-size: calc(12.5px * var(--font-scale, 1)); font-weight: 600;
   color: var(--primary); text-decoration: none; white-space: nowrap;
 }
 .ln-pick-models:hover { text-decoration: underline; }
@@ -1378,7 +1377,7 @@ a.kpi:hover { text-decoration: none; }
    ชิปเล็กกว่าในส่วนกาง เพราะต้องอยู่ในความสูงบรรทัดเดียวของแถว */
 .ma-cell-items { display: flex; flex-wrap: wrap; gap: 4px; }
 .ma-cell-items > span {
-  font-size: 11.5px; line-height: 1.5;
+  font-size: calc(11.5px * var(--font-scale, 1)); line-height: 1.5;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: 5px; padding: 1px 7px;
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -1502,7 +1501,7 @@ button.mw-cal-cell.is-work:focus-visible { outline: 2px solid var(--text); outli
 .mw-modal-head b { font-size: calc(15px * var(--font-scale, 1)); }
 .mw-modal-head .muted { margin-left: 8px; font-size: calc(12px * var(--font-scale, 1)); }
 .mw-modal-x {
-  background: none; border: 0; font-size: 24px; line-height: 1; cursor: pointer;
+  background: none; border: 0; font-size: calc(24px * var(--font-scale, 1)); line-height: 1; cursor: pointer;
   color: var(--text-muted); padding: 0 4px; min-height: 0;
 }
 .mw-modal-x:hover { color: var(--primary); }
@@ -1527,7 +1526,7 @@ a.mw-item.is-link:hover { background: var(--primary-soft); }
 a.mw-item.is-link:hover b { color: var(--primary); }
 a.mw-item.is-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 /* ลูกศรบอกว่ากดแล้วเปิดแท็บใหม่ — ไม่ใช่ทุกแถวที่เทียบเจอเครื่องในทะเบียน */
-a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size: 11px; }
+a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size: calc(11px * var(--font-scale, 1)); }
 .mw-hint { font-size: calc(12px * var(--font-scale, 1)); margin: 0 0 10px; padding: 0 4px; }
 .mw-ref {
   font-family: ui-monospace, "Consolas", monospace; font-size: calc(12px * var(--font-scale, 1));

@@ -279,8 +279,6 @@
 .nav-group-label {
   font-size: calc(10px * var(--font-scale, 1));
   font-weight: 700;
-  letter-spacing: .1em;
-  text-transform: uppercase;
   color: rgba(255, 255, 255, .42);
   padding: 12px 10px 4px;
   white-space: nowrap;

@@ -224,8 +224,10 @@ var CHART_COLORS = { new:'#6ee7b7', rental:'#93c5fd', sold:'#fdba74', spare:'#fd
 var CHART_SEG_FLEX = { new:3, rental:2, sold:1, spare:1, retired:1, lost:1 };
 var PRESETS = {
   slate: { color_primary:'#64748b', color_primary_dark:'#475569', color_sidebar:'#334155', color_sidebar_active:'#64748b', color_page_bg:'#f8fafc' },
-  sky: { color_primary:'#38bdf8', color_primary_dark:'#0ea5e9', color_sidebar:'#1e40af', color_sidebar_active:'#38bdf8', color_page_bg:'#f8fafc' },
-  mint: { color_primary:'#2dd4bf', color_primary_dark:'#14b8a6', color_sidebar:'#115e59', color_sidebar_active:'#2dd4bf', color_page_bg:'#f0fdfa' },
+  /* ฟ้า/มินต์เดิมสว่างเกินไป ตัวอักษรขาวบนปุ่มได้คอนทราสต์ 2.14 กับ 1.86 คืออ่านไม่ออก
+     เข้มขึ้นจนผ่าน 4.5 โดยยังเป็นสีเดิมในสายตา */
+  sky: { color_primary:'#257da4', color_primary_dark:'#1f698a', color_sidebar:'#1e40af', color_sidebar_active:'#257da4', color_page_bg:'#f8fafc' },
+  mint: { color_primary:'#1c8376', color_primary_dark:'#186e63', color_sidebar:'#115e59', color_sidebar_active:'#1c8376', color_page_bg:'#f0fdfa' },
   v2: { color_primary:'#e11d74', color_primary_dark:'#c01862', color_sidebar:'#4e2985', color_sidebar_active:'#e11d74', color_page_bg:'#f4f1fb' },
   navy: { color_primary:'#2c4a7c', color_primary_dark:'#1d3a68', color_sidebar:'#17233a', color_sidebar_active:'#2c4a7c', color_page_bg:'#f2f4f8' },
   teal: { color_primary:'#0f766e', color_primary_dark:'#115e59', color_sidebar:'#12312e', color_sidebar_active:'#0f766e', color_page_bg:'#f1f5f4' },
