@@ -403,8 +403,7 @@ page_header('ทะเบียนสินค้า (stock)');
 </div>
 
 <div class="stock-list-meta muted">
-  แสดง <?= number_format($totalRows ? $off + 1 : 0) ?>–<?= number_format(min($off + $per, $totalRows)) ?> จาก <b><?= number_format($totalRows) ?></b> รายการ<?= $w ? ' (ตามฟิลเตอร์)' : '' ?>
-  · ติ๊กเลือกแล้วลบได้หลายรายการ (เฉพาะหน้านี้)
+  ติ๊กเลือกแล้วลบได้หลายรายการ (เฉพาะหน้านี้)
 </div>
 
 <div class="stock-bulk-bar" id="stock-bulk-bar" hidden>

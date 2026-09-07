@@ -320,11 +320,6 @@ page_header('หลังบ้าน — เปรียบเทียบ asse
   <?= rc_link('meta_diff', 'ค่าไม่ตรงกัน (' . number_format($rc['meta_diff']) . ')', $flt, $rc, $qsKeep) ?>
 </div>
 
-<p class="muted rc-meta">
-  แสดง <?= number_format($list['total'] ? ($list['page'] - 1) * $per + 1 : 0) ?>–<?= number_format(min($list['page'] * $per, $list['total'])) ?>
-  จาก <b><?= number_format($list['total']) ?></b> รายการ
-</p>
-
 <div class="rc-bulk" id="rc-bulk" hidden>
   <span>เลือกแล้ว <b id="rc-bulk-n">0</b> รายการ</span>
   <button type="button" class="btn btn-sm" id="rc-bulk-sync" disabled><?= ui_btn_label('refresh', 'Sync → stock', 13) ?></button>
@@ -451,7 +446,6 @@ echo page_pager_html($list['page'], $list['pages'], $per, $list['total'], functi
 .rc-tools summary { user-select:none; }
 .rc-search { margin-bottom:8px; }
 .rc-chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
-.rc-meta { font-size:13px; margin:0 0 8px; }
 .rc-bulk { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px; padding:8px 12px; background:#f0f6ff; border:1px solid #b8d4f0; border-radius:8px; }
 .rc-bulk[hidden] { display:none !important; }
 #rc-table .rc-pick { width:15px; height:15px; accent-color:var(--primary); }
