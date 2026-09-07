@@ -1297,6 +1297,11 @@ a.kpi:hover { text-decoration: none; }
   color: var(--text);
 }
 .asset-sales-claim-pair b { font-family: ui-monospace, "Consolas", monospace; }
+/* ชื่อหน่วยงานย่อย/แผนก — รองจากชื่อบริษัท แต่บ่อยครั้งเป็นตัวที่คนจำได้จริง */
+.asset-sales-dept {
+  color: var(--text-muted);
+  font-size: calc(13px * var(--font-scale, 1));
+}
 /* สองระบบบันทึกไม่ตรงกัน — ไม่ตัดสินว่าใครถูก แค่ทำให้เห็นว่ามีสองค่า */
 .asset-sales-conflict {
   display: flex;

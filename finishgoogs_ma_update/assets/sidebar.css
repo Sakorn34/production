@@ -236,7 +236,9 @@
 .sidebar-smart-kind-repair   { background: var(--warning-soft); color: var(--warning); }
 /* ขาย/เคลม มาจากอีกระบบหนึ่ง (setupsystem) — ใส่ลูกศรบอกว่ากดแล้วออกไปเว็บอื่น */
 .sidebar-smart-kind-sale     { background: var(--success-soft); color: var(--success); }
+.sidebar-smart-kind-order    { background: var(--info-soft); color: var(--info); }
 .sidebar-smart-kind-claim    { background: var(--danger-soft); color: var(--danger); }
+.sidebar-smart-kind-order::after,
 .sidebar-smart-kind-sale::after,
 .sidebar-smart-kind-claim::after { content: " ↗"; }
 .sidebar-smart-title {

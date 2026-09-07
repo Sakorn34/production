@@ -570,5 +570,54 @@ function smart_search_query(string $q, int $limitPerKind = 5): array
         }
     }
 
+    // ── ใบส่งมอบ Order (ฐาน biton_setup) ──
+    // "ชื่อหน่วยงาน" อยู่ที่นี่ ไม่ได้อยู่ใน equipment_claim_history: setup_orders มี
+    // company_name ครบ 509 แถว department 493 แถว ส่วนตารางเคลมมี site_name แค่ 12
+    // จาก 170 · และ 449 จาก 619 S/N มีเฉพาะที่นี่ ค้นแหล่งเดียวจึงหาไม่เจอเป็นส่วนใหญ่
+    if ($setupDb) {
+        try {
+            $sql = 'SELECT ps.id, ps.issue_ref, ps.issue_type, ps.issue_date, ps.serial_number,
+                           ps.po_number, so.customer_name, so.company_name, so.department,
+                           so.product, so.status
+                    FROM po_order_part_serials ps
+                    LEFT JOIN setup_orders so ON so.id = ps.order_id
+                    WHERE ps.serial_number LIKE ? OR IFNULL(ps.old_serial_number, "") LIKE ?
+                       OR IFNULL(ps.po_number, "") LIKE ? OR IFNULL(ps.issue_ref, "") LIKE ?
+                       OR IFNULL(ps.company_name, "") LIKE ?
+                       OR IFNULL(so.company_name, "") LIKE ? OR IFNULL(so.department, "") LIKE ?
+                       OR IFNULL(so.customer_name, "") LIKE ? OR IFNULL(so.contact_person, "") LIKE ?
+                    ORDER BY ps.issue_date DESC, ps.id DESC
+                    LIMIT ' . (int) $limitPerKind;
+            $stmt = $setupDb->prepare($sql);
+            $stmt->bind_param('sssssssss', $like, $like, $like, $like, $like, $like, $like, $like, $like);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            while ($r = $res->fetch_assoc()) {
+                $sn = trim((string) ($r['serial_number'] ?? ''));
+                $out[] = [
+                    'kind'       => 'order',
+                    'kind_label' => 'ส่งมอบ',
+                    'id'         => (int) $r['id'],
+                    'asset_id'   => 0,
+                    'code'       => $sn,
+                    'title'      => $sn !== '' ? $sn : (string) ($r['issue_ref'] ?? ''),
+                    'subtitle'   => smart_search_excerpt(implode(' · ', array_filter([
+                        (string) ($r['company_name'] ?? ''),
+                        (string) ($r['department'] ?? ''),
+                        (string) ($r['product'] ?? ''),
+                        (string) ($r['po_number'] ?? ''),
+                        (string) ($r['issue_date'] ?? ''),
+                    ])), 96),
+                    'href'       => 'https://bit-online.net/setupsystem/claim_history.php?'
+                        . ($sn !== '' ? 'serial=' . rawurlencode($sn)
+                                     : 'claim_no=' . rawurlencode((string) ($r['issue_ref'] ?? ''))),
+                ];
+            }
+            $stmt->close();
+        } catch (Throwable $e) {
+            error_log('[smart_search] po_order_part_serials: ' . $e->getMessage());
+        }
+    }
+
     return $out;
 }

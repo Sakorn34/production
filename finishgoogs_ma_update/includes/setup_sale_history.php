@@ -9,6 +9,9 @@
  *     "ยังไม่มีข้อมูลการเบิกใช้งานขาย" ทั้งที่ขายไปแล้วและมีใบอ้างอิงครบ
  *   • รายการเคลม 17 รายการรู้แค่จากข้อความใน stock_movements.notes ซึ่งบอกไม่ได้
  *     ว่าเครื่องนี้ถูกเปลี่ยนมาจากตัวไหน หรือถูกเปลี่ยนออกไปเป็นตัวไหน
+ *   • "ชื่อหน่วยงาน" ไม่ได้อยู่ใน equipment_claim_history เลย (มี site_name แค่ 12
+ *     จาก 170 แถว) แต่อยู่ที่ setup_orders.company_name/department ซึ่งมีครบ 509/493
+ *     แถว — หน้า claim_history.php ของระบบนั้นรวมสามแหล่ง เราอ่านแหล่งเดียวจึงไม่เจอ
  *
  * biton_setup.equipment_claim_history เป็นทะเบียนตั้งต้นของเรื่องนี้ (ระบบ
  * setupsystem เป็นคนบันทึก) เราอ่านอย่างเดียวเพื่อเติมให้การ์ดครบ ไม่เขียนกลับ
@@ -60,10 +63,41 @@ function setup_sale_history_for_serial(string $serial): array
         $res = $st->get_result();
         while ($r = $res->fetch_assoc()) {
             // มุมมองจากเครื่องนี้: เป็นตัวที่รับเข้ามา หรือเป็นตัวที่ถูกเปลี่ยนออก
+            $r['_src'] = 'claim';
             $r['_role'] = (trim((string) $r['new_serial_number']) === $serial) ? 'new' : 'old';
             $out['rows'][] = $r;
         }
         $st->close();
+
+        // แหล่งที่สอง: ใบส่งมอบ Order — 449 จาก 619 S/N มีเฉพาะที่นี่ ไม่มีใน
+        // equipment_claim_history เลย และ "ชื่อหน่วยงาน" ก็อยู่ที่นี่ (company_name
+        // กับ department) ไม่ได้อยู่ในตารางเคลม · หน้า claim_history.php ของระบบนั้น
+        // รวมสองแหล่งนี้เข้าด้วยกัน การอ่านแหล่งเดียวจึงเห็นไม่ครบ
+        $st2 = $db->prepare(
+            'SELECT ps.id, ps.issue_ref, ps.issue_type, ps.issue_date, ps.serial_number,
+                    ps.old_serial_number, ps.po_number, ps.company_name,
+                    so.customer_name, so.company_name AS so_company, so.department,
+                    so.contact_person, so.contact_phone, so.product, so.sale_type,
+                    so.delivery_date, so.warranty_start_date, so.warranty_period,
+                    so.status, so.notes, so.created_by_name, so.po_date
+             FROM po_order_part_serials ps
+             LEFT JOIN setup_orders so ON so.id = ps.order_id
+             WHERE ps.serial_number = ? OR ps.old_serial_number = ?
+             ORDER BY ps.issue_date DESC, ps.id DESC
+             LIMIT 20'
+        );
+        if ($st2) {
+            $st2->bind_param('ss', $serial, $serial);
+            $st2->execute();
+            $res2 = $st2->get_result();
+            while ($r = $res2->fetch_assoc()) {
+                $r['_src'] = 'order';
+                $r['_role'] = (trim((string) $r['serial_number']) === $serial) ? 'new' : 'old';
+                $out['rows'][] = $r;
+            }
+            $st2->close();
+        }
+
         $out['ok'] = true;
     } catch (Throwable $e) {
         error_log('[setup_sale_history] ' . $e->getMessage());
@@ -82,14 +116,68 @@ function setup_sale_history_badge(array $row): string
 {
     $isClaim = ((string) ($row['issue_type'] ?? '')) === 'claim';
     $role = (string) ($row['_role'] ?? 'new');
+    $fromOrder = ((string) ($row['_src'] ?? '')) === 'order';
     if ($isClaim) {
         $label = $role === 'old' ? 'เคลมเปลี่ยนออก' : 'เคลมเปลี่ยนเข้า';
         $cls = 'asset-sales-badge-claim';
     } else {
-        $label = 'ขาย';
+        $label = $fromOrder ? 'ส่งมอบตาม Order' : 'ขาย';
         $cls = 'asset-sales-badge-sale';
     }
     return '<span class="asset-sales-badge ' . $cls . '">' . h($label) . '</span>';
+}
+
+/**
+ * ปรับแถวจากสองตารางให้เป็นชุดฟิลด์เดียวกัน
+ *
+ * equipment_claim_history กับ po_order_part_serials+setup_orders เก็บเรื่องเดียวกัน
+ * คนละชื่อคอลัมน์ (claim_number/po_number · customer_name/company_name · site_name/
+ * department) การ์ดจึงต้องมีชุดกลางไว้ ไม่ใช่เขียน if แยกสองชุดตลอดทั้งตัววาด
+ *
+ * @param array<string,mixed> $r
+ * @return array<string,string>
+ */
+function setup_sale_history_norm(array $r): array
+{
+    $g = function ($k) use ($r) { return trim((string) ($r[$k] ?? '')); };
+    $fromOrder = ((string) ($r['_src'] ?? '')) === 'order';
+    if ($fromOrder) {
+        // ชื่อหน่วยงานอยู่ที่ company_name — customer_name ของตารางนี้เป็นชื่อคนติดต่อ
+        $org = $g('so_company') !== '' ? $g('so_company') : $g('company_name');
+        return [
+            'org'      => $org,
+            'person'   => $g('customer_name'),
+            'dept'     => $g('department'),
+            'ref'      => $g('issue_ref') !== '' ? $g('issue_ref') : $g('po_number'),
+            'po'       => $g('po_number'),
+            'date'     => $g('issue_date') !== '' ? $g('issue_date') : $g('po_date'),
+            'product'  => $g('product'),
+            'contact'  => trim($g('contact_person') . ' ' . $g('contact_phone')),
+            'delivery' => $g('delivery_date'),
+            'warranty' => trim($g('warranty_start_date') . ' ' . $g('warranty_period')),
+            'status'   => $g('status'),
+            'remark'   => $g('notes'),
+            'by'       => $g('created_by_name'),
+            'other_sn' => $g('old_serial_number'),
+        ];
+    }
+    $role = (string) ($r['_role'] ?? 'new');
+    return [
+        'org'      => $g('customer_name'),
+        'person'   => '',
+        'dept'     => $g('site_name'),
+        'ref'      => $g('claim_number'),
+        'po'       => $g('po_number'),
+        'date'     => $g('claim_date'),
+        'product'  => trim(implode(' · ', array_filter([$g('product_name'), $g('product_code')]))),
+        'contact'  => '',
+        'delivery' => '',
+        'warranty' => '',
+        'status'   => '',
+        'remark'   => $role === 'new' ? $g('new_remark') : $g('old_remark'),
+        'by'       => $g('created_by'),
+        'other_sn' => $role === 'new' ? $g('old_serial_number') : $g('new_serial_number'),
+    ];
 }
 
 /**
@@ -104,9 +192,10 @@ function setup_sale_history_badge(array $row): string
 function setup_sale_history_conflicts(array $row, array $info): array
 {
     $diff = [];
+    $v = setup_sale_history_norm($row);
     $pairs = [
-        ['ลูกค้า', (string) ($row['customer_name'] ?? ''), (string) ($info['customer'] ?? '')],
-        ['PO', (string) ($row['po_number'] ?? ''), (string) ($info['po'] ?? '')],
+        ['ลูกค้า', $v['org'], (string) ($info['customer'] ?? '')],
+        ['PO', $v['po'], (string) ($info['po'] ?? '')],
     ];
     foreach ($pairs as $p) {
         list($label, $fromSetup, $fromStock) = $p;
@@ -148,58 +237,58 @@ function setup_sale_history_html(string $serial, array $info = []): string
     foreach ($hist['rows'] as $r) {
         $isClaim = ((string) ($r['issue_type'] ?? '')) === 'claim';
         $role = (string) ($r['_role'] ?? 'new');
+        $v = setup_sale_history_norm($r);
+
         $out .= '<div class="asset-sales-setup-row">';
         $out .= '<p class="asset-sales-summary">' . setup_sale_history_badge($r);
-        $cust = trim((string) ($r['customer_name'] ?? ''));
-        if ($cust !== '') {
-            $out .= ' <b class="asset-sales-cust">' . h($cust) . '</b>';
+        if ($v['org'] !== '') {
+            $out .= ' <b class="asset-sales-cust">' . h($v['org']) . '</b>';
         }
-        $when = trim((string) ($r['claim_date'] ?? ''));
-        if ($when !== '') {
+        if ($v['dept'] !== '') {
+            $out .= ' <span class="asset-sales-dept">' . h($v['dept']) . '</span>';
+        }
+        if ($v['date'] !== '') {
             $out .= ' <span class="asset-sales-sep">·</span> <span class="asset-sales-when">'
-                . h(dthai($when)) . '</span>';
+                . h(dthai($v['date'])) . '</span>';
         }
-        $ref = trim((string) ($r['claim_number'] ?? ''));
-        if ($ref !== '') {
+        if ($v['ref'] !== '') {
             $out .= ' <span class="asset-sales-sep">·</span> อ้างอิง <b class="asset-sales-setup-id">#'
-                . h($ref) . '</b>';
+                . h($v['ref']) . '</b>';
         }
         $out .= '</p>';
 
         // คู่เครื่องที่เคลมเปลี่ยนกัน — เรื่องที่ฝั่ง stock ตอบไม่ได้
-        if ($isClaim) {
-            $other = $role === 'new'
-                ? trim((string) ($r['old_serial_number'] ?? ''))
-                : trim((string) ($r['new_serial_number'] ?? ''));
-            if ($other !== '') {
-                $verb = $role === 'new' ? 'เปลี่ยนมาจากเครื่อง' : 'ถูกเปลี่ยนเป็นเครื่อง';
-                $out .= '<p class="asset-sales-claim-pair">' . h($verb) . ' <b>' . h($other) . '</b></p>';
-            }
+        if ($isClaim && $v['other_sn'] !== '') {
+            $verb = $role === 'new' ? 'เปลี่ยนมาจากเครื่อง' : 'ถูกเปลี่ยนเป็นเครื่อง';
+            $out .= '<p class="asset-sales-claim-pair">' . h($verb) . ' <b>' . h($v['other_sn']) . '</b></p>';
         }
 
         $rows = '';
-        $rows .= stockparts_withdraw_dl_row('สินค้า', stockparts_fmt_field(
-            trim(implode(' · ', array_filter([
-                (string) ($r['product_name'] ?? ''),
-                (string) ($r['product_code'] ?? ''),
-            ])))
-        ));
-        $rows .= stockparts_withdraw_dl_row('PO', stockparts_fmt_field((string) ($r['po_number'] ?? '')));
-        if (trim((string) ($r['lease_number'] ?? '')) !== '') {
-            $rows .= stockparts_withdraw_dl_row('เลขสัญญาเช่า', stockparts_fmt_field((string) $r['lease_number']));
+        $add = function ($label, $val) use (&$rows) {
+            if (trim((string) $val) !== '') {
+                $rows .= stockparts_withdraw_dl_row($label, stockparts_fmt_field((string) $val));
+            }
+        };
+        $add('สินค้า', $v['product']);
+        $add('PO', $v['po']);
+        // customer_name กับ contact_person มักเป็นคนเดียวกัน — ต่อกันตรง ๆ ได้ "คุณผิว คุณผิว"
+        $who = array_values(array_unique(array_filter([$v['person'], $v['contact']], function ($x) {
+            return trim($x) !== '';
+        })));
+        if (count($who) === 2 && mb_stripos($who[1], $who[0]) !== false) {
+            $who = [$who[1]];
         }
-        if (trim((string) ($r['site_name'] ?? '')) !== '') {
-            $rows .= stockparts_withdraw_dl_row('ไซต์งาน', stockparts_fmt_field((string) $r['site_name']));
+        $add('ผู้ติดต่อ', implode(' · ', $who));
+        $add('เลขสัญญาเช่า', (string) ($r['lease_number'] ?? ''));
+        $add('ที่อยู่', (string) ($r['customer_address'] ?? ''));
+        $add('วันส่งมอบ', $v['delivery'] !== '' ? dthai($v['delivery']) : '');
+        $add('ประกัน', $v['warranty']);
+        $add('สถานะ Order', $v['status']);
+        $add('หมายเหตุ', $v['remark']);
+        $add('ผู้บันทึก', $v['by']);
+        if ($rows !== '') {
+            $out .= '<dl class="asset-sales-dl asset-sales-dl-inline">' . $rows . '</dl>';
         }
-        if (trim((string) ($r['customer_address'] ?? '')) !== '') {
-            $rows .= stockparts_withdraw_dl_row('ที่อยู่', stockparts_fmt_field((string) $r['customer_address']));
-        }
-        $remark = $role === 'new' ? (string) ($r['new_remark'] ?? '') : (string) ($r['old_remark'] ?? '');
-        if (trim($remark) !== '') {
-            $rows .= stockparts_withdraw_dl_row('หมายเหตุ', stockparts_fmt_field($remark));
-        }
-        $rows .= stockparts_withdraw_dl_row('ผู้บันทึก', stockparts_fmt_field((string) ($r['created_by'] ?? '')));
-        $out .= '<dl class="asset-sales-dl asset-sales-dl-inline">' . $rows . '</dl>';
 
         foreach (setup_sale_history_conflicts($r, $info) as $c) {
             $out .= '<p class="asset-sales-conflict">' . ui_icon_html('alert', 13, 'h-svg') . ' ' . h($c) . '</p>';

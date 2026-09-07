@@ -255,7 +255,7 @@ page_header('ตั้งค่า Server / Deploy');
     </div>
     <?php $kindNames = ['asset' => 'เครื่อง', 'customer' => 'ลูกค้า/ไซต์', 'person' => 'คน', 'product' => 'รุ่นสินค้า',
         'ma' => 'MA', 'update' => 'อัปเดต FW/HW', 'part' => 'อะไหล่', 'stockout' => 'ใบเบิก',
-        'stock' => 'ทะเบียน stock', 'repair' => 'งานซ่อม', 'sale' => 'ขาย', 'claim' => 'เคลม']; ?>
+        'stock' => 'ทะเบียน stock', 'repair' => 'งานซ่อม', 'sale' => 'ขาย', 'claim' => 'เคลม', 'order' => 'ส่งมอบ Order']; ?>
     <p style="margin:10px 0 4px; font-size:13px">
       ค้น <b><?= h($searchProbe['q']) ?></b> ได้ <b><?= (int) $searchProbe['total'] ?></b> รายการ
       ใน <?= (int) $searchProbe['ms'] ?> ms
