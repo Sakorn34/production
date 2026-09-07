@@ -65,6 +65,13 @@ table.products-table th { position: sticky; top: 0; z-index: 2; }
   box-shadow: 0 1px 0 var(--border, #dfe4ec), 0 6px 10px -8px rgba(15, 23, 42, .28);
 }
 
+/* ในกรอบรายการ ความสูงของแถวคือจำนวนแถวที่เห็นโดยตรง — ขอบบนล่าง 12px ถูกตั้งไว้
+   ตอนที่หน้ายังเลื่อนทั้งหน้า จะเลื่อนอีกนิดก็เห็นแถวถัดไป พอมาอยู่ในกรอบความสูง
+   คงที่ ทุก px ที่ตัดคือแถวที่ได้เพิ่ม · 8px ยังห่างพอให้แยกแถวออกจากกันด้วยตา
+   ตารางนอกกรอบ (หน้ารายละเอียด ตารางตั้งค่า) ไม่โดน เพราะมีไม่กี่แถวอยู่แล้ว */
+.table-wrap-fold table.list td,
+.table-wrap-fold table.products-table td { padding-top: 8px; padding-bottom: 8px; }
+
 /* ── < 1100px: ตัดระดับ 3 ── */
 @media (max-width: 1100px) {
   table.list th[data-pri="3"], table.list td[data-pri="3"],

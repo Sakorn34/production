@@ -3190,3 +3190,17 @@ Files:
   shared/ui_table.css
   shared/ui_table.js
 
+
+================================================================
+v2026-09-07_092025 | Patch | 2026-09-07 09:20:26
+From: 2026-09-05_160158  ->  To: dd1401e  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  shared/ui_table.css
+  shared/ui_table.js
+

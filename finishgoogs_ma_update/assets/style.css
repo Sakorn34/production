@@ -499,6 +499,9 @@ img.broken { visibility: hidden; }
 .pager { margin: 12px 0; display: flex; gap: 6px; }
 .pager a, .pager span { padding: 5px 11px; border: 1px solid var(--border, #c9d2e0); border-radius: var(--radius-sm, 8px); background: #fff; font-size: calc(13px * var(--font-scale, 1)); }
 .pager .cur { background: var(--primary); color: #fff; border-color: var(--primary); }
+/* ข้อความบอกช่วงรายการ — ไม่ใช่ปุ่ม จึงไม่ควรมีกรอบให้ดูเหมือนกดได้ */
+.pager { align-items: center; flex-wrap: wrap; }
+.pager .pager-info { border: 0; background: none; color: var(--text-muted, #6b6480); padding-left: 4px; }
 
 .grid-products { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
 .pcard { background: #fff; border: 1px solid var(--border, #dfe4ec); border-radius: var(--radius-sm, 8px); padding: 14px; text-align: center; }
