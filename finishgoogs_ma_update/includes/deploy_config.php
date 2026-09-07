@@ -43,7 +43,7 @@ function deploy_required_db_keys(): array
  */
 function deploy_optional_db_keys(): array
 {
-    return ['leasing', 'maintenance'];
+    return ['leasing', 'maintenance', 'setup'];
 }
 
 /**

@@ -15,13 +15,37 @@ require __DIR__ . '/includes/layout.php';
 $defaults = deploy_form_defaults();
 $testResults = null;
 $saveMessages = [];
+$searchProbe = null;
+$searchProbeQ = trim((string) ($_POST['probe_q'] ?? ''));
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
     $action = (string)($_POST['action'] ?? 'save');
     $cfg = deploy_parse_form($_POST);
 
-    if ($action === 'test') {
+    if ($action === 'probe') {
+        // ค้นจริงด้วยคำที่กรอก แล้วนับผลแยกตามแหล่ง — ตอบคำถาม "ทำไมค้นแล้วไม่เจอ"
+        // ได้ตรงกว่าการทดสอบ connection เฉย ๆ เพราะเห็นด้วยว่าแหล่งไหนตอบ 0 รายการ
+        require_once __DIR__ . '/includes/smart_search.php';
+        $t0 = microtime(true);
+        $hits = $searchProbeQ !== '' ? smart_search_query($searchProbeQ, 3) : [];
+        $byKind = [];
+        foreach ($hits as $h) {
+            $k = (string) $h['kind'];
+            $byKind[$k] = ($byKind[$k] ?? 0) + 1;
+        }
+        $searchProbe = [
+            'q'     => $searchProbeQ,
+            'total' => count($hits),
+            'ms'    => (int) round((microtime(true) - $t0) * 1000),
+            'kinds' => $byKind,
+            'dbs'   => [
+                'stockparts (ทะเบียน stock)' => dbStock() ? '' : 'ต่อไม่ได้',
+                'maintenance (งานซ่อม)'      => dbMaintenance() ? '' : dbMaintenanceError(),
+                'setup (ขาย/เคลม)'           => dbSetup() ? '' : dbSetupError(),
+            ],
+        ];
+    } elseif ($action === 'test') {
         $testResults = deploy_test_all_connections($cfg);
     } else {
         $errors = deploy_validate_config($cfg);
@@ -133,6 +157,7 @@ page_header('ตั้งค่า Server / Deploy');
         'techparts'  => 'biton_tech_parts (สต็อกช่าง)',
         'leasing'    => 'biton_leasing (ระบบเช่า — ไม่บังคับ)',
         'maintenance' => 'biton_maintenance (ระบบซ่อม — ไม่บังคับ)',
+        'setup'      => 'biton_setup (ประวัติขาย/เคลม — ไม่บังคับ)',
     ];
     foreach ($dbLabels as $key => $label) {
         $b = $fg[$key] ?? deploy_empty_db_block();
@@ -168,13 +193,45 @@ page_header('ตั้งค่า Server / Deploy');
     <b>ผลทดสอบการเชื่อมต่อ</b>
     <div class="test-row">
       <?php
-      $testLabels = ['production' => 'Production', 'stockparts' => 'Stockparts', 'techparts' => 'Tech parts', 'leasing' => 'Leasing (เช่า)', 'maintenance' => 'Maintenance (ซ่อม)', 'parts' => 'Parts app'];
+      $testLabels = ['production' => 'Production', 'stockparts' => 'Stockparts', 'techparts' => 'Tech parts', 'leasing' => 'Leasing (เช่า)', 'maintenance' => 'Maintenance (ซ่อม)', 'setup' => 'Setup (ขาย/เคลม)', 'parts' => 'Parts app'];
       foreach ($testLabels as $k => $lbl) {
           $t = $testResults[$k] ?? ['ok' => false, 'message' => '-', 'detail' => ''];
           ?>
         <span class="test-pill <?= $t['ok'] ? 'ok' : 'fail' ?>">
           <?= h($lbl) ?>: <?= h($t['message']) ?><?= $t['detail'] !== '' ? ' — ' . h($t['detail']) : '' ?>
         </span>
+      <?php } ?>
+    </div>
+  </div>
+  <?php } ?>
+
+  <?php // ตรวจว่าช่องค้นหาหาเจอจริงไหม — พิมพ์คำที่รู้ว่ามีอยู่ (ชื่อลูกค้า, S/N, เลข PO)
+        // แล้วดูว่าแหล่งไหนตอบมากี่รายการ · connection ผ่านแต่ตอบ 0 = ข้อมูลไม่ตรงคำค้น
+        // ไม่ใช่ต่อฐานไม่ได้ ซึ่งเป็นคนละปัญหาและแก้คนละทาง ?>
+  <h3 style="margin-top:20px">ตรวจช่องค้นหา</h3>
+  <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end">
+    <label style="flex:1 1 260px">คำค้นที่รู้ว่ามีอยู่จริง (ชื่อลูกค้า / S/N / เลข PO)
+      <input type="text" name="probe_q" value="<?= h($searchProbeQ) ?>" placeholder="เช่น ชื่อลูกค้าที่มีในระบบ">
+    </label>
+    <button type="submit" name="action" value="probe" class="btn btn-line">ค้นทดสอบ</button>
+  </div>
+  <?php if ($searchProbe) { ?>
+  <div style="margin-top:12px">
+    <div class="test-row">
+      <?php foreach ($searchProbe['dbs'] as $name => $err) { ?>
+      <span class="test-pill <?= $err === '' ? 'ok' : 'fail' ?>"><?= h($name) ?>: <?= $err === '' ? 'ต่อได้' : h($err) ?></span>
+      <?php } ?>
+    </div>
+    <?php $kindNames = ['asset' => 'เครื่อง', 'customer' => 'ลูกค้า/ไซต์', 'product' => 'รุ่นสินค้า',
+        'ma' => 'MA', 'update' => 'อัปเดต FW/HW', 'part' => 'อะไหล่', 'stockout' => 'ใบเบิก',
+        'stock' => 'ทะเบียน stock', 'repair' => 'งานซ่อม', 'sale' => 'ขาย', 'claim' => 'เคลม']; ?>
+    <p style="margin:10px 0 4px; font-size:13px">
+      ค้น <b><?= h($searchProbe['q']) ?></b> ได้ <b><?= (int) $searchProbe['total'] ?></b> รายการ
+      ใน <?= (int) $searchProbe['ms'] ?> ms
+    </p>
+    <div class="test-row">
+      <?php foreach ($kindNames as $k => $lbl) { $n = (int) ($searchProbe['kinds'][$k] ?? 0); ?>
+      <span class="test-pill <?= $n > 0 ? 'ok' : 'fail' ?>"><?= h($lbl) ?>: <?= $n ?></span>
       <?php } ?>
     </div>
   </div>
