@@ -6,6 +6,8 @@
 
     var STORAGE_KEY = 'fg-sidebar-expanded';
     var SEARCH_MIN_LEN = 2;
+    var HISTORY_KEY = 'fg-search-history';
+    var HISTORY_MAX = 5;
 
     /**
      * @param {object} opts
@@ -128,6 +130,50 @@
             lastResults = [];
         }
 
+        // ── ประวัติการค้นหา ──
+        // เก็บที่เครื่องผู้ใช้ ไม่ใช่ที่ server: คำค้นเป็นของส่วนตัวคนใช้ ไม่ใช่ข้อมูลระบบ
+        // และไม่ควรมีใครอื่นเห็นว่าใครค้นหาอะไร · localStorage อาจถูกปิด จึงห่อ try ทุกที่
+        function loadHistory() {
+            try {
+                var raw = localStorage.getItem(HISTORY_KEY);
+                var arr = raw ? JSON.parse(raw) : [];
+                return Array.isArray(arr) ? arr.filter(function (x) { return typeof x === 'string' && x; }) : [];
+            } catch (e) { return []; }
+        }
+        function saveHistory(list) {
+            try { localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, HISTORY_MAX))); }
+            catch (e) { /* โหมดส่วนตัว/ปิด storage — ประวัติหายได้ ไม่ใช่เรื่องคอขาดบาดตาย */ }
+        }
+        function rememberQuery(q) {
+            q = (q || '').trim();
+            if (q.length < SEARCH_MIN_LEN) return;
+            var list = loadHistory().filter(function (x) { return x.toLowerCase() !== q.toLowerCase(); });
+            list.unshift(q);
+            saveHistory(list);
+        }
+        function forgetQuery(q) {
+            saveHistory(loadHistory().filter(function (x) { return x !== q; }));
+        }
+        function renderHistory() {
+            if (!suggestBox) return false;
+            var list = loadHistory();
+            if (!list.length) return false;
+            lastResults = [];
+            suggestBox.innerHTML = '<div class="sidebar-smart-head">ค้นหาล่าสุด'
+                + '<button type="button" class="sidebar-hist-clear" data-hist-clear="1">ล้างทั้งหมด</button></div>'
+                + list.map(function (q) {
+                    return '<div class="sidebar-hist-row">'
+                        + '<button type="button" class="sidebar-hist-item" data-hist="' + escHtml(q) + '">'
+                        + '<span class="sidebar-hist-ic" aria-hidden="true">↺</span>'
+                        + '<span class="sidebar-hist-q">' + escHtml(q) + '</span></button>'
+                        + '<button type="button" class="sidebar-hist-x" data-hist-del="' + escHtml(q) + '"'
+                        + ' aria-label="ลบ ' + escHtml(q) + ' ออกจากประวัติ">×</button>'
+                        + '</div>';
+                }).join('');
+            suggestBox.hidden = false;
+            return true;
+        }
+
         function goHref(href) {
             if (!href) return;
             if (href.indexOf('http') === 0 || href.indexOf('/') === 0) {
@@ -173,8 +219,30 @@
             searchWrap.appendChild(suggestBox);
 
             suggestBox.addEventListener('click', function (e) {
+                var del = e.target.closest('[data-hist-del]');
+                if (del) {
+                    forgetQuery(del.getAttribute('data-hist-del'));
+                    if (!renderHistory()) hideSmartSuggest();
+                    if (searchInput) searchInput.focus();
+                    return;
+                }
+                if (e.target.closest('[data-hist-clear]')) {
+                    saveHistory([]);
+                    hideSmartSuggest();
+                    if (searchInput) searchInput.focus();
+                    return;
+                }
+                var hist = e.target.closest('[data-hist]');
+                if (hist) {
+                    var hq = hist.getAttribute('data-hist');
+                    if (searchInput) { searchInput.value = hq; searchInput.focus(); }
+                    fetchSmartSuggest(hq);
+                    return;
+                }
                 var btn = e.target.closest('.sidebar-smart-item');
                 if (!btn) return;
+                // จำคำที่พาไปถึงผลจริง ไม่ใช่ทุกตัวอักษรที่พิมพ์ระหว่างทาง
+                rememberQuery(searchInput ? searchInput.value : '');
                 goHref(btn.getAttribute('data-href'));
             });
 
@@ -257,6 +325,8 @@
                 var q = searchInput.value.trim();
                 clearTimeout(searchTimer);
                 if (!smartSearchUrl || q.length < SEARCH_MIN_LEN) {
+                    // ช่องว่าง (หรือสั้นเกินจะค้น) = โอกาสดีที่จะเสนอคำที่เคยค้น
+                    if (!q && renderHistory()) return;
                     hideSmartSuggest();
                     return;
                 }
@@ -269,6 +339,7 @@
                 var q = searchInput.value.trim();
                 if (!q || !smartSearchUrl) return;
                 e.preventDefault();
+                rememberQuery(q);
                 if (lastResults.length >= 1) {
                     goHref(lastResults[0].href);
                     return;
@@ -280,7 +351,9 @@
                 var q = searchInput.value.trim();
                 if (smartSearchUrl && q.length >= SEARCH_MIN_LEN && lastResults.length) {
                     suggestBox.hidden = false;
+                    return;
                 }
+                if (!q) renderHistory();
             });
         }
 

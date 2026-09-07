@@ -13,6 +13,11 @@ require_once __DIR__ . '/../includes/parts_bootstrap.php';
 require_once __DIR__ . '/../includes/production_sync.php';
 require_once __DIR__ . '/../includes/product_edit.php';
 
+// มาจากหน้ารายละเอียดอะไหล่ (?do=stock_in|stock_out&product=..) — เปิด modal ค้างไว้
+// พร้อมเลือกอะไหล่ตัวนั้นให้แล้ว ผู้ใช้จะได้ไม่ต้องค้นหาชิ้นเดิมซ้ำอีกรอบ
+$openModal = (string) ($_GET['do'] ?? '');
+$preselectId = (int) ($_GET['product'] ?? 0);
+
 $sortState = parts_products_sort_state();
 $productsReturnTo = parts_products_page_url($sortState);
 
@@ -448,13 +453,14 @@ foreach ($sets as $s) {
 // ย้ายมาจาก stock-in.php / stock-out-item.php / stock-out.php เพื่อให้ทำงานได้จบในหน้าเดียว
 // ทุกฟอร์มมี action ชัดเจน (ดูเหตุผลที่บล็อก POST ด้านบน)
 ?>
-<?php parts_modal_begin('stock-in-add-modal', 'บันทึกรับเข้า'); ?>
+<?php parts_modal_begin('stock-in-add-modal', 'บันทึกรับเข้า', true, $openModal === 'stock_in'); ?>
 <form method="POST">
     <input type="hidden" name="action" value="stock_in">
     <?= parts_product_picker_html('product_id', $pickerProducts, $partIcons, [
         'id'             => 'stock-in-product',
         'autofocus'      => true,
         'disableZeroQty' => false,
+        'selected'       => $openModal === 'stock_in' ? $preselectId : 0,
     ]) ?>
     <div class="form-row">
         <div class="form-group">
@@ -473,12 +479,13 @@ foreach ($sets as $s) {
 </form>
 <?php parts_modal_end(); ?>
 
-<?php parts_modal_begin('stock-out-item-add-modal', 'บันทึกเบิกรายชิ้น'); ?>
+<?php parts_modal_begin('stock-out-item-add-modal', 'บันทึกเบิกรายชิ้น', true, $openModal === 'stock_out'); ?>
 <form method="POST">
     <input type="hidden" name="action" value="stock_out_item">
     <?= parts_product_picker_html('product_id', $pickerProducts, $partIcons, [
         'id' => 'stock-out-item-product',
         'autofocus' => true,
+        'selected' => $openModal === 'stock_out' ? $preselectId : 0,
     ]) ?>
     <div class="form-row">
         <div class="form-group">

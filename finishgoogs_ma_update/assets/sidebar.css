@@ -246,6 +246,41 @@
   color: var(--text-muted, #64748b);
 }
 
+/* ── ประวัติการค้นหา ──
+   โผล่ในกล่องเดียวกับผลค้นหา ตอนช่องค้นหาว่าง — ผู้ใช้ค้น S/N เดิมซ้ำบ่อย
+   และรหัส 12 หลักเป็นอะไรที่พิมพ์ใหม่ทีไรก็ผิดได้ทุกที */
+.sidebar-smart-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 10px 6px;
+  font-size: calc(11.5px * var(--font-scale, 1)); font-weight: 700;
+  color: var(--text-faint); border-bottom: 1px solid var(--border);
+}
+.sidebar-hist-clear {
+  background: none; border: 0; padding: 2px 4px; min-height: 0;
+  font: inherit; font-weight: 600; color: var(--primary-ink, var(--primary)); cursor: pointer;
+}
+.sidebar-hist-clear:hover { text-decoration: underline; background: none; }
+.sidebar-hist-row { display: flex; align-items: stretch; }
+.sidebar-hist-row:hover { background: var(--surface-muted); }
+.sidebar-hist-item {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
+  background: none; border: 0; padding: 9px 4px 9px 10px;
+  font: inherit; color: var(--text); text-align: left; cursor: pointer;
+}
+.sidebar-hist-item:hover { background: none; }
+.sidebar-hist-ic { color: var(--text-faint); flex-shrink: 0; }
+.sidebar-hist-q {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: calc(13px * var(--font-scale, 1));
+}
+/* ปุ่มลบทีละคำ — จางไว้ก่อน ไม่ให้แย่งสายตากับตัวคำค้นเอง */
+.sidebar-hist-x {
+  flex-shrink: 0; background: none; border: 0; padding: 0 10px; min-height: 0;
+  font-size: calc(16px * var(--font-scale, 1)); line-height: 1;
+  color: var(--text-faint); cursor: pointer;
+}
+.sidebar-hist-x:hover { color: var(--danger); background: none; }
+
 /* ── Nav scroll area ── */
 .sidebar-nav {
   flex: 1;

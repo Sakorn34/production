@@ -25,7 +25,18 @@ if ($product) {
     $icon = $icons[$product['code']] ?? '';
 }
 
-parts_page_header('products', 'รายละเอียดอะไหล่', 'ข้อมูลอะไหล่ ราคา ลิงก์สั่งซื้อ และประวัติการเบิกของชิ้นนี้');
+// ปุ่มบนหัวหน้า: ย้อนกลับ + งานที่ทำต่อกับอะไหล่ชิ้นนี้บ่อยที่สุด
+// รับเข้า/เบิกออก ส่งกลับไปเปิด modal ที่หน้าอะไหล่รวม พร้อมเลือกชิ้นนี้ไว้ให้แล้ว —
+// ฟอร์มกับตัวจัดการ POST อยู่ที่นั่นอยู่แล้ว ไม่ต้องมีสำเนาที่สองให้ต้องดูแลคู่กัน
+$detailActions = '<a href="' . e(url('/pages/products.php')) . '" class="btn btn-outline btn-with-icon">← กลับไปหน้าอะไหล่รวม</a>';
+if ($product) {
+    $detailActions .= '<span class="parts-actions-sep" aria-hidden="true"></span>'
+        . '<a href="' . e(url('/pages/products.php?do=stock_in&product=' . (int) $productId)) . '" class="btn btn-success btn-with-icon">'
+        . ui_icon_html('stock-in', 16, 'btn-svg') . ' รับเข้า</a>'
+        . '<a href="' . e(url('/pages/products.php?do=stock_out&product=' . (int) $productId)) . '" class="btn btn-danger btn-with-icon">'
+        . ui_icon_html('stock-out-item', 16, 'btn-svg') . ' เบิกออก</a>';
+}
+parts_page_header('products', 'รายละเอียดอะไหล่', 'ข้อมูลอะไหล่ ราคา ลิงก์สั่งซื้อ และประวัติการเบิกของชิ้นนี้', $detailActions);
 ?>
 
 <div class="card parts-list-card">
@@ -135,7 +146,6 @@ parts_page_header('products', 'รายละเอียดอะไหล่'
         </div>
         <?php endif; ?>
 
-        <p style="margin-top: 1rem;"><a href="<?= url('/pages/products.php') ?>" class="btn btn-outline">← กลับไปหน้าอะไหล่</a></p>
     <?php endif; ?>
 </div>
 
