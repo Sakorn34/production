@@ -196,14 +196,14 @@
   width: 100%;
   padding: 8px 10px;
   cursor: pointer;
-  border-bottom: 1px solid #eef2f7;
-  color: #1e293b;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
   text-align: left;
 }
 .sidebar-smart-item:last-child { border-bottom: 0; }
 .sidebar-smart-item:hover,
 .sidebar-smart-item:focus-visible {
-  background: #f1f5f9;
+  background: var(--surface-muted);
   outline: none;
 }
 .sidebar-smart-row {
@@ -229,7 +229,7 @@
   min-width: 0;
   font-weight: 700;
   font-size: calc(13px * var(--font-scale, 1));
-  color: #0f172a;
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -483,8 +483,8 @@
   z-index: 1200;
   padding: 6px 10px;
   border-radius: var(--radius-sm, 8px);
-  background: #1e293b;
-  color: #f8fafc;
+  background: var(--sidebar-bg);
+  color: #fff;
   font-family: var(--app-font, inherit);
   font-size: calc(12px * var(--font-scale, 1));
   font-weight: 600;
@@ -581,7 +581,7 @@
   padding: 6px;
   border-radius: var(--radius, 12px);
   background: #fff;
-  color: #1e293b;
+  color: var(--text);
   box-shadow: 0 12px 40px rgba(15, 23, 42, .22);
   border: 1px solid rgba(15, 23, 42, .08);
   z-index: 50;
@@ -600,7 +600,7 @@
   margin-bottom: 4px;
 }
 .userbox-popover-head .ub-name {
-  color: #1e293b;
+  color: var(--text);
   font-size: calc(13.5px * var(--font-scale, 1));
 }
 .userbox-popover-head .muted {
@@ -613,15 +613,15 @@
   gap: 8px;
   padding: 9px 10px;
   border-radius: var(--radius-sm, 8px);
-  color: #334155;
+  color: var(--text);
   font-size: calc(13px * var(--font-scale, 1));
   font-weight: 500;
   text-decoration: none;
   transition: background .12s;
 }
 .userbox-popover a:hover {
-  background: #f1f5f9;
-  color: #0f172a;
+  background: var(--surface-muted);
+  color: var(--text);
   text-decoration: none;
 }
 .userbox-popover a.userbox-pop-danger:hover {

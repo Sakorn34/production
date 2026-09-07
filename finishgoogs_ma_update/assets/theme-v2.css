@@ -343,7 +343,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   margin: 0 0 2px;
   font-size: calc(16px * var(--font-scale, 1));
   font-weight: 700;
-  color: #1e293b;
+  color: var(--text);
   line-height: 1.3;
 }
 .dash-prod-subtitle {
@@ -500,7 +500,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 /* โปรไฟล์อะไหล่ใน modal dashboard */
 .part-profile-head {
   display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap;
-  margin-bottom: 12px; background: #f7f9fc; border: 1px solid #eceff4;
+  margin-bottom: 12px; background: var(--surface-muted); border: 1px solid var(--border);
   border-radius: var(--radius-sm, 8px); padding: 12px 14px;
 }
 /* รูปอะไหล่ในโปรไฟล์ — ใหญ่พอให้ดูออกว่าเป็นชิ้นไหน (เจาะจงเฉพาะที่นี่ ไม่กระทบ .thumb ทั่วระบบ) */
@@ -514,7 +514,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .part-profile-meta { flex: 1; min-width: 180px; }
 .part-profile-stats { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .part-profile-stat {
-  font-size: calc(12px * var(--font-scale, 1)); background: #fff; border: 1px solid #eceff4;
+  font-size: calc(12px * var(--font-scale, 1)); background: #fff; border: 1px solid var(--border);
   border-radius: var(--radius-sm, 8px); padding: 4px 10px; color: var(--text-muted, #6b6480);
 }
 .part-move-table td { font-size: calc(13px * var(--font-scale, 1)); }
@@ -563,7 +563,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .asset-sales-card {
   grid-area: sales;
   display: flex; flex-direction: column;
-  background: #f7f9fc; border: 1px solid #dce3ef; border-radius: var(--radius-sm, 8px);
+  background: var(--surface-muted); border: 1px solid var(--border); border-radius: var(--radius-sm, 8px);
   padding: 12px 14px; font-size: calc(13px * var(--font-scale, 1));
   min-height: 100%; min-width: 0; max-height: 78vh;
 }
@@ -615,7 +615,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7;
 }
 .asset-sales-section-stock-old {
-  background: #f8fafc; border: 1px solid var(--border, #e2e8f0); border-radius: var(--radius-sm, 8px);
+  background: var(--surface-muted); border: 1px solid var(--border, #e2e8f0); border-radius: var(--radius-sm, 8px);
   padding: 10px 12px; margin-top: 12px;
 }
 .asset-sales-badge-stock-old {
@@ -653,11 +653,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 }
 .asset-sales-lines th,
 .asset-sales-lines td {
-  padding: 6px 8px; border-bottom: 1px solid #eef2f7; vertical-align: middle;
+  padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: middle;
   text-align: left; line-height: 1.35;
 }
 .asset-sales-lines th {
-  background: #f1f5f9; color: var(--text-muted, #64748b); font-weight: 600; white-space: nowrap;
+  background: var(--surface-muted); color: var(--text-muted, #64748b); font-weight: 600; white-space: nowrap;
 }
 .asset-sales-lines th:nth-child(1),
 .asset-sales-lines td:nth-child(1) { width: 11%; }
@@ -717,7 +717,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   min-width: 0;
   min-height: 0;
   display: block;
-  color: #1f2937;
+  color: var(--text);
   word-break: normal;
   overflow-wrap: break-word;
   line-height: 1.4;
@@ -752,7 +752,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   max-width: 100%; word-break: break-word;
 }
 .asset-sales-badge.is-empty {
-  background: #eef2f7; color: var(--text-faint, #8a93a5); font-weight: 500;
+  background: var(--surface-muted); color: var(--text-faint, #8a93a5); font-weight: 500;
 }
 .asset-sales-foot { margin: 12px 0 0; font-size: calc(12px * var(--font-scale, 1)); flex-shrink: 0; }
 .asset-rent-card {
@@ -934,7 +934,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .upd-img-slot:last-child { border-bottom: 0; padding-bottom: 0; margin-bottom: 0; }
 .upd-img-preview { flex: 0 0 auto; width: 74px; height: 74px; border: 1px solid var(--border); border-radius: var(--radius-sm, 8px); background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .upd-img-preview img { width: 100%; height: 100%; object-fit: contain; }
-.upd-img-empty { font-size: calc(11px * var(--font-scale, 1)); color: #98a1b3; text-align: center; padding: 0 4px; }
+.upd-img-empty { font-size: calc(11px * var(--font-scale, 1)); color: var(--text-faint); text-align: center; padding: 0 4px; }
 .upd-img-input { min-width: 0; flex: 1 1 auto; }
 .upd-img-input label { display: block; font-size: calc(13px * var(--font-scale, 1)); color: var(--text-muted, #45506a); font-weight: 600; margin-bottom: 5px; }
 .upd-img-input input[type=file] { max-width: 100%; }

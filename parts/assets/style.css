@@ -44,7 +44,7 @@ body {
     align-items: center;
     gap: 0.65rem;
     padding: 0.72rem 1.5rem;
-    color: #94a3b8;
+    color: var(--text-faint);
     text-decoration: none;
     transition: all var(--transition);
     font-size: 0.92rem;
@@ -369,7 +369,7 @@ tr.history-sub-row td {
     width: 36px;
     height: 36px;
     border: none;
-    background: #f1f5f9;
+    background: var(--surface-muted);
     border-radius: var(--radius-sm);
     font-size: 1.4rem;
     line-height: 1;
@@ -542,7 +542,7 @@ tbody td {
     vertical-align: middle;
 }
 
-tbody tr:hover { background: #f8fafc; }
+tbody tr:hover { background: var(--surface-muted); }
 
 tbody td.col-actions {
     width: 1%;
@@ -1058,7 +1058,7 @@ table .col-img {
     position: relative;
     width: 42px;
     height: 24px;
-    background: #cbd5e1;
+    background: var(--border-strong);
     border-radius: 999px;
     transition: background .2s;
     flex-shrink: 0;
@@ -1128,7 +1128,7 @@ table .col-img {
 }
 
 .form-group input[readonly] {
-    background: #f8fafc;
+    background: var(--surface-muted);
     color: var(--text-muted);
     cursor: default;
 }
@@ -1136,7 +1136,7 @@ table .col-img {
 .form-group input::placeholder,
 .form-group textarea::placeholder,
 #product-search::placeholder {
-    color: #94a3b8;
+    color: var(--text-faint);
 }
 
 .form-group input:focus,
@@ -1207,7 +1207,7 @@ a:focus-visible {
     justify-content: center;
 }
 .parts-product-picker-thumb.is-empty {
-    background: #f1f5f9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.6'%3E%3Crect x='3' y='3' width='18' height='18' rx='3'/%3E%3Ccircle cx='8.5' cy='8.5' r='1.5'/%3E%3Cpath d='M21 15l-5-5L5 21'/%3E%3C/svg%3E") center/18px no-repeat;
+    background: var(--surface-muted) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.6'%3E%3Crect x='3' y='3' width='18' height='18' rx='3'/%3E%3Ccircle cx='8.5' cy='8.5' r='1.5'/%3E%3Cpath d='M21 15l-5-5L5 21'/%3E%3C/svg%3E") center/18px no-repeat;
 }
 .parts-product-picker-thumb-img,
 .parts-product-picker-option-thumb img {
@@ -1229,7 +1229,7 @@ a:focus-visible {
     flex: 0 0 auto;
     border: 0;
     background: transparent;
-    color: #94a3b8;
+    color: var(--text-faint);
     font-size: 1.25rem;
     line-height: 1;
     padding: 0.15rem 0.35rem;
@@ -1238,7 +1238,7 @@ a:focus-visible {
 }
 .parts-product-picker-clear:hover {
     color: var(--text-muted, #64748b);
-    background: #f1f5f9;
+    background: var(--surface-muted);
 }
 .parts-product-picker-list {
     position: absolute;
@@ -1281,7 +1281,7 @@ a:focus-visible {
     overflow: hidden;
 }
 .parts-product-picker-option-thumb.is-empty {
-    background: #f1f5f9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.6'%3E%3Crect x='3' y='3' width='18' height='18' rx='3'/%3E%3Ccircle cx='8.5' cy='8.5' r='1.5'/%3E%3Cpath d='M21 15l-5-5L5 21'/%3E%3C/svg%3E") center/18px no-repeat;
+    background: var(--surface-muted) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.6'%3E%3Crect x='3' y='3' width='18' height='18' rx='3'/%3E%3Ccircle cx='8.5' cy='8.5' r='1.5'/%3E%3Cpath d='M21 15l-5-5L5 21'/%3E%3C/svg%3E") center/18px no-repeat;
 }
 .parts-product-picker-option-body {
     min-width: 0;
@@ -1368,8 +1368,8 @@ a:focus-visible {
     color: var(--text);
 }
 .btn-outline:hover {
-    border-color: #cbd5e1;
-    background: #f8fafc;
+    border-color: var(--border-strong);
+    background: var(--surface-muted);
 }
 
 .btn-sm {
@@ -1525,11 +1525,11 @@ a:focus-visible {
     transition: border-color var(--transition);
 }
 
-.set-card:hover { border-color: #cbd5e1; }
+.set-card:hover { border-color: var(--border-strong); }
 
 .set-card.disabled {
     opacity: 0.65;
-    background: #f1f5f9;
+    background: var(--surface-muted);
 }
 
 .detail-link {
