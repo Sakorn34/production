@@ -176,6 +176,12 @@
 
         function goHref(href) {
             if (!href) return;
+            // ผลจากระบบอื่น (ประวัติขาย/เคลม) อยู่คนละเว็บ — เปิดแท็บใหม่
+            // ไม่งั้นผู้ใช้ที่แค่อยากเช็คว่าขายให้ใคร จะหลุดออกจากงานที่ทำค้างอยู่
+            if (href.indexOf('http') === 0 && href.indexOf(window.location.origin) !== 0) {
+                window.open(href, '_blank', 'noopener');
+                return;
+            }
             if (href.indexOf('http') === 0 || href.indexOf('/') === 0) {
                 window.location.href = href;
                 return;

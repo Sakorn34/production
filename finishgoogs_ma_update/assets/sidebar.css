@@ -182,9 +182,9 @@
   max-height: min(320px, 48vh);
   overflow-y: auto;
   border-radius: var(--radius-sm, 8px);
-  background: #fff;
-  border: 1px solid rgba(15, 23, 42, .1);
-  box-shadow: 0 10px 28px rgba(15, 23, 42, .22);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
 }
 .sidebar-smart-suggest[hidden] { display: none; }
 .sidebar-smart-item {
@@ -224,6 +224,20 @@
 .sidebar-smart-kind-asset { background: #ede9fe; color: #5b21b6; }
 .sidebar-smart-kind-ma { background: #dcfce7; color: #166534; }
 .sidebar-smart-kind-update { background: #dbeafe; color: #1d4ed8; }
+/* ป้ายประเภทผลค้นหา — ทุกสีมาจาก token ชุดเดียวกับที่อื่นในระบบ
+   สามอันบนสุด (asset/ma/update) ยังเป็นค่าฝังไว้จากรอบก่อน ปล่อยไว้ก่อนเพื่อไม่ให้
+   สีของผลลัพธ์ที่ผู้ใช้จำได้เปลี่ยนกะทันหัน — ไล่เก็บพร้อมกันทีเดียวทีหลัง */
+.sidebar-smart-kind-customer { background: var(--primary-soft); color: var(--primary-ink, var(--primary)); }
+.sidebar-smart-kind-product  { background: var(--surface-muted); color: var(--text-muted); }
+.sidebar-smart-kind-part     { background: var(--near-soft); color: var(--warning); }
+.sidebar-smart-kind-stockout { background: var(--danger-soft); color: var(--danger); }
+.sidebar-smart-kind-stock    { background: var(--info-soft); color: var(--info); }
+.sidebar-smart-kind-repair   { background: var(--warning-soft); color: var(--warning); }
+/* ขาย/เคลม มาจากอีกระบบหนึ่ง (setupsystem) — ใส่ลูกศรบอกว่ากดแล้วออกไปเว็บอื่น */
+.sidebar-smart-kind-sale     { background: var(--success-soft); color: var(--success); }
+.sidebar-smart-kind-claim    { background: var(--danger-soft); color: var(--danger); }
+.sidebar-smart-kind-sale::after,
+.sidebar-smart-kind-claim::after { content: " ↗"; }
 .sidebar-smart-title {
   flex: 1;
   min-width: 0;

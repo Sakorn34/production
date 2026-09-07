@@ -16,6 +16,6 @@ if (!isset($_GET['ajax']) || (string) $_GET['ajax'] !== '1') {
 header('Content-Type: application/json; charset=utf-8');
 
 $q = trim((string) ($_GET['q'] ?? ''));
-$items = smart_search_query($q, 5);
+$items = smart_search_query($q, 3);
 
 echo json_encode($items, JSON_UNESCAPED_UNICODE);

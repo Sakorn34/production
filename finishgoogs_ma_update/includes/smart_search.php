@@ -488,5 +488,56 @@ function smart_search_query(string $q, int $limitPerKind = 5): array
         }
     }
 
+    // ── ประวัติขาย / เคลม (ฐาน biton_setup ของระบบ setupsystem — อ่านอย่างเดียว) ──
+    // แหล่งเดียวที่ตอบได้ว่า S/N ตัวนี้ขายให้ใคร ใบ PO ไหน หรือเคยเคลมเปลี่ยนตัวมาจากเครื่องใด
+    // ผูก href กลับไปที่หน้าเดิมของระบบนั้น เพราะรายละเอียดเต็มอยู่ที่นั่น ไม่ได้ย้ายมา
+    $setupDb = function_exists('dbSetup') ? dbSetup() : null;
+    if ($setupDb) {
+        try {
+            $sql = 'SELECT id, issue_type, claim_number, product_name, product_code,
+                           old_serial_number, new_serial_number, customer_name, site_name,
+                           po_number, lease_number, claim_date
+                    FROM equipment_claim_history
+                    WHERE claim_number LIKE ? OR IFNULL(product_name, "") LIKE ?
+                       OR IFNULL(old_serial_number, "") LIKE ? OR IFNULL(new_serial_number, "") LIKE ?
+                       OR IFNULL(customer_name, "") LIKE ? OR IFNULL(site_name, "") LIKE ?
+                       OR IFNULL(po_number, "") LIKE ? OR IFNULL(lease_number, "") LIKE ?
+                    ORDER BY claim_date DESC, id DESC
+                    LIMIT ' . (int) $limitPerKind;
+            $stmt = $setupDb->prepare($sql);
+            $stmt->bind_param('ssssssss', $like, $like, $like, $like, $like, $like, $like, $like);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            while ($r = $res->fetch_assoc()) {
+                $isClaim = ((string) ($r['issue_type'] ?? '')) === 'claim';
+                $sn = trim((string) ($r['new_serial_number'] ?? ''));
+                if ($sn === '') { $sn = trim((string) ($r['old_serial_number'] ?? '')); }
+                $out[] = [
+                    'kind'       => $isClaim ? 'claim' : 'sale',
+                    'kind_label' => $isClaim ? 'เคลม' : 'ขาย',
+                    'id'         => (int) $r['id'],
+                    'asset_id'   => 0,
+                    'code'       => $sn,
+                    'title'      => $sn !== '' ? $sn : (string) ($r['claim_number'] ?? ''),
+                    'subtitle'   => smart_search_excerpt(implode(' · ', array_filter([
+                        (string) ($r['product_name'] ?? ''),
+                        (string) ($r['customer_name'] ?? ''),
+                        (string) ($r['site_name'] ?? ''),
+                        $isClaim && trim((string) ($r['old_serial_number'] ?? '')) !== ''
+                            ? 'เปลี่ยนจาก ' . (string) $r['old_serial_number'] : '',
+                        (string) ($r['po_number'] ?? ''),
+                        (string) ($r['claim_date'] ?? ''),
+                    ])), 96),
+                    'href'       => 'https://bit-online.net/setupsystem/claim_history.php?'
+                        . ($sn !== '' ? 'serial=' . rawurlencode($sn)
+                                     : 'claim_no=' . rawurlencode((string) ($r['claim_number'] ?? ''))),
+                ];
+            }
+            $stmt->close();
+        } catch (Throwable $e) {
+            error_log('[smart_search] equipment_claim_history: ' . $e->getMessage());
+        }
+    }
+
     return $out;
 }

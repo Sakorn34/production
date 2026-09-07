@@ -33,7 +33,7 @@ function app_base_url() {
 define('BASE_URL', app_base_url());
 define('APP_NAME', 'ระบบทะเบียนเครื่องและซ่อมบำรุง');
 /** รหัสชุด deploy — อัปเมื่อ build patch แล้วเทียบกับ server ว่าอัปครบหรือยัง */
-define('APP_RELEASE_VERSION', '2026-09-07_173709');
+define('APP_RELEASE_VERSION', '2026-09-07_174352');
 
 /**
  * โหลด secrets แบบ cache ต่อ request
@@ -251,6 +251,72 @@ function dbMaintenanceError()
         return '';
     }
     return (string)($GLOBALS['_dbMaintenanceError'] ?? 'เชื่อมต่อฐานระบบซ่อมไม่ได้');
+}
+
+/**
+ * เชื่อมต่อฐานระบบ setup/ขาย (biton_setup) — อ่านอย่างเดียว fail-soft ไม่ die
+ *
+ * เป็นฐานของระบบ setupsystem (bit-online.net/setupsystem) ที่เก็บประวัติเคลม/ขาย
+ * แยกชิ้นและการส่งมอบ Order เราไม่ได้เป็นเจ้าของและไม่แก้อะไรในนั้น ใช้เพื่อให้
+ * ช่องค้นหาหาเจอเท่านั้น · ต่อไม่ได้ต้องคืน null เฉย ๆ ไม่ใช่ทำให้ช่องค้นหาพังทั้งอัน
+ *
+ * @return mysqli|null
+ */
+function dbSetup()
+{
+    static $db = false;
+    static $error = '';
+    if ($db !== false) {
+        $GLOBALS['_dbSetupError'] = $error;
+        return $db;
+    }
+    $db = null;
+    $c = db_secrets();
+    if (empty($c['setup']) || !is_array($c['setup'])) {
+        $error = 'ยังไม่ได้ตั้งค่า setup ใน finishgoogs.secrets.php';
+        $GLOBALS['_dbSetupError'] = $error;
+        return null;
+    }
+    $cfg = $c['setup'];
+    $host = trim((string)($cfg['host'] ?? ''));
+    $user = trim((string)($cfg['user'] ?? ''));
+    $pass = (string)($cfg['pass'] ?? '');
+    $name = trim((string)($cfg['db'] ?? ''));
+    if ($host === '' || $name === '' || $user === '') {
+        $error = 'ค่าเชื่อมต่อฐาน setup ไม่ครบ (host / db / user)';
+        $GLOBALS['_dbSetupError'] = $error;
+        return null;
+    }
+    $mysqli = mysqli_init();
+    if (!$mysqli) {
+        $error = 'สร้างการเชื่อมต่อฐาน setup ไม่สำเร็จ';
+        $GLOBALS['_dbSetupError'] = $error;
+        return null;
+    }
+    $mysqli->options(MYSQLI_OPT_CONNECT_TIMEOUT, 3);
+    if (!@$mysqli->real_connect($host, $user, $pass, $name)) {
+        $error = 'เชื่อมต่อฐาน setup ไม่ได้';
+        $GLOBALS['_dbSetupError'] = $error;
+        return null;
+    }
+    $mysqli->set_charset('utf8mb4');
+    $db = $mysqli;
+    $error = '';
+    $GLOBALS['_dbSetupError'] = '';
+    return $db;
+}
+
+/**
+ * ข้อความ error ล่าสุดของ dbSetup()
+ *
+ * @return string
+ */
+function dbSetupError()
+{
+    if (dbSetup() !== null) {
+        return '';
+    }
+    return (string)($GLOBALS['_dbSetupError'] ?? 'เชื่อมต่อฐาน setup ไม่ได้');
 }
 
 function db() {
