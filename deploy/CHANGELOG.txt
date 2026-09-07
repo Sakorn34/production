@@ -3262,3 +3262,14 @@ Files:
   shared/ui_table.css
   shared/ui_table.js
 
+
+================================================================
+v2026-09-07_100640 | Patch | 2026-09-07 10:06:41
+From: 2026-09-07_094251  ->  To: 3205b02  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  shared/ui_table.css
+  shared/ui_table.js
+
