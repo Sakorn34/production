@@ -258,6 +258,36 @@ function smart_search_query(string $q, int $limitPerKind = 5): array
         ];
     }
 
+    // ── คนทำงาน ──
+    // ชื่อช่างโผล่กระจายอยู่หลายตาราง (ผู้บันทึกเครื่อง · ผู้ทำ MA · ผู้เบิก) ค้นชื่อจึงได้
+    // ผลปนกันไปหมด · ทะเบียนคนทำงานเป็นจุดเดียวที่ตอบว่า "คนนี้ทำอะไรไปบ้างทั้งรอบ"
+    try {
+        $peopleRes = qr(
+            'SELECT DISTINCT w.id, w.display_name, w.is_active
+             FROM work_people w
+             LEFT JOIN work_person_aliases al ON al.person_id = w.id
+             WHERE w.display_name LIKE ? OR al.alias LIKE ?
+             ORDER BY (w.display_name LIKE ?) DESC, w.display_name ASC
+             LIMIT ' . (int) $limitPerKind,
+            'sss',
+            [$like, $like, $prefix]
+        );
+        while ($r = $peopleRes->fetch_assoc()) {
+            $out[] = [
+                'kind'       => 'person',
+                'kind_label' => 'คน',
+                'id'         => (int) $r['id'],
+                'asset_id'   => 0,
+                'code'       => (string) $r['display_name'],
+                'title'      => (string) $r['display_name'],
+                'subtitle'   => 'สรุปงานรายคน' . (((int) $r['is_active']) === 0 ? ' · ไม่ใช้งานแล้ว' : ''),
+                'href'       => 'work_report.php?p=' . (int) $r['id'],
+            ];
+        }
+    } catch (Throwable $e) {
+        error_log('[smart_search] work_people: ' . $e->getMessage());
+    }
+
     // ── รุ่นสินค้า ──
     $prodRes = qr(
         'SELECT p.id, p.name, p.product_code, p.category,
@@ -327,10 +357,11 @@ function smart_search_query(string $q, int $limitPerKind = 5): array
             OR IFNULL(u.component_name, \'\') LIKE ?
             OR IFNULL(u.old_value, \'\') LIKE ?
             OR IFNULL(u.new_value, \'\') LIKE ?
+            OR IFNULL(u.made_by, \'\') LIKE ?
          ORDER BY u.updated_at DESC, u.id DESC
          LIMIT ' . (int) $limitPerKind,
-        'ssssss',
-        [$like, $like, $like, $like, $like, $like]
+        'sssssss',
+        [$like, $like, $like, $like, $like, $like, $like]
     );
     while ($r = $updRes->fetch_assoc()) {
         $typeLabel = smart_search_update_type_label((string) ($r['update_type'] ?? 'other'));

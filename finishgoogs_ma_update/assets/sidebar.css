@@ -228,6 +228,7 @@
    สามอันบนสุด (asset/ma/update) ยังเป็นค่าฝังไว้จากรอบก่อน ปล่อยไว้ก่อนเพื่อไม่ให้
    สีของผลลัพธ์ที่ผู้ใช้จำได้เปลี่ยนกะทันหัน — ไล่เก็บพร้อมกันทีเดียวทีหลัง */
 .sidebar-smart-kind-customer { background: var(--primary-soft); color: var(--primary-ink, var(--primary)); }
+.sidebar-smart-kind-person   { background: var(--surface-soft); color: var(--text); }
 .sidebar-smart-kind-product  { background: var(--surface-muted); color: var(--text-muted); }
 .sidebar-smart-kind-part     { background: var(--near-soft); color: var(--warning); }
 .sidebar-smart-kind-stockout { background: var(--danger-soft); color: var(--danger); }

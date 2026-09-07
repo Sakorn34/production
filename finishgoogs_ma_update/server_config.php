@@ -34,8 +34,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $k = (string) $h['kind'];
             $byKind[$k] = ($byKind[$k] ?? 0) + 1;
         }
+        // นับแถวดิบในตารางต้นทางด้วย — ถ้าตารางมีข้อมูลตรงคำค้นแต่ผลค้นหาเป็น 0
+        // แปลว่าโค้ดค้นหาผิด · ถ้าตารางเองก็ 0 แปลว่าข้อมูลไม่ได้อยู่ตรงที่คิด
+        $rawCounts = [];
+        $lk = '%' . $searchProbeQ . '%';
+        if ($searchProbeQ !== '') {
+            try {
+                $rawCounts['customers ทั้งหมด'] = (int) qr('SELECT COUNT(*) n FROM customers')->fetch_assoc()['n'];
+                $rawCounts['customers ที่ชื่อ/ไซต์/ผู้ติดต่อตรง'] = (int) qr(
+                    'SELECT COUNT(*) n FROM customers WHERE name LIKE ? OR IFNULL(site_label,"") LIKE ?
+                       OR IFNULL(contact_name,"") LIKE ? OR IFNULL(security_company,"") LIKE ?',
+                    'ssss', [$lk, $lk, $lk, $lk])->fetch_assoc()['n'];
+                $rawCounts['deployments ทั้งหมด'] = (int) qr('SELECT COUNT(*) n FROM deployments')->fetch_assoc()['n'];
+                $rawCounts['repairs ทั้งหมด'] = (int) qr('SELECT COUNT(*) n FROM repairs')->fetch_assoc()['n'];
+            } catch (Throwable $e) {
+                $rawCounts['production'] = 'อ่านไม่ได้: ' . $e->getMessage();
+            }
+            $sdb = dbSetup();
+            if ($sdb) {
+                try {
+                    $st = $sdb->prepare('SELECT COUNT(*) n FROM equipment_claim_history');
+                    $st->execute(); $rawCounts['equipment_claim_history ทั้งหมด'] = (int) $st->get_result()->fetch_assoc()['n']; $st->close();
+                    $st = $sdb->prepare('SELECT COUNT(*) n FROM equipment_claim_history
+                        WHERE IFNULL(customer_name,"") LIKE ? OR IFNULL(site_name,"") LIKE ?');
+                    $st->bind_param('ss', $lk, $lk);
+                    $st->execute(); $rawCounts['ขาย/เคลม ที่ชื่อลูกค้าตรง'] = (int) $st->get_result()->fetch_assoc()['n']; $st->close();
+                } catch (Throwable $e) {
+                    $rawCounts['equipment_claim_history'] = 'อ่านไม่ได้: ' . $e->getMessage();
+                }
+            }
+        }
         $searchProbe = [
             'q'     => $searchProbeQ,
+            'raw'   => $rawCounts,
             'total' => count($hits),
             'ms'    => (int) round((microtime(true) - $t0) * 1000),
             'kinds' => $byKind,
@@ -222,7 +253,7 @@ page_header('ตั้งค่า Server / Deploy');
       <span class="test-pill <?= $err === '' ? 'ok' : 'fail' ?>"><?= h($name) ?>: <?= $err === '' ? 'ต่อได้' : h($err) ?></span>
       <?php } ?>
     </div>
-    <?php $kindNames = ['asset' => 'เครื่อง', 'customer' => 'ลูกค้า/ไซต์', 'product' => 'รุ่นสินค้า',
+    <?php $kindNames = ['asset' => 'เครื่อง', 'customer' => 'ลูกค้า/ไซต์', 'person' => 'คน', 'product' => 'รุ่นสินค้า',
         'ma' => 'MA', 'update' => 'อัปเดต FW/HW', 'part' => 'อะไหล่', 'stockout' => 'ใบเบิก',
         'stock' => 'ทะเบียน stock', 'repair' => 'งานซ่อม', 'sale' => 'ขาย', 'claim' => 'เคลม']; ?>
     <p style="margin:10px 0 4px; font-size:13px">
@@ -234,6 +265,14 @@ page_header('ตั้งค่า Server / Deploy');
       <span class="test-pill <?= $n > 0 ? 'ok' : 'fail' ?>"><?= h($lbl) ?>: <?= $n ?></span>
       <?php } ?>
     </div>
+    <?php if (!empty($searchProbe['raw'])) { ?>
+    <p style="margin:12px 0 4px; font-size:13px">จำนวนแถวในตารางต้นทาง (ไม่ผ่านตัวค้นหา)</p>
+    <div class="test-row">
+      <?php foreach ($searchProbe['raw'] as $lbl => $n) { $bad = is_string($n) || (int) $n === 0; ?>
+      <span class="test-pill <?= $bad ? 'fail' : 'ok' ?>"><?= h($lbl) ?>: <?= h(is_string($n) ? $n : number_format($n)) ?></span>
+      <?php } ?>
+    </div>
+    <?php } ?>
   </div>
   <?php } ?>
 
