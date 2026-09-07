@@ -141,23 +141,15 @@ function parts_theme_css_block(): string
 {
     $fontCfg = main_font_config();
 
-    return ':root{
-  --primary:' . main_theme_color('color_primary', '#e11d74') . ';
-  --primary-dark:' . main_theme_color('color_primary_dark', '#c01862') . ';
-  --sidebar-bg:' . main_theme_color('color_sidebar', '#4e2985') . ';
-  --sidebar:' . main_theme_color('color_sidebar', '#4e2985') . ';
-  --sidebar-active:' . parts_sidebar_active_color() . ';
-  --bg:' . main_theme_color('color_page_bg', '#f4f1fb') . ';
-  --page-bg:' . main_theme_color('color_page_bg', '#f4f1fb') . ';
-  --app-font:' . $fontCfg['font'] . ';
-  --success:#16a34a; --success-soft:#dcfce7;
-  --info:#1d4ed8; --info-soft:#dbeafe;
-  --warning:#a16207; --warning-soft:#fef9c3;
-  --danger:#b91c1c; --danger-soft:#fee2e2;
-  --radius:12px; --radius-sm:8px;
-  --shadow-sm:0 1px 2px rgba(46,26,90,.07);
-  --shadow-md:0 4px 16px rgba(46,26,90,.12);
-  --input-h:40px; --transition:.18s ease;
-  ' . main_font_css_sizes() . '
-}';
+    require_once dirname(__DIR__, 2) . '/shared/ui_tokens.php';
+
+    return ui_tokens_css_block([
+        'primary'        => main_theme_color('color_primary', '#e11d74'),
+        'primary_dark'   => main_theme_color('color_primary_dark', '#c01862'),
+        'sidebar'        => main_theme_color('color_sidebar', '#4e2985'),
+        'sidebar_active' => parts_sidebar_active_color(),
+        'page_bg'        => main_theme_color('color_page_bg', '#f4f1fb'),
+        'font'           => $fontCfg['font'],
+        'font_scale'     => main_font_scale_percent(),
+    ]);
 }

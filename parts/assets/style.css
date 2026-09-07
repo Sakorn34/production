@@ -4,38 +4,10 @@
     box-sizing: border-box;
 }
 
-:root {
-    --primary: #e11d74;
-    --primary-dark: #c01862;
-    --primary-soft: #fce7f3;
-    --success: #16a34a;
-    --success-soft: #f0fdf4;
-    --warning: #d97706;
-    --warning-soft: #fffbeb;
-    /* ใกล้ถึงขั้นต่ำ — เหลืองสว่างกว่า warning ให้อ่านออกว่าเบากว่าหนึ่งระดับ */
-    --near: #eab308;
-    --near-soft: #fefce8;
-    --danger: #dc2626;
-    --danger-soft: #fef2f2;
-    --bg: #f4f1fb;
-    --sidebar: #4e2985;
-    --card: #ffffff;
-    --text: #2a2440;
-    --text-muted: #6b6480;
-    --text-faint: #9992ad;
-    --surface: #ffffff;
-    --surface-muted: #f7f4fd;
-    --border: #e7e0f5;
-    --border-strong: #d5cce9;
-    --border-focus: #e5a3c6;
-    --radius: 12px;
-    --radius-sm: 8px;
-    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
-    --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08);
-    --shadow-lg: 0 8px 28px rgba(15, 23, 42, 0.1);
-    --input-h: 44px;
-    --transition: 0.18s ease;
-}
+/* ตัวแปรธีมทั้งหมดมาจาก shared/ui_tokens.php ผ่านบล็อก #theme-vars ที่ header.php
+   ฝังไว้ — ห้ามประกาศซ้ำที่นี่ · เดิมชุดเดียวกันถูกประกาศไว้ 4 ที่แล้วค่าไม่ตรงกัน
+   (--input-h 44 กับ 40, --danger #dc2626 กับ #b91c1c, เงาคนละสูตร) โดยที่บล็อก
+   inline โหลดทีหลังจึงชนะเสมอ ค่าที่เขียนไว้ตรงนี้เลยไม่เคยถูกใช้อยู่แล้ว */
 
 body {
     font-family: var(--app-font, 'Noto Sans Thai', 'Segoe UI', system-ui, sans-serif);

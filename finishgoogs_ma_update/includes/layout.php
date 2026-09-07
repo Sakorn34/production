@@ -184,38 +184,17 @@ function page_head_html($title) {
     ?><style>@font-face{font-family:'AppCustomFont';src:url('<?= h($fontUrl) ?>') format('<?= h($fmt) ?>');font-display:swap;font-weight:400;font-style:normal;}</style><?php
 } ?>
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/style.css?v=<?= filemtime(__DIR__ . '/../assets/style.css') ?>">
-<style id="theme-vars">:root{
-  --primary: <?= theme_color('color_primary', '#e11d74') ?>;
-  --primary-dark: <?= theme_color('color_primary_dark', '#c01862') ?>;
-  --sidebar-bg: <?= theme_color('color_sidebar', '#4e2985') ?>;
-  --sidebar-active: <?php
-    // สีเมนู active — ค่าขาวล้วน (legacy default) จะมองไม่เห็นเพราะตัวอักษรเมนูเป็นสีขาว
-    $sbAct = theme_color('color_sidebar_active', '#e11d74');
-    echo in_array(strtolower($sbAct), ['#fff', '#ffffff'], true) ? 'rgba(255,255,255,.16)' : $sbAct;
-  ?>;
-  --page-bg: <?= theme_color('color_page_bg', '#f4f1fb') ?>;
-  /* เส้นขอบผสมจากพื้นหน้ากับสีเมนู ให้อยู่ตระกูลม่วงเดียวกับธีมและตรงกับฝั่งอะไหล่
-     สูตรเดิมผสมกับ #64748b ซึ่งเป็นเทาอมฟ้า ขอบจึงคนละโทนกับสีอื่นในหน้า */
-  --border: color-mix(in srgb, var(--page-bg) 91%, var(--sidebar-bg) 9%);
-  --border-strong: color-mix(in srgb, var(--page-bg) 78%, var(--sidebar-bg) 22%);
-  --surface-muted: color-mix(in srgb, var(--page-bg) 88%, #fff);
-  --surface-soft: color-mix(in srgb, var(--page-bg) 72%, #fff);
-  --primary-soft: color-mix(in srgb, var(--primary) 12%, #fff);
-  --focus-ring: color-mix(in srgb, var(--primary) 25%, transparent);
-  --app-font: <?= $fontCfg['font'] ?>;
-  --success:#16a34a; --success-soft:#dcfce7;
-  --info:#1d4ed8; --info-soft:#dbeafe;
-  --warning:#a16207; --warning-soft:#fef9c3;
-  --near:#eab308; --near-soft:#fefce8;
-  --danger:#b91c1c; --danger-soft:#fee2e2;
-  --radius:12px; --radius-sm:8px;
-  --shadow-sm:0 1px 2px rgba(15,23,42,.06);
-  --shadow-md:0 4px 16px rgba(15,23,42,.08);
-  --text:#2a2440; --text-muted:#6b6480; --text-faint:#9992ad;
-  --surface:#ffffff;
-  --input-h:40px; --transition:.18s ease;
-  <?= theme_font_css_sizes() ?>
-}</style>
+<?php // ตัวแปรธีมทั้งหมดอยู่ที่ shared/ui_tokens.php ที่เดียว ใช้ร่วมกับแอปอะไหล่
+     require_once dirname(__DIR__, 2) . '/shared/ui_tokens.php'; ?>
+<style id="theme-vars"><?= ui_tokens_css_block([
+  'primary'        => theme_color('color_primary', '#e11d74'),
+  'primary_dark'   => theme_color('color_primary_dark', '#c01862'),
+  'sidebar'        => theme_color('color_sidebar', '#4e2985'),
+  'sidebar_active' => theme_color('color_sidebar_active', '#e11d74'),
+  'page_bg'        => theme_color('color_page_bg', '#f4f1fb'),
+  'font'           => $fontCfg['font'],
+  'font_scale'     => theme_font_scale_percent(),
+]) ?></style>
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/theme-v2.css?v=<?= @filemtime(__DIR__ . '/../assets/theme-v2.css') ?: time() ?>">
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/sidebar.css?v=<?= @filemtime(__DIR__ . '/../assets/sidebar.css') ?: time() ?>">
 <?php // ตารางที่ยุบคอลัมน์ตามความกว้าง — ใช้ร่วมกับแอปอะไหล่ ต้องมาหลัง style.css

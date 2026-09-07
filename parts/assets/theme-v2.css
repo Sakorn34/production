@@ -5,18 +5,9 @@
    <link rel="stylesheet" href="<?= url('/assets/theme-v2.css') ?>?v=1">
    ═══════════════════════════════════════════════════════════════ */
 
-/* หมายเหตุ: ห้ามประกาศสีธีมซ้ำใน :root ที่นี่ — ค่าธีมหลัก (--primary, --sidebar,
-   --bg ฯลฯ) มาจากบล็อก #theme-vars ที่ parts_theme_css_block() สร้างจาก
-   site_settings ของระบบหลัก (หน้า appearance.php) ไฟล์นี้โหลดท้ายสุด
-   ถ้า hardcode ซ้ำจะทับค่าที่ผู้ใช้ตั้ง ประกาศได้เฉพาะ token ที่ไม่มีในบล็อกนั้น */
-:root {
-  --primary-soft: #fce7f3;
-  --primary-soft: color-mix(in srgb, var(--primary) 10%, #fff);
-  --text: #2a2440;
-  --border: #e7e0f5;
-  --border-focus: #e5a3c6;
-  --shadow-lg: 0 8px 28px rgba(46, 26, 90, .14);
-}
+/* หมายเหตุเดิมบอกว่าประกาศได้เฉพาะ token ที่ไม่มีในบล็อก #theme-vars แต่ทั้งหกตัว
+   ที่เคยอยู่ตรงนี้มีในบล็อกนั้นหมดแล้ว และเป็นค่าตายตัวที่ไม่ขยับตามสีธีม —
+   ยกไป shared/ui_tokens.php ให้คำนวณจากสีที่ผู้ใช้ตั้ง เหมือนฝั่งทะเบียนเครื่อง */
 
 a { color: var(--primary-dark); }
 a:hover { color: var(--primary); }
