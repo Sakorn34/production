@@ -229,6 +229,7 @@ if ($showPartsWithdraw && ($partsSummary['out_count'] > 0 || $partsUsed)) {
     $tl = timeline_exclude_groups($tl, ['parts']);
 }
 
+require_once __DIR__ . '/includes/setup_sale_history.php';
 $stockWithdraw = asset_stockparts_withdraw_info((string) $a['asset_code']);
 $leaseInfo = asset_leasing_info(
     (string) ($a['asset_code'] ?? ''),

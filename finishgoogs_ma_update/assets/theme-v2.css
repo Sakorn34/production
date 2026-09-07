@@ -1278,6 +1278,40 @@ a.kpi:hover { text-decoration: none; }
 
 .asset-sales-badge-withdraw { background: var(--primary-soft); color: var(--primary-dark); border: 1px solid var(--border-strong); }
 
+/* ── ประวัติขาย/เคลมจากระบบ setup ──
+   ต่อท้ายการ์ดการเบิกใช้งานขาย · เส้นซ้ายบอกว่ามาจากอีกระบบหนึ่ง ไม่ใช่ข้อมูล
+   ที่ระบบนี้บันทึกเอง ผู้ใช้จะได้รู้ว่าถ้าจะแก้ต้องไปแก้ที่ไหน */
+.asset-sales-setup-block {
+  border-left: 3px solid var(--border-strong);
+  padding-left: 12px;
+}
+.asset-sales-setup-row + .asset-sales-setup-row {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+/* คู่เครื่องที่เคลมเปลี่ยนกัน — เรื่องที่ฝั่ง stock ตอบไม่ได้ ให้เด่นกว่าฟิลด์อื่น */
+.asset-sales-claim-pair {
+  margin: 4px 0 6px;
+  font-size: calc(13px * var(--font-scale, 1));
+  color: var(--text);
+}
+.asset-sales-claim-pair b { font-family: ui-monospace, "Consolas", monospace; }
+/* สองระบบบันทึกไม่ตรงกัน — ไม่ตัดสินว่าใครถูก แค่ทำให้เห็นว่ามีสองค่า */
+.asset-sales-conflict {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin: 6px 0 0;
+  padding: 6px 9px;
+  border-radius: var(--radius-sm, 8px);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: calc(12.5px * var(--font-scale, 1));
+  line-height: 1.5;
+}
+.asset-sales-conflict .h-svg { flex-shrink: 0; margin-top: 2px; }
+
 /* ชื่ออะไหล่ในตารางเบิก — รูปซ้าย ชื่อขวา ช่องรูปกว้างเท่ากันทุกแถว
    แม้อะไหล่ตัวนั้นจะไม่มีรูป คอลัมน์ชื่อจะได้เรียงตรงกัน */
 .part-row-name { display: flex; align-items: flex-start; gap: 9px; }

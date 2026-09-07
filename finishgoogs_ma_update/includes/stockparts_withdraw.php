@@ -1970,16 +1970,25 @@ function asset_stockparts_withdraw_card_html(array $info): string
         . '<b>การเบิกใช้งานขาย</b></div>';
     $out .= '<div class="asset-sales-card-body">';
 
+    // ประวัติจากระบบขาย (biton_setup) — 31 จาก 170 รายการไม่มีแถวใน stock เลย
+    // การ์ดจึงต้องแสดงมันได้แม้ฝั่ง stock จะไม่มีอะไรเลย ไม่งั้นข้อมูลที่มีอยู่จริงหายไป
+    $serial = (string) ($info['serial'] ?? '');
+    $setupHtml = function_exists('setup_sale_history_html')
+        ? setup_sale_history_html($serial, empty($info['ok']) ? [] : stockparts_withdraw_summary_fields($info))
+        : '';
+
     if (empty($info['ok'])) {
-        return $out . '<p class="muted asset-sales-empty">'
-            . h((string) ($info['message'] ?? 'ไม่มีข้อมูล')) . '</p></div></div>';
+        $msg = '<p class="muted asset-sales-empty">'
+            . h((string) ($info['message'] ?? 'ไม่มีข้อมูล')) . '</p>';
+        return $out . ($setupHtml !== '' ? $setupHtml : $msg) . '</div></div>';
     }
 
     $hasWithdraw = !empty($info['has_withdraw']);
     $hasStockOld = !empty($info['has_stock_old']) && !empty($info['stock_old']);
     if (!$hasWithdraw && !$hasStockOld) {
-        return $out . '<p class="muted asset-sales-empty">'
-            . h((string) ($info['message'] ?? 'ยังไม่มีการเบิกใช้งานขาย')) . '</p></div></div>';
+        $msg = '<p class="muted asset-sales-empty">'
+            . h((string) ($info['message'] ?? 'ยังไม่มีการเบิกใช้งานขาย')) . '</p>';
+        return $out . ($setupHtml !== '' ? $setupHtml : $msg) . '</div></div>';
     }
 
     // ① ขายให้ใคร เมื่อไหร่ อ้างอิงอะไร
@@ -2004,6 +2013,7 @@ function asset_stockparts_withdraw_card_html(array $info): string
         $out .= '<p class="muted asset-sales-empty">' . h((string) $info['message']) . '</p>';
     }
 
+    $out .= $setupHtml;
     $out .= stockparts_withdraw_provenance_html($info);
     $out .= '<p class="asset-sales-foot muted"><a href="'
         . h(BASE_URL . '/share.php?q=' . rawurlencode((string) $info['serial']))
