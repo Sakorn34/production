@@ -292,6 +292,18 @@ $partsBase = ui_parts_base_url();
       'lost'    => 'ระบบเช่าแจ้งสูญหาย',
   ];
   ?>
+  <?php
+  // ลำดับใน status_list() เดินตามวงจรชีวิตเครื่อง (ใหม่ → เช่า → สำรอง → ขาย → ปลด → หาย)
+  // ซึ่งอ่านเป็นเรื่องราวได้ แต่ตอบไม่ได้ว่าสถานะไหนเยอะสุด ทั้งที่นั่นคือคำถามแรก
+  // ของการ์ดนี้ · จำนวนเท่ากันให้คงลำดับวงจรชีวิตไว้ (usort ยังไม่ stable บน PHP 7.3
+  // ที่เว็บรันอยู่ จึงต้องตัดสินด้วยลำดับเดิมเอง ไม่ใช่ปล่อยให้ขึ้นกับอัลกอริทึม)
+  $statusCycleIdx = array_flip(status_list());
+  $statusByCount  = status_list();
+  usort($statusByCount, function ($a, $b) use ($byStatus, $statusCycleIdx) {
+      $d = (int) ($byStatus[$b] ?? 0) - (int) ($byStatus[$a] ?? 0);
+      return $d !== 0 ? $d : ($statusCycleIdx[$a] - $statusCycleIdx[$b]);
+  });
+  ?>
   <div class="kpi kpi-primary kpi-status-overview">
     <div class="kpi-top"><span class="kpi-ic"><?= ui_icon_html('assets', 14) ?></span> เครื่องทั้งหมด</div>
     <b class="kpi-num"><?= number_format($total) ?></b>
@@ -301,7 +313,7 @@ $partsBase = ui_parts_base_url();
          // ไม่ได้อยู่ติดกับตัวเลข จึงยังต้องการคำเต็มเพื่อความชัดเจน
          if ($total > 0) { ?>
     <div class="status-bar" role="img" aria-label="สัดส่วนเครื่องแยกตามสถานะ">
-      <?php foreach (status_list() as $st):
+      <?php foreach ($statusByCount as $st):
           $n = (int) ($byStatus[$st] ?? 0);
           if ($n <= 0) { continue; }
           $flex = max($n / $total * 100, 0.6); // ขั้นต่ำกันสถานะที่มีไม่กี่เครื่อง (เช่นสูญหาย) หายไปจากแท่งเลย
@@ -320,7 +332,7 @@ $partsBase = ui_parts_base_url();
          // dashStatusFilter ท้ายไฟล์) ไม่พาไปหน้าไหน — ปุ่ม modifier+คลิก (Ctrl/⌘/กลาง)
          // ยังพาไปทะเบียนเครื่องกรองแล้วเหมือนเดิม สำหรับคนอยากได้รายชื่อเต็ม ?>
     <div class="status-legend">
-      <?php foreach (status_list() as $st):
+      <?php foreach ($statusByCount as $st):
           $n = (int) ($byStatus[$st] ?? 0);
           $href = "$B/assets.php?status=$st";
       ?>

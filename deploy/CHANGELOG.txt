@@ -3230,3 +3230,13 @@ Files:
   finishgoogs_ma_update/share.php
   finishgoogs_ma_update/share_admin.php
 
+
+================================================================
+v2026-09-07_093736 | Patch | 2026-09-07 09:37:37
+From: 2026-09-07_093241  ->  To: 312abc3  |  Files: 2
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/index.php
+
