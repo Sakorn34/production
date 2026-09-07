@@ -467,6 +467,7 @@ parts_page_header($historyTabs[$tab]['icon'], 'ประวัติ — ' . $he
 
 <?php if (!$detail): ?>
 <?php // แท็บเป็นลิงก์ (navigation ฝั่งเซิร์ฟเวอร์) — ห้ามใส่ data-history-filter เพราะ app.js จะดักคลิกไปทำ filter ?>
+<div class="history-navbar">
 <nav class="history-kind-legend history-tabs" aria-label="มุมมองประวัติ">
     <?php foreach ($historyTabs as $key => $def): ?>
     <a href="<?= $key === 'move' ? $moveUrl('all') : url('/pages/history.php?tab=sn') ?>"
@@ -487,6 +488,18 @@ parts_page_header($historyTabs[$tab]['icon'], 'ประวัติ — ' . $he
     <?php endforeach; ?>
 </nav>
 <?php endif; ?>
+
+<?php if ($tab === 'sn'): ?>
+<?php // กรองฝั่งเบราว์เซอร์ (app.js ผูกจาก [data-history-filter] ทั้งหน้า จึงย้ายมาอยู่
+     // แถวเดียวกับแท็บได้) — เดิมอยู่ในการ์ดเหนือตาราง กินไปอีกหนึ่งบรรทัด ?>
+<div class="history-kind-legend move-kinds" role="group" aria-label="กรองประเภทการเบิก">
+    <button type="button" class="history-kind-filter is-active" data-history-filter="all">ทั้งหมด</button>
+    <button type="button" class="history-kind-filter badge history-note-badge history-note-prod" data-history-filter="prod">เบิกผลิต</button>
+    <button type="button" class="history-kind-filter badge history-note-badge history-note-ma" data-history-filter="ma">MA</button>
+    <button type="button" class="history-kind-filter badge history-note-badge history-note-repair" data-history-filter="repair">เบิกซ่อม</button>
+</div>
+<?php endif; ?>
+</div>
 <?php endif; ?>
 
 <?php if ($detail): ?>
@@ -745,12 +758,6 @@ parts_page_header($historyTabs[$tab]['icon'], 'ประวัติ — ' . $he
 <?php elseif ($tab === 'sn'): ?>
 
 <div class="card parts-list-card">
-    <div class="history-kind-legend" role="group" aria-label="กรองประเภทการเบิก">
-        <button type="button" class="history-kind-filter is-active" data-history-filter="all">ทั้งหมด</button>
-        <button type="button" class="history-kind-filter badge history-note-badge history-note-prod" data-history-filter="prod">เบิกผลิต</button>
-        <button type="button" class="history-kind-filter badge history-note-badge history-note-ma" data-history-filter="ma">MA</button>
-        <button type="button" class="history-kind-filter badge history-note-badge history-note-repair" data-history-filter="repair">เบิกซ่อม</button>
-    </div>
     <div class="table-wrap table-wrap-fold">
     <table class="parts-table">
         <thead>

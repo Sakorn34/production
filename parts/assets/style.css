@@ -128,7 +128,9 @@ body {
 
 .content {
     margin-left: 0;
-    padding: 1.75rem 2rem 2.5rem;
+    /* ขอบบน 28px กว้างกว่าที่ตาต้องการบนหน้ารายการ ทุก px ที่ตัดกลายเป็นความสูง
+       ของกรอบรายการพอดี — ฝั่งทะเบียนเครื่องใช้ 14px อยู่แล้ว ให้ตรงกัน */
+    padding: 0.9rem 2rem 2.5rem;
     flex: 1;
     width: 100%;
     max-width: none;
@@ -431,8 +433,18 @@ tr.history-sub-row td {
     }
 }
 
+/* ชื่อหน้ากับคำอธิบายเคยอยู่คนละบรรทัด กินความสูงสองบรรทัดโดยไม่ได้อะไรเพิ่ม
+   รวมเป็นบรรทัดเดียวแบบเดียวกับฝั่งทะเบียนเครื่อง · จอแคบกว่า 640px ปล่อยให้ห่อ
+   ลงบรรทัดใหม่ตามเดิม ไม่งั้นชื่อหน้าโดนบีบจนอ่านไม่รู้เรื่อง */
 .page-header {
-    margin-bottom: 1.75rem;
+    margin-bottom: 0.75rem;
+}
+.page-header > div:first-child {
+    display: flex;
+    align-items: baseline;
+    gap: 2px 10px;
+    flex-wrap: wrap;
+    min-width: 0;
 }
 
 .pagehead {
@@ -452,7 +464,7 @@ tr.history-sub-row td {
 
 .page-header p {
     color: var(--text-muted);
-    margin-top: 0.35rem;
+    margin: 0;
     font-size: 0.95rem;
 }
 
@@ -497,6 +509,9 @@ tr.history-sub-row td {
     letter-spacing: -0.02em;
 }
 
+/* การ์ดที่ห่อกรอบรายการไว้ ขอบบน 24px กลายเป็นช่องว่างเปล่าเหนือหัวตาราง
+   (:has ไม่รองรับที่ไหนก็แค่ได้ขอบเดิม ไม่พัง) */
+.card:has(> .table-wrap-fold) { padding-top: 0.9rem; }
 .card {
     background: var(--card);
     border-radius: var(--radius);
@@ -733,6 +748,15 @@ table .col-img {
     border-radius: var(--radius-sm, 8px);
     background: #f7f4fd;
     display: block;
+}
+/* รูปอะไหล่เป็นตัวกำหนดความสูงแถวในกรอบรายการ 34px ยังดูออกว่าเป็นชิ้นไหน
+   (รูปเต็มอยู่ในหน้าอะไหล่ชิ้นนั้น) ทำให้แถวลงมาที่ราว 64px เท่าฝั่งทะเบียนเครื่อง */
+.table-wrap-fold .col-img .parts-thumb,
+.table-wrap-fold .col-img img {
+    width: 34px;
+    height: 34px;
+    max-width: 34px;
+    max-height: 34px;
 }
 .modal-body .col-img .parts-thumb,
 .modal-body .col-img img {
@@ -1590,6 +1614,17 @@ a:focus-visible {
    ต้องแยกน้ำหนักให้เห็นว่าแถวบนคือแท็บ แถวล่างคือตัวกรองที่อยู่ในแท็บนั้น */
 /* ต้องมี :not(.badge) ต่อท้ายเหมือนกฎกลาง ไม่งั้น .history-kind-filter:not(.badge)
    ซึ่ง specificity สูงกว่าจะทับ padding/font-size/background ที่ตั้งตรงนี้ทั้งหมด */
+/* แท็บกับชิปกรองเคยอยู่คนละบรรทัด รวมกว้างแค่ราวครึ่งจอ — รวมเป็นแถวเดียว
+   คืนความสูงให้ตารางไปหนึ่งบรรทัดเต็ม ๆ · เส้นคั่นซ้ายของชิปกลายเป็นตัวแบ่ง
+   ระหว่างสองกลุ่มพอดี · จอแคบยังห่อลงบรรทัดใหม่ได้เองเพราะ flex-wrap */
+.history-navbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem 0.9rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+.history-navbar > nav { margin-bottom: 0; }
 .history-tabs { gap: 0.35rem; margin-bottom: 0.5rem; }
 .history-tabs a.history-kind-filter:not(.badge) {
     text-decoration: none;
@@ -1611,7 +1646,9 @@ a:focus-visible {
     padding-left: 0.7rem;
     border-left: 3px solid var(--border, #e7e0f5);
 }
-.move-kinds a.history-kind-filter:not(.badge) {
+/* แท็บ S/N ใช้ปุ่ม <button> ไม่ใช่ <a> — เขียนให้ครอบทั้งสองแบบ ชิปสองแท็บจะได้
+   ขนาดเท่ากัน */
+.move-kinds .history-kind-filter:not(.badge) {
     text-decoration: none;
     padding: 0.16rem 0.6rem;
     font-size: calc(11.5px * var(--font-scale, 1));
@@ -1620,7 +1657,7 @@ a:focus-visible {
     border: 1px solid var(--border, #e7e0f5);
     color: var(--text-muted, #6b6480);
 }
-.move-kinds a.history-kind-filter.is-active:not(.badge) {
+.move-kinds .history-kind-filter.is-active:not(.badge) {
     background: #ebe6f5;
     border-color: #c4b5e8;
     color: #4e2985;
