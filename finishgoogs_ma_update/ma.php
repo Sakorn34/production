@@ -1674,14 +1674,10 @@ list_search_form([
   <?php } ?>
 </table>
 </div>
-<?php if ($pages > 1) { ?>
-<div class="pager">
-  <?php for ($i = max(1, $page - 3); $i <= min($pages, $page + 3); $i++) {
-      echo $i === $page ? "<span class='cur'>$i</span>" : "<a href='" . h(ma_list_qs($productId, ['page' => $i])) . "'>$i</a>";
-  } ?>
-  <span class="muted" style="border:0;background:none"><?= number_format($total) ?> รายการ</span>
-</div>
-<?php }
+<?php
+echo page_pager_html($page, $pages, $per, $total, function ($n) use ($productId) {
+    return ma_list_qs($productId, ['page' => $n]);
+}, 'รายการ');
 }
 ?>
 <div id="ma-detail-overlay" class="notif-overlay ma-sn-overlay" hidden>

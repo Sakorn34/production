@@ -333,6 +333,68 @@ a.classList.remove('nav-collapsed');a.classList.add('nav-expanded');}}catch(e){}
 <?php
 }
 
+/**
+ * แถบเลขหน้า + ข้อความบอกว่ากำลังดูช่วงไหนของทั้งหมด
+ *
+ * เดิมทุกหน้าเขียนวนลูป ±3 หน้าเองแล้วต่อท้ายด้วยยอดรวมเฉย ๆ ซึ่งตอบไม่ได้ว่าทั้งหมด
+ * มีกี่หน้าและหน้านี้อยู่ลำดับที่เท่าไหร่ · ทะเบียนเครื่องมี 371 หน้า แต่ปุ่มพาไปได้
+ * ทีละ 3 หน้า จะไปหน้าท้าย ๆ ต้องกดหลายสิบครั้ง จึงต้องมีปุ่มข้ามหน้าแรก/หน้าสุดท้าย
+ *
+ * แถบนี้ขึ้นแม้มีหน้าเดียว เพราะตอนกรองจนเหลือหน้าเดียวคือตอนที่ "หน้าละกี่รายการ"
+ * มองไม่ออกที่สุด ว่าที่เห็นคือทั้งหมดแล้วหรือโดนตัดที่ขนาดหน้า
+ *
+ * @param int      $page   หน้าปัจจุบัน (เริ่มที่ 1)
+ * @param int      $pages  จำนวนหน้าทั้งหมด
+ * @param int      $per    จำนวนรายการต่อหน้า
+ * @param int      $total  จำนวนรายการทั้งหมดหลังกรอง
+ * @param callable $urlFor รับเลขหน้า คืน URL — แต่ละหน้าประกอบ query string ไม่เหมือนกัน
+ * @param string   $unit   คำนับหน่วย เช่น 'เครื่อง' 'รายการ'
+ * @return string
+ */
+function page_pager_html($page, $pages, $per, $total, callable $urlFor, $unit = 'รายการ') {
+    $pages = max(1, (int) $pages);
+    $page  = max(1, min((int) $page, $pages));
+    $per   = max(1, (int) $per);
+    $total = max(0, (int) $total);
+
+    $link = function ($n, $label, $title) use ($urlFor) {
+        return "<a href='" . h((string) $urlFor($n)) . "' title='" . h($title) . "'"
+             . " aria-label='" . h($title) . "'>" . $label . '</a>';
+    };
+
+    $out = '<div class="pager">';
+    if ($pages > 1) {
+        // ปุ่มข้ามสุดทางมีความหมายเฉพาะตอนที่หน้าต่าง ±3 ครอบไม่ครบ
+        $jump = $pages > 7;
+        if ($page > 1) {
+            if ($jump) { $out .= $link(1, '&laquo;', 'หน้าแรก'); }
+            $out .= $link($page - 1, '&lsaquo;', 'หน้าก่อนหน้า');
+        }
+        for ($i = max(1, $page - 3); $i <= min($pages, $page + 3); $i++) {
+            $out .= $i === $page
+                ? "<span class='cur'>{$i}</span>"
+                : $link($i, (string) $i, 'ไปหน้า ' . $i);
+        }
+        if ($page < $pages) {
+            $out .= $link($page + 1, '&rsaquo;', 'หน้าถัดไป');
+            if ($jump) { $out .= $link($pages, '&raquo;', 'หน้าสุดท้าย (' . number_format($pages) . ')'); }
+        }
+    }
+
+    if ($total === 0) {
+        $out .= '<span class="pager-info">ไม่พบ' . h($unit) . 'ตามเงื่อนไขที่ค้นหา</span>';
+    } else {
+        $from = ($page - 1) * $per + 1;
+        $to   = min($page * $per, $total);
+        $out .= '<span class="pager-info">'
+              . 'หน้า ' . number_format($page) . ' จาก ' . number_format($pages)
+              . ' · แสดง' . h($unit) . 'ที่ ' . number_format($from) . '–' . number_format($to)
+              . ' จาก ' . number_format($total) . ' ' . h($unit)
+              . ' (หน้าละ ' . number_format($per) . ')</span>';
+    }
+    return $out . '</div>';
+}
+
 function page_footer() {
     ?>
   </main>

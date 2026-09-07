@@ -436,16 +436,12 @@ page_header('หลังบ้าน — เปรียบเทียบ asse
 </table>
 </div>
 
-<?php if ($list['pages'] > 1) {
-    $base = BASE_URL . '/share_admin.php?' . http_build_query(array_filter(['f' => $flt ?: null, 'q' => $search ?: null])); ?>
-<div class="pager">
-  <?php for ($i = max(1, $list['page'] - 3); $i <= min($list['pages'], $list['page'] + 3); $i++) {
-      $url = $base . ($base[strlen($base) - 1] === '?' ? '' : '&') . 'page=' . $i;
-      echo $i === $list['page'] ? "<span class='cur'>$i</span>" : "<a href='" . h($url) . "'>$i</a>";
-  } ?>
-  <span class="muted">หน้า <?= $list['page'] ?>/<?= number_format($list['pages']) ?></span>
-</div>
-<?php } ?>
+<?php
+$pagerBase = BASE_URL . '/share_admin.php?' . http_build_query(array_filter(['f' => $flt ?: null, 'q' => $search ?: null]));
+echo page_pager_html($list['page'], $list['pages'], $per, $list['total'], function ($n) use ($pagerBase) {
+    return $pagerBase . ($pagerBase[strlen($pagerBase) - 1] === '?' ? '' : '&') . 'page=' . $n;
+}, 'รายการ');
+?>
 
 <style>
 .rc-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin:14px 0; }

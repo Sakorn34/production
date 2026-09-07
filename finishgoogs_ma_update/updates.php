@@ -235,18 +235,13 @@ page_header('อัปเดต FW/HW — ' . $product['name'] . ' (' . number_f
   </tbody>
 </table>
 </div>
-<?php if ($pages > 1) { ?>
-<div class="pager">
-  <?php for ($i = max(1, $page - 3); $i <= min($pages, $page + 3); $i++) {
-      $url = '?' . http_build_query(array_filter([
-          'product' => $productId,
-          'sn' => $searchSn !== '' ? $searchSn : null,
-          'd' => $searchDetail !== '' ? $searchDetail : null,
-          'page' => $i > 1 ? $i : null,
-      ]));
-      echo $i === $page ? "<span class='cur'>$i</span>" : "<a href='" . h($url) . "'>$i</a>";
-  } ?>
-  <span class="muted" style="border:0;background:none"><?= number_format($total) ?> รายการ</span>
-</div>
-<?php }
+<?php
+echo page_pager_html($page, $pages, $per, $total, function ($n) use ($productId, $searchSn, $searchDetail) {
+    return '?' . http_build_query(array_filter([
+        'product' => $productId,
+        'sn' => $searchSn !== '' ? $searchSn : null,
+        'd' => $searchDetail !== '' ? $searchDetail : null,
+        'page' => $n > 1 ? $n : null,
+    ]));
+}, 'รายการ');
 page_footer();

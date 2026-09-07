@@ -377,19 +377,10 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
 </table>
 </div>
 
-<?php $qs = $_GET; ?>
-<div class="pager">
-  <?php if ($pages > 1) { for ($i = max(1, $page - 3); $i <= min($pages, $page + 3); $i++) {
-      $qs['page'] = $i; $url = '?' . http_build_query($qs);
-      echo $i === $page ? "<span class='cur'>$i</span>" : "<a href='" . h($url) . "'>$i</a>";
-  } } ?>
-  <?php // เดิมบอกแค่ยอดรวม ซึ่งไม่ช่วยตอบว่า "หน้านี้คือเครื่องลำดับที่เท่าไหร่"
-        // และแถบเลขหน้าแสดงทีละ 7 หน้า จึงไม่มีทางรู้ว่าทั้งหมดมีกี่หน้า ?>
-  <?php if ($totalRows === 0) { ?>
-  <span class="pager-info">ไม่พบเครื่องตามเงื่อนไขที่ค้นหา</span>
-  <?php } else { ?>
-  <span class="pager-info">หน้า <?= number_format($page) ?> จาก <?= number_format($pages) ?> · แสดงเครื่องที่ <?= number_format($off + 1) ?>–<?= number_format(min($off + $per, $totalRows)) ?> จาก <?= number_format($totalRows) ?> เครื่อง (หน้าละ <?= number_format($per) ?>)</span>
-  <?php } ?>
-</div>
 <?php
+echo page_pager_html($page, $pages, $per, $totalRows, function ($n) {
+    $qs = $_GET;
+    $qs['page'] = $n;
+    return '?' . http_build_query($qs);
+}, 'เครื่อง');
 page_footer();

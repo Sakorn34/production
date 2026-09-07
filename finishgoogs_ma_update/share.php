@@ -598,14 +598,10 @@ page_header('ทะเบียนสินค้า (stock)');
 })();
 </script>
 
-<?php if ($pages > 1) {
-    $base = BASE_URL . '/share.php?' . http_build_query(array_filter(['q' => $search, 'model' => $model, 'f' => $flt, 'sort' => $sort !== 'time_code' ? $sort : null])); ?>
-<div class="pager">
-  <?php for ($i = max(1, $page - 3); $i <= min($pages, $page + 3); $i++) {
-      $url = $base . ($base[strlen($base) - 1] === '?' ? '' : '&') . 'page=' . $i;
-      echo $i === $page ? "<span class='cur'>$i</span>" : "<a href='" . h($url) . "'>$i</a>";
-  } ?>
-  <span class="muted" style="align-self:center">หน้า <?= $page ?>/<?= number_format($pages) ?></span>
-</div>
-<?php } ?>
+<?php
+$pagerBase = BASE_URL . '/share.php?' . http_build_query(array_filter(['q' => $search, 'model' => $model, 'f' => $flt, 'sort' => $sort !== 'time_code' ? $sort : null]));
+echo page_pager_html($page, $pages, $per, $totalRows, function ($n) use ($pagerBase) {
+    return $pagerBase . ($pagerBase[strlen($pagerBase) - 1] === '?' ? '' : '&') . 'page=' . $n;
+}, 'รายการ');
+?>
 <?php page_footer();
