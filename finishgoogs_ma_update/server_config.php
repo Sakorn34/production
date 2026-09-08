@@ -63,6 +63,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $rawCounts['equipment_claim_history'] = 'อ่านไม่ได้: ' . $e->getMessage();
                 }
             }
+            $ldb = dbLeasing();
+            if ($ldb) {
+                try {
+                    $st = $ldb->prepare('SELECT COUNT(*) n FROM tbl_product');
+                    $st->execute(); $rawCounts['tbl_product (เครื่องเช่า) ทั้งหมด'] = (int) $st->get_result()->fetch_assoc()['n']; $st->close();
+                    $st = $ldb->prepare('SELECT COUNT(*) n FROM tbl_product
+                        WHERE pro_sn LIKE ? OR IFNULL(pro_name,"") LIKE ? OR IFNULL(pro_remarks,"") LIKE ?');
+                    $st->bind_param('sss', $lk, $lk, $lk);
+                    $st->execute(); $rawCounts['เครื่องเช่า ที่ S/N-รุ่น-หมายเหตุตรง'] = (int) $st->get_result()->fetch_assoc()['n']; $st->close();
+                    $st = $ldb->prepare('SELECT COUNT(*) n FROM tbl_customer
+                        WHERE cus_name LIKE ? OR IFNULL(cus_sname,"") LIKE ?');
+                    $st->bind_param('ss', $lk, $lk);
+                    $st->execute(); $rawCounts['ลูกค้าเช่า ที่ชื่อตรง'] = (int) $st->get_result()->fetch_assoc()['n']; $st->close();
+                    $st = $ldb->prepare('SELECT COUNT(*) n FROM tbl_rent_product WHERE IFNULL(p_sitename,"") LIKE ?');
+                    $st->bind_param('s', $lk);
+                    $st->execute(); $rawCounts['บรรทัดสัญญา ที่ชื่อไซต์ตรง'] = (int) $st->get_result()->fetch_assoc()['n']; $st->close();
+                } catch (Throwable $e) {
+                    $rawCounts['ฐานเช่า'] = 'อ่านไม่ได้: ' . $e->getMessage();
+                }
+            }
         }
         $searchProbe = [
             'q'     => $searchProbeQ,
@@ -74,6 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'stockparts (ทะเบียน stock)' => dbStock() ? '' : 'ต่อไม่ได้',
                 'maintenance (งานซ่อม)'      => dbMaintenance() ? '' : dbMaintenanceError(),
                 'setup (ขาย/เคลม)'           => dbSetup() ? '' : dbSetupError(),
+                'leasing (ระบบเช่า)'         => dbLeasing() ? '' : dbLeasingError(),
             ],
         ];
     } elseif ($action === 'test') {
@@ -255,7 +276,8 @@ page_header('ตั้งค่า Server / Deploy');
     </div>
     <?php $kindNames = ['asset' => 'เครื่อง', 'customer' => 'ลูกค้า/ไซต์', 'person' => 'คน', 'product' => 'รุ่นสินค้า',
         'ma' => 'MA', 'update' => 'อัปเดต FW/HW', 'part' => 'อะไหล่', 'stockout' => 'ใบเบิก',
-        'stock' => 'ทะเบียน stock', 'repair' => 'งานซ่อม', 'sale' => 'ขาย', 'claim' => 'เคลม', 'order' => 'ส่งมอบ Order']; ?>
+        'stock' => 'ทะเบียน stock', 'repair' => 'งานซ่อม', 'sale' => 'ขาย', 'claim' => 'เคลม', 'order' => 'ส่งมอบ Order',
+        'rentasset' => 'เครื่องเช่า', 'rent' => 'สัญญาเช่า', 'rentma' => 'MA เช่า']; ?>
     <p style="margin:10px 0 4px; font-size:13px">
       ค้น <b><?= h($searchProbe['q']) ?></b> ได้ <b><?= (int) $searchProbe['total'] ?></b> รายการ
       ใน <?= (int) $searchProbe['ms'] ?> ms

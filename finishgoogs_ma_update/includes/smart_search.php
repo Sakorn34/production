@@ -4,11 +4,16 @@
  *
  * ใช้โดย smart_search.php?ajax=1&q=...
  *
- * ครอบ 9 แหล่งข้ามทั้ง 4 ฐาน: เครื่อง · ลูกค้า/ไซต์งาน · รุ่นสินค้า · MA · อัปเดต FW/HW ·
- * อะไหล่ · ใบเบิก/รับเข้า · ทะเบียนสินค้า stock · งานซ่อม
+ * ครอบ 14 แหล่งข้ามทั้ง 5 ฐาน
+ *   production   เครื่อง · ลูกค้า/ไซต์งาน · คนทำงาน · รุ่นสินค้า · MA · อัปเดต FW/HW · อะไหล่
+ *   tech_parts   ใบเบิก/รับเข้า
+ *   stockparts   ทะเบียนสินค้า stock
+ *   maintenance  งานซ่อม
+ *   setup        ประวัติขาย/เคลม · ใบส่งมอบ Order
+ *   leasing      เครื่องเช่า · สัญญาเช่า · MA เครื่องเช่า
  *
- * ฐานที่อยู่นอก production (stock/parts/maintenance) ต่อไม่ติดได้ — ทุกก้อนจึงห่อ try
- * ไว้ และคืนผลเท่าที่ได้ ไม่ใช่ทั้งช่องค้นหาพัง เพราะฐานเดียวล่ม
+ * ฐานที่อยู่นอก production (stock/parts/maintenance/setup/leasing) ต่อไม่ติดได้ — ทุกก้อน
+ * จึงห่อ try ไว้ และคืนผลเท่าที่ได้ ไม่ใช่ทั้งช่องค้นหาพัง เพราะฐานเดียวล่ม
  */
 
 // ─ helpers ─────────────────────────────────────────────────────────────────
@@ -113,13 +118,109 @@ function smart_search_update_type_label(string $type): string
     return $map[$type] ?? 'อัปเดต';
 }
 
+/**
+ * ชื่อลูกค้าในระบบเช่าจาก cus_id
+ *
+ * เรียกครั้งเดียวหลังได้ผลครบทุกก้อน — cus_id เป็น PK จึงถูกกว่าการ join ตาราง
+ * 2,700 แถวเข้าไปในทุก query แล้วให้ LIKE วิ่งบนคอลัมน์ที่ join มา
+ *
+ * @param int[] $ids
+ * @return array<int,string>  cus_id => ชื่อ
+ */
+function smart_search_rent_customer_names(array $ids): array
+{
+    $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+    if (!$ids || !function_exists('dbLeasing') || !dbLeasing()) {
+        return [];
+    }
+    $out = [];
+    try {
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $q = rent_q_try(
+            "SELECT cus_id, cus_name FROM tbl_customer WHERE cus_id IN ($ph)",
+            str_repeat('i', count($ids)),
+            $ids
+        );
+        if ($q['ok'] && !empty($q['result'])) {
+            while ($r = $q['result']->fetch_assoc()) {
+                $out[(int) $r['cus_id']] = trim((string) ($r['cus_name'] ?? ''));
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('[smart_search] rent customer names: ' . $e->getMessage());
+    }
+    return $out;
+}
+
+/**
+ * จับ S/N จากระบบอื่นกลับมาที่ทะเบียนเครื่องของเรา
+ *
+ * ทำทีเดียวทั้งชุดหลังเก็บผลครบ ไม่ยิงต่อแถว — S/N หนึ่งตัวอาจตรงกับ asset_code
+ * หรือ factory_serial ก็ได้ จึงต้องเทียบทั้งสองคอลัมน์
+ *
+ * @param string[] $serials  S/N ที่ normalize แล้ว (ตัวพิมพ์ใหญ่)
+ * @return array<string,int>  S/N => asset id
+ */
+function smart_search_asset_ids_by_serial(array $serials): array
+{
+    $serials = array_values(array_unique(array_filter(array_map('trim', $serials))));
+    if (!$serials) {
+        return [];
+    }
+    $out = [];
+    try {
+        $ph = implode(',', array_fill(0, count($serials), '?'));
+        $res = qr(
+            "SELECT id, asset_code, factory_serial FROM assets
+             WHERE asset_code IN ($ph) OR factory_serial IN ($ph)",
+            str_repeat('s', count($serials) * 2),
+            array_merge($serials, $serials)
+        );
+        while ($r = $res->fetch_assoc()) {
+            foreach ([$r['asset_code'], $r['factory_serial']] as $sn) {
+                $sn = strtoupper(trim((string) $sn));
+                if ($sn !== '' && !isset($out[$sn])) {
+                    $out[$sn] = (int) $r['id'];
+                }
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('[smart_search] asset by serial: ' . $e->getMessage());
+    }
+    return $out;
+}
+
+/**
+ * ปลายทางของผลลัพธ์ระบบเช่า
+ *
+ * เครื่องที่อยู่ในทะเบียนของเราด้วย ให้ไปหน้าเครื่อง — หน้านั้นมีการ์ดสถานะเช่า
+ * ประวัติ MA และประวัติขายรวมอยู่แล้ว ดีกว่าเด้งออกไปอีกเว็บโดยไม่จำเป็น
+ * ที่เหลือค่อยออกไปหน้าประวัติการใช้งานของระบบเช่า
+ *
+ * @param string             $sn
+ * @param array<string,int>  $assetMap
+ * @return string
+ */
+function smart_search_rent_href(string $sn, array $assetMap): string
+{
+    $sn = strtoupper(trim($sn));
+    if ($sn !== '' && isset($assetMap[$sn])) {
+        return 'asset.php?id=' . $assetMap[$sn];
+    }
+    if ($sn !== '') {
+        return 'https://bit-online.net/rent/product_history_usage.php?serial_number='
+            . rawurlencode($sn);
+    }
+    return 'https://bit-online.net/rent/detail_product.php';
+}
+
 // ─ main query ────────────────────────────────────────────────────────────────
 
 /**
  * ค้นทุกแหล่งที่มีข้อความตรงกับคำค้น รวมเป็นผลลัพธ์เดียว
  *
- * เรียงตามความน่าจะใช่: เครื่อง → ลูกค้า/ไซต์ → รุ่น → MA → อัปเดต → อะไหล่ →
- * ใบเบิก → ทะเบียน stock → งานซ่อม  (ผู้ใช้พิมพ์ S/N บ่อยที่สุด)
+ * เรียงตามความน่าจะใช่: เครื่อง → ลูกค้า/ไซต์ → คน → รุ่น → MA → อัปเดต → อะไหล่ →
+ * ใบเบิก → ทะเบียน stock → งานซ่อม → ขาย/เคลม → ส่งมอบ → เช่า  (ผู้ใช้พิมพ์ S/N บ่อยที่สุด)
  *
  * @param string $q            คำค้น (อย่างน้อย 2 ตัวอักษร)
  * @param int    $limitPerKind จำกัดต่อประเภท
@@ -616,6 +717,260 @@ function smart_search_query(string $q, int $limitPerKind = 5): array
             $stmt->close();
         } catch (Throwable $e) {
             error_log('[smart_search] po_order_part_serials: ' . $e->getMessage());
+        }
+    }
+
+    // ── ระบบเช่า (ฐาน biton_leasing — อ่านอย่างเดียว) ──
+    // ทะเบียนผลิตกับระบบเช่าตอบคนละคำถาม: ของเราบอกว่าเครื่องผลิต/อัปเดตอะไรมาบ้าง
+    // ระบบเช่าบอกว่าตอนนี้เครื่องอยู่ไซต์ไหน สัญญาใบไหน หมดอายุเมื่อไหร่ · และมี S/N
+    // อีกจำนวนมากที่อยู่เฉพาะในระบบเช่า ไม่เคยเข้าทะเบียนผลิต
+    $leaseDb = function_exists('dbLeasing') ? dbLeasing() : null;
+    if ($leaseDb) {
+        require_once __DIR__ . '/rent_ma_bridge.php';
+        $leaseRows = [];   // สะสมไว้ก่อน แล้วค่อยจับคู่ S/N กับทะเบียนเครื่องทีเดียวตอนท้าย
+
+        // ลูกค้าในระบบเช่าที่ชื่อตรง — เอา id ไปกรองต่อ เพราะ p_cus_id/r_cus_id มี index
+        // ส่วน LIKE บน cus_name ที่ join เข้ามาใช้ index ไม่ได้ (วัดแล้วช้ากว่า 2-3 เท่า)
+        $rentCusIds = [];
+        $rentCusName = [];
+        try {
+            $cq = rent_q_try(
+                'SELECT cus_id, cus_name FROM tbl_customer
+                 WHERE cus_name LIKE ? OR IFNULL(cus_sname, "") LIKE ? OR IFNULL(ecus_name, "") LIKE ?
+                 LIMIT 200',
+                'sss',
+                [$like, $like, $like]
+            );
+            if ($cq['ok'] && !empty($cq['result'])) {
+                while ($r = $cq['result']->fetch_assoc()) {
+                    $cid = (int) $r['cus_id'];
+                    $rentCusIds[] = $cid;
+                    $rentCusName[$cid] = trim((string) ($r['cus_name'] ?? ''));
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('[smart_search] tbl_customer: ' . $e->getMessage());
+        }
+        $cusIn = $rentCusIds ? implode(',', array_fill(0, count($rentCusIds), '?')) : '';
+
+        // ── เครื่องเช่า: ทะเบียนสินค้าเช่า ──
+        // ไม่เอา pro_status เข้าเงื่อนไขค้น เพราะค่าเป็นอังกฤษคำสั้น ๆ (rent 3,713 แถว
+        // · MA 777) พิมพ์ "MA" ทีเดียวจะได้เครื่องเช่าโผล่มาแทนงาน MA ที่ตั้งใจหา
+        $rentSns = [];
+        try {
+            $pq = rent_q_try(
+                'SELECT pro_id, pro_sn, pro_name, pro_status, pro_date, pro_remarks, pro_bundle
+                 FROM tbl_product
+                 WHERE pro_sn LIKE ? OR IFNULL(pro_name, "") LIKE ?
+                    OR IFNULL(pro_remarks, "") LIKE ? OR IFNULL(pro_bundle, "") LIKE ?
+                 ORDER BY (pro_sn LIKE ?) DESC, pro_date DESC, pro_id DESC
+                 LIMIT ' . (int) $limitPerKind,
+                'sssss',
+                [$like, $like, $like, $like, $prefix]
+            );
+            if ($pq['ok'] && !empty($pq['result'])) {
+                while ($r = $pq['result']->fetch_assoc()) {
+                    $sn = rent_normalize_sn($r['pro_sn'] ?? '');
+                    if ($sn === '') { continue; }
+                    $rentSns[$sn] = [
+                        'product' => trim((string) ($r['pro_name'] ?? '')),
+                        'status'  => trim((string) ($r['pro_status'] ?? '')),
+                        'remark'  => trim((string) ($r['pro_remarks'] ?? '')),
+                    ];
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('[smart_search] tbl_product: ' . $e->getMessage());
+        }
+
+        // บรรทัดสัญญาของเครื่อง — ยิงรอบเดียวทำสองหน้าที่: เติมไซต์/ลูกค้าให้ S/N ที่เจอ
+        // ข้างบน และหาเครื่องเพิ่มจากชื่อไซต์/ชื่อลูกค้า · ตารางนี้ไม่มี index บน p_sn
+        // แยกเป็นสอง query จึงเท่ากับสแกน 10,000 แถวสองรอบโดยไม่จำเป็น
+        $rentLine = [];
+        try {
+            $snList = array_keys($rentSns);
+            $snIn = $snList ? implode(',', array_fill(0, count($snList), '?')) : '';
+            $sql = 'SELECT rp.p_id, rp.p_sn, rp.p_cus_id, rp.p_status, rp.p_siteid, rp.p_sitename,
+                           rp.p_product, r.r_po, r.r_code, r.r_startdate, r.r_enddate
+                    FROM tbl_rent_product rp
+                    LEFT JOIN tbl_rent r ON r.r_id = rp.p_r_id
+                    WHERE IFNULL(rp.p_sitename, "") LIKE ? OR IFNULL(rp.p_siteid, "") LIKE ?
+                       OR IFNULL(r.r_po, "") LIKE ? OR IFNULL(r.r_code, "") LIKE ?'
+                 . ($snIn !== '' ? " OR rp.p_sn IN ($snIn)" : '')
+                 . ($cusIn !== '' ? " OR rp.p_cus_id IN ($cusIn)" : '')
+                 . ' ORDER BY CASE WHEN rp.p_status = "active" THEN 0 ELSE 1 END, rp.p_id DESC
+                    LIMIT 60';
+            $lq = rent_q_try(
+                $sql,
+                'ssss' . str_repeat('s', count($snList)) . str_repeat('i', count($rentCusIds)),
+                array_merge([$like, $like, $like, $like], $snList, $rentCusIds)
+            );
+            if ($lq['ok'] && !empty($lq['result'])) {
+                while ($r = $lq['result']->fetch_assoc()) {
+                    // แถวแรกของแต่ละ S/N คือบรรทัดที่ใช้ (active ก่อน แล้วใหม่สุด) ตาม ORDER BY
+                    $sn = rent_normalize_sn($r['p_sn'] ?? '');
+                    if ($sn === '' || isset($rentLine[$sn])) { continue; }
+                    $rentLine[$sn] = $r;
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('[smart_search] tbl_rent_product: ' . $e->getMessage());
+        }
+
+        // เครื่องที่เจอจากชื่อไซต์/ลูกค้าแต่ยังไม่มีในชุดข้างบน — เติมเข้าไปให้ครบ
+        $rentCap = $limitPerKind * 2;
+        foreach ($rentLine as $sn => $r) {
+            if (count($rentSns) >= $rentCap) { break; }
+            if (isset($rentSns[$sn])) { continue; }
+            $rentSns[$sn] = [
+                'product' => trim((string) ($r['p_product'] ?? '')),
+                'status'  => '',
+                'remark'  => '',
+            ];
+        }
+
+        foreach ($rentSns as $sn => $info) {
+            $line = isset($rentLine[$sn]) ? $rentLine[$sn] : null;
+            $cid = $line ? (int) ($line['p_cus_id'] ?? 0) : 0;
+            $leaseRows[] = [
+                'kind'       => 'rentasset',
+                'kind_label' => 'เครื่องเช่า',
+                'id'         => 0,
+                'code'       => $sn,
+                'title'      => $sn,
+                'sn'         => $sn,
+                'cus_id'     => $cid,
+                'parts'      => [
+                    $info['product'] !== '' ? $info['product'] : (string) ($line['p_product'] ?? ''),
+                    rent_leasing_status_label($info['status'], (string) ($line['p_status'] ?? '')),
+                    '@cus' . $cid,
+                    (string) ($line['p_sitename'] ?? ''),
+                    (string) ($line['r_po'] ?? ''),
+                    $info['remark'],
+                ],
+            ];
+        }
+
+        // ── สัญญาเช่า ──
+        try {
+            $sql = 'SELECT r.r_id, r.r_code, r.r_po, r.r_product, r.r_sitename, r.r_siteid,
+                           r.r_startdate, r.r_enddate, r.r_status_rent, r.r_cus_id
+                    FROM tbl_rent r
+                    WHERE IFNULL(r.r_code, "") LIKE ? OR IFNULL(r.r_po, "") LIKE ?
+                       OR IFNULL(r.r_po_renew, "") LIKE ? OR IFNULL(r.r_sitename, "") LIKE ?
+                       OR IFNULL(r.r_siteid, "") LIKE ? OR IFNULL(r.r_addrjob, "") LIKE ?
+                       OR IFNULL(r.r_contract1, "") LIKE ? OR IFNULL(r.r_contract2, "") LIKE ?
+                       OR IFNULL(r.r_contract3, "") LIKE ? OR IFNULL(r.r_tel1, "") LIKE ?
+                       OR IFNULL(r.r_tel2, "") LIKE ? OR IFNULL(r.r_tel3, "") LIKE ?
+                       OR IFNULL(r.r_remarks, "") LIKE ? OR IFNULL(r.r_product, "") LIKE ?'
+                 . ($cusIn !== '' ? " OR r.r_cus_id IN ($cusIn)" : '')
+                 . ' ORDER BY r.r_startdate DESC, r.r_id DESC
+                    LIMIT ' . (int) $limitPerKind;
+            $rq = rent_q_try(
+                $sql,
+                str_repeat('s', 14) . str_repeat('i', count($rentCusIds)),
+                array_merge(array_fill(0, 14, $like), $rentCusIds)
+            );
+            if ($rq['ok'] && !empty($rq['result'])) {
+                while ($r = $rq['result']->fetch_assoc()) {
+                    $span = trim((string) ($r['r_startdate'] ?? ''));
+                    $end = trim((string) ($r['r_enddate'] ?? ''));
+                    if ($span !== '' && $end !== '') { $span .= ' – ' . $end; }
+                    $po = trim((string) ($r['r_po'] ?? ''));
+                    $site = trim((string) ($r['r_sitename'] ?? ''));
+                    $leaseRows[] = [
+                        'kind'       => 'rent',
+                        'kind_label' => 'สัญญาเช่า',
+                        'id'         => (int) $r['r_id'],
+                        'code'       => $po,
+                        'title'      => $po !== '' ? $po : (string) ($r['r_code'] ?? ''),
+                        'sn'         => '',
+                        'cus_id'     => (int) ($r['r_cus_id'] ?? 0),
+                        'parts'      => [
+                            '@cus' . (int) ($r['r_cus_id'] ?? 0),
+                            $site,
+                            (string) ($r['r_product'] ?? ''),
+                            (string) ($r['r_status_rent'] ?? ''),
+                            $span,
+                        ],
+                        // หน้าสัญญาของระบบเช่ากรองด้วยชื่อ ไม่ใช่ id — ส่งชื่อไซต์ไปให้ตรงใบ
+                        'href'       => 'https://bit-online.net/rent/view_rent.php?sitename_rent='
+                            . rawurlencode($site),
+                    ];
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('[smart_search] tbl_rent: ' . $e->getMessage());
+        }
+
+        // ── MA เครื่องเช่า ──
+        // อาการเสียของเครื่องเช่าอยู่ที่ ma_remarks ที่เดียว ทะเบียนของเราไม่มีข้อความนี้
+        try {
+            $mq = rent_q_try(
+                'SELECT ma_id, ma_sn, ma_product, ma_date, ma_remarks, ma_status
+                 FROM tbl_product_ma
+                 WHERE ma_sn LIKE ? OR IFNULL(ma_product, "") LIKE ? OR IFNULL(ma_remarks, "") LIKE ?
+                 ORDER BY ma_date DESC, ma_id DESC
+                 LIMIT ' . (int) $limitPerKind,
+                'sss',
+                [$like, $like, $like]
+            );
+            if ($mq['ok'] && !empty($mq['result'])) {
+                while ($r = $mq['result']->fetch_assoc()) {
+                    $sn = rent_normalize_sn($r['ma_sn'] ?? '');
+                    $leaseRows[] = [
+                        'kind'       => 'rentma',
+                        'kind_label' => 'MA เช่า',
+                        'id'         => (int) $r['ma_id'],
+                        'code'       => $sn,
+                        'title'      => $sn !== '' ? $sn : (string) ($r['ma_product'] ?? ''),
+                        'sn'         => $sn,
+                        'cus_id'     => 0,
+                        'parts'      => [
+                            (string) ($r['ma_product'] ?? ''),
+                            (string) ($r['ma_remarks'] ?? ''),
+                            rent_leasing_status_label((string) ($r['ma_status'] ?? ''), ''),
+                            (string) ($r['ma_date'] ?? ''),
+                        ],
+                    ];
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('[smart_search] tbl_product_ma: ' . $e->getMessage());
+        }
+
+        // จับคู่ S/N ทั้งชุดกับทะเบียนเครื่องของเราในนัดเดียว แล้วค่อยเติมชื่อลูกค้ากับ href
+        $needSn = [];
+        $needCus = [];
+        foreach ($leaseRows as $row) {
+            if ($row['sn'] !== '') { $needSn[$row['sn']] = true; }
+            if ($row['cus_id'] > 0 && !isset($rentCusName[$row['cus_id']])) {
+                $needCus[$row['cus_id']] = true;
+            }
+        }
+        $rentCusName += smart_search_rent_customer_names(array_keys($needCus));
+        $assetBySn = smart_search_asset_ids_by_serial(array_keys($needSn));
+
+        foreach ($leaseRows as $row) {
+            $parts = [];
+            foreach ($row['parts'] as $p) {
+                if (strpos($p, '@cus') === 0) {
+                    $p = (string) ($rentCusName[(int) substr($p, 4)] ?? '');
+                }
+                if (trim($p) !== '' && $p !== '—') { $parts[] = trim($p); }
+            }
+            $out[] = [
+                'kind'       => $row['kind'],
+                'kind_label' => $row['kind_label'],
+                'id'         => $row['id'],
+                'asset_id'   => isset($assetBySn[$row['sn']]) ? $assetBySn[$row['sn']] : 0,
+                'code'       => $row['code'],
+                'title'      => $row['title'],
+                'subtitle'   => smart_search_excerpt(implode(' · ', $parts), 96),
+                'href'       => isset($row['href'])
+                    ? $row['href']
+                    : smart_search_rent_href($row['sn'], $assetBySn),
+            ];
         }
     }
 

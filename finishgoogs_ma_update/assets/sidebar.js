@@ -174,11 +174,17 @@
             return true;
         }
 
+        // ผลจากระบบอื่น (ขาย/เคลม/เช่า) อยู่คนละเว็บ กดแล้วออกจากระบบนี้
+        function isExternalHref(href) {
+            return !!href && href.indexOf('http') === 0
+                && href.indexOf(window.location.origin) !== 0;
+        }
+
         function goHref(href) {
             if (!href) return;
             // ผลจากระบบอื่น (ประวัติขาย/เคลม) อยู่คนละเว็บ — เปิดแท็บใหม่
             // ไม่งั้นผู้ใช้ที่แค่อยากเช็คว่าขายให้ใคร จะหลุดออกจากงานที่ทำค้างอยู่
-            if (href.indexOf('http') === 0 && href.indexOf(window.location.origin) !== 0) {
+            if (isExternalHref(href)) {
                 window.open(href, '_blank', 'noopener');
                 return;
             }
@@ -198,9 +204,12 @@
                 return;
             }
             suggestBox.innerHTML = lastResults.map(function (it) {
+                // ลูกศรบอกว่ากดแล้วออกไปเว็บอื่น ผูกกับ href จริง ไม่ใช่ประเภทของผล —
+                // เครื่องเช่าตัวเดียวกันไปหน้าเครื่องของเราได้ถ้าจับคู่ S/N ติด
+                var ext = isExternalHref(it.href) ? ' is-ext' : '';
                 return '<button type="button" class="sidebar-smart-item" data-href="' + escHtml(it.href || '') + '">'
                     + '<span class="sidebar-smart-row">'
-                    + '<span class="sidebar-smart-kind sidebar-smart-kind-' + escHtml(it.kind || 'asset') + '">'
+                    + '<span class="sidebar-smart-kind' + ext + ' sidebar-smart-kind-' + escHtml(it.kind || 'asset') + '">'
                     + escHtml(it.kind_label || '') + '</span>'
                     + '<span class="sidebar-smart-title">' + escHtml(it.title || it.code || '') + '</span>'
                     + '</span>'

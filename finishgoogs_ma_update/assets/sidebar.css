@@ -234,13 +234,18 @@
 .sidebar-smart-kind-stockout { background: var(--danger-soft); color: var(--danger); }
 .sidebar-smart-kind-stock    { background: var(--info-soft); color: var(--info); }
 .sidebar-smart-kind-repair   { background: var(--warning-soft); color: var(--warning); }
-/* ขาย/เคลม มาจากอีกระบบหนึ่ง (setupsystem) — ใส่ลูกศรบอกว่ากดแล้วออกไปเว็บอื่น */
+/* ขาย/เคลม/ส่งมอบ มาจากระบบขาย (setupsystem) */
 .sidebar-smart-kind-sale     { background: var(--success-soft); color: var(--success); }
 .sidebar-smart-kind-order    { background: var(--info-soft); color: var(--info); }
 .sidebar-smart-kind-claim    { background: var(--danger-soft); color: var(--danger); }
-.sidebar-smart-kind-order::after,
-.sidebar-smart-kind-sale::after,
-.sidebar-smart-kind-claim::after { content: " ↗"; }
+/* ระบบเช่า — สามป้ายใช้สีตระกูลเดียวกับแถบเมนู ให้เห็นว่ามาจากระบบเดียวกันทั้งชุด
+   แล้วอ่านชื่อป้ายเอาว่าเป็นเครื่อง/สัญญา/MA · ไล่สีความหมายจนหมดแล้ว */
+.sidebar-smart-kind-rentasset { background: color-mix(in srgb, var(--sidebar-bg) 14%, #fff); color: var(--sidebar-bg); }
+.sidebar-smart-kind-rent      { background: color-mix(in srgb, var(--sidebar-bg) 8%, #fff);  color: var(--sidebar-bg); }
+.sidebar-smart-kind-rentma    { background: color-mix(in srgb, var(--sidebar-bg) 14%, #fff); color: var(--sidebar-bg); }
+/* ลูกศรบอกว่ากดแล้วออกไปเว็บอื่น — ติดตาม href จริง ไม่ใช่ประเภทของผล เพราะเครื่องเช่า
+   ตัวที่จับคู่กับทะเบียนของเราได้ จะไปหน้าเครื่องในระบบนี้ ไม่ได้ออกไปไหน */
+.sidebar-smart-kind.is-ext::after { content: " ↗"; }
 .sidebar-smart-title {
   flex: 1;
   min-width: 0;

@@ -3436,3 +3436,16 @@ Files:
   finishgoogs_ma_update/includes/stockparts_withdraw.php
   finishgoogs_ma_update/server_config.php
 
+
+================================================================
+v2026-09-08_093653 | Patch | 2026-09-08 09:36:54
+From: 2026-09-07_184719  ->  To: 13ecb46  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/sidebar.css
+  finishgoogs_ma_update/assets/sidebar.js
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/smart_search.php
+  finishgoogs_ma_update/server_config.php
+
