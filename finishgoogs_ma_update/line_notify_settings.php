@@ -149,7 +149,6 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
 .ln-delivery-select { padding:6px 8px; font-size:calc(13px * var(--font-scale, 1)); min-width:148px; min-height:34px; }
 
-.ln-send-form { display:inline; margin:0; }
 
 .ln-plesk-path { font-family:Consolas,'Courier New',monospace; font-size:11px; overflow-wrap:anywhere; color:var(--text, #374151); line-height:1.35; }
 
@@ -227,9 +226,37 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
 .ln-form { font-size: calc(13.5px * var(--font-scale, 1)); }
 
+/* แต่ละหมวดเป็นการ์ดของตัวเอง — เดิมทุกหมวดกองอยู่ใน .panel ใบเดียวยาว 2,000px
+   หัวข้อสีธีมกับเส้นคั่นใต้หัวข้อทำให้เห็นขอบเขตหมวดโดยไม่ต้องไล่อ่าน
+   (ห้ามใช้ชื่อ .ln-card — ชื่อนั้นเป็นของการ์ดสถานะด้านบนอยู่แล้ว) */
+.ln-sec { margin-bottom: 12px; }
+
 .ln-form h3 { margin: 0 0 12px; font-size: calc(14px * var(--font-scale, 1)); color: var(--primary); font-weight: 700; }
 
-.ln-form h3.ln-form-section { margin-top: 20px; }
+.ln-sec > h3 {
+  font-size: calc(15.5px * var(--font-scale, 1)); font-weight: 800;
+  margin: 0 0 12px; padding-bottom: 9px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* toggle switch — input จริงยังอยู่ (ฟอร์มต้องได้ค่า) แค่ซ่อนแล้ววาดรางทับ
+   ใช้ opacity ไม่ใช่ display:none เพื่อให้ยัง tab เข้าถึงและกด space ได้ */
+.ln-toggle { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; cursor: pointer; font-size: calc(13.5px * var(--font-scale, 1)); color: var(--text); }
+.ln-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+.ln-toggle-track {
+  position: relative; flex: 0 0 auto; width: 40px; height: 22px; border-radius: 999px;
+  background: var(--border-strong); transition: background var(--transition, .18s ease);
+}
+.ln-toggle-track::after {
+  content: ""; position: absolute; top: 3px; inset-inline-start: 3px;
+  width: 16px; height: 16px; border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,.25);
+  transition: transform var(--transition, .18s ease);
+}
+.ln-toggle input:checked + .ln-toggle-track { background: var(--primary); }
+.ln-toggle input:checked + .ln-toggle-track::after { transform: translateX(18px); }
+.ln-toggle input:focus-visible + .ln-toggle-track { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.ln-toggle input:disabled + .ln-toggle-track { opacity: .5; }
 
 /* แถบปุ่มบันทึก/ทดสอบ ลอยติดขอบล่างจอ — ฟอร์มนี้สูงเกือบ 2,000px ถ้าปุ่มอยู่ท้ายฟอร์ม
    ตามปกติ แก้ค่าช่องบนสุดทีก็ต้องเลื่อนลงสุดหน้าไปกดบันทึกทุกครั้ง */
@@ -266,7 +293,14 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 .ln-form-field > label,
 .ln-form-grid label { display: flex; flex-direction: column; gap: 4px; font-size: calc(13px * var(--font-scale, 1)); color: var(--text-muted, #45506a); font-weight: 500; line-height: 1.4; }
 
-.ln-form-grid { display: grid; grid-template-columns: 1fr; gap: 12px; max-width: 640px; margin-bottom: 20px; }
+/* align-items:start จำเป็น — ช่อง Channel Secret มีคำอธิบายใต้ช่องยาวกว่าเพื่อน
+   ถ้าไม่ใส่ ช่องที่วางคู่กันจะถูกยืดให้สูงเท่ากันแล้วกล่อง input เหลื่อมบรรทัด */
+.ln-form-grid { display: grid; grid-template-columns: 1fr; gap: 12px 20px; align-items: start; max-width: 640px; margin-bottom: 20px; }
+
+/* จอกว้างวางสองคอลัมน์ — ทั้งไฟล์เดิมไม่มี @media เลย จอ 27 นิ้วก็เรียงลงเป็นแถวเดียว */
+@media (min-width: 920px) {
+  .ln-form-grid { grid-template-columns: 1fr 1fr; max-width: 920px; }
+}
 
 .ln-form-grid input[type=text],
 .ln-form-grid input[type=password],
@@ -281,9 +315,7 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 .ln-form-grid input:focus,
 .ln-form-field input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(225,29,116,.13); }
 
-.ln-form-check { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; font-size: calc(13.5px * var(--font-scale, 1)); color: var(--text, #374151); }
 
-.ln-form-check input[type=checkbox] { width: 16px; height: 16px; flex-shrink: 0; }
 
 .ln-form-help { font-size: calc(12.5px * var(--font-scale, 1)); margin: 0 0 10px; line-height: 1.5; }
 
@@ -293,9 +325,14 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
 .ln-types .tbl th { background: #eef1f6; text-align: left; padding: 8px 10px; font-size: calc(13px * var(--font-scale, 1)); color: var(--text-muted, #45506a); font-weight: 600; white-space: nowrap; border-bottom: 1px solid var(--border, #dfe4ec); }
 
-.ln-types .tbl td { padding: 9px 10px; border-top: 1px solid #eceff4; vertical-align: middle; line-height: 1.45; }
+/* แถบสลับสีแทนเส้นคั่นทุกแถว — ใส่ทั้งสองอย่างพร้อมกันตารางจะรก เลือกอย่างเดียว
+   (สีเดิมเป็นค่าฝัง #eceff4 เปลี่ยนมาใช้ token ให้เปลี่ยนตามธีมที่ตั้งไว้) */
+.ln-types .tbl td { padding: 9px 10px; vertical-align: middle; line-height: 1.45; }
 
-.ln-types .tbl tbody tr:first-child td { border-top: 0; }
+.ln-types .tbl tbody tr:nth-child(even) { background: var(--surface-muted); }
+
+.ln-send-cell { text-align: center; white-space: nowrap; }
+
 
 </style>
 
@@ -381,7 +418,8 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
 </div>
 
-<form method="post" class="panel ln-form" style="margin-bottom:16px">
+<?php // ฟอร์มเป็นแค่กล่องครอบ ไม่ใช่ .panel แล้ว — แต่ละหมวดเป็นการ์ดของตัวเอง ?>
+<form method="post" class="ln-form" style="margin-bottom:16px">
   <?= csrf_field() ?>
   <input type="hidden" name="action" value="save">
 
@@ -393,17 +431,21 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
   <?php // แยกเป็นหมวดตาม "ของใคร/ใช้ทำอะไร" — เดิมกอง token ของ bot สองตัว, URL ของเว็บ
         // และ token ของระบบอื่นไว้ในลิสต์เดียวกัน หาแล้วไม่รู้ว่าช่องไหนของอะไร ?>
+  <section class="panel ln-sec">
   <h3>ตั้งค่าระบบ</h3>
   <div class="ln-form-field">
     <label for="line_secrets_path">Path ไฟล์ line.secrets.php</label>
     <input type="text" id="line_secrets_path" name="line_secrets_path" value="<?= h($form['line_secrets_path']) ?>" required>
   </div>
-  <label class="ln-form-check">
+  <label class="ln-toggle">
     <input type="checkbox" name="line_enabled" value="1" <?= !empty($form['enabled']) ? 'checked' : '' ?>>
-    <span>เปิดใช้งานแจ้งเตือน LINE</span>
+    <span class="ln-toggle-track" aria-hidden="true"></span>
+    <span class="ln-toggle-text">เปิดใช้งานแจ้งเตือน LINE</span>
   </label>
+  </section>
 
-  <h3 class="ln-form-section">bot ตัวจริง — ส่งเข้ากลุ่ม</h3>
+  <section class="panel ln-sec">
+  <h3>bot ตัวจริง — ส่งเข้ากลุ่ม</h3>
   <p class="muted ln-form-help">ใช้ส่งแจ้งเตือนทุกประเภทเข้ากลุ่มงาน · ไม่ได้เปิด webhook</p>
   <div class="ln-form-grid">
     <label>Channel Access Token
@@ -418,7 +460,10 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
     </label>
   </div>
 
-  <h3 class="ln-form-section">bot สำรอง — ส่งหาไลน์ส่วนตัว</h3>
+  </section>
+
+  <section class="panel ln-sec">
+  <h3>bot สำรอง — ส่งหาไลน์ส่วนตัว</h3>
   <p class="muted ln-form-help">ทำ 2 หน้าที่ — ส่ง "สรุปงานรายคน" เข้าไลน์ส่วนตัวเสมอ (bot ตัวจริงใช้ในกลุ่มอย่างเดียว)
     และเป็นห้องปลายทางตอนเปิดโหมดทดสอบ</p>
   <div class="ln-form-grid">
@@ -434,12 +479,15 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
       <input type="text" name="test_recipient_id" value="<?= h($form['test_recipient_id']) ?>" placeholder="ห้องที่ bot สำรองอยู่">
     </label>
   </div>
-  <label class="ln-form-check">
+  <label class="ln-toggle">
     <input type="checkbox" name="test_mode" value="1" <?= !empty($form['test_mode']) ? 'checked' : '' ?>>
-    <span>โหมดทดสอบ — ส่งเข้าห้องทดสอบแทนกลุ่มจริงทั้งหมด</span>
+    <span class="ln-toggle-track" aria-hidden="true"></span>
+    <span class="ln-toggle-text">โหมดทดสอบ — ส่งเข้าห้องทดสอบแทนกลุ่มจริงทั้งหมด</span>
   </label>
+  </section>
 
-  <h3 class="ln-form-section">ลิงก์และรูปในข้อความ</h3>
+  <section class="panel ln-sec">
+  <h3>ลิงก์และรูปในข้อความ</h3>
   <p class="muted ln-form-help">งานตามเวลารันแบบ CLI ไม่มีชื่อโดเมนให้เดา ถ้าไม่ตั้งค่าตรงนี้
     รูปที่อัปเองจะไม่ขึ้นและปุ่มในข้อความจะกดไม่ได้</p>
   <div class="ln-form-grid">
@@ -454,7 +502,10 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
     </label>
   </div>
 
-  <h3 class="ln-form-section">เชื่อมต่อระบบอื่น</h3>
+  </section>
+
+  <section class="panel ln-sec">
+  <h3>เชื่อมต่อระบบอื่น</h3>
   <p class="muted ln-form-help">ดึงยอดสินค้าที่ต้องผลิตเพิ่มมาจาก setupsystem — production ไม่ได้คำนวณเอง</p>
   <div class="ln-form-grid">
     <label>URL API สินค้าที่ต้องผลิตเพิ่ม
@@ -466,7 +517,10 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
   </div>
 
 
-  <h3 class="ln-form-section">ประเภทแจ้งเตือน · วิธีส่ง · Plesk</h3>
+  </section>
+
+  <section class="panel ln-sec">
+  <h3>ประเภทแจ้งเตือน · วิธีส่ง · Plesk</h3>
 
   <p class="muted ln-form-help">
 
@@ -491,6 +545,7 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
           <th>วิธีส่ง</th>
 
           <th>Plesk script</th>
+          <th>ส่งทันที</th>
         </tr>
       </thead>
       <tbody>
@@ -578,11 +633,19 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
               <span class="ln-instant">—</span>
             <?php } ?>
           </td>
+          <td class="ln-send-cell">
+            <?php // form="ln-send-now" ชี้ไปฟอร์มเล็กที่อยู่นอกฟอร์มตั้งค่า — ฟอร์มซ้อนฟอร์ม
+                  // ไม่ได้ และการให้ปุ่มนี้ submit ฟอร์มตั้งค่าจะทำให้ค่าที่แก้ค้างอยู่
+                  // ถูกบันทึกหรือถูกทิ้งโดยไม่ได้ตั้งใจ · ชื่อปุ่มถูกส่งไปเป็น send_event ?>
+            <button type="submit" form="ln-send-now" name="send_event" value="<?= h($eventKey) ?>"
+                    class="btn btn-sm btn-line" <?= line_notify_is_enabled() ? '' : 'disabled' ?>>ส่งทันที</button>
+          </td>
         </tr>
         <?php } ?>
       </tbody>
     </table>
   </div>
+  </section>
 
   <div class="ln-form-actions">
 
@@ -594,53 +657,12 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
 </form>
 
-<div class="panel ln-types" style="margin-bottom:16px">
-
-  <h3 style="margin:0 0 10px; font-size:15px">ส่งทันที (แต่ละประเภท)</h3>
-
-  <p class="muted" style="font-size:12px; margin-bottom:12px">กดแล้วระบบ enqueue และส่ง LINE ทันที (ไม่รอ cron)</p>
-
-  <table class="tbl">
-
-    <thead>
-
-      <tr><th>ประเภท</th><th></th></tr>
-
-    </thead>
-
-    <tbody>
-
-      <?php foreach ($catalog as $eventKey => $meta) { ?>
-
-      <tr>
-
-        <td><?= h($meta['label']) ?></td>
-
-        <td>
-
-          <form method="post" class="ln-send-form">
-
-            <?= csrf_field() ?>
-
-            <input type="hidden" name="action" value="send_now">
-
-            <input type="hidden" name="send_event" value="<?= h($eventKey) ?>">
-
-            <button type="submit" class="btn btn-sm btn-line" <?= line_notify_is_enabled() ? '' : 'disabled' ?>>ส่งทันที</button>
-
-          </form>
-
-        </td>
-
-      </tr>
-
-      <?php } ?>
-
-    </tbody>
-
-  </table>
-
-</div>
+<?php // ปลายทางของปุ่ม "ส่งทันที" ในตารางข้างบน — ต้องอยู่นอกฟอร์มตั้งค่า
+      // เพราะฟอร์มซ้อนฟอร์มไม่ได้ · ปุ่มผูกเข้ามาด้วย attribute form="ln-send-now" ?>
+<form method="post" id="ln-send-now" hidden>
+  <?= csrf_field() ?>
+  <input type="hidden" name="action" value="send_now">
+</form>
 
 <details class="panel ln-diag">
 
