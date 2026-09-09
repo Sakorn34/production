@@ -83,18 +83,10 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fields') {
                GROUP BY pr.lot_label ORDER BY MAX(pr.id) DESC LIMIT 15", 'i', [$pid]);
     while ($r = $res->fetch_assoc()) $out['lot_options'][] = $r['v'];
 
-    // รายชื่อสำหรับฟิลด์ชนิด "ผู้ผลิต" — login_name จาก SSO + ประวัติ made_by
-    $out['user_names'] = [];
-    $actor = actor_name();
-    if ($actor !== '') {
-        $out['user_names'][] = $actor;
-    }
-    foreach ($out['made_by_options'] as $mb) {
-        if ($mb !== '' && !in_array($mb, $out['user_names'], true)) {
-            $out['user_names'][] = $mb;
-        }
-    }
-    $out['actor_name'] = $actor;
+    // actor_name ใช้เป็นค่าตั้งต้นของช่อง "ผู้ผลิต/ประกอบ" · ส่วน user_names
+    // (ชื่อคนล็อกอิน + ประวัติ made_by) เลิกใช้แล้วตั้งแต่ให้ฟิลด์ชนิดผู้ผลิต
+    // ยึดรายชื่อจากหลังบ้านอย่างเดียว จึงไม่ต้องประกอบอีก
+    $out['actor_name'] = actor_name();
 
     // รายการอะไหล่ทั้งหมด + ชุดอะไหล่ประจำรุ่น (BOM) — จัดชุดเบิกได้ในหน้านี้เลย
     $out['all_parts'] = [];
@@ -183,14 +175,10 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fields') {
         if ($lastVal === '' && !empty($f['options'][0])) {
             $lastVal = $f['options'][0];
         }
+        // รายชื่อของฟิลด์ชนิด "ผู้ผลิต" มาจากที่ตั้งไว้หลังบ้านอย่างเดียว
+        // เดิมแทรก $out['user_names'] (ชื่อคนที่ล็อกอิน + made_by จากประวัติผลิตของรุ่น)
+        // ไว้หน้าสุดด้วย ชื่อที่แอดมินเอาออกจากหลังบ้านแล้วจึงยังโผล่กลับมา
         $opts = $f['options'];
-        if ($f['kind'] === 'ผู้ผลิต') {
-            foreach ($out['user_names'] as $nm) {
-                if ($nm !== '' && !in_array($nm, $opts, true)) {
-                    array_unshift($opts, $nm);
-                }
-            }
-        }
         $out['fields'][] = [
             'name' => $f['name'],
             'kind' => $f['kind'],
@@ -635,14 +623,13 @@ function kindLabelText(k){
 function fieldRowHtml(f){
   var hidden = '<input type="hidden" name="field_names[]" value="' + esc(f.name) + '">'
              + '<input type="hidden" name="field_kinds[]" value="' + esc(f.kind) + '">';
-  // ชนิดผู้ผลิต: ใช้ combo เหมือนช่องอื่น — เลือกจากรายชื่อหรือพิมพ์เองได้
+  // รายชื่อมาจากที่ตั้งไว้หลังบ้านอย่างเดียว
+  // เดิมเอา cfg.user_names (ชื่อคนที่ล็อกอิน + made_by 10 ชื่อล่าสุดจากประวัติผลิต
+  // ของรุ่นนั้น) มาแทรกไว้หน้าสุดด้วย ผลคือชื่อที่แอดมินตั้งใจเอาออกจากหลังบ้านแล้ว
+  // ยังโผล่อยู่ — วัดได้ 15 จาก 35 ฟิลด์มีชื่อเกิน (Yo, Tony, Admin, Korn)
+  // ตอนเป็น dropdown มันซ่อนอยู่ในลิสต์เลยไม่มีใครเห็น พอเป็นปุ่มจึงโผล่ชัด
+  // ฟิลด์ชนิดนี้ตั้งรายชื่อไว้หลังบ้านครบทั้ง 35 ฟิลด์ จึงยึดตามนั้นได้เต็มที่
   var opts = f.options || [];
-  if (f.kind === MAKER_KIND && cfg && cfg.user_names) {
-    opts = opts.slice();
-    (cfg.user_names || []).forEach(function(nm){
-      if (nm && opts.indexOf(nm) === -1) opts.unshift(nm);
-    });
-  }
   // ฟิลด์ที่คำตอบเป็นชื่อคน มีชื่อให้เลือกไม่กี่ชื่อ วางเป็นปุ่มกดทีเดียวจบ
   // เร็วกว่าเปิด dropdown แล้วค่อยเลือก ซึ่งเป็นสองจังหวะ
   var control = (f.kind === MAKER_KIND)
