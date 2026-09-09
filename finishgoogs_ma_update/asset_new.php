@@ -179,6 +179,18 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fields') {
         // เดิมแทรก $out['user_names'] (ชื่อคนที่ล็อกอิน + made_by จากประวัติผลิตของรุ่น)
         // ไว้หน้าสุดด้วย ชื่อที่แอดมินเอาออกจากหลังบ้านแล้วจึงยังโผล่กลับมา
         $opts = $f['options'];
+        if ($f['kind'] === 'ผู้ผลิต') {
+            // บรรทัดที่พิมพ์สองชื่อติดกันในหลังบ้าน ("Ice, Tom") ต้องแตกเป็นคนละชื่อ
+            // ไม่งั้นได้ปุ่มเดียวที่กดแล้วบันทึกเป็นชื่อคนเดียวว่า "Ice, Tom"
+            $flat = [];
+            foreach ($opts as $o) {
+                foreach (explode(',', (string)$o) as $one) {
+                    $one = trim($one);
+                    if ($one !== '' && !in_array($one, $flat, true)) { $flat[] = $one; }
+                }
+            }
+            $opts = $flat;
+        }
         $out['fields'][] = [
             'name' => $f['name'],
             'kind' => $f['kind'],
@@ -633,7 +645,7 @@ function fieldRowHtml(f){
   // ฟิลด์ที่คำตอบเป็นชื่อคน มีชื่อให้เลือกไม่กี่ชื่อ วางเป็นปุ่มกดทีเดียวจบ
   // เร็วกว่าเปิด dropdown แล้วค่อยเลือก ซึ่งเป็นสองจังหวะ
   var control = (f.kind === MAKER_KIND)
-    ? namePickHtml('field_values[]', f.last || '', opts, hidden, f.input_mode)
+    ? namePickHtml('field_values[]', f.last || '', opts, hidden, f.input_mode, false)
     : comboHtml('field_values[]', f.last || '', opts, hidden, f.input_mode);
   return '<div class="dyn-field-row">'
        + '<label>' + esc(f.name) + '</label>'
@@ -680,7 +692,9 @@ function renderFields(d){
       madeOpts.unshift(d.actor_name);
     }
     // ช่องนี้ก็ตอบเป็นชื่อคน ใช้ปุ่มชุดเดียวกัน
-    document.getElementById('madeby-slot').innerHTML = namePickHtml('made_by', defaultMade, madeOpts, '', d.made_by_input_mode || 'chip_single_free');
+    // ช่องนี้ยังพิมพ์เองได้ เพราะไม่มีที่ตั้งรายชื่อในหลังบ้านเลย (0 จาก 37 ฟิลด์)
+    // ถ้าปิดด้วยจะไม่เหลือทางกรอกชื่อที่ไม่เคยผลิตรุ่นนี้มาก่อน
+    document.getElementById('madeby-slot').innerHTML = namePickHtml('made_by', defaultMade, madeOpts, '', d.made_by_input_mode || 'chip_single_free', true);
   } else {
     document.getElementById('madeby-slot').innerHTML = '<input type="hidden" name="made_by" value="">';
   }

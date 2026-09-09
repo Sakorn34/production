@@ -776,7 +776,7 @@ function modalBack(){
 
      ใช้สัญญาเดียวกับ chipDdHtml ทุกอย่าง: hidden input ชื่อเดิม ค่าเป็นชื่อคั่นด้วย
      จุลภาค ฝั่ง PHP จึงไม่ต้องแก้อะไรเลย                                        */
-  window.namePickHtml = function(inputName, value, options, hidden, inputMode){
+  window.namePickHtml = function(inputName, value, options, hidden, inputMode, allowFree){
     inputMode = inputMode || 'chip_multi_free';
     // โหมด text เดิมเป็นช่องพิมพ์ล้วน (ช่อง "ผู้ผลิต/ประกอบ" ใช้โหมดนี้) — ถ้าปล่อยให้
     // เป็นปุ่มอย่างเดียวจะพิมพ์ชื่อที่ไม่มีในรายการไม่ได้เลย ซึ่งเป็นการถอยหลัง
@@ -784,15 +784,24 @@ function modalBack(){
     var isText = inputMode === 'text';
     var vals = parseChipVals(value);
     if ((isText || !chipDdIsMulti(inputMode)) && vals.length > 1) vals = [vals[0]];
+    // รายการตั้งค่าบางบรรทัดมีสองชื่อรวมกัน ("Ice, Tom") จากการพิมพ์ติดกันในหลังบ้าน
+    // ถ้าปล่อยไว้จะกลายเป็นปุ่มเดียวชื่อ "Ice, Tom" ซึ่งกดแล้วบันทึกเป็นชื่อคนเดียว
+    // จุลภาคเป็นตัวคั่นค่าของฟิลด์นี้อยู่แล้ว ชื่อคนจึงมีจุลภาคไม่ได้ — แยกออกเสมอ
+    var opts = [];
+    (options || []).forEach(function(o){
+      parseChipVals(o).forEach(function(one){ if (opts.indexOf(one) === -1) opts.push(one); });
+    });
     // ชื่อที่เคยบันทึกไว้แต่ไม่มีในรายการตั้งค่า ต้องขึ้นเป็นปุ่มด้วย ไม่งั้นค่าเดิมหาย
-    var opts = (options || []).slice();
     vals.forEach(function(v){ if (opts.indexOf(v) === -1) opts.push(v); });
     var btns = opts.map(function(o){
       var on = vals.indexOf(o) !== -1;
       return '<button type="button" class="name-btn' + (on ? ' is-on' : '') + '"'
            + ' data-v="' + esc(o) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + esc(o) + '</button>';
     }).join('');
-    var free = (isText || chipDdAllowFree(inputMode))
+    // ฟิลด์ที่รายชื่อมาจากหลังบ้าน ไม่เปิดช่องพิมพ์เอง — อยากได้ชื่อใหม่ให้ไปเพิ่มที่
+    // หลังบ้าน รายชื่อจะได้เป็นชุดเดียวกันทุกคนและไม่มีชื่อสะกดเพี้ยนงอกเพิ่ม
+    // ส่งมาชัด ๆ ว่าให้พิมพ์ได้หรือไม่ ไม่เดาจาก input_mode เพราะสองเรื่องนี้คนละเรื่องกัน
+    var free = (allowFree === true)
       ? '<input type="text" class="name-free" autocomplete="off" placeholder="ชื่ออื่น + Enter">'
       : '';
     return '<div class="name-pick" data-mode="' + esc(inputMode) + '">'
