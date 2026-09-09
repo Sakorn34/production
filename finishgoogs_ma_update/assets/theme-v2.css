@@ -329,7 +329,55 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   padding-bottom: 8px;
 }
 .dash-prod-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 16px;
   margin-bottom: 12px;
+}
+
+/* ป้ายเทียบเดือน — ตัวเลขเดียวในหน้าที่บอกทิศทาง ไม่ใช่ภาพนิ่ง
+   สีมาจาก token ชุดเดียวกับที่อื่น ไม่ได้ผูกกับสีแบรนด์ เพราะ "ลดลง" ไม่ใช่เรื่องแย่เสมอไป */
+.dash-prod-trend {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 7px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--surface-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.3;
+}
+.dash-trend-label { color: var(--text-muted); }
+.dash-trend-num {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.dash-trend-unit { color: var(--text-muted); }
+.dash-trend-delta {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding-inline-start: 7px;
+  border-inline-start: 1px solid var(--border);
+}
+.dash-trend-vs {
+  font-weight: 400;
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+  padding-inline-start: 3px;
+}
+.dash-trend-up .dash-trend-delta { color: var(--success); }
+.dash-trend-down .dash-trend-delta { color: var(--warning); }
+.dash-trend-flat .dash-trend-delta { color: var(--text-muted); }
+
+@media (max-width: 560px) {
+  .dash-prod-trend { width: 100%; }
 }
 .dash-prod-head-main {
   display: flex;

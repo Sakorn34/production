@@ -68,6 +68,54 @@ function asset_status_counts_total(array $counts)
 }
 
 /**
+ * ยอดผลิตเดือนล่าสุดเทียบเดือนก่อนหน้า
+ *
+ * หน้าแดชบอร์ดตอบได้แต่ "ตอนนี้มีเท่าไหร่" ทุกตัวเลขเป็นภาพนิ่ง ไม่มีที่ไหนบอกว่า
+ * กำลังเพิ่มหรือลด · ใช้ข้อมูลรายเดือนที่ index.php ดึงมาอยู่แล้วสำหรับกราฟ
+ * จึงไม่มี query เพิ่ม
+ *
+ * เดือนล่าสุด = เดือนปัจจุบันตามปฏิทิน ไม่ใช่เดือนสุดท้ายที่มีข้อมูล — ต้นเดือนที่ยัง
+ * ผลิตไม่กี่เครื่องก็ต้องเห็นว่าน้อย ไม่ใช่ให้ระบบข้ามไปหยิบเดือนก่อนมาแสดงแทน
+ *
+ * @param array<int,array<int,array<string,int>>> $monthCountsByYear [ปี][เดือน] => counts
+ * @param string|null $today วันที่อ้างอิง (null = วันนี้) — รับเข้ามาเพื่อให้เทสต์ได้
+ * @return array<string,mixed>|null null = ไม่มีข้อมูลพอจะเทียบ
+ */
+function dash_month_trend(array $monthCountsByYear, $today = null)
+{
+    $today = $today === null ? date('Y-m-d') : $today;
+    $ts = strtotime($today);
+    if ($ts === false) {
+        return null;
+    }
+
+    $nowY = (int) date('Y', $ts);
+    $nowM = (int) date('n', $ts);
+    $prevY = $nowM === 1 ? $nowY - 1 : $nowY;
+    $prevM = $nowM === 1 ? 12 : $nowM - 1;
+
+    // เดือนก่อนหน้าต้องอยู่ในช่วงปีที่ดึงมา ไม่งั้นเทียบไม่ได้จริง
+    if (!isset($monthCountsByYear[$prevY][$prevM])) {
+        return null;
+    }
+
+    $now = isset($monthCountsByYear[$nowY][$nowM])
+        ? asset_status_counts_total($monthCountsByYear[$nowY][$nowM])
+        : 0;
+    $prev = asset_status_counts_total($monthCountsByYear[$prevY][$prevM]);
+
+    return [
+        'now'        => $now,
+        'prev'       => $prev,
+        'diff'       => $now - $prev,
+        // เดือนก่อนเป็น 0 คิดเปอร์เซ็นต์ไม่ได้ (หารศูนย์) — ให้ null แล้วไปแสดงแค่ส่วนต่าง
+        'pct'        => $prev > 0 ? (int) round(($now - $prev) / $prev * 100) : null,
+        'now_ym'     => sprintf('%04d-%02d', $nowY, $nowM),
+        'prev_ym'    => sprintf('%04d-%02d', $prevY, $prevM),
+    ];
+}
+
+/**
  * @param string            $label
  * @param array<string,int> $counts
  * @return string

@@ -43,6 +43,7 @@ $dashProdYears = array_reverse($dashProdYears, true);
 
 $dashProdYearPoints = [];
 $dashProdMonthPointsByYear = [];
+$dashProdTrend = null;
 if ($dashProdYears) {
     $minY = (int) min(array_keys($dashProdYears));
     $maxY = (int) max(array_keys($dashProdYears));
@@ -66,6 +67,10 @@ if ($dashProdYears) {
             $dashProdMonthPointsByYear[$yKey][(int) $r['m']] = asset_status_counts_from_row($r);
         }
     }
+
+    // ต้องคิดก่อน loop ข้างล่าง เพราะ loop นั้นเขียนทับ $dashProdMonthPointsByYear
+    // ด้วยจุดกราฟ ทำให้จำนวนดิบรายเดือนหายไป
+    $dashProdTrend = dash_month_trend($dashProdMonthPointsByYear);
 
     foreach ($dashProdYears as $y => $counts) {
         $y = (int) $y;
@@ -375,6 +380,30 @@ $partsBase = ui_parts_base_url();
         <p class="muted dash-prod-subtitle" id="dash-prod-subtitle">6 ปีล่าสุด · แยกตามสถานะเครื่อง</p>
       </div>
     </div>
+    <?php
+    // ทั้งหน้าไม่มีตัวเลขไหนบอกทิศทางเลย ตอบได้แค่ "ตอนนี้มีเท่าไหร่"
+    // ป้ายนี้อยู่ติดกราฟผลิตเพราะเป็นตัวเลขชุดเดียวกัน — เดือนนี้เทียบเดือนก่อน
+    if ($dashProdTrend) {
+        $tDiff = (int) $dashProdTrend['diff'];
+        $tTone = $tDiff > 0 ? 'up' : ($tDiff < 0 ? 'down' : 'flat');
+        $tSign = $tDiff > 0 ? '+' : ($tDiff < 0 ? '−' : '±');
+        $tPct  = $dashProdTrend['pct'];
+    ?>
+    <div class="dash-prod-trend dash-trend-<?= h($tTone) ?>"
+         title="<?= h(thai_month_period_label($dashProdTrend['now_ym']) . ' ผลิต ' . number_format($dashProdTrend['now'])
+                    . ' เครื่อง · ' . thai_month_period_label($dashProdTrend['prev_ym']) . ' ผลิต '
+                    . number_format($dashProdTrend['prev']) . ' เครื่อง') ?>">
+      <span class="dash-trend-label"><?= h(thai_month_short($dashProdTrend['now_ym'])) ?></span>
+      <b class="dash-trend-num"><?= number_format($dashProdTrend['now']) ?></b>
+      <span class="dash-trend-unit">เครื่อง</span>
+      <span class="dash-trend-delta">
+        <?= h($tSign . number_format(abs($tDiff))) ?><?php
+          // เดือนก่อนเป็น 0 คิดเปอร์เซ็นต์ไม่ได้ — แสดงแค่ส่วนต่าง
+          if ($tPct !== null) { echo ' · ' . h(($tPct > 0 ? '+' : '') . $tPct . '%'); } ?>
+        <span class="dash-trend-vs">เทียบ <?= h(thai_month_short($dashProdTrend['prev_ym'])) ?></span>
+      </span>
+    </div>
+    <?php } ?>
   </div>
   <?php if ($dashProdYearPoints) { ?>
   <div id="dash-prod-year-view">
