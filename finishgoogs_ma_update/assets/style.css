@@ -784,7 +784,7 @@ span.thumb-sm { display: inline-flex; align-items: center; justify-content: cent
 .chk-list input[type=checkbox] { margin-top: 3px; width: 16px; height: 16px; }
 
 /* หน้าบันทึกผลิต: เลย์เอาต์ 2 คอลัมน์ ลดการเลื่อนจอ */
-.produce-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.produce-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .panel { background: #fff; border: 1px solid var(--border, #dfe4ec); border-radius: var(--radius-sm, 8px); padding: 16px 18px; box-shadow: 0 1px 2px rgba(20,30,60,.04); }
 .panel > h3 { font-size: calc(14px * var(--font-scale, 1)); margin-bottom: 12px; color: var(--primary); }
 .panel .field { margin-bottom: 13px; }
@@ -911,7 +911,7 @@ span.thumb-sm { display: inline-flex; align-items: center; justify-content: cent
   .produce-save-bar { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
   .produce-save-bar > button { width: 100%; }
 }
-@media (max-width: 900px) { .produce-cols { grid-template-columns: 1fr; } .note-grid { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .produce-cols { grid-template-columns: minmax(0, 1fr); } .note-grid { grid-template-columns: 1fr; } }
 
 .sidebar-toggle { display: none !important; }
 
@@ -1189,4 +1189,20 @@ button:active, .btn:active { transform: scale(.96); }
 @media (max-width: 640px) {
   .name-btn { min-height: 44px; padding: 8px 16px; }
   .name-free { min-height: 44px; flex: 1 1 100%; }
+}
+
+/* ชื่อผู้ผลิต/ประกอบ — แสดงชื่อคนที่ทำรายการอยู่ ไม่ใช่ช่องให้เลือก
+   จัดให้สูงเท่าช่องกรอกแถวอื่นในกริดเดียวกัน หัวข้อกับค่าจะได้อยู่ระดับเดียวกัน */
+.made-by-fixed {
+  display: flex; align-items: center;
+  min-height: var(--input-h, 40px);
+  font-size: calc(14px * var(--font-scale, 1));
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* หน้าบันทึกเครื่องใหม่: บนจอมือถือให้ป้ายชื่อขึ้นบรรทัดบน ช่องกรอกได้เต็มความกว้าง */
+@media (max-width: 640px) {
+  .dyn-field-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .dyn-field-row label { font-weight: 600; }
 }

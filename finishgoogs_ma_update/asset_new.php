@@ -458,9 +458,11 @@ page_header('บันทึกเครื่องผลิตใหม่');
           <span class="muted" style="font-size:12px">เพิ่มฟิลด์นอกเหนือจากที่ตั้งไว้หลังบ้านได้</span>
         </div>
       </div>
-      <div class="field" id="madeby-field-wrap"><label>ผู้ผลิต/ประกอบ</label><div id="madeby-slot"></div></div>
-      <div class="field" id="fw-field-wrap"><label>เวอร์ชัน Firmware</label><div id="fw-slot"></div></div>
-      <div class="field" id="lot-field-wrap"><label>Lot</label><div id="lot-slot"></div></div>
+      <?php // สามแถวนี้ใช้กริดเดียวกับแถว "ข้อมูลประจำรุ่น" ด้านบน — เดิมเป็น .field ซึ่งวาง
+            // label ไว้บรรทัดบน ทำให้หัวข้อไม่ตรงคอลัมน์เดียวกับฟิลด์อื่นในกล่องเดียวกัน ?>
+      <div class="dyn-field-row" id="madeby-field-wrap"><label>ผู้ผลิต/ประกอบ</label><div id="madeby-slot"></div></div>
+      <div class="dyn-field-row" id="fw-field-wrap"><label>เวอร์ชัน Firmware</label><div id="fw-slot"></div></div>
+      <div class="dyn-field-row" id="lot-field-wrap"><label>Lot</label><div id="lot-slot"></div></div>
       <div class="field">
         <label class="h-with-icon"><?= ui_icon_html('edit', 14, 'h-svg') ?><span>ปัญหา / การแก้ไข / หมายเหตุ</span></label>
         <div class="note-stack">
@@ -683,21 +685,18 @@ function renderFields(d){
   } else {
     document.getElementById('fw-slot').innerHTML = '<input type="hidden" name="fw_version" value="">';
   }
-  // ผู้ผลิต/ประกอบ — ค่าเริ่มเป็นชื่อผู้ทำรายการ (login name)
+  // ผู้ผลิต/ประกอบ — แสดงชื่อคนที่กำลังทำรายการอย่างเดียว ไม่ให้เลือกคนอื่น
+  // คนบันทึกคือคนประกอบเสมอ การเปิดให้เลือกชื่อคนอื่นได้จึงมีแต่ทางให้กดผิด
   if (showMadeBy) {
-    var defaultMade = d.actor_name || '';
-    var madeOpts = (d.made_by_options || []).slice();
-    if (d.actor_name) {
-      madeOpts = madeOpts.filter(function(o){ return o !== d.actor_name; });
-      madeOpts.unshift(d.actor_name);
-    }
     // ช่องนี้ก็ตอบเป็นชื่อคน ใช้ปุ่มชุดเดียวกัน
     // ช่องนี้ไม่มีที่ตั้ง "รายชื่อ" ในหลังบ้าน (ชื่อมาจากประวัติผลิตของรุ่น) แต่มีที่ตั้ง
     // "รูปแบบการกรอก" อยู่ — ต้องทำตามนั้น เลือก "รายการเท่านั้น" แล้วต้องไม่มีช่องพิมพ์
     // ไม่ใช่ปัญหาถ้ารายชื่อว่าง เพราะ made_by ไม่ใช่ช่องบังคับ ว่างแล้ว server ใส่ชื่อ
     // คนที่ล็อกอินให้เอง
-    var mbMode = d.made_by_input_mode || 'chip_single_free';
-    document.getElementById('madeby-slot').innerHTML = namePickHtml('made_by', defaultMade, madeOpts, '', mbMode, mbMode === 'text' || mbMode.indexOf('_free') !== -1);
+    var actor = d.actor_name || '';
+    document.getElementById('madeby-slot').innerHTML =
+      '<div class="made-by-fixed">' + (actor ? esc(actor) : '<span class="muted">— ไม่ทราบชื่อผู้ทำรายการ —</span>') + '</div>'
+      + '<input type="hidden" name="made_by" value="' + esc(actor) + '">';
   } else {
     document.getElementById('madeby-slot').innerHTML = '<input type="hidden" name="made_by" value="">';
   }
@@ -708,7 +707,6 @@ function renderFields(d){
   }
   initChipDd(document.getElementById('dyn-fields'));
   initNamePick(document.getElementById('dyn-fields'));
-  if (showMadeBy) initNamePick(document.getElementById('madeby-slot'));
   if (showFw) initChipDd(document.getElementById('fw-slot'));
   if (showLot) initChipDd(document.getElementById('lot-slot'));
 }
