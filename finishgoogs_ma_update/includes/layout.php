@@ -769,6 +769,87 @@ function modalBack(){
       + '<div class="chip-dd-list" hidden><div class="chip-dd-opts"></div></div>'
       + '</div>';
   };
+  /* ── ตัวเลือกชื่อคนแบบปุ่มกด ──────────────────────────────────────────────
+     ฟิลด์ที่คำตอบเป็นชื่อคน (ใครประกอบ Camera / HUB / EXP ฯลฯ) มีชื่อให้เลือกแค่
+     5-6 ชื่อต่อฟิลด์ และทั้งระบบใช้อยู่ 6 ชื่อ การต้องกดเปิด dropdown แล้วค่อยเลือก
+     จึงเป็นสองจังหวะโดยไม่จำเป็น — วางเป็นปุ่มให้เห็นทุกชื่อแล้วกดทีเดียวจบ
+
+     ใช้สัญญาเดียวกับ chipDdHtml ทุกอย่าง: hidden input ชื่อเดิม ค่าเป็นชื่อคั่นด้วย
+     จุลภาค ฝั่ง PHP จึงไม่ต้องแก้อะไรเลย                                        */
+  window.namePickHtml = function(inputName, value, options, hidden, inputMode){
+    inputMode = inputMode || 'chip_multi_free';
+    // โหมด text เดิมเป็นช่องพิมพ์ล้วน (ช่อง "ผู้ผลิต/ประกอบ" ใช้โหมดนี้) — ถ้าปล่อยให้
+    // เป็นปุ่มอย่างเดียวจะพิมพ์ชื่อที่ไม่มีในรายการไม่ได้เลย ซึ่งเป็นการถอยหลัง
+    // นับเป็นเลือกได้ชื่อเดียวแต่ยังพิมพ์เองได้
+    var isText = inputMode === 'text';
+    var vals = parseChipVals(value);
+    if ((isText || !chipDdIsMulti(inputMode)) && vals.length > 1) vals = [vals[0]];
+    // ชื่อที่เคยบันทึกไว้แต่ไม่มีในรายการตั้งค่า ต้องขึ้นเป็นปุ่มด้วย ไม่งั้นค่าเดิมหาย
+    var opts = (options || []).slice();
+    vals.forEach(function(v){ if (opts.indexOf(v) === -1) opts.push(v); });
+    var btns = opts.map(function(o){
+      var on = vals.indexOf(o) !== -1;
+      return '<button type="button" class="name-btn' + (on ? ' is-on' : '') + '"'
+           + ' data-v="' + esc(o) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + esc(o) + '</button>';
+    }).join('');
+    var free = (isText || chipDdAllowFree(inputMode))
+      ? '<input type="text" class="name-free" autocomplete="off" placeholder="ชื่ออื่น + Enter">'
+      : '';
+    return '<div class="name-pick" data-mode="' + esc(inputMode) + '">'
+      + (hidden || '')
+      + '<input type="hidden" name="' + inputName + '" data-chip-val="1" value="' + esc(vals.join(', ')) + '">'
+      + btns + free
+      + '</div>';
+  };
+
+  function namePickSync(box){
+    var on = [].map.call(box.querySelectorAll('.name-btn.is-on'), function(b){ return b.dataset.v; });
+    box.querySelector('input[type=hidden][data-chip-val]').value = on.join(', ');
+  }
+  window.initNamePick = function(root){
+    (root || document).querySelectorAll('.name-pick').forEach(function(box){
+      if (box.dataset.ready) return;
+      box.dataset.ready = '1';
+      var multi = chipDdIsMulti(box.dataset.mode || 'chip_multi_free');
+      box.addEventListener('click', function(e){
+        var b = e.target.closest('.name-btn');
+        if (!b || !box.contains(b)) return;
+        e.preventDefault();
+        var turningOn = !b.classList.contains('is-on');
+        // แบบเลือกได้ชื่อเดียว: กดชื่อใหม่แล้วชื่อเดิมต้องหลุดเอง ไม่ต้องกดปิดก่อน
+        if (multi === false && turningOn) {
+          box.querySelectorAll('.name-btn.is-on').forEach(function(o){
+            o.classList.remove('is-on'); o.setAttribute('aria-pressed', 'false');
+          });
+        }
+        b.classList.toggle('is-on', turningOn);
+        b.setAttribute('aria-pressed', turningOn ? 'true' : 'false');
+        namePickSync(box);
+      });
+      var free = box.querySelector('.name-free');
+      if (!free) return;
+      free.addEventListener('keydown', function(e){
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        var v = free.value.trim();
+        if (!v) return;
+        var exist = box.querySelector('.name-btn[data-v="' + v.replace(/"/g, '\\"') + '"]');
+        if (!exist) {
+          free.insertAdjacentHTML('beforebegin',
+            '<button type="button" class="name-btn is-on" data-v="' + esc(v) + '" aria-pressed="true">' + esc(v) + '</button>');
+        } else if (!exist.classList.contains('is-on')) {
+          exist.classList.add('is-on'); exist.setAttribute('aria-pressed', 'true');
+        }
+        if (!chipDdIsMulti(box.dataset.mode || '')) {
+          box.querySelectorAll('.name-btn.is-on').forEach(function(o, i, all){
+            if (o !== all[all.length - 1]) { o.classList.remove('is-on'); o.setAttribute('aria-pressed', 'false'); }
+          });
+        }
+        free.value = '';
+        namePickSync(box);
+      });
+    });
+  };
   window.initChipDd = function(root){
     (root || document).querySelectorAll('.chip-dd').forEach(function(dd){
       if (dd.dataset.ready) return;

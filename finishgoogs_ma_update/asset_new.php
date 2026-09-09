@@ -643,7 +643,11 @@ function fieldRowHtml(f){
       if (nm && opts.indexOf(nm) === -1) opts.unshift(nm);
     });
   }
-  var control = comboHtml('field_values[]', f.last || '', opts, hidden, f.input_mode);
+  // ฟิลด์ที่คำตอบเป็นชื่อคน มีชื่อให้เลือกไม่กี่ชื่อ วางเป็นปุ่มกดทีเดียวจบ
+  // เร็วกว่าเปิด dropdown แล้วค่อยเลือก ซึ่งเป็นสองจังหวะ
+  var control = (f.kind === MAKER_KIND)
+    ? namePickHtml('field_values[]', f.last || '', opts, hidden, f.input_mode)
+    : comboHtml('field_values[]', f.last || '', opts, hidden, f.input_mode);
   return '<div class="dyn-field-row">'
        + '<label>' + esc(f.name) + '</label>'
        + control + '</div>';
@@ -658,6 +662,7 @@ function addFreeField(){
   if (box.querySelector('.muted') && !box.querySelector('.dyn-field-row')) box.innerHTML = '';
   box.insertAdjacentHTML('beforeend', fieldRowHtml({ name: name, kind: 'extra', last: '', options: [], from_settings: false }));
   initChipDd(box);
+  initNamePick(box);
 }
 function renderFields(d){
   var html = '';
@@ -687,7 +692,8 @@ function renderFields(d){
       madeOpts = madeOpts.filter(function(o){ return o !== d.actor_name; });
       madeOpts.unshift(d.actor_name);
     }
-    document.getElementById('madeby-slot').innerHTML = comboHtml('made_by', defaultMade, madeOpts, '', d.made_by_input_mode || 'chip_single_free');
+    // ช่องนี้ก็ตอบเป็นชื่อคน ใช้ปุ่มชุดเดียวกัน
+    document.getElementById('madeby-slot').innerHTML = namePickHtml('made_by', defaultMade, madeOpts, '', d.made_by_input_mode || 'chip_single_free');
   } else {
     document.getElementById('madeby-slot').innerHTML = '<input type="hidden" name="made_by" value="">';
   }
@@ -697,7 +703,8 @@ function renderFields(d){
     document.getElementById('lot-slot').innerHTML = '<input type="hidden" name="lot_label" value="">';
   }
   initChipDd(document.getElementById('dyn-fields'));
-  if (showMadeBy) initChipDd(document.getElementById('madeby-slot'));
+  initNamePick(document.getElementById('dyn-fields'));
+  if (showMadeBy) initNamePick(document.getElementById('madeby-slot'));
   if (showFw) initChipDd(document.getElementById('fw-slot'));
   if (showLot) initChipDd(document.getElementById('lot-slot'));
 }
