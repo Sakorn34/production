@@ -23,15 +23,19 @@
  *   ]
  *
  * Flow: line_flex_finishgood_shortage_messages($items) → array ของ message object
+ *
+ * การ์ดใช้รูปทรงเดียวกับแจ้งเตือนอะไหล่ต่ำ (line_flex_low_stock_* ใน line_flex_templates.php)
+ * ทั้งสองอันเข้าไลน์กลุ่มเดียวกันตอนเช้า ถ้าคนละทรงคนอ่านต้องเรียนรู้สองแบบ
  */
 
 // ─ Config ─────────────────────────────────────────────────────────────────────
 
-/** @var int จำนวนรุ่นสูงสุดต่อการ์ด 1 ใบ */
-const LINE_FLEX_FG_ITEMS_PER_CARD = 5;
+/** @var int จำนวนรุ่นต่อการ์ดที่อยากได้ — เพิ่มเองอัตโนมัติถ้าจำเป็นเพื่อให้จบข้อความเดียว */
+const LINE_FLEX_FG_ITEMS_PER_CARD = 6;
 
-/** @var string ความสูงคงที่ของแถว 1 รุ่น — ทำให้ทุกการ์ดสูงเท่ากัน */
-const LINE_FLEX_FG_ROW_HEIGHT = '108px';
+/** @var int จำนวนรุ่นสูงสุดต่อการ์ด — เกินนี้การ์ดยาวจนต้องเลื่อนในแนวตั้ง อ่านยาก */
+const LINE_FLEX_FG_ITEMS_PER_CARD_MAX = 10;
+
 
 /** @var int จำนวนการ์ดสูงสุดต่อ 1 ข้อความ (LINE จำกัด carousel 12 bubble) */
 const LINE_FLEX_FG_MAX_CARDS = 12;
@@ -87,64 +91,6 @@ function line_flex_fg_color(int $available, int $required): string
 }
 
 /**
- * แถบเส้นแนวนอน: จำนวนที่มี เทียบกับจำนวนที่ต้องมี
- *
- * ใช้ flex ratio แทน width % เพราะ LINE Flex ไม่รองรับ % ใน box ซ้อน
- *
- * @param int $available
- * @param int $required
- * @param string $color
- * @return array<string,mixed>
- */
-function line_flex_fg_bar(int $available, int $required, string $color): array
-{
-    $pct = $required > 0 ? (int)round($available / $required * 100) : 100;
-    $pct = max(0, min(100, $pct));
-
-    return [
-        'type' => 'box', 'layout' => 'horizontal', 'height' => '8px', 'margin' => 'sm',
-        'backgroundColor' => '#ececec', 'cornerRadius' => '4px',
-        'contents' => [
-            [
-                'type' => 'box', 'layout' => 'vertical', 'flex' => max($pct, 1),
-                'backgroundColor' => $color, 'cornerRadius' => '4px',
-                'contents' => [['type' => 'filler']],
-            ],
-            [
-                'type' => 'box', 'layout' => 'vertical', 'flex' => max(100 - $pct, 1),
-                'contents' => [['type' => 'filler']],
-            ],
-        ],
-    ];
-}
-
-/**
- * กรอบสีบอกตัวเลข 1 ชุด — ป้ายกำกับ · ที่มา · ยอดรวม
- *
- * แยกสีเพื่อให้อ่านออกทันทีว่าอันไหน "ที่มี" อันไหน "ที่ต้องมี"
- *
- * @param string $label ป้ายกำกับ เช่น คงเหลือ
- * @param string $breakdown ที่มาของตัวเลข เช่น 2 (+11 เช่า)
- * @param int $total ยอดรวม
- * @param string $bgColor สีพื้นกรอบ
- * @param string $labelColor สีป้ายกำกับ
- * @param string $totalColor สีตัวเลขรวม
- * @return array<string,mixed>
- */
-function line_flex_fg_metric_pill(string $label, string $breakdown, int $total, string $bgColor, string $labelColor, string $totalColor): array
-{
-    return [
-        'type' => 'box', 'layout' => 'horizontal', 'margin' => 'xs',
-        'backgroundColor' => $bgColor, 'cornerRadius' => '4px', 'paddingAll' => '4px',
-        'contents' => [
-            ['type' => 'text', 'text' => $label, 'size' => 'xxs', 'color' => $labelColor, 'weight' => 'bold', 'flex' => 4, 'wrap' => false],
-            ['type' => 'text', 'text' => $breakdown, 'size' => 'xxs', 'color' => '#8a8a8a', 'flex' => 5, 'align' => 'end', 'wrap' => false],
-            ['type' => 'text', 'text' => '= ' . $total, 'size' => 'xxs', 'color' => $totalColor, 'weight' => 'bold', 'flex' => 3, 'align' => 'end', 'wrap' => false],
-        ],
-    ];
-}
-
-/**
  * URL รูปของรุ่นสินค้า — ใช้ตัวกลางใน line_flex_templates.php
  *
  * เดิมไฟล์นี้มีตัวค้น icon_path กับรูป default ของตัวเอง ซึ่งซ้ำกับตัวกลาง
@@ -160,9 +106,11 @@ function line_flex_fg_image_url(string $productName, string $fallbackUrl = ''): 
 }
 
 /**
- * แถว 1 รุ่น: รูป (กึ่งกลาง) · ชื่อที่กดไปหน้า serial list · ยอดขาด · แถบเส้น · กรอบสี 2 ชุด
+ * แถว 1 รุ่น: รูป · ชื่อ+รหัสที่กดไปหน้า serial list · ยอดที่ต้องผลิต · ที่มาของตัวเลข
  *
- * ล็อกความสูงคงที่ทุกแถว เพื่อให้ทุกการ์ดใน carousel สูงเท่ากัน
+ * รูปทรงเดียวกับแถวอะไหล่ต่ำ (line_flex_low_stock_part_row) โดยตั้งใจ — สองการแจ้งเตือนนี้
+ * อ่านคู่กันทุกเช้า ถ้าคนละทรงต้องเรียนรู้สองแบบ · และแถวทรงนี้กินราว 1.1 KB เทียบกับ
+ * ทรงเดิมที่มีแถบเส้น + กรอบสีสองชุด 2.4 KB ซึ่งเป็นเหตุผลเดียวที่การ์ดต้องแตกสองข้อความ
  *
  * @param array<string,mixed> $item
  * @return array<string,mixed>
@@ -173,14 +121,28 @@ function line_flex_fg_row(array $item): array
     $required  = (int)$item['required'];
     $color     = line_flex_fg_color($available, $required);
 
+    // ยอดขาดเก็บเป็นค่าติดลบ แต่หัวคอลัมน์อ่านว่า "ต้องผลิต" อยู่แล้ว จึงแสดงเป็นบวก
+    // แบบเดียวกับการ์ดอะไหล่ต่ำที่ตัวเลขใหญ่คือจำนวน ไม่ใช่ส่วนต่าง
+    $needQty = abs((int)$item['need']);
+
     $leasingQty = (int)($item['leasing_qty'] ?? 0);
-    $leasingSuffix = $leasingQty > 0 ? ' (+' . $leasingQty . ' เช่า)' : '';
+    $haveText = 'มี ' . $available . ($leasingQty > 0 ? ' (+' . $leasingQty . ' เช่า)' : '')
+        . ' / ต้องมี ' . $required;
+
+    $image = [
+        'type' => 'image',
+        'url' => line_flex_fg_image_url((string)$item['product_name'], (string)($item['image_url'] ?? '')),
+        'size' => 'xs', 'aspectMode' => 'fit', 'aspectRatio' => '1:1',
+        'flex' => 0, 'gravity' => 'center',
+    ];
 
     $nameText = [
         'type' => 'text',
         'text' => line_flex_fg_text((string)$item['product_name'], 60),
-        'size' => 'xs', 'weight' => 'bold', 'color' => '#1a5fb4', 'flex' => 7, 'wrap' => true,
+        'size' => 'sm', 'weight' => 'bold', 'color' => '#1a5fb4', 'wrap' => true,
     ];
+    // ลิงก์ติดที่ชื่อรุ่นอย่างเดียว ไม่ติดที่รูปด้วย — ซ้ำอีกที่กิน 110 byte ต่อแถว
+    // ซึ่งคูณ 27 รุ่นแล้วเท่ากับการ์ดทั้งใบ และเป็นตัวตัดสินว่าจบข้อความเดียวได้หรือไม่
     if (!empty($item['detail_url'])) {
         $nameText['action'] = [
             'type'  => 'uri',
@@ -190,76 +152,32 @@ function line_flex_fg_row(array $item): array
     }
 
     return [
-        'type' => 'box', 'layout' => 'horizontal', 'height' => LINE_FLEX_FG_ROW_HEIGHT, 'margin' => 'lg',
+        'type' => 'box', 'layout' => 'horizontal',
+        'paddingTop' => '8px', 'paddingStart' => '4px', 'paddingEnd' => '4px', 'alignItems' => 'center',
         'contents' => [
-            // รูปสินค้า — จัดกึ่งกลางช่องทั้งแนวตั้งและแนวนอน
             [
-                'type' => 'box', 'layout' => 'vertical', 'flex' => 0, 'width' => '58px',
-                'backgroundColor' => '#f5f5f5', 'cornerRadius' => '6px', 'paddingAll' => '3px',
-                'justifyContent' => 'center', 'alignItems' => 'center',
+                'type' => 'box', 'layout' => 'vertical', 'flex' => 0,
+                'width' => '40px', 'height' => '40px', 'cornerRadius' => '6px', 'backgroundColor' => '#f5f5f5',
+                'contents' => [$image],
+            ],
+            [
+                'type' => 'box', 'layout' => 'vertical', 'flex' => 1, 'paddingStart' => '10px',
                 'contents' => [
-                    [
-                        'type' => 'image',
-                        'url' => line_flex_fg_image_url((string)$item['product_name'], (string)($item['image_url'] ?? '')),
-                        'size' => 'full',
-                        'aspectMode' => 'fit',
-                        'aspectRatio' => '1:1',
-                    ],
+                    $nameText,
+                    ['type' => 'text', 'text' => line_flex_fg_text((string)$item['product_code'], 30),
+                     'size' => 'xxs', 'color' => '#999999'],
                 ],
             ],
-
-            // รายละเอียด
             [
-                'type' => 'box', 'layout' => 'vertical', 'flex' => 1, 'paddingStart' => '8px',
+                'type' => 'box', 'layout' => 'vertical', 'flex' => 0, 'alignItems' => 'flex-end',
                 'contents' => [
-                    [
-                        'type' => 'box', 'layout' => 'horizontal',
-                        'contents' => [
-                            $nameText,
-                            [
-                                'type' => 'text', 'text' => (string)(int)$item['need'],
-                                'size' => 'lg', 'weight' => 'bold', 'color' => $color, 'flex' => 3, 'align' => 'end',
-                            ],
-                        ],
-                    ],
-                    [
-                        'type' => 'box', 'layout' => 'horizontal',
-                        'contents' => [
-                            ['type' => 'text', 'text' => line_flex_fg_text((string)$item['product_code'], 30), 'size' => 'xxs', 'color' => '#999999', 'flex' => 7],
-                            ['type' => 'text', 'text' => 'ต้องผลิต', 'size' => 'xxs', 'color' => '#999999', 'flex' => 3, 'align' => 'end'],
-                        ],
-                    ],
-
-                    line_flex_fg_bar($available, $required, $color),
-
-                    line_flex_fg_metric_pill(
-                        'คงเหลือ',
-                        (int)$item['stock_qty'] . $leasingSuffix,
-                        $available,
-                        '#eaf2fc', '#4a7ab8', '#1a5fb4'
-                    ),
-                    line_flex_fg_metric_pill(
-                        'ขั้นต่ำ+PO',
-                        (int)$item['minimum_stock'] . ' + ' . (int)$item['po_qty'],
-                        $required,
-                        '#fdeeea', '#b5705a', '#b02a1e'
-                    ),
+                    ['type' => 'text', 'text' => (string)$needQty,
+                     'size' => 'lg', 'weight' => 'bold', 'color' => $color, 'align' => 'end'],
+                    ['type' => 'text', 'text' => $haveText,
+                     'size' => 'xxs', 'color' => '#999999', 'align' => 'end', 'margin' => 'xs'],
                 ],
             ],
         ],
-    ];
-}
-
-/**
- * แถวเปล่าความสูงเท่าแถวจริง — เติมการ์ดที่มีรายการน้อยกว่าให้สูงเท่ากัน
- *
- * @return array<string,mixed>
- */
-function line_flex_fg_placeholder_row(): array
-{
-    return [
-        'type' => 'box', 'layout' => 'vertical', 'height' => LINE_FLEX_FG_ROW_HEIGHT, 'margin' => 'lg',
-        'contents' => [['type' => 'filler']],
     ];
 }
 
@@ -312,23 +230,17 @@ function line_flex_fg_card_chunks(array $items, int $maxPerCard): array
  * @param int $totalItems จำนวนรุ่นติดลบทั้งหมด
  * @param int $totalShortage ยอดขาดรวม (ค่าติดลบ)
  * @param string $timestamp เวลาที่สรุป
- * @param int $rowsPerCard จำนวนแถวที่ทุกการ์ดต้องมีเท่ากัน
  * @return array<string,mixed>
  */
-function line_flex_fg_bubble(array $items, int $page, int $totalPages, int $totalItems, int $totalShortage, string $timestamp, int $rowsPerCard = 0): array
+function line_flex_fg_bubble(array $items, int $page, int $totalPages, int $totalItems, int $totalShortage, string $timestamp): array
 {
+    // ไม่เติมแถวเปล่าให้ทุกการ์ดสูงเท่ากันแล้ว: ชื่อรุ่นยาวจะตัดเป็นสองบรรทัด ความสูงจริงของ
+    // แต่ละแถวจึงไม่เท่ากันอยู่ดี แถวเปล่าความสูงคงที่ได้ผลเป็นช่องว่างก้อนโตเหนือท้ายการ์ด
+    // ซึ่งดูแย่กว่าการ์ดสูงไม่เท่ากันเฉย ๆ (การ์ดอะไหล่ต่ำก็ไม่เท่ากันและอ่านได้ปกติ)
     $rows = [];
-    foreach ($items as $index => $item) {
-        if ($index > 0) {
-            $rows[] = ['type' => 'separator', 'color' => '#f0f0f0', 'margin' => 'lg'];
-        }
+    foreach ($items as $item) {
         $rows[] = line_flex_fg_row($item);
-    }
-
-    $rowsPerCard = max($rowsPerCard, count($items));
-    for ($i = count($items); $i < $rowsPerCard; $i++) {
-        $rows[] = ['type' => 'separator', 'color' => '#f0f0f0', 'margin' => 'lg'];
-        $rows[] = line_flex_fg_placeholder_row();
+        $rows[] = ['type' => 'separator', 'color' => '#f0f0f0', 'margin' => 'xs'];
     }
 
     return [
@@ -346,9 +258,15 @@ function line_flex_fg_bubble(array $items, int $page, int $totalPages, int $tota
                 ],
                 [
                     'type' => 'text',
-                    'text' => ($totalPages > 1 ? 'การ์ด ' . $page . '/' . $totalPages . ' | ' : '') . '🕐 ' . $timestamp,
+                    'text' => '📦 ' . count($items) . ' รุ่น'
+                        . ($totalPages > 1 ? ' (' . $page . '/' . $totalPages . ')' : '')
+                        . ' | 🕐 ' . $timestamp,
                     'size' => 'xxs', 'color' => '#ffc9c4', 'margin' => 'xs', 'wrap' => true,
                 ],
+                // บอกว่ายังมีการ์ดต่อทางขวา ไม่งั้นคนอ่านการ์ดแรกแล้วนึกว่าจบแค่นั้น
+                ($totalPages > 1 && $page < $totalPages)
+                    ? ['type' => 'text', 'text' => 'เลื่อนดูการ์ดถัดไป →', 'size' => 'xxs', 'color' => '#ffd0cb', 'margin' => 'xs', 'align' => 'end']
+                    : ['type' => 'filler'],
             ],
         ],
         'body' => [
@@ -368,12 +286,52 @@ function line_flex_fg_bubble(array $items, int $page, int $totalPages, int $tota
         'footer' => [
             'type' => 'box', 'layout' => 'vertical', 'paddingAll' => '12px', 'backgroundColor' => '#fff4f2', 'cornerRadius' => '12px',
             'contents' => [
-                ['type' => 'text', 'text' => 'แถบเส้น = Stock คงเหลือ(+เช่า) ต่อ ขั้นต่ำ+PO', 'size' => 'xxs', 'color' => '#b02a1e', 'align' => 'center', 'wrap' => true],
+                ['type' => 'text', 'text' => 'ตัวเลขใหญ่ = ต้องผลิตเพิ่ม · มี = คงเหลือ+เช่า · ต้องมี = ขั้นต่ำ+PO', 'size' => 'xxs', 'color' => '#b02a1e', 'align' => 'center', 'wrap' => true],
                 ['type' => 'separator', 'margin' => 'sm', 'color' => '#ffd9d3'],
                 ['type' => 'text', 'text' => '✅ Setup System · เช็ค Stock สินค้าสำเร็จรูป', 'size' => 'xxs', 'color' => '#bbbbbb', 'align' => 'center', 'margin' => 'sm'],
             ],
         ],
     ];
+}
+
+/**
+ * ประกอบการ์ดทั้งชุดที่ความหนาแน่นที่กำหนด
+ *
+ * @param array<int,array<string,mixed>> $items
+ * @param int $itemsPerCard
+ * @param int $totalItems
+ * @param int $totalShortage
+ * @param string $timestamp
+ * @return array<int,array<string,mixed>>
+ */
+function line_flex_fg_build_bubbles(array $items, int $itemsPerCard, int $totalItems, int $totalShortage, string $timestamp): array
+{
+    $chunks = line_flex_fg_card_chunks($items, $itemsPerCard);
+    $totalPages = count($chunks);
+
+    $bubbles = [];
+    foreach ($chunks as $index => $chunk) {
+        $bubbles[] = line_flex_fg_bubble($chunk, $index + 1, $totalPages, $totalItems, $totalShortage, $timestamp);
+    }
+    return $bubbles;
+}
+
+/**
+ * การ์ดชุดนี้อยู่ในข้อความเดียวได้ไหม (ทั้งจำนวนการ์ดและขนาด payload)
+ *
+ * @param array<int,array<string,mixed>> $bubbles
+ * @return bool
+ */
+function line_flex_fg_fits_one_message(array $bubbles): bool
+{
+    if (count($bubbles) > LINE_FLEX_FG_MAX_CARDS) {
+        return false;
+    }
+    $bytes = 0;
+    foreach ($bubbles as $bubble) {
+        $bytes += strlen(json_encode($bubble, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+    return $bytes <= LINE_FLEX_FG_MESSAGE_BYTE_BUDGET;
 }
 
 /**
@@ -399,17 +357,16 @@ function line_flex_finishgood_shortage_messages(array $items, ?string $timestamp
         $totalShortage += (int)$item['need'];
     }
 
-    $chunks = line_flex_fg_card_chunks($items, LINE_FLEX_FG_ITEMS_PER_CARD);
-    $totalPages = count($chunks);
-
-    $rowsPerCard = 0;
-    foreach ($chunks as $chunk) {
-        $rowsPerCard = max($rowsPerCard, count($chunk));
-    }
-
+    // หาจำนวนรุ่นต่อการ์ดที่น้อยที่สุดที่ยังทำให้ทุกการ์ดอยู่ในแถวเดียว (ข้อความเดียว)
+    // LINE บังคับ 2 อย่าง: ข้อความละ 50 KB และ carousel ละ 12 การ์ด — ยัดรุ่นต่อการ์ด
+    // มากขึ้นคือทางเดียวที่ลดจำนวนการ์ดลงได้ เพราะหัว/ท้ายการ์ดเสียไบต์ซ้ำทุกใบ
+    // ถ้าอัดจนถึงเพดานแล้วยังไม่พอ ก็ปล่อยให้ตัวจัดกลุ่มข้างล่างแตกเป็นหลายข้อความตามเดิม
     $bubbles = [];
-    foreach ($chunks as $index => $chunk) {
-        $bubbles[] = line_flex_fg_bubble($chunk, $index + 1, $totalPages, $totalItems, $totalShortage, $timestamp, $rowsPerCard);
+    for ($per = LINE_FLEX_FG_ITEMS_PER_CARD; $per <= LINE_FLEX_FG_ITEMS_PER_CARD_MAX; $per++) {
+        $bubbles = line_flex_fg_build_bubbles($items, $per, $totalItems, $totalShortage, $timestamp);
+        if (line_flex_fg_fits_one_message($bubbles)) {
+            break;
+        }
     }
 
     // จัด bubble ลงข้อความแบบ greedy ตามงบ byte และจำนวน bubble สูงสุด
