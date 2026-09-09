@@ -319,6 +319,17 @@
             });
         }
 
+        // ปุ่ม "เมนู" บนแถบล่างของมือถือ — เปิด off-canvas ตัวเดิม ไม่ได้ทำกลไกใหม่
+        // ไม่ persist สถานะ เพราะบนมือถือเมนูเต็มเป็นของชั่วคราว เปิดแล้วเลือกแล้วปิด
+        // ถ้า persist ไว้ หน้าถัดไปจะเปิดมาพร้อมเมนูคลุมจออยู่
+        var mbarMore = document.querySelector('.mbar-more');
+        if (mbarMore) {
+            mbarMore.addEventListener('click', function (e) {
+                e.stopPropagation();
+                setExpanded(!isExpanded(), false);
+            });
+        }
+
         // ปุ่มแว่นในรางแคบ: ขยายเมนูก่อน แล้วค่อยโฟกัสช่องค้นหา
         // รอ 280ms ให้ transition ของกล่อง (260ms) จบก่อน ไม่งั้นโฟกัสตอนช่องยังกว้าง 0
         // แล้วเบราว์เซอร์จะเลื่อนหน้าไปหา element ที่มองไม่เห็น

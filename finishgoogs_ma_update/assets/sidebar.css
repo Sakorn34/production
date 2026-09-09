@@ -842,3 +842,61 @@
   top: -7px;
   border-top: 1px solid rgba(255, 255, 255, .14);
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   แถบเมนูล่างสำหรับมือถือ (UX เฟส 3 ข้อ 1)
+
+   ต่ำกว่า 640px แถบเมนูซ้ายหายไปทั้งแท่ง แล้วแถบนี้ขึ้นมาแทน — เดิมแถบซ้ายแบบหุบ
+   กิน 56 จาก 390px คือ 14% ของจอ ตลอดเวลา เพื่อแสดงไอคอน 40x39px ที่เล็กกว่า
+   เกณฑ์เป้าสัมผัส 44px อยู่แล้ว · เมนูเต็มยังเปิดได้จากปุ่ม "เมนู" ซึ่งใช้ off-canvas
+   ตัวเดิมที่มีอยู่แล้ว ไม่ได้ทำกลไกใหม่
+   ───────────────────────────────────────────────────────────────────────────── */
+.mbar { display: none; }
+
+@media (max-width: 640px) {
+  .mbar {
+    display: flex;
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 75;
+    background: var(--surface, #fff);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -2px 12px color-mix(in srgb, var(--sidebar-bg) 10%, transparent);
+    /* กันแถบโดนแถบ home ของ iPhone บัง */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .mbar-item {
+    flex: 1 1 0;
+    min-width: 0;
+    /* 48px คือความสูงเป้าสัมผัสที่ตั้งไว้ ไม่ใช่แค่ 44px ขั้นต่ำ — ช่างใส่ถุงมือกดได้ */
+    min-height: 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 2px;
+    border: 0;
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: calc(11px * var(--font-scale, 1));
+    line-height: 1.2;
+    text-decoration: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mbar-item:active { background: var(--surface-muted); }
+  .mbar-ico { display: flex; width: 22px; height: 22px; }
+  .mbar-ico svg { width: 22px; height: 22px; }
+  .mbar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .mbar-item.is-current { color: var(--primary); font-weight: 700; }
+  .mbar-item:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+
+  /* แถบซ้ายแบบหุบไม่ต้องมีแล้ว — แต่ตอนกดปุ่มเมนู (nav-expanded) ยังต้องเลื่อนออกมาได้ */
+  .app:not(.nav-expanded) .sidebar { display: none; }
+
+  /* เว้นที่ให้แถบล่างไม่ทับเนื้อหาบรรทัดสุดท้าย */
+  .content { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+}

@@ -1640,3 +1640,48 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
 .wr-switch.is-on { background: var(--success, #16a34a); }
 .wr-switch.is-on span { transform: translateX(17px); }
 .wr-switch:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ทางลัดสแกน → บันทึก บนมือถือ (UX เฟส 3 ข้อ 4)
+
+   หน้าเครื่องยาว 1.9 จอบนมือถือ ช่างที่สแกนมาแล้วต้องเลื่อนกลับขึ้นไปหาปุ่มทุกครั้ง
+   ที่อ่านประวัติเสร็จ · ตรึงแถบปุ่มไว้บนสุด ปุ่ม "บันทึก MA" กับ "เบิกอะไหล่"
+   จึงอยู่ในระยะเอื้อมตลอดโดยไม่ต้องเพิ่มปุ่มลอยอีกชุด
+   ───────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .asset-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: var(--page-bg);
+    padding-top: 8px;
+    padding-bottom: 8px;
+    margin-inline: -4px;
+    padding-inline: 4px;
+    box-shadow: 0 6px 10px -8px color-mix(in srgb, var(--sidebar-bg) 30%, transparent);
+  }
+  /* ปุ่มเรียงสองคอลัมน์แทนการบีบให้อยู่บรรทัดเดียวจนแตะพลาด
+     flex-grow เป็น 0 — ไม่งั้นปุ่มที่เหลือตัวเดียวบนแถวจะยืดเต็มความกว้าง
+     แล้วดูสำคัญเท่าปุ่มหลักทั้งที่ไม่ใช่ */
+  .asset-toolbar-actions { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+  .asset-toolbar-actions > .btn { flex: 0 1 calc(50% - 4px); justify-content: center; }
+  /* งานหลักของช่างคือบันทึก MA — ดันขึ้นแถวแรกและกินเต็มความกว้าง */
+  .asset-toolbar-actions > .btn[href*="ma.php?record="] { order: -1; flex: 1 1 100%; }
+}
+
+/* แถบร่างที่กรอกค้างไว้ (UX เฟส 3 ข้อ 3) — ถามก่อนเสมอ ไม่เติมค่าให้เอง */
+.ma-draft-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--primary);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--primary-soft);
+  font-size: var(--fs-sm);
+}
+.ma-draft-text { flex: 1 1 220px; color: var(--primary-ink, var(--text)); font-weight: 600; }

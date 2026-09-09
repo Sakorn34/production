@@ -1059,7 +1059,7 @@ $maFwMode = effective_fw_input_mode($productId);
       <textarea name="remark" id="ma_remark" class="field-note ma-remark" rows="2" placeholder="บันทึกเพิ่มเติม…"><?= h($ea ? $ea['remark'] : ($maProductPrefill['remark'] ?? '')) ?></textarea>
 
       <div class="full ma-form-actions">
-        <button type="submit" id="ma-submit-btn"><?= $ea ? '💾 บันทึกการแก้ไข' : '💾 บันทึก MA' ?></button>
+        <button type="submit" id="ma-submit-btn"><?= $ea ? 'บันทึกการแก้ไข' : 'บันทึก MA' ?></button>
         <?php if ($ea) { ?><a class="btn btn-line" href="<?= h($maListUrl) ?>">ยกเลิก</a><?php } ?>
       </div>
     </form>
@@ -1500,7 +1500,7 @@ window.addEventListener('pageshow', function(e) {
     var btn = document.getElementById('ma-submit-btn');
     if (btn) {
       btn.disabled = false;
-      btn.textContent = btn.dataset.defaultLabel || '💾 บันทึกการแก้ไข';
+      btn.textContent = btn.dataset.defaultLabel || 'บันทึกการแก้ไข';
     }
     return;
   }
@@ -1508,7 +1508,7 @@ window.addEventListener('pageshow', function(e) {
   var btn = document.getElementById('ma-submit-btn');
   if (!btn) return;
   btn.disabled = false;
-  btn.textContent = btn.dataset.defaultLabel || '💾 บันทึก MA';
+  btn.textContent = btn.dataset.defaultLabel || 'บันทึก MA';
 });
 (function(){
   var btn = document.getElementById('ma-submit-btn');
@@ -1622,6 +1622,115 @@ populateMaEditChips();
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', populateMaEditChips);
 }
+
+/* ── ร่างที่ยังไม่ได้บันทึก (UX เฟส 3 ข้อ 3) ─────────────────────────────────
+   ช่างกรอกฟอร์มนี้หน้างาน ซึ่งสัญญาณหลุดและจอดับได้ตลอด · ฟอร์มยาว 3.4 จอบนมือถือ
+   กรอกใหม่ทั้งชุดคือเสียเวลาจริง จึงเก็บร่างไว้ในเครื่องผูกกับ S/N
+
+   ไม่เติมค่ากลับให้เองเงียบ ๆ — ขึ้นแถบถามก่อนเสมอ เพราะถ้าเผลอเติมค่าของเครื่องก่อน
+   หน้าลงในเครื่องใหม่แล้วกดบันทึก จะได้ข้อมูล MA ที่ผิดเครื่องโดยไม่มีใครรู้
+   โหมดแก้ไขไม่เก็บ ที่นั่นมีค่าจากฐานอยู่แล้ว ร่างจะทับของจริง                */
+(function(){
+  var form = document.getElementById("ma-form");
+  if (!form || maEditMode) return;
+  var codeInput = document.getElementById("ma_code");
+  if (!codeInput) return;
+
+  var PREFIX = "fg-ma-draft:";
+  var MAX_AGE = 24 * 60 * 60 * 1000;   // ร่างข้ามวันไม่ควรเด้งกลับมา งานคนละรอบแล้ว
+  var saveTimer = null;
+
+  function keyFor(code) {
+    code = (code || "").trim().toUpperCase();
+    return code ? PREFIX + code : "";
+  }
+
+  function collect() {
+    var data = { f: {}, chips: {} };
+    [].forEach.call(form.querySelectorAll("input, select, textarea"), function (el) {
+      if (!el.name || el.type === "hidden" || el.type === "file" || el.name === "csrf") return;
+      if (el.type === "checkbox" || el.type === "radio") { data.f[el.name] = el.checked ? el.value : ""; }
+      else { data.f[el.name] = el.value; }
+    });
+    FIELDS.forEach(function (k) { data.chips[k] = chipValues(k); });
+    return data;
+  }
+
+  function isEmpty(d) {
+    var any = false;
+    FIELDS.forEach(function (k) { if ((d.chips[k] || []).length) any = true; });
+    if (any) return false;
+    return !(d.f.remark || "").trim() && !(d.f.fw_version || "").trim();
+  }
+
+  function save() {
+    try {
+      var key = keyFor(codeInput.value);
+      if (!key) return;
+      var d = collect();
+      if (isEmpty(d)) { localStorage.removeItem(key); return; }
+      localStorage.setItem(key, JSON.stringify({ at: Date.now(), data: d }));
+    } catch (e) { /* โหมดส่วนตัว/พื้นที่เต็ม — ไม่ต้องรบกวนผู้ใช้ */ }
+  }
+
+  function clearDraft() {
+    try { var k = keyFor(codeInput.value); if (k) localStorage.removeItem(k); } catch (e) {}
+  }
+
+  function apply(d) {
+    Object.keys(d.f).forEach(function (name) {
+      var el = form.querySelector("[name=\"" + name + "\"]");
+      if (!el || el.readOnly) return;
+      if (el.type === "checkbox" || el.type === "radio") { el.checked = !!d.f[name]; }
+      else { el.value = d.f[name]; }
+    });
+    FIELDS.forEach(function (k) {
+      var box = document.getElementById("chips-" + k);
+      if (box) box.innerHTML = "";
+      (d.chips[k] || []).forEach(function (v) { addChip(k, v, true); });
+    });
+    if (typeof updateMaSnippets === "function") updateMaSnippets();
+  }
+
+  function offer() {
+    var key = keyFor(codeInput.value);
+    if (!key) return;
+    var raw;
+    try { raw = localStorage.getItem(key); } catch (e) { return; }
+    if (!raw) return;
+    var saved;
+    try { saved = JSON.parse(raw); } catch (e) { localStorage.removeItem(key); return; }
+    if (!saved || !saved.data || (Date.now() - (saved.at || 0)) > MAX_AGE) { localStorage.removeItem(key); return; }
+    if (document.querySelector(".ma-draft-bar")) return;
+
+    var when = new Date(saved.at);
+    var bar = document.createElement("div");
+    bar.className = "ma-draft-bar";
+    bar.innerHTML = "<span class=\"ma-draft-text\">มีร่างที่กรอกค้างไว้ของเครื่องนี้ เมื่อ "
+      + String(when.getHours()).padStart(2, "0") + ":" + String(when.getMinutes()).padStart(2, "0")
+      + "</span>";
+    var use = document.createElement("button");
+    use.type = "button"; use.className = "btn btn-sm btn-primary"; use.textContent = "ใช้ร่างนี้";
+    var drop = document.createElement("button");
+    drop.type = "button"; drop.className = "btn btn-sm btn-line"; drop.textContent = "ทิ้งร่าง";
+    use.addEventListener("click", function () { apply(saved.data); bar.remove(); });
+    drop.addEventListener("click", function () { clearDraft(); bar.remove(); });
+    bar.appendChild(use); bar.appendChild(drop);
+    form.insertBefore(bar, form.firstChild);
+  }
+
+  function queueSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(save, 600);
+  }
+  form.addEventListener("input", queueSave);
+  // ชิป (ตรวจผ่าน/เปลี่ยน/ซ่อม) เพิ่มและลบด้วยการคลิก ไม่ยิง input — ดักคลิกด้วย
+  form.addEventListener("click", queueSave);
+  // บันทึกสำเร็จแล้วร่างต้องหายไป ไม่งั้นครั้งหน้าจะถูกถามถึงงานที่ทำจบไปแล้ว
+  form.addEventListener("submit", clearDraft);
+  codeInput.addEventListener("asset-picked", offer);
+  offer();
+})();
 </script>
 <?php } ?>
 

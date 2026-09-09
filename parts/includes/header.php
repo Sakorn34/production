@@ -98,5 +98,9 @@ a.classList.remove('nav-collapsed');a.classList.add('nav-expanded');}}catch(e){}
         </div>
     </aside>
     <div class="sidebar-backdrop nav-backdrop" id="sidebar-backdrop" hidden aria-hidden="true"></div>
+    <?php // แถบล่างชุดเดียวกับฝั่งทะเบียนเครื่อง — ช่างเดินข้ามสองแอปตอนเบิกอะไหล่
+          // ถ้ามีแค่ฝั่งเดียว แถบจะหายไปกลางทางแล้วต้องกดย้อนกลับเอง
+          $mbarCur = 'pages/' . basename((string)($_SERVER['SCRIPT_NAME'] ?? '')); ?>
+    <?= ui_mobile_bar_html($mbarCur, $fgBase, ui_parts_base_url()) ?>
 
     <main class="content">

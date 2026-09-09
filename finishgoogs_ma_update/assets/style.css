@@ -1121,3 +1121,37 @@ button:active, .btn:active { transform: scale(.96); }
 #list-overlay .list-modal-box:has(.formgrid.form-narrow) .formgrid.form-narrow {
   max-width: 100%;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   เป้าสัมผัสขนาดนิ้วบนมือถือ (UX เฟส 3 ข้อ 2)
+
+   วัดบนจอ 390px ก่อนแก้: ปุ่มหลัก 34-40px · 16 จาก 28 เป้าสัมผัสในหน้าสแกน
+   และ 15 จาก 72 ในหน้า MA ต่ำกว่าเกณฑ์ 44px · ช่างหน้างานกดด้วยนิ้วโป้งข้างเดียว
+   บางทีใส่ถุงมือ จึงตั้งไว้ที่ 48px ไม่ใช่แค่ 44px ขั้นต่ำ
+
+   ใช้เฉพาะต่ำกว่า 640px — จอใหญ่ที่ใช้เมาส์ยังเป็นขนาดเดิม ไม่ต้องเสียพื้นที่
+   ───────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .btn, .btn-sm, button.btn, a.btn { min-height: 48px; }
+  .btn-sm { padding: 0 15px; }
+
+  /* ปุ่มที่ไม่ได้ใส่คลาส .btn แต่ช่างกดจริงทุกครั้ง — ปุ่มบันทึกท้ายฟอร์ม,
+     ปุ่มเลือกสถานะเครื่อง (เช่า/สำรอง/ซ่อมแล้ว/เสื่อมสภาพ) และปุ่ม ▾ เปิดรายการชิป
+     ปุ่ม ▾ แคบด้วย จึงกำหนดความกว้างขั้นต่ำไปพร้อมกัน */
+  button[type=submit], .ma-choice-btn { min-height: 48px; }
+  .chip-dd-btn { min-height: 48px; min-width: 48px; }
+
+  /* ช่องกรอกด้วย — แตะพลาดแล้วต้องเลื่อนหน้าหาใหม่เสียเวลากว่าปุ่มพลาด
+     16px กัน iOS ซูมเข้าอัตโนมัติตอนโฟกัส ซึ่งทำให้ layout เด้งทั้งหน้า */
+  input[type=text], input[type=search], input[type=date], input[type=datetime-local],
+  input[type=password], input[type=number], input[type=tel], select, textarea {
+    min-height: 48px;
+    font-size: max(16px, calc(14px * var(--font-scale, 1)));
+  }
+  textarea { min-height: 96px; }
+
+  /* checkbox/radio ตัวจริงเล็กเกินจะแตะ — ขยายพื้นที่กดผ่าน label ที่ครอบอยู่ */
+  label:has(> input[type=checkbox]),
+  label:has(> input[type=radio]) { min-height: 48px; display: flex; align-items: center; }
+  input[type=checkbox], input[type=radio] { width: 20px; height: 20px; }
+}

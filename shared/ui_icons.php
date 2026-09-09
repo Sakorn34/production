@@ -532,3 +532,52 @@ function app_release_version()
     }
     return $cached = '';
 }
+
+/**
+ * แถบเมนูล่างสำหรับมือถือ — 4 ปุ่มที่ช่างใช้จริงตอนอยู่หน้างาน + ปุ่มเปิดเมนูเต็ม
+ *
+ * บนจอมือถือ แถบเมนูซ้ายแบบหุบยังกินความกว้าง 56 จาก 390px (14% ของจอ) ตลอดเวลา
+ * เพื่อแสดงไอคอนขนาด 40px ที่ต่ำกว่าเกณฑ์เป้าสัมผัส 44px อยู่แล้ว · CSS ซ่อนแถบซ้าย
+ * ต่ำกว่า 640px แล้วให้แถบนี้ขึ้นมาแทน คืนความกว้างให้เนื้อหาและวางปุ่มไว้ระยะที่นิ้วโป้ง
+ * เอื้อมถึงโดยไม่ต้องขยับมือ
+ *
+ * รายการปุ่มตายตัวตามงานของช่าง ไม่ได้ดึงจาก nav_effective() เพราะลำดับเมนูผู้ใช้
+ * จัดเองได้ แต่เคารพการซ่อน: ส่งชื่อไฟล์ที่ถูกซ่อนมาใน $hidden แล้วปุ่มนั้นจะไม่ขึ้น
+ *
+ * @param string   $currentFile ชื่อไฟล์หน้าปัจจุบัน เช่น scan.php หรือ pages/products.php
+ * @param string   $fgBase      base URL ระบบทะเบียนเครื่อง
+ * @param string   $partsBase   base URL ระบบอะไหล่
+ * @param string[] $hidden      ชื่อไฟล์ฝั่งทะเบียนเครื่องที่ผู้ใช้ซ่อนไว้
+ * @return string
+ */
+function ui_mobile_bar_html(string $currentFile, string $fgBase, string $partsBase, array $hidden = []): string
+{
+    $fg = rtrim($fgBase, '/');
+    $pt = rtrim($partsBase, '/');
+
+    $items = [
+        ['file' => 'scan.php',           'href' => $fg . '/scan.php',           'icon' => 'scan',     'label' => 'สแกน'],
+        ['file' => 'assets.php',         'href' => $fg . '/assets.php',         'icon' => 'assets',   'label' => 'เครื่อง'],
+        ['file' => 'ma.php',             'href' => $fg . '/ma.php',             'icon' => 'ma',       'label' => 'บันทึก MA'],
+        ['file' => 'pages/products.php', 'href' => $pt . '/pages/products.php', 'icon' => 'products', 'label' => 'อะไหล่'],
+    ];
+
+    $out = '<nav class="mbar" aria-label="เมนูลัดสำหรับมือถือ">';
+    foreach ($items as $it) {
+        if (in_array($it['file'], $hidden, true)) {
+            continue;
+        }
+        $isCur = $currentFile === $it['file'] || $currentFile === basename($it['file']);
+        $out .= '<a class="mbar-item' . ($isCur ? ' is-current' : '') . '" href="' . htmlspecialchars($it['href'], ENT_QUOTES, 'UTF-8') . '"'
+              . ($isCur ? ' aria-current="page"' : '') . '>'
+              . '<span class="mbar-ico">' . ui_nav_icon_html($it['icon']) . '</span>'
+              . '<span class="mbar-label">' . htmlspecialchars($it['label'], ENT_QUOTES, 'UTF-8') . '</span>'
+              . '</a>';
+    }
+    // ปุ่มนี้เปิดแถบเมนูเต็มแบบ off-canvas ที่มีอยู่แล้ว — เมนูอื่นทั้งหมดยังเข้าถึงได้
+    $out .= '<button type="button" class="mbar-item mbar-more" aria-label="เปิดเมนูทั้งหมด">'
+          . '<span class="mbar-ico">' . ui_icon_html('menu', 22) . '</span>'
+          . '<span class="mbar-label">เมนู</span>'
+          . '</button>';
+    return $out . '</nav>';
+}
