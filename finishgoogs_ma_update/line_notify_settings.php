@@ -231,6 +231,36 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
 .ln-form h3.ln-form-section { margin-top: 20px; }
 
+/* แถบปุ่มบันทึก/ทดสอบ ลอยติดขอบล่างจอ — ฟอร์มนี้สูงเกือบ 2,000px ถ้าปุ่มอยู่ท้ายฟอร์ม
+   ตามปกติ แก้ค่าช่องบนสุดทีก็ต้องเลื่อนลงสุดหน้าไปกดบันทึกทุกครั้ง */
+.ln-form-actions {
+  position: sticky; bottom: 12px; z-index: 5;
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin-top: 16px; padding: 10px 12px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border); border-radius: var(--radius-sm, 8px);
+  box-shadow: var(--shadow-md);
+}
+
+/* แผงตรวจสอบ/ประวัติ พับเก็บไว้ — เปิดหน้ามาเจอของที่ต้องกรอกกับปุ่มก่อน
+   สองแผงนี้รวมกันสูง 2,000px และเป็นข้อมูลอ่านอย่างเดียวที่ไม่ได้ดูทุกครั้ง */
+.ln-diag { margin-bottom: 12px; padding: 0; }
+.ln-diag > summary {
+  cursor: pointer; list-style: none; padding: 12px 16px;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+}
+.ln-diag > summary::-webkit-details-marker { display: none; }
+.ln-diag > summary::before {
+  content: "▸"; color: var(--text-faint); margin-inline-end: 2px;
+  transition: transform var(--transition, .18s ease); display: inline-block;
+}
+.ln-diag[open] > summary::before { transform: rotate(90deg); }
+.ln-diag > summary:hover { background: var(--surface-muted); }
+.ln-diag[open] > summary { border-bottom: 1px solid var(--border); }
+.ln-diag-title { font-weight: 700; color: var(--primary); font-size: calc(15px * var(--font-scale, 1)); }
+.ln-diag-sub { color: var(--text-faint); font-size: calc(12px * var(--font-scale, 1)); }
+.ln-diag-body { padding: 14px 16px 16px; }
+
 .ln-form-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; max-width: 640px; }
 
 .ln-form-field > label,
@@ -268,186 +298,6 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 .ln-types .tbl tbody tr:first-child td { border-top: 0; }
 
 </style>
-
-
-
-<div class="ln-note">
-
-  <b>LINE Messaging API</b> — เลือกวิธีส่งแต่ละประเภท (ทันที / ตามเวลา / ทั้งสอง) แล้วกด <b>บันทึก</b><br>
-
-  <b>Plesk:</b> ตั้ง Scheduled Task <b>รายการละ 1 task</b> — Run a PHP script ตามคอลัมน์ <b>Plesk script</b> · ตั้งเวลา/วันใน Plesk เท่านั้น · PHP 8.2
-
-</div>
-
-
-
-<div class="ln-grid">
-
-  <div class="ln-card <?= $secretsExists ? 'ok' : 'fail' ?>">
-
-    <b>ไฟล์ secrets</b>
-
-    <span class="muted" style="overflow-wrap:anywhere; font-size:12px"><?= h($secretsPath) ?></span>
-
-  </div>
-
-  <div class="ln-card <?= line_notify_is_enabled() ? 'ok' : 'fail' ?>">
-
-    <b>สถานะระบบ</b>
-
-    <?= line_notify_is_enabled() ? 'เปิดใช้งาน' : 'ปิด / ยังไม่ตั้งค่า' ?>
-
-  </div>
-
-</div>
-
-
-
-<div class="panel ln-plesk-check-panel ln-plesk-check">
-
-  <h3 style="margin:0 0 4px; font-size:15px; color:var(--primary)">ตรวจสอบ Plesk Scheduled Task</h3>
-
-  <p class="muted" style="font-size:12px; margin:0 0 12px">อนุมานจาก config + line-cron.log — PHP ไม่สามารถอ่าน task ใน Plesk โดยตรง</p>
-
-  <div class="ln-grid">
-
-    <div class="ln-card <?= !empty($pleskDiag['system_enabled']) ? 'ok' : 'fail' ?>">
-
-      <b>ระบบ LINE</b>
-
-      <?= !empty($pleskDiag['system_enabled']) ? 'เปิดใช้งาน' : 'ปิด / ยังไม่ตั้งค่า' ?>
-
-    </div>
-
-    <div class="ln-card <?= ($pleskDiag['tasks_required'] > 0 && $pleskDiag['tasks_ok'] >= $pleskDiag['tasks_required']) ? 'ok' : (($pleskDiag['tasks_required'] > 0) ? 'fail' : 'ok') ?>">
-
-      <b>Task ที่ต้องตั้ง</b>
-
-      <?= (int)$pleskDiag['tasks_ok'] ?> / <?= (int)$pleskDiag['tasks_required'] ?> ตรวจแล้วปกติ
-
-    </div>
-
-    <div class="ln-card <?= !empty($pleskDiag['log_exists']) ? 'ok' : 'fail' ?>">
-
-      <b>ไฟล์ log</b>
-
-      <span class="muted" style="overflow-wrap:anywhere; font-size:11px"><?= h((string)$pleskDiag['log_path']) ?></span>
-
-      <?= !empty($pleskDiag['log_exists']) ? ' · พบแล้ว' : ' · ยังไม่มี' ?>
-
-    </div>
-
-    <?php if (($pleskDiag['outbox']['pending'] ?? 0) > 0 || ($pleskDiag['outbox']['failed'] ?? 0) > 0) { ?>
-
-    <div class="ln-card fail">
-
-      <b>Outbox</b>
-
-      <?php if (($pleskDiag['outbox']['pending'] ?? 0) > 0) { ?>รอส่ง <?= (int)$pleskDiag['outbox']['pending'] ?><?php } ?>
-
-      <?php if (($pleskDiag['outbox']['failed'] ?? 0) > 0) { ?> · ล้มเหลว <?= (int)$pleskDiag['outbox']['failed'] ?><?php } ?>
-
-    </div>
-
-    <?php } ?>
-
-  </div>
-
-  <div style="overflow-x:auto; margin-bottom:12px">
-
-    <table class="tbl">
-
-      <thead>
-
-        <tr>
-
-          <th>ประเภท</th>
-
-          <th>ต้องตั้ง?</th>
-
-          <th>Script path</th>
-
-          <th>แนะนำ Plesk</th>
-
-          <th>รันล่าสุด</th>
-
-          <th>สถานะ</th>
-
-        </tr>
-
-      </thead>
-
-      <tbody>
-
-        <?php foreach ($pleskDiag['tasks'] as $task) {
-
-            $st = (string)($task['status'] ?? 'needs_setup');
-
-            $stClass = line_plesk_status_class($st);
-
-        ?>
-
-        <tr>
-
-          <td><b><?= h((string)$task['label']) ?></b></td>
-
-          <td><?= !empty($task['required']) ? 'ใช่' : 'ไม่' ?></td>
-
-          <td><div class="ln-plesk-path"><?= h((string)$task['script_path']) ?></div></td>
-
-          <td>
-
-            <div class="ln-plesk-recipe"><?= h((string)($task['recommended']['recipe'] ?? '')) ?></div>
-
-            <div class="ln-plesk-hint"><?= h((string)$task['plesk_hint']) ?></div>
-
-          </td>
-
-          <td><?= h(line_settings_outbox_format_time($task['last_run_at'] ?? null)) ?></td>
-
-          <td>
-
-            <span class="ln-plesk-status <?= h($stClass) ?>" title="<?= h((string)$task['status_message']) ?>"><?= h(line_plesk_status_label($st)) ?></span>
-
-          </td>
-
-        </tr>
-
-        <?php } ?>
-
-      </tbody>
-
-    </table>
-
-  </div>
-
-  <div class="ln-note" style="margin-bottom:12px">
-
-    <b>คำแนะนำ Plesk</b><br>
-
-    · ลบ/ปิด task เก่า: <code>plesk_line_tick.php</code>, <code>line_notify_scheduled.php --job=tick</code><br>
-
-    <?php if (!empty($pleskDiag['needs_instant_worker'])) { ?>
-
-    · มี event แบบ <b>ทันที</b> — พิจารณา worker สำรอง <code>production/finishgoogs_ma_update/cron/plesk_line_worker.php</code> ทุก 2 นาที (Cron <code>*/2 * * * *</code>)<br>
-
-    <?php } ?>
-
-    · ทดสอบ: กด <b>Run Now</b> ใน Plesk → ควรได้ JSON เช่น <code>{"job":"daily","result":{...}}</code>
-
-  </div>
-
-  <form method="post" style="margin:0">
-
-    <?= csrf_field() ?>
-
-    <input type="hidden" name="action" value="test_worker">
-
-    <button type="submit" class="btn btn-sm btn-line" <?= line_notify_is_enabled() ? '' : 'disabled' ?>>ทดสอบ worker (process outbox)</button>
-
-  </form>
-
-</div>
 
 
 
@@ -503,107 +353,33 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
 
 <?php } ?>
 
+<div class="ln-note">
 
+  <b>LINE Messaging API</b> — เลือกวิธีส่งแต่ละประเภท (ทันที / ตามเวลา / ทั้งสอง) แล้วกด <b>บันทึก</b><br>
 
-<div class="panel ln-outbox-panel">
-
-  <h3 style="margin:0 0 4px; font-size:15px; color:var(--primary)">คิวส่ง LINE ล่าสุด</h3>
-
-  <p class="muted" style="font-size:12px; margin:0 0 12px">รายการ 15 รายการล่าสุด — ดูว่าส่งสำเร็จหรือมีปัญหาอะไร</p>
-
-  <?php if (!$outbox) { ?>
-
-    <p class="ln-outbox-empty">ยังไม่มีรายการในคิว</p>
-
-  <?php } else { ?>
-
-  <div class="ln-outbox-summary">
-
-    <?php if ($outboxSummary['sent'] > 0) { ?>
-
-      <span class="ln-outbox-stat ln-outbox-stat--sent">ส่งแล้ว <?= (int)$outboxSummary['sent'] ?></span>
-
-    <?php } ?>
-
-    <?php if ($outboxSummary['pending'] > 0) { ?>
-
-      <span class="ln-outbox-stat ln-outbox-stat--pending">รอส่ง <?= (int)$outboxSummary['pending'] ?></span>
-
-    <?php } ?>
-
-    <?php if ($outboxSummary['failed'] > 0) { ?>
-
-      <span class="ln-outbox-stat ln-outbox-stat--failed">ล้มเหลว <?= (int)$outboxSummary['failed'] ?></span>
-
-    <?php } ?>
-
-    <?php if ($outboxSummary['dead'] > 0) { ?>
-
-      <span class="ln-outbox-stat ln-outbox-stat--dead">ส่งไม่ได้ <?= (int)$outboxSummary['dead'] ?></span>
-
-    <?php } ?>
-
-  </div>
-
-  <div class="ln-outbox-list">
-
-    <?php foreach ($outbox as $row) {
-
-        $status = (string)($row['status'] ?? 'pending');
-
-        $statusClass = line_settings_outbox_status_class($status);
-
-        $label = line_settings_outbox_event_label((string)$row['event_key'], $catalog);
-
-        $attempts = (int)($row['attempts'] ?? 0);
-
-        $lastError = trim((string)($row['last_error'] ?? ''));
-
-    ?>
-
-    <article class="ln-outbox-item <?= h($statusClass) ?>">
-
-      <div class="ln-outbox-head">
-
-        <span class="ln-outbox-badge <?= h($statusClass) ?>"><?= h(line_settings_outbox_status_label($status)) ?></span>
-
-        <strong class="ln-outbox-title"><?= h($label) ?></strong>
-
-        <span class="ln-outbox-id">#<?= (int)$row['id'] ?></span>
-
-      </div>
-
-      <div class="ln-outbox-meta">
-
-        <span><b>เข้าคิว</b> <?= h(line_settings_outbox_format_time($row['created_at'] ?? null)) ?></span>
-
-        <span><b>ส่งเมื่อ</b> <?= h(line_settings_outbox_format_time($row['sent_at'] ?? null)) ?></span>
-
-        <?php if ($attempts > 1) { ?>
-
-          <span><b>ลองส่ง</b> <?= $attempts ?> ครั้ง</span>
-
-        <?php } ?>
-
-      </div>
-
-      <?php if ($lastError !== '') { ?>
-
-        <div class="ln-outbox-error"><b>สาเหตุ:</b> <?= h($lastError) ?></div>
-
-      <?php } ?>
-
-    </article>
-
-    <?php } ?>
-
-  </div>
-
-  <?php } ?>
+  <b>Plesk:</b> ตั้ง Scheduled Task <b>รายการละ 1 task</b> — Run a PHP script ตามคอลัมน์ <b>Plesk script</b> · ตั้งเวลา/วันใน Plesk เท่านั้น · PHP 8.2
 
 </div>
 
+<div class="ln-grid">
 
+  <div class="ln-card <?= $secretsExists ? 'ok' : 'fail' ?>">
+
+    <b>ไฟล์ secrets</b>
+
+    <span class="muted" style="overflow-wrap:anywhere; font-size:12px"><?= h($secretsPath) ?></span>
+
+  </div>
+
+  <div class="ln-card <?= line_notify_is_enabled() ? 'ok' : 'fail' ?>">
+
+    <b>สถานะระบบ</b>
+
+    <?= line_notify_is_enabled() ? 'เปิดใช้งาน' : 'ปิด / ยังไม่ตั้งค่า' ?>
+
+  </div>
+
+</div>
 
 <form method="post" class="panel ln-form" style="margin-bottom:16px">
   <?= csrf_field() ?>
@@ -808,7 +584,7 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
     </table>
   </div>
 
-  <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:16px">
+  <div class="ln-form-actions">
 
     <button type="submit" class="btn btn-primary">บันทึกการตั้งค่า</button>
 
@@ -817,8 +593,6 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
   </div>
 
 </form>
-
-
 
 <div class="panel ln-types" style="margin-bottom:16px">
 
@@ -867,6 +641,254 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
   </table>
 
 </div>
+
+<details class="panel ln-diag">
+
+  <summary><span class="ln-diag-title">ตรวจสอบ Plesk Scheduled Task</span><span class="ln-diag-sub">อนุมานจาก config + line-cron.log · มีปุ่มทดสอบ worker</span></summary>
+
+  <div class="ln-diag-body">
+
+  <div class="ln-grid">
+
+    <div class="ln-card <?= !empty($pleskDiag['system_enabled']) ? 'ok' : 'fail' ?>">
+
+      <b>ระบบ LINE</b>
+
+      <?= !empty($pleskDiag['system_enabled']) ? 'เปิดใช้งาน' : 'ปิด / ยังไม่ตั้งค่า' ?>
+
+    </div>
+
+    <div class="ln-card <?= ($pleskDiag['tasks_required'] > 0 && $pleskDiag['tasks_ok'] >= $pleskDiag['tasks_required']) ? 'ok' : (($pleskDiag['tasks_required'] > 0) ? 'fail' : 'ok') ?>">
+
+      <b>Task ที่ต้องตั้ง</b>
+
+      <?= (int)$pleskDiag['tasks_ok'] ?> / <?= (int)$pleskDiag['tasks_required'] ?> ตรวจแล้วปกติ
+
+    </div>
+
+    <div class="ln-card <?= !empty($pleskDiag['log_exists']) ? 'ok' : 'fail' ?>">
+
+      <b>ไฟล์ log</b>
+
+      <span class="muted" style="overflow-wrap:anywhere; font-size:11px"><?= h((string)$pleskDiag['log_path']) ?></span>
+
+      <?= !empty($pleskDiag['log_exists']) ? ' · พบแล้ว' : ' · ยังไม่มี' ?>
+
+    </div>
+
+    <?php if (($pleskDiag['outbox']['pending'] ?? 0) > 0 || ($pleskDiag['outbox']['failed'] ?? 0) > 0) { ?>
+
+    <div class="ln-card fail">
+
+      <b>Outbox</b>
+
+      <?php if (($pleskDiag['outbox']['pending'] ?? 0) > 0) { ?>รอส่ง <?= (int)$pleskDiag['outbox']['pending'] ?><?php } ?>
+
+      <?php if (($pleskDiag['outbox']['failed'] ?? 0) > 0) { ?> · ล้มเหลว <?= (int)$pleskDiag['outbox']['failed'] ?><?php } ?>
+
+    </div>
+
+    <?php } ?>
+
+  </div>
+
+  <div style="overflow-x:auto; margin-bottom:12px">
+
+    <table class="tbl">
+
+      <thead>
+
+        <tr>
+
+          <th>ประเภท</th>
+
+          <th>ต้องตั้ง?</th>
+
+          <th>Script path</th>
+
+          <th>แนะนำ Plesk</th>
+
+          <th>รันล่าสุด</th>
+
+          <th>สถานะ</th>
+
+        </tr>
+
+      </thead>
+
+      <tbody>
+
+        <?php foreach ($pleskDiag['tasks'] as $task) {
+
+            $st = (string)($task['status'] ?? 'needs_setup');
+
+            $stClass = line_plesk_status_class($st);
+
+        ?>
+
+        <tr>
+
+          <td><b><?= h((string)$task['label']) ?></b></td>
+
+          <td><?= !empty($task['required']) ? 'ใช่' : 'ไม่' ?></td>
+
+          <td><div class="ln-plesk-path"><?= h((string)$task['script_path']) ?></div></td>
+
+          <td>
+
+            <div class="ln-plesk-recipe"><?= h((string)($task['recommended']['recipe'] ?? '')) ?></div>
+
+            <div class="ln-plesk-hint"><?= h((string)$task['plesk_hint']) ?></div>
+
+          </td>
+
+          <td><?= h(line_settings_outbox_format_time($task['last_run_at'] ?? null)) ?></td>
+
+          <td>
+
+            <span class="ln-plesk-status <?= h($stClass) ?>" title="<?= h((string)$task['status_message']) ?>"><?= h(line_plesk_status_label($st)) ?></span>
+
+          </td>
+
+        </tr>
+
+        <?php } ?>
+
+      </tbody>
+
+    </table>
+
+  </div>
+
+  <div class="ln-note" style="margin-bottom:12px">
+
+    <b>คำแนะนำ Plesk</b><br>
+
+    · ลบ/ปิด task เก่า: <code>plesk_line_tick.php</code>, <code>line_notify_scheduled.php --job=tick</code><br>
+
+    <?php if (!empty($pleskDiag['needs_instant_worker'])) { ?>
+
+    · มี event แบบ <b>ทันที</b> — พิจารณา worker สำรอง <code>production/finishgoogs_ma_update/cron/plesk_line_worker.php</code> ทุก 2 นาที (Cron <code>*/2 * * * *</code>)<br>
+
+    <?php } ?>
+
+    · ทดสอบ: กด <b>Run Now</b> ใน Plesk → ควรได้ JSON เช่น <code>{"job":"daily","result":{...}}</code>
+
+  </div>
+
+  <form method="post" style="margin:0">
+
+    <?= csrf_field() ?>
+
+    <input type="hidden" name="action" value="test_worker">
+
+    <button type="submit" class="btn btn-sm btn-line" <?= line_notify_is_enabled() ? '' : 'disabled' ?>>ทดสอบ worker (process outbox)</button>
+
+  </form>
+
+  </div>
+
+</details>
+
+<details class="panel ln-diag">
+
+  <summary><span class="ln-diag-title">คิวส่ง LINE ล่าสุด</span><span class="ln-diag-sub">15 รายการล่าสุด — ส่งสำเร็จหรือมีปัญหาอะไร</span></summary>
+
+  <div class="ln-diag-body">
+
+  <?php if (!$outbox) { ?>
+
+    <p class="ln-outbox-empty">ยังไม่มีรายการในคิว</p>
+
+  <?php } else { ?>
+
+  <div class="ln-outbox-summary">
+
+    <?php if ($outboxSummary['sent'] > 0) { ?>
+
+      <span class="ln-outbox-stat ln-outbox-stat--sent">ส่งแล้ว <?= (int)$outboxSummary['sent'] ?></span>
+
+    <?php } ?>
+
+    <?php if ($outboxSummary['pending'] > 0) { ?>
+
+      <span class="ln-outbox-stat ln-outbox-stat--pending">รอส่ง <?= (int)$outboxSummary['pending'] ?></span>
+
+    <?php } ?>
+
+    <?php if ($outboxSummary['failed'] > 0) { ?>
+
+      <span class="ln-outbox-stat ln-outbox-stat--failed">ล้มเหลว <?= (int)$outboxSummary['failed'] ?></span>
+
+    <?php } ?>
+
+    <?php if ($outboxSummary['dead'] > 0) { ?>
+
+      <span class="ln-outbox-stat ln-outbox-stat--dead">ส่งไม่ได้ <?= (int)$outboxSummary['dead'] ?></span>
+
+    <?php } ?>
+
+  </div>
+
+  <div class="ln-outbox-list">
+
+    <?php foreach ($outbox as $row) {
+
+        $status = (string)($row['status'] ?? 'pending');
+
+        $statusClass = line_settings_outbox_status_class($status);
+
+        $label = line_settings_outbox_event_label((string)$row['event_key'], $catalog);
+
+        $attempts = (int)($row['attempts'] ?? 0);
+
+        $lastError = trim((string)($row['last_error'] ?? ''));
+
+    ?>
+
+    <article class="ln-outbox-item <?= h($statusClass) ?>">
+
+      <div class="ln-outbox-head">
+
+        <span class="ln-outbox-badge <?= h($statusClass) ?>"><?= h(line_settings_outbox_status_label($status)) ?></span>
+
+        <strong class="ln-outbox-title"><?= h($label) ?></strong>
+
+        <span class="ln-outbox-id">#<?= (int)$row['id'] ?></span>
+
+      </div>
+
+      <div class="ln-outbox-meta">
+
+        <span><b>เข้าคิว</b> <?= h(line_settings_outbox_format_time($row['created_at'] ?? null)) ?></span>
+
+        <span><b>ส่งเมื่อ</b> <?= h(line_settings_outbox_format_time($row['sent_at'] ?? null)) ?></span>
+
+        <?php if ($attempts > 1) { ?>
+
+          <span><b>ลองส่ง</b> <?= $attempts ?> ครั้ง</span>
+
+        <?php } ?>
+
+      </div>
+
+      <?php if ($lastError !== '') { ?>
+
+        <div class="ln-outbox-error"><b>สาเหตุ:</b> <?= h($lastError) ?></div>
+
+      <?php } ?>
+
+    </article>
+
+    <?php } ?>
+
+  </div>
+
+  <?php } ?>
+
+  </div>
+
+</details>
 
 
 

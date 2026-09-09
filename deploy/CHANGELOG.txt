@@ -3459,3 +3459,13 @@ Files:
   finishgoogs_ma_update/config.php
   shared/line_flex_finishgood_shortage.php
 
+
+================================================================
+v2026-09-09_092859 | Patch | 2026-09-09 09:29:02
+From: 2026-09-09_091558  ->  To: 9a0c4bf  |  Files: 2
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/line_notify_settings.php
+
