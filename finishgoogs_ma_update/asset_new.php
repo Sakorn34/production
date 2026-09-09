@@ -438,7 +438,7 @@ page_header('บันทึกเครื่องผลิตใหม่');
   <div class="produce-cols">
     <!-- ซ้าย: ข้อมูลการผลิต + ข้อมูลประจำรุ่น (รวมผู้ผลิต/FW/Lot) -->
     <div class="panel">
-      <h3>🏭 ข้อมูลการผลิต</h3>
+      <h3 class="h-with-icon"><?= ui_icon_html('box', 15, 'h-svg') ?><span>ข้อมูลการผลิต</span></h3>
       <div class="field">
         <label for="produced_at">วันที่ผลิต</label>
         <input type="date" name="produced_at" id="produced_at" value="<?= date('Y-m-d') ?>" required>
@@ -447,14 +447,14 @@ page_header('บันทึกเครื่องผลิตใหม่');
         <label>รายการเครื่องในชุดนี้ <span class="muted" id="unit-hint"></span></label>
         <div id="last-asset-hint" class="muted" style="font-size:12px; margin-bottom:4px; display:none"></div>
         <div id="unit-list"></div>
-        <button type="button" class="btn btn-line btn-sm" id="add-unit" onclick="addUnit()" disabled>➕ เพิ่มเครื่อง</button>
+        <button type="button" class="btn btn-line btn-sm" id="add-unit" onclick="addUnit()" disabled><?= ui_btn_label('plus', 'เพิ่มเครื่อง') ?></button>
         <input type="hidden" name="gen_count" id="gen_count" value="0">
       </div>
       <div class="field">
         <label>ข้อมูลประจำรุ่น <span class="muted">(จากตั้งค่าหลังบ้าน · กด ▾ เลือก หรือพิมพ์ใหม่ได้อิสระ)</span></label>
         <div id="dyn-fields"><span class="muted">เลือกรุ่นสินค้าก่อน</span></div>
         <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center">
-          <button type="button" class="btn btn-line btn-sm" id="add-free-field" onclick="addFreeField()" disabled>➕ เพิ่มฟิลด์กรอกเอง</button>
+          <button type="button" class="btn btn-line btn-sm" id="add-free-field" onclick="addFreeField()" disabled><?= ui_btn_label('plus', 'เพิ่มฟิลด์กรอกเอง') ?></button>
           <span class="muted" style="font-size:12px">เพิ่มฟิลด์นอกเหนือจากที่ตั้งไว้หลังบ้านได้</span>
         </div>
       </div>
@@ -462,7 +462,7 @@ page_header('บันทึกเครื่องผลิตใหม่');
       <div class="field" id="fw-field-wrap"><label>เวอร์ชัน Firmware</label><div id="fw-slot"></div></div>
       <div class="field" id="lot-field-wrap"><label>Lot</label><div id="lot-slot"></div></div>
       <div class="field">
-        <label>📝 ปัญหา / การแก้ไข / หมายเหตุ</label>
+        <label class="h-with-icon"><?= ui_icon_html('edit', 14, 'h-svg') ?><span>ปัญหา / การแก้ไข / หมายเหตุ</span></label>
         <div class="note-stack">
           <div class="field"><label for="problems_found">ปัญหาที่พบ (ถ้ามี)</label><textarea name="problems_found" id="problems_found" class="field-note" rows="2"></textarea></div>
           <div class="field"><label for="fix">การแก้ไข (ถ้ามี)</label><textarea name="fix" id="fix" class="field-note" rows="2"></textarea></div>
@@ -473,7 +473,7 @@ page_header('บันทึกเครื่องผลิตใหม่');
 
     <!-- ขวา: ชุดอะไหล่ + checklist -->
     <div class="panel">
-      <h3>🔩 ชุดอะไหล่ &amp; ตรวจสอบ</h3>
+      <h3 class="h-with-icon"><?= ui_icon_html('parts', 15, 'h-svg') ?><span>ชุดอะไหล่ &amp; ตรวจสอบ</span></h3>
       <div class="field">
         <label>ชุดอะไหล่ที่จะเบิก <span class="muted">(เบิกอัตโนมัติต่อเครื่องตอนบันทึก)</span></label>
         <div id="bom-fields"><span class="muted">เลือกรุ่นสินค้าก่อน</span></div>
@@ -483,13 +483,13 @@ page_header('บันทึกเครื่องผลิตใหม่');
         <div class="chk-list" id="chk-list"><span class="muted">เลือกรุ่นสินค้าก่อน</span></div>
         <div style="display:flex; gap:8px; margin-top:8px">
           <input type="text" id="chk-new" placeholder="เพิ่มข้อตรวจใหม่…" style="flex:1">
-          <button type="button" class="btn btn-line btn-sm" onclick="addChkItem()">➕ เพิ่มข้อ</button>
+          <button type="button" class="btn btn-line btn-sm" onclick="addChkItem()"><?= ui_btn_label('plus', 'เพิ่มข้อ') ?></button>
         </div>
       </div>
     </div>
   </div>
 
-  <div style="margin-top:16px"><button type="submit" id="save-btn" disabled><?= ui_btn_label('save', 'บันทึกทั้งชุด') ?></button></div>
+  <div class="produce-save-bar"><button type="submit" id="save-btn" disabled><?= ui_btn_label('save', 'บันทึกทั้งชุด') ?></button></div>
 </form>
 
 <!-- popup คำสั่งตั้งค่าหมายเลขสินค้า -->
@@ -500,7 +500,7 @@ page_header('บันทึกเครื่องผลิตใหม่');
         <h2 id="prod-snippet-title" class="ma-snippets-title h-with-icon"><?= ui_icon_html('clipboard', 16, 'h-svg') ?><span><?= h(ma_snippets_title(false)) ?></span></h2>
         <p class="muted ma-snippets-lead">อัปเดตตามรหัสเครื่องและฟอร์ม · กดคัดลอกทีละข้อ</p>
       </div>
-      <button type="button" class="btn-sm btn-line" onclick="closeOverlay('prod-snippet-overlay')">✕ ปิด</button>
+      <button type="button" class="btn-sm btn-line" onclick="closeOverlay('prod-snippet-overlay')"><?= ui_btn_label('close', 'ปิด') ?></button>
     </div>
     <?= ma_snippets_inner_html('prod-sn', ['title' => false, 'lead' => false, 'rental' => false]) ?>
   </div>
@@ -510,14 +510,14 @@ page_header('บันทึกเครื่องผลิตใหม่');
 <div id="confirm-overlay" class="notif-overlay" hidden>
   <div class="notif-box" style="width:min(680px,94vw); max-height:84vh">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px">
-      <h2 style="margin:0">🔎 ตรวจสอบก่อนบันทึก</h2>
-      <button type="button" class="btn-sm btn-line" onclick="closeOverlay('confirm-overlay')">✕ ปิด</button>
+      <h2 style="margin:0" class="h-with-icon"><?= ui_icon_html('search', 17, 'h-svg') ?><span>ตรวจสอบก่อนบันทึก</span></h2>
+      <button type="button" class="btn-sm btn-line" onclick="closeOverlay('confirm-overlay')"><?= ui_btn_label('close', 'ปิด') ?></button>
     </div>
     <div id="confirm-body" style="overflow:auto; max-height:62vh"></div>
     <div id="confirm-error" hidden style="margin-top:10px; padding:12px 14px; background:#fff4f4; border:1px solid #f5c2c2; border-radius:8px; color:#b42318; font-size:14px; line-height:1.5; white-space:pre-wrap"></div>
     <div style="margin-top:14px; display:flex; gap:10px; justify-content:flex-end">
       <button type="button" class="btn btn-line" onclick="closeOverlay('confirm-overlay')">← กลับไปแก้ไข</button>
-      <button type="button" id="confirm-submit-btn" onclick="doConfirmSubmit()">✅ ยืนยันบันทึก</button>
+      <button type="button" id="confirm-submit-btn" onclick="doConfirmSubmit()"><?= ui_btn_label('check-circle', 'ยืนยันบันทึก') ?></button>
     </div>
   </div>
 </div>
@@ -526,8 +526,8 @@ page_header('บันทึกเครื่องผลิตใหม่');
 <div id="qr-overlay" class="notif-overlay" hidden>
   <div class="notif-box" style="width:min(460px,94vw)">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
-      <h2 style="margin:0">📷 สแกนรหัสเครื่อง</h2>
-      <button type="button" class="btn-sm btn-line" onclick="stopScan()">✕ ปิด</button>
+      <h2 style="margin:0" class="h-with-icon"><?= ui_icon_html('scan', 17, 'h-svg') ?><span>สแกนรหัสเครื่อง</span></h2>
+      <button type="button" class="btn-sm btn-line" onclick="stopScan()"><?= ui_btn_label('close', 'ปิด') ?></button>
     </div>
     <div id="qr-reader"></div>
     <p class="muted" id="qr-status">กำลังเปิดกล้อง…</p>
@@ -539,6 +539,9 @@ page_header('บันทึกเครื่องผลิตใหม่');
 <script>
 var cfg = null, unitCount = 0;
 var BASE = '<?= BASE_URL ?>';
+// ปุ่ม "เพิ่มอะไหล่" ถูกสร้างจาก JS จึงเรียก ui_btn_label() ไม่ได้ — ส่ง SVG ชุดเดียวกัน
+// มาเป็นสตริงไว้แทน จะได้หน้าตาตรงกับปุ่มเพิ่มอื่น ๆ ที่ PHP เรนเดอร์
+var ICON_PLUS = <?= json_encode(ui_icon_html('plus', 16, 'btn-svg'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 
 function esc(s){ var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML.replace(/"/g, '&quot;'); }
 
@@ -868,7 +871,7 @@ function renderBom(d){
   var rows = (d.bom || []).map(function(b){ return bomRowHtml(b.part_id, b.qty); }).join('');
   document.getElementById('bom-fields').innerHTML =
     '<div id="bom-list">' + rows + '</div>'
-    + '<button type="button" class="btn btn-line btn-sm" style="margin-top:6px" onclick="addBomRow()">➕ เพิ่มอะไหล่</button>';
+    + '<button type="button" class="btn btn-line btn-sm" style="margin-top:6px" onclick="addBomRow()">' + ICON_PLUS + '<span>เพิ่มอะไหล่</span></button>';
 }
 function addBomRow(){
   document.getElementById('bom-list').insertAdjacentHTML('beforeend', bomRowHtml(0, 1));
@@ -923,12 +926,12 @@ function buildConfirm(){
       bomRows += rowHtml(esc(nm), qty + ' × ' + mcount + ' = <b>' + (Math.round(qty * mcount * 100) / 100) + '</b>');
     }
   });
-  if (bomRows) html += '<h3 style="margin:14px 0 6px">🔩 อะไหล่ที่จะเบิก (รวมทั้งชุด)</h3><div class="table-wrap"><table class="list">' + bomRows + '</table></div>';
+  if (bomRows) html += '<h3 style="margin:14px 0 6px">อะไหล่ที่จะเบิก (รวมทั้งชุด)</h3><div class="table-wrap"><table class="list">' + bomRows + '</table></div>';
   // checklist / ปัญหา / แก้ไข / หมายเหตุ
   var chk = [];
   document.querySelectorAll('#chk-list input[type=checkbox]:checked').forEach(function(c){ chk.push(c.dataset.item); });
   var extra = '';
-  if (chk.length) extra += rowHtml('Checklist ✓', chk.map(esc).join(' · '));
+  if (chk.length) extra += rowHtml('Checklist', chk.map(esc).join(' · '));
   if (val('[name="problems_found"]')) extra += rowHtml('ปัญหาที่พบ', esc(val('[name="problems_found"]')));
   if (val('[name="fix"]')) extra += rowHtml('การแก้ไข', esc(val('[name="fix"]')));
   if (val('[name="note"]')) extra += rowHtml('หมายเหตุ', esc(val('[name="note"]')));
@@ -957,7 +960,7 @@ function doConfirmSubmit(){
     .then(function(r){ return r.json(); })
     .then(function(d){
       btn.disabled = false;
-      btn.textContent = '✅ ยืนยันบันทึก';
+      btn.textContent = 'ยืนยันบันทึก';
       if (!d.ok) {
         errBox.textContent = d.message || 'ไม่สามารถบันทึกได้ — กรุณาตรวจสอบรหัสเครื่อง';
         errBox.hidden = false;
@@ -970,7 +973,7 @@ function doConfirmSubmit(){
     })
     .catch(function(){
       btn.disabled = false;
-      btn.textContent = '✅ ยืนยันบันทึก';
+      btn.textContent = 'ยืนยันบันทึก';
       errBox.textContent = 'ตรวจสอบรหัสไม่สำเร็จ — กรุณาลองใหม่หรือตรวจสอบการเชื่อมต่อ';
       errBox.hidden = false;
     });
@@ -1061,7 +1064,7 @@ function addUnit(){
     row.innerHTML = '<span class="badge st-new">#' + unitCount + '</span>'
       + '<input type="text" name="serials[]" placeholder="รหัสเครื่อง" style="flex:1; min-width:0" required autocomplete="off">'
       + '<div style="display:flex; gap:8px; margin-left:auto; flex-shrink:0">'
-      + '<button type="button" class="btn-sm btn-line" onclick="scanInto(this)">📷 สแกน</button>'
+      + '<button type="button" class="btn-sm btn-line" onclick="scanInto(this)">สแกน</button>'
       + '<button type="button" class="btn-sm btn-line" onclick="removeUnit(this)">ลบ</button>'
       + '</div>';
     list.appendChild(row);
