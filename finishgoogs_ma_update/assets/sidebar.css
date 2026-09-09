@@ -953,6 +953,26 @@
    เติม .app นำหน้าเพื่อให้ชนะโดยไม่ต้องใช้ !important */
 @media (max-width: 640px) {
   .app .btn, .app .btn.btn-sm, .app button.btn, .app a.btn { min-height: 48px; }
+  /* แถบกรอง — ทุกช่องยาวเท่ากันเต็มความกว้าง
+     เดิมเรียงแนวนอนแล้วแต่ละช่องกว้างตามเนื้อในของตัวเอง วัดในกรอบ 334px ได้
+     220 / 293 / 150 / 272 / 68px คือไม่ตรงกันสักอัน และ select ที่มีตัวเลือกชื่อยาว
+     (bitSupply 1206 Paperless Router) ดันล้นกรอบออกไป · min-width:0 จำเป็นเพราะ
+     select ตั้ง min-width:150px ไว้ ซึ่งกันไม่ให้ย่อตามกรอบ */
+  .filter { flex-direction: column; align-items: stretch; }
+  .filter > *,
+  .filter .livesearch-wrap,
+  .filter input,
+  .filter select,
+  .filter button {
+    /* !important จำเป็นตรงนี้ — หลายหน้าเขียนความกว้างเป็น style= ติดกับ element
+       (width:230px, width:120px, min-width:160px ฯลฯ) ซึ่งเป็นการจัดหน้าสำหรับจอใหญ่
+       inline style ชนะกฎใน stylesheet เสมอ ไม่ว่าจะเขียน selector ละเอียดแค่ไหน
+       ใช้เฉพาะในบล็อกมือถือนี้เท่านั้น จอใหญ่ยังได้ความกว้างที่หน้ากำหนดเอง */
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
   .app .history-kind-filter,
   .app .history-tab,
   .app .tab-link { min-height: 44px; display: inline-flex; align-items: center; }
