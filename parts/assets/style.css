@@ -1644,3 +1644,13 @@ a:focus-visible {
     .products-table th:nth-child(9),
     .products-table td:nth-child(9) { display: none; }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   เป้าสัมผัสบนมือถือ — กฎกลางอยู่ใน finishgoogs_ma_update/assets/sidebar.css
+   (ทั้งสองแอปโหลดร่วมกัน) แต่สองตัวนี้ไฟล์นี้ตั้ง min-height:auto ทับไว้เอง
+   ด้วย specificity สูงกว่า จึงต้องแก้ตรงจุดที่เขียนไว้ ไม่ใช่ไปเขียนกฎแข่งในไฟล์กลาง
+   ───────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .set-manage-form input[type="text"] { min-height: 48px; }
+  .set-qty-input { min-height: 44px; }
+}

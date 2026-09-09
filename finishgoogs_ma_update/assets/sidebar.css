@@ -900,3 +900,65 @@
   /* เว้นที่ให้แถบล่างไม่ทับเนื้อหาบรรทัดสุดท้าย */
   .content { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
 }
+/* ─────────────────────────────────────────────────────────────────────────────
+   เป้าสัมผัสขนาดนิ้วบนมือถือ (UX เฟส 3 ข้อ 2)
+
+   วัดบนจอ 390px ก่อนแก้: ปุ่มหลัก 34-40px · 16 จาก 28 เป้าสัมผัสในหน้าสแกน
+   และ 15 จาก 72 ในหน้า MA ต่ำกว่าเกณฑ์ 44px · ช่างหน้างานกดด้วยนิ้วโป้งข้างเดียว
+   บางทีใส่ถุงมือ จึงตั้งไว้ที่ 48px ไม่ใช่แค่ 44px ขั้นต่ำ
+
+   อยู่ในไฟล์นี้เพราะทั้งสองแอปโหลด sidebar.css ร่วมกัน — เดิมเขียนไว้ใน
+   finishgoogs_ma_update/assets/style.css ซึ่งฝั่งอะไหล่ไม่ได้โหลด ปุ่มฝั่งนั้นจึงยังเล็กอยู่
+
+   ใช้เฉพาะต่ำกว่า 640px — จอใหญ่ที่ใช้เมาส์ยังเป็นขนาดเดิม ไม่ต้องเสียพื้นที่
+   ───────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .btn, .btn-sm, button.btn, a.btn { min-height: 48px; }
+  .btn-sm { padding: 0 15px; }
+
+  /* ปุ่มที่ไม่ได้ใส่คลาส .btn แต่ช่างกดจริงทุกครั้ง — ปุ่มบันทึกท้ายฟอร์ม,
+     ปุ่มเลือกสถานะเครื่อง (เช่า/สำรอง/ซ่อมแล้ว/เสื่อมสภาพ) และปุ่ม ▾ เปิดรายการชิป
+     ปุ่ม ▾ แคบด้วย จึงกำหนดความกว้างขั้นต่ำไปพร้อมกัน */
+  button[type=submit], .ma-choice-btn { min-height: 48px; }
+  .chip-dd-btn { min-height: 48px; min-width: 48px; }
+
+  /* ช่องกรอกด้วย — แตะพลาดแล้วต้องเลื่อนหน้าหาใหม่เสียเวลากว่าปุ่มพลาด
+     16px กัน iOS ซูมเข้าอัตโนมัติตอนโฟกัส ซึ่งทำให้ layout เด้งทั้งหน้า */
+  input[type=text], input[type=search], input[type=date], input[type=datetime-local],
+  input[type=password], input[type=number], input[type=tel], select, textarea {
+    min-height: 48px;
+    font-size: max(16px, calc(14px * var(--font-scale, 1)));
+  }
+  textarea { min-height: 96px; }
+
+  /* checkbox/radio ตัวจริงเล็กเกินจะแตะ — ขยายพื้นที่กดผ่าน label ที่ครอบอยู่ */
+  label:has(> input[type=checkbox]),
+  label:has(> input[type=radio]) { min-height: 48px; display: flex; align-items: center; }
+  input[type=checkbox], input[type=radio] { width: 20px; height: 20px; }
+
+  /* ปุ่มเปลี่ยนหน้า (« ‹ 1 2 3 › ») วัดได้ 31px — เป็น <a> ไม่มีคลาส .btn
+     กดพลาดแล้วเด้งไปหน้าอื่น ต้องเลื่อนกลับมาใหม่ทั้งหน้า */
+  .pager a, .pager span, .pager b { min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; }
+
+  /* แท็บและลิงก์กรองในหน้าประวัติฝั่งอะไหล่ วัดได้ 24-37px */
+  .tabs a, .tabs button, .filter-chips a, .stf-link, .chip-link { min-height: 44px; display: inline-flex; align-items: center; }
+}
+
+/* เก็บตกเป้าสัมผัสที่กฎข้างบนยังไม่ชนะ — ฝั่งอะไหล่มี .btn-sm ของตัวเองที่ specificity
+   สูงกว่า และแท็บกรองประวัติใช้คลาส history-kind-filter ที่เดาไม่ถูกในรอบแรก
+   เติม .app นำหน้าเพื่อให้ชนะโดยไม่ต้องใช้ !important */
+@media (max-width: 640px) {
+  .app .btn, .app .btn.btn-sm, .app button.btn, .app a.btn { min-height: 48px; }
+  .app .history-kind-filter,
+  .app .history-tab,
+  .app .tab-link { min-height: 44px; display: inline-flex; align-items: center; }
+}
+
+/* ความสูงช่องกรอกมาตรฐาน — ขยับที่ตัวแปรแทนการไล่เขียนกฎรายหน้า
+   หลายหน้ามี <style> ของตัวเองใน <head> ซึ่งมาทีหลังไฟล์นี้และ specificity สูงกว่า
+   (เช่น .assets-filter input{min-height:var(--input-h,40px)}) เขียนกฎแข่งไม่ชนะ
+   แต่กฎพวกนั้นอ่านค่าจาก --input-h อยู่แล้ว ขยับตัวแปรจึงมีผลทุกหน้าพร้อมกัน
+   sidebar.css โหลดหลังบล็อก #theme-vars ทั้งสองแอป ค่านี้จึงทับได้ */
+@media (max-width: 640px) {
+  :root { --input-h: 48px; }
+}
