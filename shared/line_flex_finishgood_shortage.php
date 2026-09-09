@@ -377,6 +377,134 @@ function line_flex_fg_bubble(array $items, int $page, int $totalPages, int $tota
 }
 
 /**
+ * ประกอบการ์ดทั้งชุดที่ความหนาแน่นที่กำหนด
+ *
+ * @param array<int,array<string,mixed>> $items
+ * @param int $itemsPerCard จำนวนรุ่นสูงสุดต่อการ์ด
+ * @param int $totalItems
+ * @param int $totalShortage
+ * @param string $timestamp
+ * @return array<int,array<string,mixed>>
+ */
+function line_flex_fg_build_bubbles(array $items, int $itemsPerCard, int $totalItems, int $totalShortage, string $timestamp): array
+{
+    $chunks = line_flex_fg_card_chunks($items, $itemsPerCard);
+    $totalPages = count($chunks);
+
+    $rowsPerCard = 0;
+    foreach ($chunks as $chunk) {
+        $rowsPerCard = max($rowsPerCard, count($chunk));
+    }
+
+    $bubbles = [];
+    foreach ($chunks as $index => $chunk) {
+        $bubbles[] = line_flex_fg_bubble($chunk, $index + 1, $totalPages, $totalItems, $totalShortage, $timestamp, $rowsPerCard);
+    }
+    return $bubbles;
+}
+
+/**
+ * ขนาด payload ของการ์ด 1 ใบ
+ *
+ * @param array<string,mixed> $bubble
+ * @return int
+ */
+function line_flex_fg_bubble_bytes(array $bubble): int
+{
+    return strlen(json_encode($bubble, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+}
+
+/**
+ * จัดการ์ดลงข้อความแบบ greedy — ยัดให้เต็มงบก่อนขึ้นข้อความใหม่
+ *
+ * @param array<int,array<string,mixed>> $bubbles
+ * @return array<int,array<int,array<string,mixed>>>
+ */
+function line_flex_fg_pack_greedy(array $bubbles): array
+{
+    $groups = [];
+    $current = [];
+    $currentBytes = 0;
+    foreach ($bubbles as $bubble) {
+        $size = line_flex_fg_bubble_bytes($bubble);
+        $wouldOverflow = ($currentBytes + $size) > LINE_FLEX_FG_MESSAGE_BYTE_BUDGET;
+        if ($current !== [] && ($wouldOverflow || count($current) >= LINE_FLEX_FG_MAX_CARDS)) {
+            $groups[] = $current;
+            $current = [];
+            $currentBytes = 0;
+        }
+        $current[] = $bubble;
+        $currentBytes += $size;
+    }
+    if ($current !== []) {
+        $groups[] = $current;
+    }
+    return $groups;
+}
+
+/**
+ * จัดการ์ดให้ทุกข้อความมีจำนวนเท่ากัน
+ *
+ * ไล่ความหนาแน่น (รุ่นต่อการ์ด) หาแบบที่จำนวนการ์ดหารด้วยจำนวนข้อความลงตัว แล้วเลือก
+ * แบบที่รุ่นต่อการ์ดใกล้ค่าที่ตั้งไว้ที่สุด เพื่อให้หน้าตาการ์ดขยับจากเดิมน้อยที่สุด
+ *
+ * @param array<int,array<string,mixed>> $items
+ * @param int $messages จำนวนข้อความที่ต้องใช้
+ * @param int $totalItems
+ * @param int $totalShortage
+ * @param string $timestamp
+ * @return array<int,array<int,array<string,mixed>>>|null  null = ไม่มีแบบไหนลงตัว ใช้ greedy ตามเดิม
+ */
+function line_flex_fg_even_groups(array $items, int $messages, int $totalItems, int $totalShortage, string $timestamp)
+{
+    if ($messages < 2) {
+        return null;
+    }
+
+    $best = null;
+    $bestDistance = null;
+    $total = count($items);
+
+    for ($per = 1; $per <= $total; $per++) {
+        $bubbles = line_flex_fg_build_bubbles($items, $per, $totalItems, $totalShortage, $timestamp);
+        $cards = count($bubbles);
+
+        // ต้องแบ่งลงข้อความละเท่า ๆ กันได้ และแต่ละข้อความไม่เกินลิมิตการ์ดของ LINE
+        if ($cards % $messages !== 0) {
+            continue;
+        }
+        $perMessage = intdiv($cards, $messages);
+        if ($perMessage < 1 || $perMessage > LINE_FLEX_FG_MAX_CARDS) {
+            continue;
+        }
+
+        $groups = array_chunk($bubbles, $perMessage);
+        $fits = true;
+        foreach ($groups as $group) {
+            $bytes = 0;
+            foreach ($group as $bubble) {
+                $bytes += line_flex_fg_bubble_bytes($bubble);
+            }
+            if ($bytes > LINE_FLEX_FG_MESSAGE_BYTE_BUDGET) {
+                $fits = false;
+                break;
+            }
+        }
+        if (!$fits) {
+            continue;
+        }
+
+        $distance = abs(($total / $cards) - LINE_FLEX_FG_ITEMS_PER_CARD);
+        if ($bestDistance === null || $distance < $bestDistance) {
+            $bestDistance = $distance;
+            $best = $groups;
+        }
+    }
+
+    return $best;
+}
+
+/**
  * ประกอบ Flex ทั้งชุด แล้วแตกเป็นหลายข้อความให้แต่ละข้อความไม่เกินลิมิต 50 KB ของ LINE
  *
  * @param array<int,array<string,mixed>> $items รายการที่ต้องผลิตเพิ่ม (เรียงจากขาดมากไปน้อย)
@@ -399,36 +527,16 @@ function line_flex_finishgood_shortage_messages(array $items, ?string $timestamp
         $totalShortage += (int)$item['need'];
     }
 
-    $chunks = line_flex_fg_card_chunks($items, LINE_FLEX_FG_ITEMS_PER_CARD);
-    $totalPages = count($chunks);
+    $bubbles = line_flex_fg_build_bubbles($items, LINE_FLEX_FG_ITEMS_PER_CARD, $totalItems, $totalShortage, $timestamp);
+    $groups  = line_flex_fg_pack_greedy($bubbles);
 
-    $rowsPerCard = 0;
-    foreach ($chunks as $chunk) {
-        $rowsPerCard = max($rowsPerCard, count($chunk));
-    }
-
-    $bubbles = [];
-    foreach ($chunks as $index => $chunk) {
-        $bubbles[] = line_flex_fg_bubble($chunk, $index + 1, $totalPages, $totalItems, $totalShortage, $timestamp, $rowsPerCard);
-    }
-
-    // จัด bubble ลงข้อความแบบ greedy ตามงบ byte และจำนวน bubble สูงสุด
-    $groups = [];
-    $current = [];
-    $currentBytes = 0;
-    foreach ($bubbles as $bubble) {
-        $size = strlen(json_encode($bubble, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-        $wouldOverflow = ($currentBytes + $size) > LINE_FLEX_FG_MESSAGE_BYTE_BUDGET;
-        if ($current !== [] && ($wouldOverflow || count($current) >= LINE_FLEX_FG_MAX_CARDS)) {
-            $groups[] = $current;
-            $current = [];
-            $currentBytes = 0;
+    // ถ้าต้องส่งหลายข้อความ ให้แต่ละข้อความมีการ์ดเท่ากัน — 5 การ์ดยังไงก็ลงเป็น 3+2
+    // ทางเดียวที่ทำให้เท่ากันคือขยับ "จำนวนการ์ด" ให้หารกับจำนวนข้อความลงตัว
+    if (count($groups) > 1) {
+        $even = line_flex_fg_even_groups($items, count($groups), $totalItems, $totalShortage, $timestamp);
+        if ($even !== null) {
+            $groups = $even;
         }
-        $current[] = $bubble;
-        $currentBytes += $size;
-    }
-    if ($current !== []) {
-        $groups[] = $current;
     }
 
     $totalGroups = count($groups);

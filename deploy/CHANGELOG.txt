@@ -3449,3 +3449,13 @@ Files:
   finishgoogs_ma_update/includes/smart_search.php
   finishgoogs_ma_update/server_config.php
 
+
+================================================================
+v2026-09-09_091558 | Patch | 2026-09-09 09:15:59
+From: 2026-09-08_093653  ->  To: f9050a1  |  Files: 2
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  shared/line_flex_finishgood_shortage.php
+
