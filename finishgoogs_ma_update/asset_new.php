@@ -692,9 +692,12 @@ function renderFields(d){
       madeOpts.unshift(d.actor_name);
     }
     // ช่องนี้ก็ตอบเป็นชื่อคน ใช้ปุ่มชุดเดียวกัน
-    // ช่องนี้ยังพิมพ์เองได้ เพราะไม่มีที่ตั้งรายชื่อในหลังบ้านเลย (0 จาก 37 ฟิลด์)
-    // ถ้าปิดด้วยจะไม่เหลือทางกรอกชื่อที่ไม่เคยผลิตรุ่นนี้มาก่อน
-    document.getElementById('madeby-slot').innerHTML = namePickHtml('made_by', defaultMade, madeOpts, '', d.made_by_input_mode || 'chip_single_free', true);
+    // ช่องนี้ไม่มีที่ตั้ง "รายชื่อ" ในหลังบ้าน (ชื่อมาจากประวัติผลิตของรุ่น) แต่มีที่ตั้ง
+    // "รูปแบบการกรอก" อยู่ — ต้องทำตามนั้น เลือก "รายการเท่านั้น" แล้วต้องไม่มีช่องพิมพ์
+    // ไม่ใช่ปัญหาถ้ารายชื่อว่าง เพราะ made_by ไม่ใช่ช่องบังคับ ว่างแล้ว server ใส่ชื่อ
+    // คนที่ล็อกอินให้เอง
+    var mbMode = d.made_by_input_mode || 'chip_single_free';
+    document.getElementById('madeby-slot').innerHTML = namePickHtml('made_by', defaultMade, madeOpts, '', mbMode, mbMode === 'text' || mbMode.indexOf('_free') !== -1);
   } else {
     document.getElementById('madeby-slot').innerHTML = '<input type="hidden" name="made_by" value="">';
   }
