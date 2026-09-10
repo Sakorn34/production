@@ -804,10 +804,15 @@ function modalBack(){
     var free = (allowFree === true)
       ? '<input type="text" class="name-free" autocomplete="off" placeholder="ชื่ออื่น + Enter">'
       : '';
+    // ไม่มีชื่อให้เลือกและพิมพ์เองไม่ได้ = กล่องเปล่าสูง 0px ผู้ใช้เห็นแต่ป้ายชื่อฟิลด์
+    // แล้วนึกว่าหน้าเว็บพัง ทั้งที่สาเหตุคือยังไม่ได้ใส่รายชื่อไว้หลังบ้าน — บอกไปตรง ๆ
+    var empty = (!btns && !free)
+      ? '<span class="name-pick-empty">ยังไม่ได้ตั้งรายชื่อไว้ที่หลังบ้าน — ไปเพิ่มที่ ตั้งค่ารายรุ่น</span>'
+      : '';
     return '<div class="name-pick" data-mode="' + esc(inputMode) + '">'
       + (hidden || '')
       + '<input type="hidden" name="' + inputName + '" data-chip-val="1" value="' + esc(vals.join(', ')) + '">'
-      + btns + free
+      + btns + free + empty
       + '</div>';
   };
 

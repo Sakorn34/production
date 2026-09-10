@@ -1206,3 +1206,13 @@ button:active, .btn:active { transform: scale(.96); }
   .dyn-field-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .dyn-field-row label { font-weight: 600; }
 }
+
+/* ฟิลด์ชนิด "ผู้ผลิต" ที่ยังไม่ได้ใส่รายชื่อ — บอกสาเหตุแทนที่จะปล่อยเป็นกล่องเปล่า */
+.name-pick-empty {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--input-h, 40px);
+  font-size: calc(13px * var(--font-scale, 1));
+  color: var(--text-muted, #6b7280);
+  font-style: italic;
+}
