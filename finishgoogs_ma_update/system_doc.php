@@ -10,6 +10,33 @@ $B = BASE_URL;
 <style>
 .doc-section { margin-bottom: 28px; }
 .doc-section h2 { font-size: 17px; margin: 0 0 12px; padding-bottom: 8px; border-bottom: 2px solid var(--primary); color: var(--primary); }
+/* เลขหัวข้อ: เดิมใช้อักขระ ①②③ ซึ่งฟอนต์ไทยไม่มี เบราว์เซอร์เลยไปหยิบฟอนต์สำรอง
+   ขนาดกับน้ำหนักเส้นจึงไม่เข้ากับตัวหนังสือรอบข้าง — วาดเองด้วย CSS ให้คุมได้ทุกเครื่อง */
+.doc-n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  margin-right: 8px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.doc-section h2 .doc-n { min-width: 24px; height: 24px; font-size: 13px; margin-right: 10px; }
+/* หัวข้อยาวบนจอแคบจะตกลงมา 2 บรรทัด — ถ้าจัดกึ่งกลาง ป้ายเลขจะไปลอยคร่อมกลางสองบรรทัด
+   ให้ยึดขอบบนแทน ป้ายจะอยู่ระดับเดียวกับบรรทัดแรกเสมอ */
+.doc-section h2 { display: flex; align-items: flex-start; }
+.doc-toc-link { display: inline-flex; align-items: center; text-decoration: none; }
+.doc-toc-link:hover { text-decoration: underline; }
+.doc-toc-link:hover .doc-n { filter: brightness(1.12); }
+.doc-toc-link:focus-visible { outline: 2px solid var(--focus-ring, var(--primary)); outline-offset: 3px; border-radius: 4px; }
 .doc-section h3 { font-size: 14px; font-weight: 700; margin: 14px 0 6px; color: var(--text-muted, #45506a); }
 .doc-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .doc-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
@@ -77,28 +104,28 @@ $B = BASE_URL;
 <div class="panel doc-section" style="padding: 14px 18px">
   <b style="font-size:13px">เนื้อหา</b>
   <div style="display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:8px; font-size:13px">
-    <a href="#overview">① ภาพรวม</a>
-    <a href="#status">② สถานะเครื่อง</a>
-    <a href="#databases">③ ฐานข้อมูล</a>
-    <a href="#pages">④ หน้าระบบ</a>
-    <a href="#lifecycle">⑤ วงจรชีวิตเครื่อง</a>
-    <a href="#tables">⑥ รายละเอียดตาราง</a>
-    <a href="#relations">⑦ ความสัมพันธ์ตาราง</a>
-    <a href="#helpers">⑧ ฟังก์ชันหลัก</a>
-    <a href="#permissions">⑨ สิทธิ์ / Login</a>
-    <a href="#import">⑩ การนำเข้าข้อมูล</a>
-    <a href="#stockstatus">⑪ สถานะสต็อกอะไหล่</a>
-    <a href="#search">⑫ ค้นหาอัจฉริยะ</a>
-    <a href="#workreport">⑬ สรุปงานรายคน</a>
-    <a href="#linenotify">⑭ แจ้งเตือน LINE</a>
-    <a href="#mobile">⑮ โหมดมือถือ</a>
-    <a href="#cron">⑯ งานอัตโนมัติ (cron)</a>
+    <a class="doc-toc-link" href="#overview"><span class="doc-n">1</span>ภาพรวม</a>
+    <a class="doc-toc-link" href="#status"><span class="doc-n">2</span>สถานะเครื่อง</a>
+    <a class="doc-toc-link" href="#databases"><span class="doc-n">3</span>ฐานข้อมูล</a>
+    <a class="doc-toc-link" href="#pages"><span class="doc-n">4</span>หน้าระบบ</a>
+    <a class="doc-toc-link" href="#lifecycle"><span class="doc-n">5</span>วงจรชีวิตเครื่อง</a>
+    <a class="doc-toc-link" href="#tables"><span class="doc-n">6</span>รายละเอียดตาราง</a>
+    <a class="doc-toc-link" href="#relations"><span class="doc-n">7</span>ความสัมพันธ์ตาราง</a>
+    <a class="doc-toc-link" href="#helpers"><span class="doc-n">8</span>ฟังก์ชันหลัก</a>
+    <a class="doc-toc-link" href="#permissions"><span class="doc-n">9</span>สิทธิ์ / Login</a>
+    <a class="doc-toc-link" href="#import"><span class="doc-n">10</span>การนำเข้าข้อมูล</a>
+    <a class="doc-toc-link" href="#stockstatus"><span class="doc-n">11</span>สถานะสต็อกอะไหล่</a>
+    <a class="doc-toc-link" href="#search"><span class="doc-n">12</span>ค้นหาอัจฉริยะ</a>
+    <a class="doc-toc-link" href="#workreport"><span class="doc-n">13</span>สรุปงานรายคน</a>
+    <a class="doc-toc-link" href="#linenotify"><span class="doc-n">14</span>แจ้งเตือน LINE</a>
+    <a class="doc-toc-link" href="#mobile"><span class="doc-n">15</span>โหมดมือถือ</a>
+    <a class="doc-toc-link" href="#cron"><span class="doc-n">16</span>งานอัตโนมัติ (cron)</a>
   </div>
 </div>
 
-<!-- ① ภาพรวม -->
+<!-- 1 ภาพรวม -->
 <div class="panel doc-section" id="overview">
-  <h2>① ภาพรวมระบบ</h2>
+  <h2><span class="doc-n">1</span>ภาพรวมระบบ</h2>
   <p style="font-size:13px; color:var(--text-muted, #4b5563); margin-bottom:12px">
     ระบบบันทึกข้อมูลการผลิตและการจัดการสินค้า (Production &amp; Asset Management) พัฒนาด้วย <b>PHP</b> บน <b>AppServ (Windows)</b> ใช้ <b>MySQL</b> ผ่าน <b>mysqli / PDO</b> (prepared statements) · Login ผ่าน <b>SSO bit-online</b> (localhost dev = Tom อัตโนมัติ)
   </p>
@@ -156,29 +183,29 @@ $B = BASE_URL;
     <div class="page-card" style="border-left:3px solid #0ea5e9">
       <div style="font-size:20px">🔍</div>
       <div style="font-weight:700; margin-top:4px">ค้นหาอัจฉริยะ</div>
-      <div class="pdesc">ช่องเดียวที่ sidebar ค้นข้าม 14 แหล่งใน 5 ฐาน — ดู <a href="#search">หัวข้อ ⑫</a></div>
+      <div class="pdesc">ช่องเดียวที่ sidebar ค้นข้าม 14 แหล่งใน 5 ฐาน — ดู <a href="#search">หัวข้อ 12</a></div>
     </div>
     <div class="page-card" style="border-left:3px solid #a855f7">
       <div style="font-size:20px">🧑‍🔧</div>
       <div style="font-weight:700; margin-top:4px">สรุปงานรายคน</div>
-      <div class="pdesc">รอบ 21–20 ของเดือน รวมงานจาก production + ซ่อม + เช่า — ดู <a href="#workreport">หัวข้อ ⑬</a></div>
+      <div class="pdesc">รอบ 21–20 ของเดือน รวมงานจาก production + ซ่อม + เช่า — ดู <a href="#workreport">หัวข้อ 13</a></div>
     </div>
     <div class="page-card" style="border-left:3px solid #22c55e">
       <div style="font-size:20px">💬</div>
       <div style="font-weight:700; margin-top:4px">แจ้งเตือน LINE</div>
-      <div class="pdesc">Flex Message ทั้งแบบทันทีและตามรอบ + ผูกไลน์รายคนผ่าน webhook — ดู <a href="#linenotify">หัวข้อ ⑭</a></div>
+      <div class="pdesc">Flex Message ทั้งแบบทันทีและตามรอบ + ผูกไลน์รายคนผ่าน webhook — ดู <a href="#linenotify">หัวข้อ 14</a></div>
     </div>
     <div class="page-card" style="border-left:3px solid #f97316">
       <div style="font-size:20px">📱</div>
       <div style="font-weight:700; margin-top:4px">โหมดมือถือ</div>
-      <div class="pdesc">แถบลัดล่างจอ + เป้าสัมผัส 48px เมื่อจอกว้าง ≤640px — ดู <a href="#mobile">หัวข้อ ⑮</a></div>
+      <div class="pdesc">แถบลัดล่างจอ + เป้าสัมผัส 48px เมื่อจอกว้าง ≤640px — ดู <a href="#mobile">หัวข้อ 15</a></div>
     </div>
   </div>
 </div>
 
-<!-- ② สถานะเครื่อง -->
+<!-- 2 สถานะเครื่อง -->
 <div class="panel doc-section" id="status">
-  <h2>② สถานะเครื่อง (ผลิตใหม่ / เช่า / สำรอง)</h2>
+  <h2><span class="doc-n">2</span>สถานะเครื่อง (ผลิตใหม่ / เช่า / สำรอง)</h2>
   <div class="section-note">
     เก็บที่คอลัมน์ <span class="inline-code">assets.status</span> ในฐานข้อมูลหลัก (production DB) · ไม่มีตารางแยก
   </div>
@@ -198,7 +225,7 @@ $B = BASE_URL;
     <span class="inline-code">includes/asset_status_sync.php</span> อ่านจาก<b>ระบบเช่า</b> (biton_leasing) และ<b>การเบิกขาย</b> (biton_stockparts)
     แล้วตัดสินตามลำดับความสำคัญ <span class="inline-code">sold &gt; rental (เช่าอยู่/MA) &gt; new (รับคืนแล้ว)</span>
     · <b>ไม่ทับ spare</b> ยกเว้นกรณีขายแล้ว<br>
-    รันเป็นรอบด้วย <span class="inline-code">cron/sync_asset_status.php</span> (CLI · แนะนำวันละครั้ง เช่น 06:00) — ดู <a href="#cron">หัวข้อ ⑯</a>
+    รันเป็นรอบด้วย <span class="inline-code">cron/sync_asset_status.php</span> (CLI · แนะนำวันละครั้ง เช่น 06:00) — ดู <a href="#cron">หัวข้อ 16</a>
   </div>
   <ul style="font-size:13px; color:var(--text-muted, #4b5563); margin:0 0 0 18px; line-height:1.75">
     <li><b>ประเภท DB:</b> <span class="inline-code">ENUM('new','rental','spare','sold','retired','lost')</span> DEFAULT 'new'</li>
@@ -213,9 +240,9 @@ $B = BASE_URL;
   </ul>
 </div>
 
-<!-- ③ ฐานข้อมูล -->
+<!-- 3 ฐานข้อมูล -->
 <div class="panel doc-section" id="databases">
-  <h2>③ ฐานข้อมูล</h2>
+  <h2><span class="doc-n">3</span>ฐานข้อมูล</h2>
   <p class="section-note">
     ระบบต่อ <b>6 database</b> แบ่งเป็น 2 กลุ่ม<br>
     <b>เขียนได้ (ของเรา):</b> <span class="inline-code">biton_production</span> ฐานหลัก ·
@@ -323,9 +350,9 @@ $B = BASE_URL;
   </div>
 </div>
 
-<!-- ④ หน้าระบบ -->
+<!-- 4 หน้าระบบ -->
 <div class="panel doc-section" id="pages">
-  <h2>④ หน้าระบบ — แต่ละหน้าทำอะไร อ่านข้อมูลจากไหน</h2>
+  <h2><span class="doc-n">4</span>หน้าระบบ — แต่ละหน้าทำอะไร อ่านข้อมูลจากไหน</h2>
   <div class="page-grid">
     <div class="page-card" style="border-top:3px solid #ec4899">
       <div class="pfile">index.php</div>
@@ -514,9 +541,9 @@ $B = BASE_URL;
   </div>
 </div>
 
-<!-- ⑤ วงจรชีวิตเครื่อง -->
+<!-- 5 วงจรชีวิตเครื่อง -->
 <div class="panel doc-section" id="lifecycle">
-  <h2>⑤ วงจรชีวิตของเครื่อง — บันทึกอย่างไร เก็บที่ไหน</h2>
+  <h2><span class="doc-n">5</span>วงจรชีวิตของเครื่อง — บันทึกอย่างไร เก็บที่ไหน</h2>
 
   <h3>🏭 การสร้างเครื่องใหม่ (asset_new.php → create_produced_asset)</h3>
   <div class="section-note" style="margin-bottom:10px">
@@ -583,9 +610,9 @@ $B = BASE_URL;
   </div>
 </div>
 
-<!-- ⑥ รายละเอียดตาราง -->
+<!-- 6 รายละเอียดตาราง -->
 <div class="panel doc-section" id="tables">
-  <h2>⑥ รายละเอียดคอลัมน์ตารางสำคัญ</h2>
+  <h2><span class="doc-n">6</span>รายละเอียดคอลัมน์ตารางสำคัญ</h2>
 
   <h3>🗃️ assets (ตารางกลาง)</h3>
   <div style="overflow-x:auto">
@@ -700,9 +727,9 @@ $B = BASE_URL;
   </div>
 </div>
 
-<!-- ⑦ ความสัมพันธ์ตาราง -->
+<!-- 7 ความสัมพันธ์ตาราง -->
 <div class="panel doc-section" id="relations">
-  <h2>⑦ ความสัมพันธ์ของตาราง (Foreign Keys &amp; JOINs)</h2>
+  <h2><span class="doc-n">7</span>ความสัมพันธ์ของตาราง (Foreign Keys &amp; JOINs)</h2>
   <div class="rel-grid">
     <div class="rel-box">
       <b>assets</b> → เชื่อมออกไป
@@ -800,9 +827,9 @@ $B = BASE_URL;
   </div>
 </div>
 
-<!-- ⑧ ฟังก์ชันหลัก -->
+<!-- 8 ฟังก์ชันหลัก -->
 <div class="panel doc-section" id="helpers">
-  <h2>⑧ ฟังก์ชันหลักใน config.php (+ shared)</h2>
+  <h2><span class="doc-n">8</span>ฟังก์ชันหลักใน config.php (+ shared)</h2>
   <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:10px">
     <?php
     $fns = [
@@ -848,9 +875,9 @@ $B = BASE_URL;
   </div>
 </div>
 
-<!-- ⑨ สิทธิ์ผู้ใช้ -->
+<!-- 9 สิทธิ์ผู้ใช้ -->
 <div class="panel doc-section" id="permissions">
-  <h2>⑨ การ Login และสิทธิ์</h2>
+  <h2><span class="doc-n">9</span>การ Login และสิทธิ์</h2>
   <div class="section-note" style="margin-bottom:12px">
     <b>Login:</b> SSO bit-online → session <span class="inline-code">$_SESSION['profile']</span> (display name, employee id ฯลฯ)<br>
     <b>Localhost dev:</b> bootstrap เป็น Tom อัตโนมัติถ้ายังไม่มี profile<br>
@@ -893,9 +920,9 @@ $B = BASE_URL;
   </div>
 </div>
 
-<!-- ⑩ การนำเข้าข้อมูล -->
+<!-- 10 การนำเข้าข้อมูล -->
 <div class="panel doc-section" id="import">
-  <h2>⑩ การนำเข้าข้อมูล</h2>
+  <h2><span class="doc-n">10</span>การนำเข้าข้อมูล</h2>
   <h3>🗂️ import_legacy.php (CLI — นำเข้าจาก AppSheet ครั้งแรก)</h3>
   <div class="section-note">รันผ่าน Command Line เท่านั้น (<span class="inline-code">php database/import_legacy.php</span>) — idempotent: ล้างตารางแล้ว reload ใหม่ได้เสมอ</div>
   <div class="flow-steps">
@@ -933,11 +960,11 @@ $B = BASE_URL;
   </ul>
 </div>
 
-<!-- ⑪ สถานะสต็อกอะไหล่ -->
+<!-- 11 สถานะสต็อกอะไหล่ -->
 <div class="panel doc-section" id="stockstatus">
-  <h2>⑪ สถานะสต็อกอะไหล่ (5 ระดับ)</h2>
+  <h2><span class="doc-n">11</span>สถานะสต็อกอะไหล่ (5 ระดับ)</h2>
   <div class="section-note">
-    คนละเรื่องกับสถานะ<b>เครื่อง</b> ใน <a href="#status">หัวข้อ ②</a> (new/rental/spare) — นี่คือสถานะของ<b>ยอดคงเหลืออะไหล่</b> คำนวณจากฟังก์ชันกลาง <span class="inline-code">shared/stock_status.php::stock_status_key()</span> ใช้ร่วมกันทั้งฝั่ง production และ parts (แทนที่โค้ดคำนวณซ้ำที่เคยกระจายอยู่ 5 จุด)
+    คนละเรื่องกับสถานะ<b>เครื่อง</b> ใน <a href="#status">หัวข้อ 2</a> (new/rental/spare) — นี่คือสถานะของ<b>ยอดคงเหลืออะไหล่</b> คำนวณจากฟังก์ชันกลาง <span class="inline-code">shared/stock_status.php::stock_status_key()</span> ใช้ร่วมกันทั้งฝั่ง production และ parts (แทนที่โค้ดคำนวณซ้ำที่เคยกระจายอยู่ 5 จุด)
   </div>
   <div style="overflow-x:auto">
   <table class="schema-table" style="min-width:420px">
@@ -951,9 +978,9 @@ $B = BASE_URL;
   </div>
 </div>
 
-<!-- ⑫ ค้นหาอัจฉริยะ -->
+<!-- 12 ค้นหาอัจฉริยะ -->
 <div class="panel doc-section" id="search">
-  <h2>⑫ ค้นหาอัจฉริยะ (ช่องค้นหาที่ sidebar)</h2>
+  <h2><span class="doc-n">12</span>ค้นหาอัจฉริยะ (ช่องค้นหาที่ sidebar)</h2>
   <div class="section-note">
     ช่องเดียวค้น <b>14 แหล่งข้าม 5 ฐานข้อมูล</b> พร้อมกัน · ตรรกะอยู่ที่
     <span class="inline-code">includes/smart_search.php</span> · หน้า AJAX คือ
@@ -997,9 +1024,9 @@ $B = BASE_URL;
   </div>
 </div>
 
-<!-- ⑬ สรุปงานรายคน -->
+<!-- 13 สรุปงานรายคน -->
 <div class="panel doc-section" id="workreport">
-  <h2>⑬ รายงานสรุปงานรายคน</h2>
+  <h2><span class="doc-n">13</span>รายงานสรุปงานรายคน</h2>
   <div class="section-note">
     หน้า <span class="inline-code">work_report.php</span> (ภาพรวมทุกคน) และ <span class="inline-code">my_work.php</span> (รายคนแบบละเอียด)
     · ตรรกะอยู่ที่ <span class="inline-code">includes/work_summary.php</span> + <span class="inline-code">includes/work_people.php</span>
@@ -1042,9 +1069,9 @@ $B = BASE_URL;
   </ul>
 </div>
 
-<!-- ⑭ LINE -->
+<!-- 14 LINE -->
 <div class="panel doc-section" id="linenotify">
-  <h2>⑭ ระบบแจ้งเตือนผ่าน LINE</h2>
+  <h2><span class="doc-n">14</span>ระบบแจ้งเตือนผ่าน LINE</h2>
   <div class="section-note">
     อยู่ใน <span class="inline-code">shared/</span> ใช้ร่วมกันทั้ง 2 แอป — ไม่ใช่ระบบแยกต่างหาก ·
     ตั้งค่าที่ <span class="inline-code">line_notify_settings.php</span> (PIN 9981) ·
@@ -1087,9 +1114,9 @@ $B = BASE_URL;
   </p>
 </div>
 
-<!-- ⑮ โหมดมือถือ -->
+<!-- 15 โหมดมือถือ -->
 <div class="panel doc-section" id="mobile">
-  <h2>⑮ โหมดมือถือ</h2>
+  <h2><span class="doc-n">15</span>โหมดมือถือ</h2>
   <div class="section-note">
     เข้าโหมดมือถือด้วย <span class="inline-code">@media (max-width: 640px)</span> เท่านั้น —
     <b>ดูความกว้างหน้าจอ ไม่ได้ดูว่าเป็นเครื่องอะไร</b> (ไม่มี UA sniffing)
@@ -1112,9 +1139,9 @@ $B = BASE_URL;
   </div>
 </div>
 
-<!-- ⑯ Cron -->
+<!-- 16 Cron -->
 <div class="panel doc-section" id="cron">
-  <h2>⑯ งานอัตโนมัติ (cron / Plesk Scheduled Task)</h2>
+  <h2><span class="doc-n">16</span>งานอัตโนมัติ (cron / Plesk Scheduled Task)</h2>
   <div class="section-note">
     ไฟล์ทั้งหมดอยู่ใน <span class="inline-code">cron/</span> · ล็อกเป็น <b>CLI-only 2 ชั้น</b>:
     <span class="inline-code">cron/.htaccess</span> บล็อก HTTP ทั้งหมด และ <span class="inline-code">cron/_bootstrap.php</span>
