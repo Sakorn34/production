@@ -33,7 +33,7 @@ function app_base_url() {
 define('BASE_URL', app_base_url());
 define('APP_NAME', 'ระบบทะเบียนเครื่องและซ่อมบำรุง');
 /** รหัสชุด deploy — อัปเมื่อ build patch แล้วเทียบกับ server ว่าอัปครบหรือยัง */
-define('APP_RELEASE_VERSION', '2026-09-09_173203');
+define('APP_RELEASE_VERSION', '2026-09-10_091928');
 
 /**
  * โหลด secrets แบบ cache ต่อ request

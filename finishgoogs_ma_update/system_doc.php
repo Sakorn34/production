@@ -17,8 +17,8 @@ $B = BASE_URL;
 .tag-db2 { background: #fce7f3; color: #9d174d; }
 .tag-table { background: #f3f4f6; color: var(--text, #374151); border: 1px solid #d1d5db; }
 .tag-fn { background: #fef3c7; color: #92400e; }
-.db-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-@media (max-width: 900px) { .db-grid { grid-template-columns: 1fr; } }
+.db-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 900px) { .db-grid { grid-template-columns: minmax(0, 1fr); } }
 .db-box { border-radius: 10px; overflow: hidden; }
 .db-box-head { padding: 12px 16px; font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 8px; }
 .db-box-head.primary { background: #1d4ed8; color: #fff; }
@@ -40,7 +40,7 @@ $B = BASE_URL;
 .flow-write.del { background: #fee2e2; color: #991b1b; }
 .rel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 10px; }
 .rel-box { background: #f9fafb; border: 1px solid var(--border, #e5e7eb); border-radius: 8px; padding: 10px 14px; font-size: 12.5px; }
-.rel-box b { font-size: 13px; font-family: monospace; color: #1d4ed8; }
+.rel-box b { font-size: 13px; font-family: monospace; color: #1d4ed8; overflow-wrap: anywhere; }
 .rel-box ul { margin: 6px 0 0 16px; color: var(--text-muted, #4b5563); line-height: 1.7; }
 .schema-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .schema-table th { background: #f3f4f6; padding: 6px 10px; text-align: left; border: 1px solid var(--border, #e5e7eb); font-weight: 600; color: var(--text, #374151); }
@@ -62,6 +62,15 @@ $B = BASE_URL;
 .perm-list { padding: 7px 12px; border: 1px solid var(--border, #e5e7eb); border-top: 0; border-radius: 0 0 8px 8px; }
 .perm-list li { color: var(--text-muted, #4b5563); line-height: 1.7; }
 .inline-code { font-family: monospace; font-size: 12px; background: #f3f4f6; padding: 1px 6px; border-radius: 4px; color: var(--text, #374151); }
+.inline-code { overflow-wrap: anywhere; }
+/* บนจอมือถือ: กล่องรายชื่อตารางกับหัวข้อยาว ๆ ต้องหดตามจอได้ ไม่ใช่ดันหน้าให้เลื่อนข้าง */
+@media (max-width: 640px) {
+  .tbl-item { flex-direction: column; gap: 3px; padding: 8px 12px; }
+  .tbl-name { min-width: 0; }
+  .db-box-head { flex-wrap: wrap; padding: 10px 12px; }
+  .schema-table { font-size: 12px; }
+  .schema-table th, .schema-table td { padding: 5px 7px; }
+}
 </style>
 
 <!-- TOC ด่วน -->
@@ -79,7 +88,11 @@ $B = BASE_URL;
     <a href="#permissions">⑨ สิทธิ์ / Login</a>
     <a href="#import">⑩ การนำเข้าข้อมูล</a>
     <a href="#stockstatus">⑪ สถานะสต็อกอะไหล่</a>
-    <a href="#linenotify">⑫ LINE Notify</a>
+    <a href="#search">⑫ ค้นหาอัจฉริยะ</a>
+    <a href="#workreport">⑬ สรุปงานรายคน</a>
+    <a href="#linenotify">⑭ แจ้งเตือน LINE</a>
+    <a href="#mobile">⑮ โหมดมือถือ</a>
+    <a href="#cron">⑯ งานอัตโนมัติ (cron)</a>
   </div>
 </div>
 
@@ -94,6 +107,9 @@ $B = BASE_URL;
     • <span class="inline-code">finishgoogs_ma_update/</span> — ทะเบียนเครื่อง, บันทึกผลิต, MA, อัปเดต FW/HW, เบิกอะไหล่ต่อเครื่อง<br>
     • <span class="inline-code">parts/</span> — สต็อกอะไหล่ช่าง (รับเข้า / เบิก Set / เบิกรายชิ้น) ใช้ DB <b>biton_tech_parts</b> โดยตรง<br>
     สต็อกจริง single source of truth = <span class="inline-code">biton_tech_parts.products.quantity</span> · Production map ผ่าน <span class="inline-code">parts.stock_code</span><br>
+    <b>ต่อฐานข้อมูลรวม 6 ตัว</b> — 3 ตัวที่เราเขียนเองได้ (biton_production, biton_stockparts, biton_tech_parts)
+    และอีก 3 ตัวที่ <b>อ่านอย่างเดียว</b> ของทีมอื่น (biton_maintenance งานซ่อม, biton_setup ขาย/เคลม, biton_leasing งานเช่า)
+    — 3 ตัวหลัง<b>ต่อไม่ติดได้โดยไม่ทำให้หน้าเว็บล้ม</b> (timeout 3 วินาที คืน null แล้วซ่อนเฉพาะส่วนนั้น)<br>
     <b>เมนู/sidebar ของทั้ง 2 แอปตอนนี้ใช้แหล่งเดียวกัน</b>: อ่าน/เขียนลำดับและการซ่อนเมนูจาก <span class="inline-code">site_settings.nav_items</span> ร่วมกัน ผ่าน <span class="inline-code">shared/ui_icons.php::ui_nav_apply_override()</span> (ปรับที่ appearance.php ฝั่งเดียว มีผลทั้ง 2 แอป)
   </div>
   <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px">
@@ -137,6 +153,26 @@ $B = BASE_URL;
       <div style="font-weight:700; margin-top:4px">Activity Log</div>
       <div class="pdesc">บันทึกการใช้งาน Production + Parts, ดู/Export CSV ที่หลังบ้าน</div>
     </div>
+    <div class="page-card" style="border-left:3px solid #0ea5e9">
+      <div style="font-size:20px">🔍</div>
+      <div style="font-weight:700; margin-top:4px">ค้นหาอัจฉริยะ</div>
+      <div class="pdesc">ช่องเดียวที่ sidebar ค้นข้าม 14 แหล่งใน 5 ฐาน — ดู <a href="#search">หัวข้อ ⑫</a></div>
+    </div>
+    <div class="page-card" style="border-left:3px solid #a855f7">
+      <div style="font-size:20px">🧑‍🔧</div>
+      <div style="font-weight:700; margin-top:4px">สรุปงานรายคน</div>
+      <div class="pdesc">รอบ 21–20 ของเดือน รวมงานจาก production + ซ่อม + เช่า — ดู <a href="#workreport">หัวข้อ ⑬</a></div>
+    </div>
+    <div class="page-card" style="border-left:3px solid #22c55e">
+      <div style="font-size:20px">💬</div>
+      <div style="font-weight:700; margin-top:4px">แจ้งเตือน LINE</div>
+      <div class="pdesc">Flex Message ทั้งแบบทันทีและตามรอบ + ผูกไลน์รายคนผ่าน webhook — ดู <a href="#linenotify">หัวข้อ ⑭</a></div>
+    </div>
+    <div class="page-card" style="border-left:3px solid #f97316">
+      <div style="font-size:20px">📱</div>
+      <div style="font-weight:700; margin-top:4px">โหมดมือถือ</div>
+      <div class="pdesc">แถบลัดล่างจอ + เป้าสัมผัส 48px เมื่อจอกว้าง ≤640px — ดู <a href="#mobile">หัวข้อ ⑮</a></div>
+    </div>
   </div>
 </div>
 
@@ -146,12 +182,24 @@ $B = BASE_URL;
   <div class="section-note">
     เก็บที่คอลัมน์ <span class="inline-code">assets.status</span> ในฐานข้อมูลหลัก (production DB) · ไม่มีตารางแยก
   </div>
-  <table class="schema-table" style="max-width:720px; margin-bottom:12px">
+  <div style="overflow-x:auto">
+  <table class="schema-table" style="min-width:520px; margin-bottom:12px">
     <tr><th>ค่าใน DB</th><th>แสดงผล (ไทย)</th><th>ความหมาย</th><th>CSS badge</th></tr>
     <tr><td class="col-key">new</td><td>เครื่องใหม่</td><td>อยู่ในคลัง / ผลิตใหม่ยังไม่ออกไปเช่า</td><td><span class="inline-code">st-new</span></td></tr>
     <tr><td class="col-key">rental</td><td>เครื่องเช่า</td><td>ออกไปเช่าลูกค้า</td><td><span class="inline-code">st-rental</span></td></tr>
     <tr><td class="col-key">spare</td><td>เครื่องสำรอง</td><td>เครื่องสำรอง / ยืมทดแทน</td><td><span class="inline-code">st-spare</span></td></tr>
+    <tr><td class="col-key">sold</td><td>ขายแล้ว</td><td>เบิกขายออกไปแล้ว — มาจากการเบิกขายใน biton_stockparts</td><td><span class="inline-code">st-sold</span></td></tr>
+    <tr><td class="col-key">retired</td><td>เสื่อมสภาพ</td><td>ปลดระวาง ไม่ใช้งานต่อ</td><td><span class="inline-code">st-retired</span></td></tr>
+    <tr><td class="col-key">lost</td><td>สูญหาย</td><td>หาไม่เจอ / ลูกค้าทำหาย</td><td><span class="inline-code">st-lost</span></td></tr>
   </table>
+  </div>
+  <div class="section-note" style="background:#fff7ed; border-color:#f59e0b; color:#92400e; margin-bottom:10px">
+    <b>3 สถานะท้ายไม่ได้กดเปลี่ยนเอง — ระบบ sync ให้</b><br>
+    <span class="inline-code">includes/asset_status_sync.php</span> อ่านจาก<b>ระบบเช่า</b> (biton_leasing) และ<b>การเบิกขาย</b> (biton_stockparts)
+    แล้วตัดสินตามลำดับความสำคัญ <span class="inline-code">sold &gt; rental (เช่าอยู่/MA) &gt; new (รับคืนแล้ว)</span>
+    · <b>ไม่ทับ spare</b> ยกเว้นกรณีขายแล้ว<br>
+    รันเป็นรอบด้วย <span class="inline-code">cron/sync_asset_status.php</span> (CLI · แนะนำวันละครั้ง เช่น 06:00) — ดู <a href="#cron">หัวข้อ ⑯</a>
+  </div>
   <ul style="font-size:13px; color:var(--text-muted, #4b5563); margin:0 0 0 18px; line-height:1.75">
     <li><b>ประเภท DB:</b> <span class="inline-code">ENUM('new','rental','spare','sold','retired','lost')</span> DEFAULT 'new'</li>
     <li><b>ตอนผลิตใหม่:</b> <span class="inline-code">create_produced_asset()</span> INSERT ด้วย <span class="inline-code">status='new'</span> เสมอ</li>
@@ -165,7 +213,23 @@ $B = BASE_URL;
 <!-- ③ ฐานข้อมูล -->
 <div class="panel doc-section" id="databases">
   <h2>③ ฐานข้อมูล</h2>
-  <p class="section-note">ระบบใช้ <b>3 database</b>: <b>biton_production</b> (ฐานหลัก), <b>biton_stockparts</b> (ทะเบียน S/N ทีม stock), <b>biton_tech_parts</b> (สต็อกอะไหล่ช่าง — single source of truth)</p>
+  <p class="section-note">
+    ระบบต่อ <b>6 database</b> แบ่งเป็น 2 กลุ่ม<br>
+    <b>เขียนได้ (ของเรา):</b> <span class="inline-code">biton_production</span> ฐานหลัก ·
+    <span class="inline-code">biton_stockparts</span> ทะเบียน S/N ของทีม stock ·
+    <span class="inline-code">biton_tech_parts</span> สต็อกอะไหล่ช่าง (single source of truth ของจำนวนคงเหลือ)<br>
+    <b>อ่านอย่างเดียว (ของทีมอื่น — ห้ามแก้ schema หรือเขียนลงไป):</b>
+    <span class="inline-code">biton_maintenance</span> งานซ่อม ·
+    <span class="inline-code">biton_setup</span> ประวัติขาย/เคลม/ใบส่งมอบ ·
+    <span class="inline-code">biton_leasing</span> งานเช่า
+  </p>
+  <div class="section-note" style="background:#fff7ed; border-color:#f59e0b; color:#92400e">
+    <b>3 ฐานอ่านอย่างเดียวต่อไม่ติดได้ — และต้องไม่ทำให้หน้าเว็บล้ม</b><br>
+    <span class="inline-code">dbMaintenance()</span> / <span class="inline-code">dbSetup()</span> / <span class="inline-code">dbLeasing()</span>
+    ตั้ง connect timeout <b>3 วินาที</b> และ<b>คืน <span class="inline-code">null</span></b> ถ้าต่อไม่ได้ (ไม่ throw)
+    ทุกจุดที่เรียกจึงต้องเช็ค null แล้วซ่อนเฉพาะส่วนนั้น
+    · เหตุผลที่อ่านค่าความผิดพลาดได้: <span class="inline-code">dbLeasingError()</span> ฯลฯ
+  </div>
   <div class="db-grid">
     <!-- biton_production -->
     <div class="db-box">
@@ -189,6 +253,13 @@ $B = BASE_URL;
         <div class="tbl-item"><span class="tbl-name">site_settings</span><div><div class="tbl-desc">key-value: สีธีม, โลโก้, ชื่อแอป, เมนู, ฟอนต์ (ใช้ร่วม parts ผ่าน main_theme)</div></div></div>
         <div class="tbl-item"><span class="tbl-name">customers</span><div><div class="tbl-desc">ข้อมูล legacy (AppSheet) — ยังมี FK ใน assets/repairs แต่<strong>ไม่มีหน้ UI จัดการแล้ว</strong></div></div></div>
         <div class="tbl-item"><span class="tbl-name">users</span><div><div class="tbl-desc">legacy — ปัจจุบัน login ใช้ SSO session profile ไม่ได้ auth จากตารางนี้</div></div></div>
+        <div class="tbl-item"><span class="tbl-name">work_people</span><div><div class="tbl-desc">ทะเบียน<b>คนทำงาน</b> สำหรับสรุปงานรายคน: ชื่อที่แสดง, LINE user id + bot ที่ผูก, รหัสผูกบัญชี 8 หลัก + วันหมดอายุ, <span class="inline-code">view_token</span> (เปิดหน้าสรุปของตัวเองได้โดยไม่ต้อง login), เปิด/ปิดรับแจ้งเตือน</div><div class="tbl-rows">สร้างอัตโนมัติด้วย work_people_ensure_schema() — ไม่ต้องรัน SQL มือ</div></div></div>
+        <div class="tbl-item"><span class="tbl-name">work_person_aliases</span><div><div class="tbl-desc">ชื่อที่สะกดต่างกันแต่เป็นคนเดียวกัน (เช่น <span class="inline-code">AUI</span> = <span class="inline-code">Aui</span>) — alias เป็น PK เพื่อกันชื่อเดียวไปผูกสองคน</div></div></div>
+        <div class="tbl-item"><span class="tbl-name">notification_outbox</span><div><div class="tbl-desc">คิวข้อความ LINE ที่รอส่ง (เก็บ recipient_id รายแถว จึงส่งรายคนได้)</div></div></div>
+        <div class="tbl-item"><span class="tbl-name">notification_log</span><div><div class="tbl-desc">ประวัติการส่งจริง — สำเร็จ/ล้มเหลว/ข้อความที่ LINE ตอบกลับ</div></div></div>
+        <div class="tbl-item"><span class="tbl-name">notification_dedup</span><div><div class="tbl-desc">กันส่งซ้ำ: เก็บ dedup key + TTL ต่อประเภทเหตุการณ์ (cron รันซ้ำก็ไม่ส่งซ้ำ)</div></div></div>
+        <div class="tbl-item"><span class="tbl-name">notification_snapshots</span><div><div class="tbl-desc">ค่าที่ส่งไปครั้งก่อน ใช้เทียบว่ามีอะไรเปลี่ยนพอที่จะส่งใหม่ไหม</div></div></div>
+        <div class="tbl-item"><span class="tbl-name">notification_recipients</span><div><div class="tbl-desc">ทะเบียนปลายทาง (กลุ่ม/ห้อง/รายคน) ที่เลือกได้ในหน้าตั้งค่า LINE</div></div></div>
       </div>
     </div>
     <!-- biton_stockparts + tech_parts -->
@@ -207,6 +278,28 @@ $B = BASE_URL;
           <div class="tbl-item"><span class="tbl-name">sets</span><div><div class="tbl-desc">ชุดเบิก (BOM ช่าง) สำหรับเบิกหลายชิ้นพร้อมกัน</div></div></div>
         </div>
       </div>
+      <div class="db-box" style="margin-bottom:12px">
+        <div class="db-box-head secondary" style="background:#b45309">🛠️ biton_maintenance &nbsp;<span style="font-weight:400; font-size:11px; opacity:.85">(ระบบซ่อม — อ่านอย่างเดียว)</span></div>
+        <div class="db-box-body">
+          <div class="tbl-item"><span class="tbl-name">transac_repair</span><div><div class="tbl-desc">งานซ่อม 1 แถว = 1 งาน มี<b>ชื่อคน 4 บทบาท</b>คู่กับวันที่คนละช่อง: รับเครื่อง (<span class="inline-code">trp_user_recive_ma</span>), ประเมินราคา (<span class="inline-code">trp_user_rate</span>), ซ่อมเสร็จ (<span class="inline-code">trp_user_ma</span>), ส่งคืน (<span class="inline-code">trp_sendby</span>)</div><div class="tbl-rows">⚠️ ห้ามแก้ code/schema ของระบบซ่อม — เชื่อมผ่าน includes/maintenance_repair_bridge.php เท่านั้น</div></div></div>
+        </div>
+      </div>
+      <div class="db-box" style="margin-bottom:12px">
+        <div class="db-box-head secondary" style="background:#4338ca">🧾 biton_setup &nbsp;<span style="font-weight:400; font-size:11px; opacity:.85">(ขาย / เคลม / ส่งมอบ — อ่านอย่างเดียว)</span></div>
+        <div class="db-box-body">
+          <div class="tbl-item"><span class="tbl-name">ประวัติขาย / เคลม</span><div><div class="tbl-desc">เลขที่เคลม, S/N เดิม-ใหม่, ชื่อลูกค้า/ไซต์, PO, เลขที่สัญญาเช่า — เชื่อมผ่าน <span class="inline-code">includes/setup_sale_history.php</span></div></div></div>
+          <div class="tbl-item"><span class="tbl-name">ใบส่งมอบ (Order)</span><div><div class="tbl-desc">S/N ที่ส่งมอบ, PO, บริษัท/แผนก/ผู้ติดต่อ — กดจากผลค้นหาแล้วเปิดที่ระบบต้นทาง</div></div></div>
+        </div>
+      </div>
+      <div class="db-box" style="margin-bottom:12px">
+        <div class="db-box-head secondary" style="background:#0f766e">📄 biton_leasing &nbsp;<span style="font-weight:400; font-size:11px; opacity:.85">(ระบบเช่า — อ่านอย่างเดียว)</span></div>
+        <div class="db-box-body">
+          <div class="tbl-item"><span class="tbl-name">tbl_product</span><div><div class="tbl-desc">ทะเบียนเครื่องเช่า: <span class="inline-code">pro_sn</span>, ชื่อเครื่อง, ผู้ลงทะเบียน + วันที่ (<span class="inline-code">pro_user_add</span>/<span class="inline-code">pro_date</span>)</div></div></div>
+          <div class="tbl-item"><span class="tbl-name">tbl_product_ma</span><div><div class="tbl-desc">งาน MA ของเครื่องเช่า: <span class="inline-code">ma_user_add</span> / <span class="inline-code">ma_date</span></div></div></div>
+          <div class="tbl-item"><span class="tbl-name">tbl_rent / tbl_rent_product</span><div><div class="tbl-desc">สัญญาเช่า + รายการเครื่องในสัญญา: เลขสัญญา, PO, ไซต์, ผู้ติดต่อ 3 คน/เบอร์ 3 เบอร์</div><div class="tbl-rows">⚠️ tbl_rent_product ไม่มี index บนคอลัมน์ชื่อ — ต้องกรองด้วย cus_id ที่มี index ก่อนเสมอ ไม่งั้นช้า 10 เท่า</div></div></div>
+          <div class="tbl-item"><span class="tbl-name">tbl_customer</span><div><div class="tbl-desc">ชื่อลูกค้าฝั่งเช่า (<span class="inline-code">cus_name</span>, <span class="inline-code">cus_sname</span>, <span class="inline-code">ecus_name</span>) — เชื่อมผ่าน includes/rent_ma_bridge.php, rent_product_name_map.php</div></div></div>
+        </div>
+      </div>
       <div class="section-note">
         <b>กติกาการเชื่อม Cross-Database</b><br>
         — JOIN ข้าม DB ผ่าน PHP mysqli <b>ไม่ work</b> เสมอไป → แก้ด้วยการ query แยก 2 ครั้งแล้วรวมผลใน PHP<br>
@@ -217,7 +310,7 @@ $B = BASE_URL;
         ทุกครั้งที่สร้าง/แก้ไข/ลบ asset ในระบบ → <span class="inline-code">share_upsert_asset()</span> / <span class="inline-code">share_delete_asset()</span> ถูกเรียกอัตโนมัติ ทำให้ <span class="inline-code">biton_stockparts.stock</span> อัปเดตตลอด
       </div>
       <div class="section-note" style="background:#f0fdf4; border-color:#10b981; color:#065f46">
-        <b>สถานะข้อมูล (ณ 2026-07-13)</b><br>
+        <b>ยอด ณ วันสำรวจ 2026-07-13</b> <span style="font-weight:400">(ตัวเลขอ้างอิงเก่า ไม่ได้อัปเดตอัตโนมัติ — ดูของจริงที่ share_admin.php)</span><br>
         — 18,356 แถว ใน biton_stockparts.stock<br>
         — active=1: 466 เครื่อง (เครื่องผลิตจากระบบนี้)<br>
         — active=0: 17,890 เครื่อง (นำเข้าจาก legacy / AppSheet)<br>
@@ -268,7 +361,7 @@ $B = BASE_URL;
     </div>
     <div class="page-card" style="border-top:3px solid #f59e0b">
       <div class="pfile">repairs.php</div>
-      <div class="pdesc">รายการซ่อมทั้งหมด: filter/ค้นหา (นำเข้าจาก AppSheet legacy) — แสดงชื่อลูกค้าเป็นข้อความ ไม่มีลิงก์ไปหน้าจัดการลูกค้า</div>
+      <div class="pdesc">ประวัติซ่อมรูปแบบเดิม (ตาราง Repair Display ที่นำเข้าจาก AppSheet) — <b>อ่านอย่างเดียว</b> กรองตามลูกค้า/ค้นหาได้ · งานซ่อมปัจจุบันอยู่ที่ระบบซ่อม (biton_maintenance) ซึ่งเราอ่านผ่าน includes/maintenance_repair_bridge.php</div>
       <div class="pread">อ่าน: repairs JOIN assets JOIN products LEFT JOIN customers (legacy)</div>
     </div>
     <div class="page-card" style="border-top:3px solid #10b981">
@@ -331,7 +424,81 @@ $B = BASE_URL;
       <div class="pdesc">เอกสารหลักการทำงานของระบบ (หน้านี้)</div>
       <div class="pread">ไม่อ่าน DB</div>
     </div>
+    <div class="page-card" style="border-top:3px solid #0ea5e9">
+      <div class="pfile">smart_search.php</div>
+      <div class="pdesc">AJAX เบื้องหลังช่องค้นหาที่ sidebar — <span class="inline-code">?ajax=1&amp;q=…</span> คืน JSON ผลจาก 14 แหล่งใน 5 ฐาน (ตรรกะอยู่ที่ includes/smart_search.php)</div>
+      <div class="pread">อ่าน: ทั้ง 6 ฐาน (ฐานนอกที่ต่อไม่ติดจะข้ามไป)</div>
+    </div>
+    <div class="page-card" style="border-top:3px solid #a855f7">
+      <div class="pfile">work_report.php</div>
+      <div class="pdesc">สรุปงานรายคนต่อรอบเดือน (21 เดือนก่อน – 20 เดือนนี้) ตาราง คน × หมวดงาน · กดตัวเลขดูรายการจริง · ปุ่มส่ง LINE รายคน · จัดการทะเบียนคน/ผูกไลน์</div>
+      <div class="pread">อ่าน: production (5 ตาราง) + biton_maintenance + biton_leasing / เขียน: work_people, work_person_aliases, notification_outbox</div>
+    </div>
+    <div class="page-card" style="border-top:3px solid #a855f7">
+      <div class="pfile">my_work.php</div>
+      <div class="pdesc">สรุปงานของ “คนเดียว” แบบละเอียด — เปิดจากหน้ารายงาน หรือจากลิงก์ในไลน์ด้วย <span class="inline-code">view_token</span> (ไม่ต้อง login)</div>
+      <div class="pread">อ่าน: เหมือน work_report.php แต่กรองเฉพาะคนเดียว</div>
+    </div>
+    <div class="page-card" style="border-top:3px solid #22c55e">
+      <div class="pfile">line_notify_settings.php</div>
+      <div class="pdesc">หลังบ้านตั้งค่า LINE (PIN 9981): เปิด/ปิดรายเหตุการณ์, วิธีส่ง (ทันที/ตามเวลา/ทั้งสอง), token, ผู้รับ, โหมดทดสอบ, ปุ่มส่งทดสอบรายแถว, ประวัติการส่ง</div>
+      <div class="pread">อ่าน+เขียน: site_settings, notification_recipients, notification_log</div>
+    </div>
+    <div class="page-card" style="border-top:3px solid #22c55e">
+      <div class="pfile">line_webhook.php</div>
+      <div class="pdesc"><b>Endpoint สาธารณะ</b> ให้ LINE เรียกเข้ามา — คนทักรหัสผูกบัญชี 8 หลักมา แล้วระบบเก็บ LINE user id ลง work_people · <b>ตรวจลายเซ็น X-Line-Signature ก่อนเสมอ</b> และตอบ HTTP 200 ทุกกรณี (ไม่งั้น LINE ยิงซ้ำรัว)</div>
+      <div class="pread">เขียน: work_people.line_user_id / ไม่มี session</div>
+    </div>
+    <div class="page-card" style="border-top:3px solid #22c55e">
+      <div class="pfile">finishgood_shortage_preview.php</div>
+      <div class="pdesc">ดูตัวอย่างการ์ด Flex “สินค้าที่ต้องผลิตเพิ่ม” ก่อนปล่อยให้ cron ส่งจริง — ตรวจหน้าตาและตัวเลขได้ก่อน</div>
+      <div class="pread">อ่าน: assets, products, biton_stockparts</div>
+    </div>
+    <div class="page-card" style="border-top:3px solid #6366f1">
+      <div class="pfile">settings_bulk.php</div>
+      <div class="pdesc">ตั้งค่า<b>ทุกรุ่นในหน้าเดียว</b> (PIN 9981): แผงคำสั่งตั้งค่าหมายเลขสินค้า (Serial/MAC) และค่าที่ต้องเซ็ตซ้ำ ๆ หลายรุ่น</div>
+      <div class="pread">อ่าน+เขียน: product_field_config, products</div>
+    </div>
+    <div class="page-card" style="border-top:3px solid #06b6d4">
+      <div class="pfile">update_edit.php</div>
+      <div class="pdesc">แก้ไขรายการอัปเดต FW/HW ที่บันทึกไปแล้ว (<span class="inline-code">?id=</span> ของ update_logs)</div>
+      <div class="pread">อ่าน+เขียน: update_logs (+ assets.current_fw_version)</div>
+    </div>
+    <div class="page-card" style="border-top:3px solid #06b6d4">
+      <div class="pfile">updates_import.php</div>
+      <div class="pdesc">นำเข้าประวัติอัปเดต FW/HW จาก CSV</div>
+      <div class="pread">เขียน: update_logs</div>
+    </div>
+    <div class="page-card" style="border-top:3px solid #64748b">
+      <div class="pfile">profile.php</div>
+      <div class="pdesc">แสดงข้อมูลจาก SSO session profile — ชื่อที่ระบบใช้บันทึกรายการคือ login_name</div>
+      <div class="pread">ไม่อ่าน DB</div>
+    </div>
+    <div class="page-card" style="border-top:3px solid #64748b">
+      <div class="pfile">server_config.php</div>
+      <div class="pdesc">หลังบ้านดูค่าตั้งเซิร์ฟเวอร์/เส้นทางไฟล์ (PIN 9981)</div>
+      <div class="pread">อ่าน: ค่า config + สถานะการต่อฐาน</div>
+    </div>
+    <div class="page-card" style="border-top:3px solid #64748b">
+      <div class="pfile">healthz.php</div>
+      <div class="pdesc">ตรวจสุขภาพระบบ — ใช้เช็คว่าต่อฐานข้อมูลได้ไหม</div>
+      <div class="pread">ping ฐานข้อมูล</div>
+    </div>
+    <div class="page-card" style="border-top:3px solid #64748b">
+      <div class="pfile">dashboard_data.php · notifications.php · sync_data.php</div>
+      <div class="pdesc">AJAX endpoint: modal เจาะลึกจาก dashboard · รายการแจ้งเตือนสำหรับ popup · ซิงก์ stock จากทะเบียนเครื่อง</div>
+      <div class="pread">อ่าน: assets/products · เขียน: biton_stockparts.stock (sync_data)</div>
+    </div>
+    <div class="page-card" style="border-top:3px solid #64748b">
+      <div class="pfile">login.php · logout.php</div>
+      <div class="pdesc">localhost dev → login เป็น Tom อัตโนมัติ · production → ส่งต่อ SSO bit-online</div>
+      <div class="pread">ไม่อ่าน DB</div>
+    </div>
     <div class="page-card" style="border-top:3px solid #9ca3af; opacity:.75">
+      <div class="pfile">report.php · stock_compare.php · spares.php</div>
+      <div class="pdesc"><s>ยกเลิกแล้ว</s> — report ถูกรวมเข้า Dashboard · stock_compare ถูกรวมเข้า share.php · โมดูลยืม-คืนเครื่องสำรองยกเลิก 2026-07-11 (ใช้ระบบ MA แทน) · ทั้ง 3 ไฟล์คง URL ไว้ให้ redirect เท่านั้น</div>
+      <div class="pread">—</div>
+    </div>    <div class="page-card" style="border-top:3px solid #9ca3af; opacity:.75">
       <div class="pfile">users.php</div>
       <div class="pdesc"><s>legacy</s> — เหลือเป็น stub redirect กลับ index.php พร้อมข้อความ "ระบบผู้ใช้งานภายในถูกปิดแล้ว" ไม่มีลิงก์จากเมนูใดๆ · login ใช้ SSO profile ทั้งหมด</div>
       <div class="pread">(ไม่มี query DB)</div>
@@ -603,6 +770,9 @@ $B = BASE_URL;
     <?php
     $fns = [
       ['db()', 'Singleton: คืน mysqli connection ไปยัง biton_production (lazy init)'],
+      ['dbStock() / dbParts()', 'ต่อ biton_stockparts (mysqli) และ biton_tech_parts (PDO) — 2 ฐานที่เราเขียนได้'],
+      ['dbLeasing() / dbMaintenance() / dbSetup()', 'ต่อฐานอ่านอย่างเดียวของทีมอื่น — timeout 3 วิ, คืน null ถ้าต่อไม่ได้ (ไม่ throw) ทุกจุดที่เรียกต้องเช็ค null'],
+      ['dbLeasingError() / dbMaintenanceError() / dbSetupError()', 'ข้อความผิดพลาดล่าสุดของฐานนั้น สำหรับแสดงว่าทำไมส่วนนี้ถึงว่าง'],
       ['q($sql, $types, $params)', 'Prepared statement: execute แล้วคืน mysqli_stmt. Die ถ้า prepare ล้มเหลว'],
       ['qr($sql, $types, $params)', 'เหมือน q() แต่คืน result set (mysqli_result) ใช้ fetch_assoc/fetch_row'],
       ['h($s)', 'htmlspecialchars() ป้องกัน XSS ใช้ทุกที่ที่ echo ข้อมูลจาก DB หรือ User'],
@@ -625,6 +795,14 @@ $B = BASE_URL;
       ['dthai($d)', 'วันที่ d/m/Y'],
       ['setting($key) / set_setting($key,$val)', 'อ่าน/เขียน site_settings'],
       ['nav_effective()', 'Build sidebar ฝั่ง production จาก site_settings.nav_items (parts ใช้ shared/ui_icons.php::ui_nav_apply_override() อ่าน settings ชุดเดียวกัน — ทั้ง 2 แอปจึงเห็นเมนูตรงกัน)'],
+      ['ui_mobile_bar_html(...)', 'shared/ui_icons.php — แถบลัดล่างจอสำหรับมือถือ (สแกน / เครื่อง / บันทึก MA / อะไหล่) ใช้ร่วมกันทั้ง 2 แอป'],
+      ['smart_search_query($q, $limitPerKind=5)', 'includes/smart_search.php — ค้น 14 แหล่งข้าม 5 ฐานในครั้งเดียว คืน array ผลลัพธ์พร้อม kind/href (ฐานที่ต่อไม่ติดถูกข้าม ไม่ทำให้ทั้งช่องค้นหาพัง)'],
+      ['asset_status_sync_*()', 'includes/asset_status_sync.php — คิดสถานะเครื่องใหม่จากระบบเช่า + การเบิกขาย ตามลำดับ sold > rental > new (ไม่ทับ spare)'],
+      ['work_people_ensure_schema() / work_people_resolve($raw)', 'includes/work_people.php — สร้างตารางทะเบียนคนอัตโนมัติ · แปลงชื่อดิบเป็นรหัสคน (แยก comma + เทียบไม่สนตัวพิมพ์ + ตาม alias)'],
+      ['work_summary_cycle($today) / work_summary_for_cycle($from,$to)', 'includes/work_summary.php — คำนวณรอบ 21–20 · รวมยอดงานรายคนจาก 3 ระบบ ยิง query ทีเดียวต่อแหล่งแล้ว group ใน PHP'],
+      ['line_notify_dispatch($eventKey, $payload, $opts)', 'shared/line_notify_core.php — เข้าคิวข้อความ (รับ recipient_id + dedup_key จึงส่งรายคนและกันส่งซ้ำได้)'],
+      ['line_notify_process_outbox()', 'ส่งคิวที่ค้าง — cron job ทุกตัวเรียกท้ายงาน'],
+      ['maintenance_repair_* / rent_ma_* / setup_sale_history_*', 'includes/ — สะพานอ่านข้อมูลจากระบบซ่อม/เช่า/ขาย โดยไม่แตะโค้ดหรือ schema ของระบบเหล่านั้น'],
     ];
     foreach ($fns as $f) {
         echo '<div class="rel-box"><b style="color:#92400e">' . h($f[0]) . '</b><ul><li style="list-style:none; margin-left:0; color:var(--text, #374151)">' . h($f[1]) . '</li></ul></div>';
@@ -641,6 +819,9 @@ $B = BASE_URL;
     <b>Localhost dev:</b> bootstrap เป็น Tom อัตโนมัติถ้ายังไม่มี profile<br>
     <b>Role เก่า (admin/qc/technician):</b> ตาราง users ยังมีใน DB แต่<strong>ไม่ใช้ตัดสินใจสิทธิ์แล้ว</strong> — ทุกคนที่ login ได้ใช้ฟีเจอร์หลักได้<br>
     <b>หลังบ้าน (settings, appearance, share_admin, activity_logs):</b> ต้องปลดล็อก PIN <span class="inline-code">9981</span> หรือชื่อ Tom (ดู <span class="inline-code">includes/settings_gate.php</span>) — <b>appearance.php ย้ายมาอยู่กลุ่มนี้แล้ว</b> (เดิมแค่ require_login) และการปลดล็อกจะ<b>หมดอายุใน 30 นาที</b> (<span class="inline-code">SETTINGS_UNLOCK_TTL</span>, config.php) ต้องใส่ PIN ใหม่หลังจากนั้น<br>
+    <b>หน้าที่เปิดได้โดยไม่ต้อง login 2 หน้า:</b>
+    <span class="inline-code">line_webhook.php</span> (LINE เรียกเข้ามา — ป้องกันด้วยการตรวจลายเซ็น HMAC-SHA256 ไม่ใช่ session) และ
+    <span class="inline-code">my_work.php</span> เมื่อเปิดด้วย <span class="inline-code">view_token</span> ประจำตัว (คนทำงาน 30 ชื่อมีบัญชีในระบบแค่ 9 — กดปุ่มในไลน์แล้วเจอหน้า login ก็เท่ากับดูไม่ได้) · โทเคนเปิดได้เฉพาะสรุปงานของคนคนนั้น และเพิกถอนรายคนได้<br>
     <b>Cron jobs:</b> ไฟล์ใน <span class="inline-code">cron/</span> ถูกล็อกเป็น CLI-only 2 ชั้น — <span class="inline-code">cron/.htaccess</span> บล็อก HTTP access ทั้งหมด และ <span class="inline-code">cron/_bootstrap.php</span> เช็ค <span class="inline-code">PHP_SAPI !== 'cli'</span> → ตอบ 403 ถ้าพยายามเรียกผ่านเว็บ
   </div>
   <div class="perm-grid">
@@ -656,9 +837,12 @@ $B = BASE_URL;
       <div class="perm-head" style="background:#92400e">🔑 PIN 9981 / Tom</div>
       <div class="perm-list"><ul>
         <li>settings.php — config รุ่น/checklist/watch alerts</li>
+        <li>settings_bulk.php — ตั้งค่าทุกรุ่นในหน้าเดียว</li>
         <li>share_admin.php — Sync stock, Import CSV</li>
         <li>activity_logs.php — ดู log + Export CSV</li>
         <li>appearance.php — ธีม/เมนู</li>
+        <li>line_notify_settings.php — ตั้งค่าแจ้งเตือน LINE</li>
+        <li>server_config.php — ค่าตั้งเซิร์ฟเวอร์</li>
       </ul></div>
     </div>
     <div class="perm-box">
@@ -718,7 +902,8 @@ $B = BASE_URL;
   <div class="section-note">
     คนละเรื่องกับสถานะ<b>เครื่อง</b> ใน <a href="#status">หัวข้อ ②</a> (new/rental/spare) — นี่คือสถานะของ<b>ยอดคงเหลืออะไหล่</b> คำนวณจากฟังก์ชันกลาง <span class="inline-code">shared/stock_status.php::stock_status_key()</span> ใช้ร่วมกันทั้งฝั่ง production และ parts (แทนที่โค้ดคำนวณซ้ำที่เคยกระจายอยู่ 5 จุด)
   </div>
-  <table class="schema-table" style="max-width:640px">
+  <div style="overflow-x:auto">
+  <table class="schema-table" style="min-width:420px">
     <tr><th>ระดับ</th><th>ความหมาย</th></tr>
     <tr><td class="col-key">out</td><td>หมด (0 ชิ้น)</td></tr>
     <tr><td class="col-key">critical</td><td>วิกฤต — เหลือน้อยมาก</td></tr>
@@ -726,31 +911,197 @@ $B = BASE_URL;
     <tr><td class="col-key">near</td><td>ใกล้ขั้นต่ำ</td></tr>
     <tr><td class="col-key">ok</td><td>ปกติ</td></tr>
   </table>
+  </div>
 </div>
 
-<!-- ⑫ LINE Notify -->
-<div class="panel doc-section" id="linenotify">
-  <h2>⑫ ระบบแจ้งเตือนผ่าน LINE</h2>
+<!-- ⑫ ค้นหาอัจฉริยะ -->
+<div class="panel doc-section" id="search">
+  <h2>⑫ ค้นหาอัจฉริยะ (ช่องค้นหาที่ sidebar)</h2>
   <div class="section-note">
-    อยู่ใน <span class="inline-code">shared/</span> ใช้ร่วมกันทั้ง 2 แอป — ไม่ใช่ระบบแยกต่างหาก
+    ช่องเดียวค้น <b>14 แหล่งข้าม 5 ฐานข้อมูล</b> พร้อมกัน · ตรรกะอยู่ที่
+    <span class="inline-code">includes/smart_search.php</span> · หน้า AJAX คือ
+    <span class="inline-code">smart_search.php?ajax=1&amp;q=…</span> คืน JSON
   </div>
+  <h3>กติกา</h3>
   <ul style="font-size:13px; color:var(--text-muted, #4b5563); margin:0 0 12px 18px; line-height:1.8">
-    <li><span class="inline-code">shared/line_notify_core.php</span> — คิว/ส่งข้อความผ่าน LINE Messaging API</li>
-    <li><span class="inline-code">shared/line_flex_templates.php</span> — สร้าง Flex Message ตามประเภทเหตุการณ์ (พบปัญหาตอนผลิต, ต้องซ่อมตอน MA, สต็อกอะไหล่ต่ำ)</li>
-    <li><span class="inline-code">shared/line_notify_jobs.php</span> — ตัว runner ที่ cron เรียกเพื่อประมวลผลคิว</li>
+    <li>ต้องพิมพ์อย่างน้อย <b>2 ตัวอักษร</b> (สั้นกว่านั้นคืน array ว่าง)</li>
+    <li>ค้นแบบ <span class="inline-code">LIKE %q%</span> — พิมพ์ท่อนกลางก็เจอ ไม่ต้องรู้ว่าขึ้นต้นด้วยอะไร</li>
+    <li><b>ประเภทละ 5 รายการ</b> (<span class="inline-code">$limitPerKind</span> ปรับได้ 1–8)</li>
+    <li>บรรทัดคำอธิบายยกข้อความ<b>ตรงที่ตรงกับคำค้น</b>ขึ้นมาโชว์ (<span class="inline-code">smart_search_pick_match()</span>) ไม่ใช่ยกฟิลด์แรกที่มีค่า — ผู้ใช้จะได้รู้ว่าทำไมรายการนี้ขึ้นมา</li>
+    <li>ทุกก้อนที่ยิงไปฐานนอกห่อ <span class="inline-code">try</span> ไว้ — <b>ฐานเดียวล่มไม่ทำให้ทั้งช่องค้นหาพัง</b> ผลจากส่วนนั้นหายไปเฉย ๆ</li>
+    <li>ผลที่ต้องเปิดที่ระบบต้นทางมีเครื่องหมาย <b>↗</b> ต่อท้ายป้ายประเภท</li>
   </ul>
-  <h3>จุดที่ยิงแจ้งเตือนจริง</h3>
-  <ul style="font-size:13px; color:var(--text-muted, #4b5563); margin:0 0 12px 18px; line-height:1.8">
-    <li><span class="inline-code">asset_new.php</span> — เมื่อพบปัญหาตอนผลิต (<span class="inline-code">production.problem_found</span>)</li>
-    <li><span class="inline-code">ma.php</span> — เมื่อผลตรวจ MA ต้องซ่อม (<span class="inline-code">ma.repair_required</span>)</li>
-    <li><span class="inline-code">parts/includes/StockService.php</span> — เมื่อสต็อกอะไหล่ต่ำกว่าขั้นต่ำ</li>
+  <h3>แหล่งข้อมูลทั้งหมด</h3>
+  <div style="overflow-x:auto">
+  <table class="schema-table">
+    <tr><th>ฐาน</th><th>ป้ายผลลัพธ์</th><th>ค้นจากคอลัมน์</th><th>กดแล้วไป</th></tr>
+    <tr><td rowspan="8" class="col-key">biton_production</td><td>เครื่อง</td><td>asset_code, factory_serial, ชื่อรุ่น, current_fw_version, note, lot_label</td><td>asset.php</td></tr>
+    <tr><td>เครื่อง (ผ่านลูกค้า)</td><td>ชื่อลูกค้า / site_label ของลูกค้าและของ deployment</td><td>asset.php</td></tr>
+    <tr><td>ลูกค้า</td><td>name, site_label, contact_name, phone, security_company</td><td>repairs.php?customer=</td></tr>
+    <tr><td>คน</td><td>work_people.display_name, work_person_aliases.alias</td><td>work_report.php?p=</td></tr>
+    <tr><td>รุ่น</td><td>products: name, product_code, category</td><td>assets.php?product=</td></tr>
+    <tr><td>MA</td><td>รหัสเครื่อง, S/N, remark, ok/replace/repair_items, fw_version, <b>done_by</b></td><td>asset.php</td></tr>
+    <tr><td>FW / HW</td><td>รหัสเครื่อง, S/N, detail, component_name, old_value, new_value, <b>made_by</b></td><td>asset.php</td></tr>
+    <tr><td>อะไหล่</td><td>parts: name, part_code, stock_code, category, dealer</td><td>parts.php?q=</td></tr>
+    <tr><td class="col-key">biton_tech_parts</td><td>ใบเบิก</td><td>doc_no, note, <b>issued_by</b>, asset_code</td><td>parts/pages/history.php?q=</td></tr>
+    <tr><td class="col-key">biton_stockparts</td><td>ทะเบียน stock</td><td>serial_number, model, <b>create_name</b>, setup_id</td><td>share.php?q=</td></tr>
+    <tr><td class="col-key">biton_maintenance</td><td>ซ่อม</td><td>trp_sn, trp_product, <b>trp_repair_inform (อาการที่ลูกค้าแจ้ง)</b>, trp_repair_remarks</td><td>repairs.php?q=</td></tr>
+    <tr><td rowspan="2" class="col-key">biton_setup</td><td>ขาย · เคลม ↗</td><td>claim_number, product_name, S/N เดิม-ใหม่, customer_name, site_name, po_number, lease_number</td><td>↗ ระบบ setup</td></tr>
+    <tr><td>ส่งมอบ ↗</td><td>serial_number, S/N เดิม, po_number, issue_ref, company_name, department, customer_name, contact_person</td><td>↗ ระบบ setup</td></tr>
+    <tr><td rowspan="3" class="col-key">biton_leasing</td><td>เครื่องเช่า</td><td>pro_sn, pro_name, pro_remarks, pro_bundle + ชื่อลูกค้า/ไซต์</td><td>asset.php (ถ้าเป็นเครื่องเรา)</td></tr>
+    <tr><td>สัญญาเช่า ↗</td><td>r_code, r_po, r_po_renew, r_sitename, r_siteid, r_addrjob, <b>ผู้ติดต่อ 3 คน + เบอร์ 3 เบอร์</b>, r_remarks, r_product</td><td>↗ ระบบเช่า</td></tr>
+    <tr><td>MA เช่า</td><td>งาน MA ของเครื่องเช่า — ค้นจาก S/N หรือชื่อไซต์เดียวกับด้านบน</td><td>ประวัติ MA เครื่องเช่า</td></tr>
+  </table>
+  </div>
+  <div class="section-note" style="margin-top:10px; background:#fff7ed; border-color:#f59e0b; color:#92400e">
+    <b>บทเรียนเรื่องความเร็วฝั่งระบบเช่า</b> — เดิมยิง LIKE บน <span class="inline-code">cus_name</span> ที่ join เข้ามา
+    ใช้ index ไม่ได้ ใช้เวลา ~100 ms · แก้เป็นหาชื่อลูกค้าให้ได้ <span class="inline-code">cus_id</span> ก่อน
+    แล้วค่อยกรองด้วยคอลัมน์ที่มี index เหลือ ~10 ms
+  </div>
+</div>
+
+<!-- ⑬ สรุปงานรายคน -->
+<div class="panel doc-section" id="workreport">
+  <h2>⑬ รายงานสรุปงานรายคน</h2>
+  <div class="section-note">
+    หน้า <span class="inline-code">work_report.php</span> (ภาพรวมทุกคน) และ <span class="inline-code">my_work.php</span> (รายคนแบบละเอียด)
+    · ตรรกะอยู่ที่ <span class="inline-code">includes/work_summary.php</span> + <span class="inline-code">includes/work_people.php</span>
+  </div>
+  <h3>รอบเวลา</h3>
+  <p style="font-size:13px; color:var(--text-muted, #4b5563); margin:0 0 12px">
+    <b>วันที่ 21 ของเดือนก่อน ถึงวันที่ 20 ของเดือนนี้</b> — <span class="inline-code">work_summary_cycle()</span> เลื่อนรอบก่อน/ถัดไปได้ รองรับข้ามปี ธ.ค.→ม.ค.
+  </p>
+  <h3>หมวดงานที่นับ (11 หมวด จาก 3 ระบบ)</h3>
+  <div style="overflow-x:auto">
+  <table class="schema-table">
+    <tr><th>ระบบ</th><th>หมวด</th><th>ตาราง</th><th>ช่องชื่อคน</th><th>ช่องวันที่</th></tr>
+    <tr><td rowspan="5" class="col-key">production</td><td>บันทึกผลิต / QC</td><td>production_records</td><td>made_by</td><td>recorded_at</td></tr>
+    <tr><td>บันทึก MA</td><td>ma_records</td><td>done_by</td><td>visited_at</td></tr>
+    <tr><td>อัปเดต FW/HW</td><td>update_logs</td><td>made_by</td><td>updated_at</td></tr>
+    <tr><td>เบิกอะไหล่ (นอกงานผลิต)</td><td>part_movements</td><td>made_by</td><td>moved_at</td></tr>
+    <tr><td>เคลื่อนไหวคลัง</td><td>stock_movements</td><td>made_by</td><td>moved_at</td></tr>
+    <tr><td rowspan="4" class="col-key">ระบบซ่อม</td><td>รับเครื่องเข้าซ่อม</td><td rowspan="4">transac_repair</td><td>trp_user_recive_ma</td><td>trp_receive_date</td></tr>
+    <tr><td>ประเมิน / เสนอราคา</td><td>trp_user_rate</td><td>trp_rate_date</td></tr>
+    <tr><td>ซ่อมเสร็จ</td><td>trp_user_ma</td><td>trp_success_date</td></tr>
+    <tr><td>ส่งคืนลูกค้า</td><td>trp_sendby</td><td>trp_send_date</td></tr>
+    <tr><td rowspan="2" class="col-key">ระบบเช่า</td><td>ลงทะเบียนเครื่องเช่า</td><td>tbl_product</td><td>pro_user_add</td><td>pro_date</td></tr>
+    <tr><td>MA เครื่องเช่า</td><td>tbl_product_ma</td><td>ma_user_add</td><td>ma_date</td></tr>
+  </table>
+  </div>
+  <h3 style="margin-top:14px">กับดักที่โค้ดจัดการไว้แล้ว — ห้ามถอดออก</h3>
+  <ul style="font-size:13px; color:var(--text-muted, #4b5563); margin:0 0 12px 18px; line-height:1.85">
+    <li><b>ชื่อหลายคนในช่องเดียว</b> — <span class="inline-code">production_records.made_by</span> เก็บได้แบบ <span class="inline-code">Ice,Tom</span> ต้อง split ก่อนนับ ไม่งั้นคนหายจากสรุป</li>
+    <li><b>แถวที่ระบบเขียนเอง</b> — <span class="inline-code">stock_movements</span> ที่ <span class="inline-code">reason LIKE 'Sync สถานะ:%'</span> เป็นของ cron ต้องตัดออก ไม่งั้นยอดบวมด้วยงานที่ไม่มีคนทำ · ตัด <span class="inline-code">system</span> / <span class="inline-code">Admin</span> ออกจากรายชื่อคนด้วย</li>
+    <li><b>ชื่อซ้ำต่างตัวพิมพ์</b> — <span class="inline-code">AUI</span> กับ <span class="inline-code">Aui</span> คือคนเดียวกัน เทียบแบบไม่สนตัวพิมพ์ผ่าน work_person_aliases</li>
+    <li><b>คนทำงานส่วนใหญ่ไม่มีบัญชีในระบบ</b> — สรุปให้<b>ทุกชื่อที่พบในข้อมูลงาน</b> ไม่ยึดตามตาราง users</li>
+    <li><b>ระบบซ่อม/เช่าต่อไม่ได้</b> — คืนเฉพาะส่วน production พร้อมข้อความบอก ไม่ใช่หน้า error</li>
   </ul>
-  <h3>Cron ที่เกี่ยวข้อง (CLI-only — ดูหัวข้อ ⑨)</h3>
+  <h3>ส่งเข้าไลน์รายคน</h3>
   <ul style="font-size:13px; color:var(--text-muted, #4b5563); margin:0 0 0 18px; line-height:1.8">
-    <li><span class="inline-code">cron/line_notify_worker.php</span> — ส่งคิวที่ค้างอยู่</li>
-    <li><span class="inline-code">cron/line_notify_scheduled.php</span> — งานแจ้งเตือนตามรอบเวลา</li>
-    <li><span class="inline-code">cron/plesk_line_run_job.php</span>, <span class="inline-code">cron/plesk_line_worker.php</span> — ตัวเรียกสำหรับ Plesk scheduled task</li>
+    <li>ผูกบัญชี: หน้ารายงานสร้าง<b>รหัส 8 หลัก</b> ให้ → พนักงานทักรหัสเข้าไลน์บอท → <span class="inline-code">line_webhook.php</span> เก็บ LINE user id ลง <span class="inline-code">work_people</span> · รหัสใช้ครั้งเดียว มีวันหมดอายุ</li>
+    <li>LINE user id ผูกกับ <b>bot ตัวที่ได้มา</b> (คอลัมน์ <span class="inline-code">line_user_bot</span>) — ย้าย bot แล้ว id เดิมใช้ส่งไม่ได้ ต้องผูกใหม่</li>
+    <li>ส่ง 1 ข้อความต่อคน ผ่าน <span class="inline-code">line_notify_dispatch('work.summary.monthly', …)</span> พร้อม dedup key รายคน+รายรอบ → cron รันซ้ำก็ไม่ส่งซ้ำ</li>
+    <li>คนที่ยังไม่ผูกไลน์ = <b>ข้าม</b> และรายงานว่าข้ามกี่คน ไม่นับเป็น error</li>
   </ul>
+</div>
+
+<!-- ⑭ LINE -->
+<div class="panel doc-section" id="linenotify">
+  <h2>⑭ ระบบแจ้งเตือนผ่าน LINE</h2>
+  <div class="section-note">
+    อยู่ใน <span class="inline-code">shared/</span> ใช้ร่วมกันทั้ง 2 แอป — ไม่ใช่ระบบแยกต่างหาก ·
+    ตั้งค่าที่ <span class="inline-code">line_notify_settings.php</span> (PIN 9981) ·
+    <b>เวลาและวันส่งตั้งที่ Plesk Scheduled Task เท่านั้น</b> หลังบ้านตั้งแค่เปิด/ปิด · วิธีส่ง · token · ผู้รับ
+  </div>
+  <h3>ไฟล์หลัก</h3>
+  <ul style="font-size:13px; color:var(--text-muted, #4b5563); margin:0 0 12px 18px; line-height:1.8">
+    <li><span class="inline-code">shared/line_notify_core.php</span> — คิว/ส่ง/dedup/retry ผ่าน LINE Messaging API + สร้าง 5 ตาราง notification_* อัตโนมัติ</li>
+    <li><span class="inline-code">shared/line_flex_templates.php</span> — เลือกแบบการ์ด Flex ตามประเภทเหตุการณ์</li>
+    <li><span class="inline-code">shared/line_flex_finishgood_shortage.php</span> · <span class="inline-code">shared/line_flex_work_summary.php</span> — builder แยกไฟล์สำหรับการ์ดที่ซับซ้อน</li>
+    <li><span class="inline-code">shared/line_notify_jobs.php</span> — runner ที่ cron เรียก</li>
+    <li><span class="inline-code">includes/line_notify_settings.php</span> · <span class="inline-code">includes/work_summary_send.php</span> — ตรรกะหน้าตั้งค่า และตัวส่งสรุปงานรายคน</li>
+  </ul>
+  <h3>ประเภทเหตุการณ์ทั้งหมด</h3>
+  <div style="overflow-x:auto">
+  <table class="schema-table" style="max-width:820px">
+    <tr><th>event key</th><th>ชื่อไทย</th><th>ยิงจากไหน</th></tr>
+    <tr><td class="col-key">production.problem_found</td><td>พบปัญหาตอนผลิต</td><td>asset_new.php (ทันที)</td></tr>
+    <tr><td class="col-key">ma.repair_required</td><td>MA ต้องซ่อม</td><td>ma.php (ทันที)</td></tr>
+    <tr><td class="col-key">stock.low_threshold</td><td>อะไหล่ควรสั่งเพิ่ม</td><td>parts/includes/StockService.php + cron รายวัน</td></tr>
+    <tr><td class="col-key">stock.manual_withdraw</td><td>เบิกอะไหล่ (manual)</td><td>หน้าเบิกอะไหล่</td></tr>
+    <tr><td class="col-key">production.summary.daily</td><td>สรุปผลิตรายวัน</td><td>cron/plesk_line_job_daily.php</td></tr>
+    <tr><td class="col-key">production.summary.daily_update</td><td>อัปเดตผลิตหลัง 17:30</td><td>cron/plesk_line_job_daily_update.php</td></tr>
+    <tr><td class="col-key">production.summary.weekly</td><td>สรุปผลิตรายสัปดาห์</td><td>cron/plesk_line_job_weekly.php</td></tr>
+    <tr><td class="col-key">production.summary.monthly</td><td>สรุปผลิตรายเดือน</td><td>cron/plesk_line_job_monthly.php</td></tr>
+    <tr><td class="col-key">work.summary.monthly</td><td>สรุปงานรายคน (รายเดือน)</td><td>cron/plesk_line_job_work_summary.php — ส่งรายคน</td></tr>
+    <tr><td class="col-key">line.test</td><td>ทดสอบการส่ง</td><td>ปุ่มในหน้าตั้งค่า (รายแถว)</td></tr>
+  </table>
+  </div>
+  <div class="section-note" style="margin-top:10px; background:#fff7ed; border-color:#f59e0b; color:#92400e">
+    <b>ข้อจำกัดของ LINE Flex ที่ต้องคิดเผื่อเสมอ</b><br>
+    1 ข้อความไม่เกิน <b>50 KB</b> (โค้ดกันไว้ที่ 45 KB) และ carousel ไม่เกิน <b>12 bubble</b>
+    — การ์ดที่มีรายการยาว (เช่นสรุปรุ่นทั้งหมด) ต้อง<b>แบ่งเป็นหลายข้อความให้จำนวนใกล้เคียงกัน</b> ไม่ใช่ยัดข้อความเดียว
+  </div>
+  <h3>โหมดทดสอบ</h3>
+  <p style="font-size:13px; color:var(--text-muted, #4b5563); margin:0">
+    <span class="inline-code">line_notify_test_mode()</span> เปลี่ยนปลายทาง<b>ทุกข้อความ</b>ไปบัญชีทดสอบ —
+    เปิดก่อนตรวจหน้าตาการ์ด แล้วค่อยปิดเมื่อจะส่งจริง ·
+    การ์ด “สินค้าที่ต้องผลิตเพิ่ม” ดูตัวอย่างได้ที่ <span class="inline-code">finishgood_shortage_preview.php</span> โดยไม่ต้องส่ง
+  </p>
+</div>
+
+<!-- ⑮ โหมดมือถือ -->
+<div class="panel doc-section" id="mobile">
+  <h2>⑮ โหมดมือถือ</h2>
+  <div class="section-note">
+    เข้าโหมดมือถือด้วย <span class="inline-code">@media (max-width: 640px)</span> เท่านั้น —
+    <b>ดูความกว้างหน้าจอ ไม่ได้ดูว่าเป็นเครื่องอะไร</b> (ไม่มี UA sniffing)
+    จึงต้องมี <span class="inline-code">&lt;meta name="viewport" content="width=device-width, initial-scale=1"&gt;</span> ในทุกหน้า
+  </div>
+  <ul style="font-size:13px; color:var(--text-muted, #4b5563); margin:0 0 12px 18px; line-height:1.85">
+    <li><b>แถบลัดล่างจอ</b> (<span class="inline-code">.mbar</span>): สแกน · เครื่อง · บันทึก MA · อะไหล่ — สร้างจาก <span class="inline-code">ui_mobile_bar_html()</span> ใช้ร่วมกัน 2 แอป</li>
+    <li><b>เป้าสัมผัส 48px</b>: <span class="inline-code">:root { --input-h: 48px }</span> บนจอเล็ก</li>
+    <li>กฎมือถือทั้งหมดอยู่ใน <span class="inline-code">assets/sidebar.css</span> <b>ไม่ใช่ style.css</b> — เพราะแอป parts ไม่ได้โหลด style.css ของ production</li>
+    <li>เนื้อหาท้ายหน้าเว้นที่ให้แถบลอย: <span class="inline-code">padding-bottom: calc(64px + env(safe-area-inset-bottom))</span></li>
+  </ul>
+  <div class="section-note" style="background:#fff7ed; border-color:#f59e0b; color:#92400e">
+    <b>เวลาตรวจหน้าจอมือถือ</b><br>
+    • วัดการล้นแนวนอนด้วย <span class="inline-code">documentElement.clientWidth</span> <b>ไม่ใช่</b> <span class="inline-code">innerWidth</span>
+    — บน viewport มือถือ innerWidth โตตามความกว้างที่เลื่อนได้ ทำให้ตรวจไม่เจอ<br>
+    • ใช้ <span class="inline-code">minmax(0, 1fr)</span> แทน <span class="inline-code">1fr</span> ใน grid ที่ต้องหดได้
+    — <span class="inline-code">1fr</span> หดต่ำกว่า min-content ไม่ได้ แล้วดันคอลัมน์ล้นกรอบเงียบ ๆ<br>
+    • ต้องตรวจ<b>สถานะที่ต้องกดถึงจะเห็น</b>ด้วย (เช่นการ์ดที่สลับด้วยปุ่ม) ไม่ใช่ตรวจแค่ตอนโหลดหน้า<br>
+    • ถ้าเปิดในมือถือแล้วยังเห็นหน้าจอแบบคอม ให้เช็คก่อนว่าเบราว์เซอร์เปิด “Request Desktop Site” อยู่หรือเปล่า
+  </div>
+</div>
+
+<!-- ⑯ Cron -->
+<div class="panel doc-section" id="cron">
+  <h2>⑯ งานอัตโนมัติ (cron / Plesk Scheduled Task)</h2>
+  <div class="section-note">
+    ไฟล์ทั้งหมดอยู่ใน <span class="inline-code">cron/</span> · ล็อกเป็น <b>CLI-only 2 ชั้น</b>:
+    <span class="inline-code">cron/.htaccess</span> บล็อก HTTP ทั้งหมด และ <span class="inline-code">cron/_bootstrap.php</span>
+    เช็ค <span class="inline-code">PHP_SAPI !== 'cli'</span> → ตอบ 403 · เซิร์ฟเวอร์รันด้วย <b>PHP 8.2</b> (เว็บรัน 7.3)
+    · คู่มือตั้ง task อยู่ที่ <span class="inline-code">cron/README.md</span>
+  </div>
+  <div style="overflow-x:auto">
+  <table class="schema-table">
+    <tr><th>ไฟล์</th><th>ทำอะไร</th><th>ความถี่ที่แนะนำ</th></tr>
+    <tr><td class="col-key">sync_asset_status.php</td><td>sync <span class="inline-code">assets.status</span> จากระบบเช่า + การเบิกขาย (sold / rental / new)</td><td>วันละครั้ง เช่น 06:00</td></tr>
+    <tr><td class="col-key">plesk_line_job_daily.php</td><td>สรุปผลิตรายวัน</td><td>Daily</td></tr>
+    <tr><td class="col-key">plesk_line_job_daily_update.php</td><td>อัปเดตผลิตหลังเลิกงาน</td><td>Daily หลัง 17:30</td></tr>
+    <tr><td class="col-key">plesk_line_job_low_stock.php</td><td>อะไหล่ใกล้หมด</td><td>Daily</td></tr>
+    <tr><td class="col-key">plesk_line_job_finishgood_shortage.php</td><td>สินค้าที่ต้องผลิตเพิ่ม</td><td>ตามที่ตกลง</td></tr>
+    <tr><td class="col-key">plesk_line_job_weekly.php</td><td>สรุปผลิตรายสัปดาห์</td><td>รายสัปดาห์</td></tr>
+    <tr><td class="col-key">plesk_line_job_monthly.php</td><td>สรุปผลิตรายเดือน</td><td><span class="inline-code">10 20 28-31 * *</span> (ส่งเฉพาะวันสุดท้ายของเดือน)</td></tr>
+    <tr><td class="col-key">plesk_line_job_work_summary.php</td><td><b>สรุปงานรายคน</b> — คิดรอบที่เพิ่งปิด แล้ว dispatch รายคน</td><td><span class="inline-code">0 9 21 * *</span></td></tr>
+    <tr><td class="col-key">plesk_line_worker.php</td><td>ส่ง outbox ที่ค้าง (worker สำรอง)</td><td><span class="inline-code">*/2 * * * *</span> ถ้าต้องการให้ instant เร็วขึ้น</td></tr>
+    <tr><td class="col-key">line_notify_worker.php · line_notify_scheduled.php</td><td>เวอร์ชันเรียกตรงสำหรับ dev / ทดสอบด้วยมือ</td><td>—</td></tr>
+  </table>
+  </div>
+  <p style="font-size:12.5px; color:var(--text-muted, #4b5563); margin:10px 0 0">
+    job รายการเรียก <span class="inline-code">line_notify_process_outbox()</span> ท้ายงานอยู่แล้ว — worker สำรองจึงไม่บังคับ
+  </p>
 </div>
 
 <p class="muted" style="font-size:12px; text-align:center; margin-top:8px">เอกสารนี้สร้างอัตโนมัติจากโครงสร้างระบบ · อัปเดตล่าสุด: <?= date('d/m/Y') ?></p>
