@@ -206,7 +206,10 @@ $B = BASE_URL;
     <li><b>เปลี่ยนสถานะ:</b> หน้า <span class="inline-code">asset.php</span> (dropdown + บันทึก) หรือ <span class="inline-code">ma.php</span> (เลือกสถานะหลังบันทึก MA)</li>
     <li><b>Dashboard / assets.php:</b> นับ GROUP BY status · filter <span class="inline-code">?status=new|rental|spare</span></li>
     <li><b>Helper:</b> <span class="inline-code">status_th()</span>, <span class="inline-code">status_badge()</span>, <span class="inline-code">status_list()</span> ใน config.php</li>
-    <li><b>Audit (ถ้ามี):</b> การเปลี่ยนสถานะบางครั้งบันทึกใน <span class="inline-code">stock_movements</span> (direction in/out)</li>
+    <li><b>ทุกครั้งที่สถานะเปลี่ยน จะมีแถวบันทึกไว้เสมอ</b> ใน <span class="inline-code">stock_movements</span>
+        (ไม่ใช่ "บางครั้ง") — เก็บว่าใครเปลี่ยน เปลี่ยนจากอะไรเป็นอะไร และเข้าคลัง (<span class="inline-code">in</span>)
+        หรือออกจากคลัง (<span class="inline-code">out</span>) · แถวที่ cron sync เขียนเองจะขึ้นต้นเหตุผลว่า
+        <span class="inline-code">Sync สถานะ:</span> ทำให้แยกออกจากที่คนกดเองได้</li>
   </ul>
 </div>
 
@@ -518,7 +521,14 @@ $B = BASE_URL;
   <h3>🏭 การสร้างเครื่องใหม่ (asset_new.php → create_produced_asset)</h3>
   <div class="section-note" style="margin-bottom:10px">
     <b>โหมดสร้างรหัส 2 แบบ:</b><br>
-    • <b>generated</b>: ระบบสร้างรหัสอัตโนมัติ <span class="inline-code">{prefix}{YY}{MM}{NNNN}</span> — ใช้ MySQL <span class="inline-code">GET_LOCK()</span> ล็อกก่อนคำนวณเลขวิ่งถัดไป (ป้องกัน race condition, รองรับ batch หลายเครื่องพร้อมกัน) เลขวิ่งคำนวณโดย<b>อ่านจากท้าย asset_code ของแถวที่มีอยู่จริงเป็นหลัก</b> (<span class="inline-code">asset_running_scan_for_product()</span>) ไม่ใช่ query MAX(running_no) ตรงๆ — กันเคสคอลัมน์ running_no ในฐานข้อมูลผิดรูปหรือไม่ตรงกับรหัสจริง แล้วค่อย fallback ไปคอลัมน์ running_no ถ้า parse ไม่ได้<br>
+    • <b>generated</b>: ระบบตั้งรหัสให้เอง รูปแบบ <span class="inline-code">{prefix}{YY}{MM}{NNNN}</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<b>หาเลขวิ่งตัวถัดไปยังไง</b> — ไล่<b>อ่านตัวเลขท้ายรหัสของเครื่องที่มีอยู่จริง</b>
+    (<span class="inline-code">asset_running_scan_for_product()</span>)
+    ไม่ได้ถาม <span class="inline-code">MAX(running_no)</span> ตรง ๆ
+    เพราะคอลัมน์ <span class="inline-code">running_no</span> เคยมีค่าที่ไม่ตรงกับรหัสจริง ถ้าเชื่อคอลัมน์นั้นจะได้เลขซ้ำ
+    · อ่านตัวเลขท้ายรหัสไม่ออกเมื่อไหร่ค่อยหันไปใช้คอลัมน์ <span class="inline-code">running_no</span> แทน<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<b>กันเลขชนกันยังไง</b> — ล็อกด้วย <span class="inline-code">GET_LOCK()</span> ของ MySQL
+    ก่อนคำนวณ ถ้ามีคนกดบันทึกพร้อมกันหรือบันทึกทีเดียวหลายเครื่อง จะต่อคิวกันไม่แย่งเลขเดียวกัน<br>
     • <b>factory_serial</b>: ใช้ S/N จากโรงงานเป็นรหัสเครื่อง (ต้อง unique), 1 form = 1 เครื่อง
   </div>
   <div class="flow-steps">
@@ -652,14 +662,41 @@ $B = BASE_URL;
     <tr><td class="col-fk col-key">product_id</td><td>BIGINT UNSIGNED</td><td>FK → products(id)</td></tr>
     <tr><td>context</td><td>ENUM('production','ma','update')</td><td>ฟิลด์นี้ใช้ในฟอร์มไหน</td></tr>
     <tr><td>field_name</td><td>VARCHAR(150)</td><td>ชื่อฟิลด์ เช่น "Display", "Battery By"</td></tr>
-    <tr><td>field_kind</td><td>VARCHAR(30)</td><td>component / extra / text / ma_item / <b>checklist</b> / <b>watch_alert</b> / <b>watch_alert_cfg</b> / fw / lot / made_by · เพิ่มเมื่อปิดสวิตช์: fw_off / lot_off / made_by_off / product_snippets / product_snippets_off · ชุด MA เพิ่มเติม: ma_ok / ma_replace / ma_repair / ma_fw / ma_status / ma_remark</td></tr>
+    <tr><td>field_kind</td><td>VARCHAR(30)</td><td><b>ฟิลด์นี้เป็นชนิดไหน — เป็นข้อความอิสระ ผู้ใช้พิมพ์เองได้จากหน้า settings</b><br>
+      มีบางค่าที่ระบบ<b>จองไว้</b> คือใส่ค่านี้แล้วพฤติกรรมจะเปลี่ยนจริง ๆ ส่วนค่าอื่นที่พิมพ์เองเป็นแค่ป้ายจัดกลุ่ม
+      ไม่มีผลอะไรกับระบบ (ในฐานตอนนี้มีทั้ง <span class="inline-code">ประเภทการใช้งาน</span> และ
+      <span class="inline-code">ชิ้นส่วนฮาร์ดแวร์</span> ที่พิมพ์เข้ามาเอง)<br><br>
+      <b>ค่าที่ระบบจองไว้ — ฟอร์มบันทึกผลิต</b><br>
+      <span class="inline-code">component</span> ชิ้นส่วนของเครื่อง (บันทึกลง asset_components) ·
+      <span class="inline-code">extra</span> ฟิลด์เสริม (ลง extra_json) ·
+      <span class="inline-code">text</span> ข้อความทั่วไป ·
+      <span class="inline-code">ผู้ผลิต</span> ตอบเป็นชื่อคนแบบปุ่มกด <b>เลือกได้เฉพาะชื่อที่ตั้งไว้หลังบ้าน พิมพ์เพิ่มเองไม่ได้</b> ·
+      <span class="inline-code">checklist</span> · <span class="inline-code">fw</span> ·
+      <span class="inline-code">lot</span> · <span class="inline-code">made_by</span><br><br>
+      <b>ค่าที่ระบบจองไว้ — ฟอร์ม MA</b><br>
+      <span class="inline-code">ma_ok</span> · <span class="inline-code">ma_replace</span> ·
+      <span class="inline-code">ma_repair</span> · <span class="inline-code">ma_fw</span> ·
+      <span class="inline-code">ma_status</span> · <span class="inline-code">ma_remark</span> ·
+      <span class="inline-code">ma_item</span> (แบบเก่า รวมทุกช่องไว้ด้วยกัน)<br><br>
+      <b>ค่าที่ระบบจองไว้ — แจ้งเตือนอายุอุปกรณ์</b><br>
+      <span class="inline-code">watch_alert</span> เปิดใช้ · <span class="inline-code">watch_alert_cfg</span> ค่าที่ตั้งไว้<br><br>
+      <b>ค่าที่ลงท้ายด้วย <span class="inline-code">_off</span> = ตั้งใจปิด ไม่ใช่ยังไม่เคยตั้ง</b><br>
+      <span class="inline-code">fw_off</span> · <span class="inline-code">lot_off</span> ·
+      <span class="inline-code">made_by_off</span> · <span class="inline-code">product_snippets_off</span> —
+      ถ้าไม่มีแถวนี้เลย ระบบจะถือว่ายังไม่เคยตั้งค่าแล้วไปเดาให้เอง ซึ่งคนละความหมายกับ "ปิด"</td></tr>
     <tr><td>input_mode</td><td>VARCHAR(40) NULL</td><td>chip_single_free, chip_multi, text, … — ควบคุม UI ฟิลด์ (settings.php)</td></tr>
     <tr><td>options_text</td><td>TEXT NULL</td><td>ตัวเลือก dropdown (1 ตัวเลือก/บรรทัด) หรือรายการ checklist / รหัส watch alert</td></tr>
     <tr><td>sort_order</td><td>INT</td><td>ลำดับแสดง (drag-reorder ได้)</td></tr>
   </table>
   </div>
   <div class="section-note" style="margin-top:8px">
-    <b>Auto-derive:</b> ถ้าไม่มี config ใน product_field_config → ระบบ derive จากประวัติจริง: component จาก asset_components.component_name, extra จาก production_records.extra_json keys, MA pool จาก ma_records.ok/replace/repair_items โดยจัดลำดับตามความถี่
+    <b>รุ่นที่ยังไม่ได้ตั้งค่า ระบบเดาฟิลด์ให้เอง</b><br>
+    ถ้ารุ่นไหนไม่มีแถวใน <span class="inline-code">product_field_config</span> เลย ระบบจะไปดู<b>ประวัติที่เคยบันทึกจริง</b>
+    ของรุ่นนั้นแล้วสร้างฟิลด์ให้ตามที่เคยใช้ — <b>เรียงตัวที่ใช้บ่อยขึ้นก่อน</b><br>
+    • ชิ้นส่วน ← ชื่อชิ้นส่วนที่เคยบันทึกใน <span class="inline-code">asset_components</span><br>
+    • ฟิลด์เสริม ← ชื่อคีย์ที่เคยมีใน <span class="inline-code">production_records.extra_json</span><br>
+    • รายการ MA ← อุปกรณ์ที่เคยถูกบันทึกว่า OK / เปลี่ยน / ซ่อม ใน <span class="inline-code">ma_records</span><br>
+    พอไปตั้งค่าที่หน้า settings แล้ว ค่าที่ตั้งจะแทนที่ตัวที่เดาไว้ทั้งหมด
   </div>
 </div>
 
@@ -773,24 +810,24 @@ $B = BASE_URL;
       ['dbStock() / dbParts()', 'ต่อ biton_stockparts (mysqli) และ biton_tech_parts (PDO) — 2 ฐานที่เราเขียนได้'],
       ['dbLeasing() / dbMaintenance() / dbSetup()', 'ต่อฐานอ่านอย่างเดียวของทีมอื่น — timeout 3 วิ, คืน null ถ้าต่อไม่ได้ (ไม่ throw) ทุกจุดที่เรียกต้องเช็ค null'],
       ['dbLeasingError() / dbMaintenanceError() / dbSetupError()', 'ข้อความผิดพลาดล่าสุดของฐานนั้น สำหรับแสดงว่าทำไมส่วนนี้ถึงว่าง'],
-      ['q($sql, $types, $params)', 'Prepared statement: execute แล้วคืน mysqli_stmt. Die ถ้า prepare ล้มเหลว'],
-      ['qr($sql, $types, $params)', 'เหมือน q() แต่คืน result set (mysqli_result) ใช้ fetch_assoc/fetch_row'],
+      ['q($sql, $types, $params)', 'สั่ง query แบบ prepared statement (ค่าที่ส่งเข้าไปถูกแยกจากตัวคำสั่ง จึงกัน SQL injection) คืน mysqli_stmt · หยุดทำงานทันทีถ้า prepare ไม่ผ่าน'],
+      ['qr($sql, $types, $params)', 'เหมือน q() แต่คืนผลลัพธ์มาให้วนอ่านต่อได้เลยด้วย fetch_assoc() / fetch_row()'],
       ['h($s)', 'htmlspecialchars() ป้องกัน XSS ใช้ทุกที่ที่ echo ข้อมูลจาก DB หรือ User'],
       ['require_login()', 'บังคับ SSO session profile (localhost dev → Tom อัตโนมัติ)'],
-      ['can($perm) / require_can($perm)', 'เปิดให้ทุก profile ใช้ได้ — พารามิเตอร์ perm เก็บไว้เพื่อ backward compat'],
+      ['can($perm) / require_can($perm)', 'ตอนนี้คืน true ให้ทุกคนที่ล็อกอินได้ — ระบบไม่ได้แบ่งสิทธิ์ตามบทบาทแล้ว ที่ยังรับพารามิเตอร์ $perm อยู่ก็เพื่อไม่ต้องไล่แก้จุดที่เรียกทั้งระบบ'],
       ['actor_name()', 'ชื่อผู้ใช้จาก $_SESSION profile สำหรับบันทึก/เบิก/activity log'],
       ['status_th($s) / status_badge($s) / status_list()', 'แปลง/แสดงสถานะเครื่อง new/rental/spare'],
       ['thai_month_short($ym) / thai_month_period_label($ym)', 'ป้ายเดือนย่อไทย + พ.ศ. สำหรับ Dashboard'],
-      ['create_produced_asset($pid,$date,$serial,$note,$uid)', 'สร้างเครื่องใหม่ status=new; GET_LOCK สำหรับ generated code; share_upsert_asset()'],
+      ['create_produced_asset($pid,$date,$serial,$note,$uid)', 'สร้างเครื่องใหม่ให้สถานะ new เสมอ · ถ้ารุ่นนั้นให้ระบบตั้งรหัสเอง จะล็อกด้วย GET_LOCK ก่อนหาเลขวิ่ง กันเลขชนกัน · เสร็จแล้วส่งต่อให้ share_upsert_asset() ไปลงทะเบียน stock ให้อัตโนมัติ'],
       ['share_upsert_asset($assetId, $oldCode)', 'Sync → biton_stockparts.stock (fail-soft)'],
       ['share_delete_asset($code)', 'DELETE จาก biton_stockparts.stock (fail-soft)'],
-      ['tech_parts_stock_out_by_part_id(...)', 'เบิกอะไหล่ผ่าน includes/part_stock_bridge.php — เขียนตรงเข้า biton_tech_parts.quantity ด้วย PDO transaction + row lock (เดิมเคยยิงผ่าน webhook แยกระบบ ปัจจุบันเป็น direct DB write)'],
-      ['effective_fields($pid, $ctx)', 'config ฟิลด์ฟอร์ม หรือ auto-derive จากประวัติ'],
-      ['effective_production_checklist($pid)', 'รายการ checklist จาก product_field_config field_kind=checklist'],
+      ['tech_parts_stock_out_by_part_id(...)', 'ตัดยอดอะไหล่ในคลังช่าง (includes/part_stock_bridge.php) — เขียนเข้า biton_tech_parts โดยตรง ครอบด้วย transaction และล็อกแถวไว้ กันสองคนเบิกพร้อมกันแล้วยอดเพี้ยน'],
+      ['effective_fields($pid, $ctx)', 'คืนรายการฟิลด์ที่ต้องแสดงในฟอร์มของรุ่นนั้น — ใช้ค่าที่ตั้งไว้หลังบ้านก่อน ถ้ายังไม่เคยตั้งจึงเดาจากประวัติที่เคยบันทึกจริง'],
+      ['effective_production_checklist($pid)', 'รายการที่ต้องติ๊กตรวจก่อนส่งมอบของรุ่นนั้น — ถ้าไม่ได้ตั้งไว้ จะดึงจากเครื่องล่าสุดของรุ่นเดียวกันมาให้'],
       ['product_watch_alerts_enabled($pid)', 'เปิด/ปิด watch alert SD Card / Battery RTC ต่อรุ่น'],
-      ['part_watch_alerts($assetId, $producedAt)', 'คำนวณแจ้งเตือนอายุ SD/RTC จาก ma_records.replace_items'],
+      ['part_watch_alerts($assetId, $producedAt)', 'คำนวณว่า SD Card / ถ่าน RTC ถึงเวลาเปลี่ยนหรือยัง — หาวันเปลี่ยนล่าสุดจาก 3 ที่แล้วเลือกอันที่ใหม่สุด: บันทึก MA, งานซ่อมในระบบซ่อม, และวันผลิต (ใช้เมื่อไม่เคยเปลี่ยนเลย) · ครบ 22 เดือนเตือนสีส้ม ครบ 24 เดือนเตือนสีแดง · ต้องเปิดใช้ต่อรุ่นก่อนถึงจะเตือน'],
       ['activity_log_write([...])', 'shared/activity_log_core.php — บันทึก activity_logs'],
-      ['img_url($path)', 'แปลง path ใน DB เป็น URL (รองรับ legacy AppSheet)'],
+      ['img_url($path)', 'แปลงที่อยู่ไฟล์รูปที่เก็บใน DB ให้เป็น URL ที่เปิดได้ — รองรับทั้งรูปที่อัปผ่านระบบนี้และรูปเก่าที่ย้ายมาจาก AppSheet ซึ่งเก็บคนละรูปแบบ'],
       ['save_upload($field,$subdir,$exts)', 'รับ upload ภาพ → uploads/{subdir}/'],
       ['dthai($d)', 'วันที่ d/m/Y'],
       ['setting($key) / set_setting($key,$val)', 'อ่าน/เขียน site_settings'],
