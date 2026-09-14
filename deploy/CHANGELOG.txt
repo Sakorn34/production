@@ -3663,3 +3663,16 @@ Files:
   finishgoogs_ma_update/config.php
   finishgoogs_ma_update/system_doc.php
 
+
+================================================================
+v2026-09-14_195811 | Patch | 2026-09-14 19:58:14
+From: 2026-09-10_102643  ->  To: c6eac07  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/finishgood_shortage_preview.php
+  shared/finishgood_shortage_client.php
+  shared/finishgood_shortage_registry.php
+  shared/line_notify_jobs.php
+
