@@ -515,14 +515,23 @@ function line_notify_run_job(string $job, array $opts = []): array
             break;
 
         case 'finishgood_shortage':
-            // ตัวเลขมาจาก setupsystem ทางเดียว — production ไม่มีสูตรคำนวณซ้ำ
+            // ตัวเลขหลักมาจาก setupsystem · รุ่นที่เลือกไว้นับยอดคงเหลือจากทะเบียนเครื่องของเราแทน
             require_once __DIR__ . '/finishgood_shortage_client.php';
             require_once __DIR__ . '/finishgood_shortage_filter.php';
+            require_once __DIR__ . '/finishgood_shortage_registry.php';
             try {
                 $fetched = finishgood_shortage_fetch();
                 if (!$fetched['ok']) {
                     $result['skipped'] = $fetched['error'];
                     break;
+                }
+                // รุ่นที่เลือกไว้ใช้ยอดคงเหลือจากทะเบียนเครื่องของเรา — setupsystem ยังนับเครื่องที่ปล่อยเช่าเป็นของในคลัง
+                // คำนวณไม่ได้ = ใช้ตัวเลขของ setupsystem ตามเดิม ไม่ใช่ข้ามการแจ้งเตือนทั้งชุด
+                $registry = fg_shortage_apply_registry($fetched['items']);
+                $fetched['items'] = $registry['items'];
+                $result['registry'] = array_keys($registry['replaced']);
+                if ($registry['error'] !== '') {
+                    $result['registry_error'] = $registry['error'];
                 }
                 // ตัดรุ่นที่ปิดแจ้งเตือนไว้ออกก่อน
                 $filtered = fg_shortage_filter_items($fetched['items']);

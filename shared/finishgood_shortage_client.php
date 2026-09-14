@@ -3,7 +3,8 @@
  * shared/finishgood_shortage_client.php — ดึงรายการสินค้าที่ต้องผลิตเพิ่มจากระบบ Setup
  *
  * วัตถุประสงค์: ให้ production ได้ตัวเลขจากแหล่งเดียว (setupsystem) แทนการมีสูตรคำนวณซ้ำ
- *              สูตร (คงเหลือ + ระบบเช่า) − (ขั้นต่ำ + PO) อยู่ที่ setupsystem ที่เดียวเท่านั้น
+ *              สูตร (คงเหลือ + ระบบเช่า) − (ขั้นต่ำ + PO) อยู่ที่ setupsystem
+ *              ยกเว้นรุ่นที่เลือกให้นับยอดคงเหลือจากทะเบียนเครื่องของเรา — ดู finishgood_shortage_registry.php
  *
  * ตั้งค่าใน line.secrets.php:
  *   'finishgood_shortage_api_url'   => 'https://bit-online.net/setupsystem/api/finishgood_shortage.php',
@@ -68,6 +69,8 @@ function finishgood_shortage_fetch(): array
         CURLOPT_FOLLOWLOCATION => false,
         CURLOPT_HTTPHEADER     => ['X-Api-Token: ' . $cfg['token'], 'Accept: application/json'],
     ]);
+    // ใบรับรอง CA บน AppServ ใช้ตัวช่วยเดียวกับตอนส่ง LINE — ไม่งั้นเครื่อง dev เรียก API ไม่ผ่าน
+    line_notify_apply_curl_ssl($ch);
     $body = curl_exec($ch);
     $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $curlError = curl_error($ch);

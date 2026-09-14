@@ -11,8 +11,18 @@ require __DIR__ . '/config.php';
 require_once dirname(__DIR__) . '/shared/finishgood_shortage_client.php';
 require_once dirname(__DIR__) . '/shared/line_flex_finishgood_shortage.php';
 require_once dirname(__DIR__) . '/shared/finishgood_shortage_filter.php';
+require_once dirname(__DIR__) . '/shared/finishgood_shortage_registry.php';
 
 require_login();
+
+// บันทึกรุ่นที่ให้นับยอดคงเหลือจากทะเบียนเครื่องของเรา
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_registry'])) {
+    csrf_check();
+    $posted = isset($_POST['registry']) && is_array($_POST['registry']) ? $_POST['registry'] : [];
+    fg_shortage_save_registry_codes($posted);
+    header('Location: ' . BASE_URL . '/finishgood_shortage_preview.php?saved=registry');
+    exit;
+}
 
 // บันทึกรุ่นที่เลือกปิดแจ้งเตือน
 $savedMsg = '';
@@ -25,6 +35,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_skip'])) {
 }
 
 $fetchedAll = finishgood_shortage_fetch();
+// เก็บตัวเลขดิบของ setupsystem ไว้เทียบในตาราง ก่อนแทนด้วยยอดจากทะเบียนเรา
+$apiRawByCode = [];
+$registryApplied = ['replaced' => [], 'missing' => [], 'error' => ''];
+if (!empty($fetchedAll['ok'])) {
+    foreach ($fetchedAll['items'] as $__raw) {
+        $apiRawByCode[strtoupper(trim((string)($__raw['product_code'] ?? '')))] = $__raw;
+    }
+    $registryApplied = fg_shortage_apply_registry($fetchedAll['items']);
+    $fetchedAll['items'] = $registryApplied['items'];
+}
+$registryCodes = fg_shortage_registry_codes();
+$registryAll   = fg_shortage_registry_rows(null);
 $skipCodes  = fg_shortage_skipped_codes();
 $fetched    = $fetchedAll;
 if (!empty($fetchedAll['ok'])) {
@@ -225,6 +247,12 @@ $allJson = $messages !== []
         .img-fallback { width: 100%; aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; background: #e4e4e4; color: #9a9a9a; font-size: 10px; font-weight: 700; border-radius: 4px; }
         .err { background: #fdecea; border: 1px solid #f5c6c2; color: #a3231a; border-radius: 8px; padding: 12px; }
         .ok { background: #eaf7ee; border: 1px solid #bfe3c9; color: #1e6b33; border-radius: 8px; padding: 12px; }
+        .reg-wrap { overflow-x: auto; }
+        .reg-table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+        .reg-table th, .reg-table td { padding: 6px 10px; border-bottom: 1px solid #eee; text-align: left; white-space: nowrap; }
+        .reg-table th { color: #777; font-weight: 600; font-size: 12px; }
+        .reg-table .n { text-align: right; font-variant-numeric: tabular-nums; }
+        .reg-table tr.reg-on td { background: #f2f8ff; }
     </style>
 </head>
 <body>
@@ -264,13 +292,67 @@ $allJson = $messages !== []
     <?php endif; ?>
 </div>
 
+<div class="panel" style="margin-bottom:12px">
+    <h2 style="margin:0 0 4px;font-size:16px">นับยอดคงเหลือจากทะเบียนเครื่องของเรา</h2>
+    <p style="margin:0 0 10px;font-size:13px;color:#666">
+        ติ๊กรุ่นที่ให้ใช้จำนวนเครื่องสถานะ <b>ใหม่ (อยู่ในคลัง)</b> จากทะเบียนเครื่อง แทนยอดคงเหลือของ setupsystem ·
+        ใช้กับรุ่นที่ setupsystem ยังนับเครื่องที่ปล่อยเช่าไปแล้วเป็นของในคลัง · ขั้นต่ำและ PO ค้างใช้ค่าเดียวกับ setupsystem
+    </p>
+    <?php if (($_GET['saved'] ?? '') === 'registry'): ?><div class="ok" style="margin-bottom:10px">บันทึกแล้ว</div><?php endif; ?>
+    <?php if ($registryApplied['error'] !== ''): ?>
+        <div class="err" style="margin-bottom:10px">คำนวณจากทะเบียนเครื่องไม่ได้ จึงใช้ตัวเลขของ setupsystem แทน: <?= htmlspecialchars($registryApplied['error'], ENT_QUOTES, 'UTF-8') ?></div>
+    <?php endif; ?>
+    <?php if (!empty($registryApplied['missing'])): ?>
+        <div class="err" style="margin-bottom:10px">รุ่นที่เลือกไว้แต่จับคู่กับทะเบียนเราไม่ได้ (ใช้ตัวเลขของ setupsystem): <?= htmlspecialchars(implode(', ', $registryApplied['missing']), ENT_QUOTES, 'UTF-8') ?></div>
+    <?php endif; ?>
+    <?php if (!$registryAll['ok']): ?>
+        <div class="err">โหลดรายการรุ่นไม่ได้: <?= htmlspecialchars($registryAll['error'], ENT_QUOTES, 'UTF-8') ?></div>
+    <?php else: ?>
+    <form method="post">
+        <?= csrf_field() ?>
+        <div class="reg-wrap">
+        <table class="reg-table">
+            <thead>
+                <tr>
+                    <th>ใช้</th>
+                    <th>รุ่น</th>
+                    <th class="n">setupsystem: มี → ขาด</th>
+                    <th class="n">ทะเบียนเรา: ใหม่ → ขาด</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($registryAll['rows'] as $code => $row):
+                $on = in_array($code, $registryCodes, true);
+                // รุ่นที่ไม่มีเครื่องในทะเบียนเลย (หมวด STK) เลือกไปก็ได้ 0 ตลอด — ซ่อนไว้ ยกเว้นที่เลือกค้างอยู่
+                if ((int)$row['registry_total'] === 0 && !$on) { continue; }
+                $api = $apiRawByCode[$code] ?? null; ?>
+                <tr class="<?= $on ? 'reg-on' : '' ?>">
+                    <td><input type="checkbox" name="registry[]" value="<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>" <?= $on ? 'checked' : '' ?> aria-label="นับ <?= htmlspecialchars((string)$row['product_name'], ENT_QUOTES, 'UTF-8') ?> จากทะเบียนเครื่อง"></td>
+                    <td><?= htmlspecialchars((string)$row['product_name'], ENT_QUOTES, 'UTF-8') ?> <span style="color:#999">(<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>)</span></td>
+                    <td class="n"><?php if (empty($fetchedAll['ok'])): ?>—<?php elseif ($api): ?><?= (int)$api['available'] ?> → <b style="color:#c0392b"><?= (int)$api['need'] ?></b><?php else: ?><span style="color:#1e6b33">ไม่ขาด</span><?php endif; ?></td>
+                    <td class="n">
+                        <a href="<?= htmlspecialchars(BASE_URL . '/assets.php?' . http_build_query(['product' => $row['registry_name'], 'status' => 'new']), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= (int)$row['stock_qty'] ?></a>
+                        → <b style="color:<?= (int)$row['need'] < 0 ? '#c0392b' : '#1e6b33' ?>"><?= (int)$row['need'] ?></b>
+                        <span style="color:#999;font-size:12px">(ขั้นต่ำ <?= (int)$row['minimum_stock'] ?> + PO <?= (int)$row['po_qty'] ?>)</span>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        </div>
+        <button type="submit" name="save_registry" value="1" style="margin-top:10px">บันทึกการเลือก</button>
+        <span style="margin-left:10px;font-size:13px;color:#666">นับจากทะเบียนเรา <?= count($registryCodes) ?> รุ่น</span>
+    </form>
+    <?php endif; ?>
+</div>
+
 <?php if (!empty($fetchedAll['ok'])): ?>
 <div class="panel" style="margin-bottom:12px">
     <h2 style="margin:0 0 4px;font-size:16px">เลือกรุ่นที่จะแจ้งเตือน</h2>
     <p style="margin:0 0 10px;font-size:13px;color:#666">
         ติ๊กรุ่นที่ <b>ไม่ต้องการ</b> ให้แจ้งเตือน · รุ่นใหม่ที่เพิ่มมาทีหลังจะถูกแจ้งเตือนเองโดยไม่ต้องมาตั้งค่า
     </p>
-    <?php if (isset($_GET['saved'])): ?><div class="ok" style="margin-bottom:10px">บันทึกแล้ว</div><?php endif; ?>
+    <?php if (($_GET['saved'] ?? '') === '1'): ?><div class="ok" style="margin-bottom:10px">บันทึกแล้ว</div><?php endif; ?>
     <form method="post">
         <?= csrf_field() ?>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:6px 16px;margin-bottom:12px">
@@ -281,7 +363,7 @@ $allJson = $messages !== []
                 <input type="checkbox" name="skip[]" value="<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>" <?= $off ? 'checked' : '' ?>>
                 <span><?= htmlspecialchars((string)$it['product_name'], ENT_QUOTES, 'UTF-8') ?>
                     <span style="color:#999">(<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>)</span>
-                    <b style="color:#c0392b"><?= (int)($it['need'] ?? 0) ?></b></span>
+                    <b style="color:#c0392b"><?= (int)($it['need'] ?? 0) ?></b><?php if (($it['stock_source'] ?? '') === 'production_registry'): ?> <span style="font-size:11px;color:#1a5fb4">· นับจากทะเบียนเรา</span><?php endif; ?></span>
             </label>
         <?php endforeach; ?>
         </div>
