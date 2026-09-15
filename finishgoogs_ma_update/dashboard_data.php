@@ -818,6 +818,86 @@ switch ($type) {
         render_stock_today_table($rows, $partsBase);
         break;
 
+    case 'fg_shortage_summary': // การ์ด Dashboard — ตัวเลขสรุป (JSON)
+    case 'fg_shortage':         // modal — รายการรุ่นที่ต้องผลิตเพิ่ม
+        require_once dirname(__DIR__) . '/shared/finishgood_shortage_dashboard.php';
+        $fg = fg_shortage_dashboard_data(isset($_GET['refresh']));
+        $fgUpdated = $fg['saved_at'] > 0 ? date('d/m/Y H:i', (int) $fg['saved_at']) . ' น.' : '';
+
+        if ($type === 'fg_shortage_summary') {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'ok'             => (bool) $fg['ok'],
+                'models'         => count($fg['items']),
+                'total_shortage' => (int) $fg['total_shortage'],
+                'stale'          => (bool) $fg['stale'],
+                'updated'        => $fgUpdated,
+            ], JSON_UNESCAPED_UNICODE);
+            break;
+        }
+
+        if (!$fg['ok']) {
+            echo '<p class="muted">ดึงข้อมูลจากระบบ Setup ไม่ได้: ' . h($fg['error']) . '</p>';
+            break;
+        }
+
+        echo '<p class="muted" style="font-size:12px;margin:0 0 10px">'
+           . 'ขาด = คงเหลือ − (ขั้นต่ำ + PO ค้าง) · ข้อมูล ณ ' . h($fgUpdated)
+           . ($fg['stale'] ? ' <b style="color:var(--warning)">(ดึงรอบล่าสุดไม่สำเร็จ — แสดงข้อมูลเก่า)</b>' : '')
+           . ($fg['skipped'] > 0 ? ' · ซ่อน ' . number_format($fg['skipped']) . ' รุ่นที่ปิดแจ้งเตือนไว้' : '')
+           . '</p>';
+        if ($fg['registry_error'] !== '') {
+            echo '<p class="muted" style="font-size:12px;color:var(--warning)">นับจากทะเบียนเครื่องไม่ได้ จึงใช้ตัวเลขของระบบ Setup ทุกรุ่น: ' . h($fg['registry_error']) . '</p>';
+        }
+        if (!$fg['items']) {
+            echo '<p class="muted dash-low-stock-empty">ไม่มีรุ่นที่ต้องผลิตเพิ่ม — ทุกรุ่นเพียงพอ</p>';
+            break;
+        }
+
+        // รูปรุ่นจากทะเบียนเรา จับคู่ด้วยชื่อ (ชื่อใน setupsystem กับของเราตรงกันเกือบทุกรุ่น)
+        $fgIcons = [];
+        $fgRes = db()->query("SELECT name, icon_path FROM products WHERE icon_path IS NOT NULL AND icon_path <> ''");
+        while ($fgRes && ($r = $fgRes->fetch_assoc())) {
+            $fgIcons[mb_strtolower(trim((string) $r['name']), 'UTF-8')] = (string) $r['icon_path'];
+        }
+
+        echo '<div class="low-stock-cards">';
+        foreach ($fg['items'] as $it) {
+            $name = (string) $it['product_name'];
+            $available = (int) $it['available'];
+            $required = (int) $it['required'];
+            $need = (int) $it['need'];
+            $fromRegistry = ($it['stock_source'] ?? '') === 'production_registry';
+            $icon = $fgIcons[mb_strtolower(trim($name), 'UTF-8')] ?? '';
+            $pctHave = $required > 0 ? min(100, (int) round($available / $required * 100)) : 100;
+            $breakdown = $fromRegistry
+                ? 'ใหม่ในทะเบียน ' . number_format((int) $it['stock_qty'])
+                : 'stock ' . number_format((int) $it['stock_qty']) . ((int) $it['leasing_qty'] > 0 ? ' + เช่า ' . number_format((int) $it['leasing_qty']) : '');
+            $url = (string) ($it['detail_url'] ?? '');
+
+            echo '<div class="low-stock-card">';
+            echo '<div class="ls-img">' . ($icon !== ''
+                    ? img_tag($icon, $name, 'ls-thumb')
+                    : '<span class="ls-thumb ls-thumb-ph">' . ui_icon_html('box', 15) . '</span>') . '</div>';
+            echo '<div class="ls-info">'
+               . '<div class="ls-name" title="' . h($name) . '">'
+               . ($url !== '' ? '<a href="' . h($url) . '" target="_blank" rel="noopener">' . h($name) . '</a>' : h($name))
+               . '</div>'
+               . '<div class="ls-code muted">' . h((string) $it['product_code'])
+               . ($fromRegistry ? ' · <span class="fg-src">นับจากทะเบียนเรา</span>' : '') . '</div>'
+               . '<div class="ls-bar" title="มี ' . number_format($available) . ' · ต้องการ ' . number_format($required) . '">'
+               . '<i style="width:' . $pctHave . '%;background:' . ($pctHave < 50 ? 'var(--danger)' : 'var(--warning)') . '"></i></div>'
+               . '</div>';
+            echo '<div class="ls-qty">มี <b>' . number_format($available) . '</b> / ต้องการ <b>' . number_format($required) . '</b>'
+               . '<div class="muted fg-breakdown">' . h($breakdown) . ' · ขั้นต่ำ ' . number_format((int) $it['minimum_stock'])
+               . ' + PO ' . number_format((int) $it['po_qty']) . '</div></div>';
+            echo '<div class="ls-badge"><span class="badge-pill ' . ($pctHave < 50 ? 'bp-danger' : 'bp-warning') . '">ขาด '
+               . number_format(abs($need)) . '</span></div>';
+            echo '</div>';
+        }
+        echo '</div>';
+        break;
+
     default:
         echo 'ไม่รู้จักประเภทข้อมูล';
 }

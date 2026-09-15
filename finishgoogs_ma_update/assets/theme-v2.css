@@ -1688,3 +1688,7 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
   font-size: var(--fs-sm);
 }
 .ma-draft-text { flex: 1 1 220px; color: var(--primary-ink, var(--text)); font-weight: 600; }
+
+/* modal "สินค้าที่ต้องผลิตเพิ่ม" — ใช้การ์ดเดียวกับอะไหล่ที่ควรสั่งเพิ่ม เพิ่มแค่ป้ายที่มาของยอด */
+.fg-src { color: var(--primary); font-weight: 600; }
+.low-stock-card .fg-breakdown { font-size: calc(11.5px * var(--font-scale, 1)); margin-top: 2px; }

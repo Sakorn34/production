@@ -12,6 +12,7 @@ require_once dirname(__DIR__) . '/shared/finishgood_shortage_client.php';
 require_once dirname(__DIR__) . '/shared/line_flex_finishgood_shortage.php';
 require_once dirname(__DIR__) . '/shared/finishgood_shortage_filter.php';
 require_once dirname(__DIR__) . '/shared/finishgood_shortage_registry.php';
+require_once dirname(__DIR__) . '/shared/finishgood_shortage_dashboard.php';
 
 require_login();
 
@@ -20,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_registry'])) {
     csrf_check();
     $posted = isset($_POST['registry']) && is_array($_POST['registry']) ? $_POST['registry'] : [];
     fg_shortage_save_registry_codes($posted);
+    fg_shortage_dash_cache_clear();
     header('Location: ' . BASE_URL . '/finishgood_shortage_preview.php?saved=registry');
     exit;
 }
@@ -30,6 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_skip'])) {
     csrf_check();
     $posted = isset($_POST['skip']) && is_array($_POST['skip']) ? $_POST['skip'] : [];
     fg_shortage_save_skipped_codes($posted);
+    fg_shortage_dash_cache_clear();
     header('Location: ' . BASE_URL . '/finishgood_shortage_preview.php?saved=1');
     exit;
 }

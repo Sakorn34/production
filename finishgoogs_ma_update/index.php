@@ -368,6 +368,15 @@ $partsBase = ui_parts_base_url();
         echo '<div class="kpi kpi-warning"><div class="kpi-top"><span class="kpi-ic">' . ui_icon_html('alert', 14) . '</span> สต็อกอะไหล่</div><b class="kpi-num">—</b><div class="kpi-sub">เชื่อมต่อระบบสต็อกไม่ได้</div></div>';
     }
     ?>
+    <?php // ตัวเลขมาจาก API ของ setupsystem ซึ่งใช้เวลาหลายวินาที — วาดการ์ดเปล่าไว้ก่อน แล้วโหลด
+         // ทีหลังด้วย JS ท้ายไฟล์ หน้า Dashboard จะได้ไม่ต้องรอ · ตัวเลขชุดเดียวกับการแจ้งเตือน LINE ?>
+    <a class="kpi kpi-info clickable" id="dash-fg-shortage" href="<?= h("$B/finishgood_shortage_preview.php") ?>" aria-busy="true"
+       onclick="if(event.ctrlKey||event.metaKey||event.shiftKey||event.button===1)return true;<?= h(modal_js('สินค้าที่ต้องผลิตเพิ่ม', "$B/dashboard_data.php?type=fg_shortage", "$B/finishgood_shortage_preview.php")) ?>;return false;">
+      <span class="kpi-sys">สินค้า</span>
+      <div class="kpi-top"><span class="kpi-ic"><?= ui_icon_html('box', 14) ?></span> สินค้าที่ต้องผลิตเพิ่ม</div>
+      <b class="kpi-num" id="dash-fg-shortage-num">…</b>
+      <div class="kpi-sub" id="dash-fg-shortage-sub">กำลังโหลดจากระบบ Setup</div>
+    </a>
   </div>
 </div>
 
@@ -835,6 +844,44 @@ $partsBase = ui_parts_base_url();
     apply();
   }
   window.dashStatusFilter = { toggle: toggle };
+})();
+
+// การ์ด "สินค้าที่ต้องผลิตเพิ่ม" — โหลดแยกจากหน้า เพราะ API ของ setupsystem ช้า (ฝั่งเซิร์ฟเวอร์ cache ไว้ 10 นาที)
+(function () {
+  var card = document.getElementById('dash-fg-shortage');
+  if (!card) { return; }
+  var num = document.getElementById('dash-fg-shortage-num');
+  var sub = document.getElementById('dash-fg-shortage-sub');
+  function setTone(tone) {
+    card.classList.remove('kpi-info', 'kpi-warning', 'kpi-success');
+    card.classList.add('kpi-' + tone);
+  }
+  fetch('<?= h($B) ?>/dashboard_data.php?type=fg_shortage_summary', { credentials: 'same-origin' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      card.removeAttribute('aria-busy');
+      if (!d || !d.ok) {
+        num.textContent = '—';
+        sub.textContent = 'ดึงข้อมูลจากระบบ Setup ไม่ได้';
+        setTone('warning');
+        return;
+      }
+      num.textContent = Number(d.models).toLocaleString('en-US') + ' รุ่น';
+      if (d.models > 0) {
+        sub.textContent = 'ขาดรวม ' + Number(Math.abs(d.total_shortage)).toLocaleString('en-US') + ' เครื่อง' + (d.stale ? ' · ข้อมูลเก่า' : '');
+        setTone('warning');
+      } else {
+        sub.textContent = 'ทุกรุ่นเพียงพอ';
+        setTone('success');
+      }
+      if (d.updated) { card.title = 'ข้อมูล ณ ' + d.updated; }
+    })
+    .catch(function () {
+      card.removeAttribute('aria-busy');
+      num.textContent = '—';
+      sub.textContent = 'โหลดข้อมูลไม่สำเร็จ';
+      setTone('warning');
+    });
 })();
 </script>
 
