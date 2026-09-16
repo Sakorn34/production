@@ -241,6 +241,10 @@ page_header('ระบบหลังบ้าน — ตั้งค่าร�
     <?= ui_icon_html('palette', 28, 'h-svg') ?>
     <div><b>ปรับแต่งหน้าตาระบบ</b><div class="muted">ข้อความ · โลโก้ · สีธีม · เมนู (ไอคอน/ลำดับ/ตำแหน่ง)</div></div>
   </a>
+  <a class="card clickable" href="<?= BASE_URL ?>/rent_retire_sync.php">
+    <?= ui_icon_html("wrench", 28, "h-svg") ?>
+    <div><b>ตรวจสถานะเสื่อมสภาพ ↔ ระบบเช่า</b><div class="muted">เครื่องที่ลง MA เสื่อมสภาพแล้ว · เทียบกับระบบเช่า · กดซิงก์ย้อนหลัง</div></div>
+  </a>
   <a class="card clickable" href="<?= BASE_URL ?>/share_admin.php">
     <?= ui_icon_html('switch', 28, 'h-svg') ?>
     <div><b>เปรียบเทียบ assets ↔ stock</b><div class="muted">รายการไม่ตรงกัน · ค้นหา · แก้ไข · ลบ · Sync · Import</div></div>

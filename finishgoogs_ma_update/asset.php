@@ -2,6 +2,7 @@
 require __DIR__ . '/config.php';
 require __DIR__ . '/includes/asset_production_edit.php';
 require __DIR__ . '/includes/layout.php';
+require_once __DIR__ . '/includes/rent_retire_sync.php';
 require_login();
 
 // เปิดด้วย id หรือ code (จากการสแกน QR)
@@ -37,6 +38,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_status'])) {
     header('Location: ' . BASE_URL . '/asset.php?id=' . $id); exit;
 }
 
+// ซิงก์สถานะเสื่อมสภาพกับระบบเช่า (เครื่องที่ลง MA ไว้แล้วแต่สองระบบไม่ตรงกัน)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['retire_sync'])) {
+    csrf_check();
+    $rs = rent_retire_sync_one($id);
+    flash_set($rs['message'], $rs['ok'] ? 'ok' : 'err');
+    header('Location: ' . BASE_URL . '/asset.php?id=' . $id); exit;
+}
 // แก้ไข FW ปัจจุบันของเครื่อง (แก้ค่าผิด/อัปเดตโดยตรง)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_fw'])) {
     csrf_check();
@@ -338,7 +346,7 @@ page_header('เครื่อง ' . $a['asset_code'], false);
     </dl>
   </div>
   <?php if (!empty($leaseInfo['found'])) { ?>
-  <?= asset_leasing_card_html($leaseInfo) ?>
+  <?= asset_leasing_card_html($leaseInfo, rent_retire_sync_asset_box_html($a, $leaseInfo)) ?>
   <?php } else { ?>
   <?= asset_stockparts_withdraw_card_html($stockWithdraw) ?>
   <?php } ?>

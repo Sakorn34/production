@@ -625,6 +625,17 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   padding-right: 2px;
 }
 .asset-sales-empty { flex: 1; margin: 0; font-size: calc(12px * var(--font-scale, 1)); }
+
+/* ── กล่องเทียบสถานะเสื่อมสภาพกับระบบเช่า (ในการ์ดการเบิกเช่า) ───────────── */
+.retire-sync-box {
+  margin: 0 0 10px; padding: 8px 10px; border-radius: var(--radius-sm, 8px);
+  border: 1px solid var(--border); background: #fff;
+  font-size: calc(12.5px * var(--font-scale, 1)); line-height: 1.45;
+}
+.retire-sync-box .retire-sync-line { overflow-wrap: anywhere; }
+.retire-sync-ok   { border-color: #bbf7d0; background: #f0fdf4; }
+.retire-sync-warn { border-color: #fde68a; background: #fffbeb; }
+.retire-sync-err  { border-color: #fecaca; background: #fef2f2; }
 .asset-sales-card-head {
   display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
   font-size: calc(14px * var(--font-scale, 1)); color: var(--text-muted, #4b5563);
@@ -1237,6 +1248,24 @@ a.kpi:hover { text-decoration: none; }
 .ma-more > summary:hover { background: var(--surface-soft); }
 .ma-more > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
 .ma-more .ma-tblscroll { border-top: 1px solid var(--border); }
+
+/* ── พับ/กางคิวรอ MA จากระบบเช่า (รายการยาวมากจนฟอร์ม MA ตกจอ) ───────────── */
+.rent-q { border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft, #f8fafc); margin: 0 0 12px; }
+.rent-q > summary {
+  padding: 10px 14px; cursor: pointer; font-size: calc(13px * var(--font-scale, 1)); font-weight: 600;
+  color: var(--primary); list-style: none; display: flex; align-items: center; gap: 8px; border-radius: 10px;
+}
+.rent-q > summary::-webkit-details-marker { display: none; }
+.rent-q > summary::before { content: "\25B8"; font-size: 11px; transition: transform .15s ease; }
+.rent-q[open] > summary::before { transform: rotate(90deg); }
+.rent-q > summary:hover { background: var(--surface, #fff); }
+.rent-q > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.rent-q[open] > summary { border-bottom: 1px solid var(--border); border-radius: 10px 10px 0 0; }
+.rent-q > *:not(summary) { margin-left: 14px; margin-right: 14px; }
+.rent-q > .table-wrap { max-height: 60vh; overflow: auto; }
+.rent-q .rent-q-hide { display: none; }
+.rent-q[open] .rent-q-show { display: none; }
+.rent-q[open] .rent-q-hide { display: inline; }
 
 @media (max-width: 900px) {
   .ma-jobbody { grid-template-columns: 1fr; gap: 20px; }

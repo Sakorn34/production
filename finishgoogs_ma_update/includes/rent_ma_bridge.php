@@ -1061,6 +1061,11 @@ function rent_register_assets_to_product($productId, array $serials, $note = '')
 }
 
 /**
+ * @var int จำนวนแถวที่เกินแล้วให้พับคิวไว้ก่อน — มากกว่านี้ฟอร์ม MA จะตกจอไปไกล
+ */
+const RENT_QUEUE_FOLD_FROM = 12;
+
+/**
  * HTML แผงคิวรอ MA + ฟอร์มเสื่อมสภาพหลาย S/N
  *
  * @param int $productId กรองเฉพาะรุ่นนี้
@@ -1093,7 +1098,13 @@ function rent_wait_ma_panel_html($productId)
     <div class="panel" style="margin-bottom:16px">
       <h3 class="h-with-icon" style="margin:0 0 8px"><?= function_exists('ui_icon_html') ? ui_icon_html('wrench', 15, 'h-svg') : '' ?><span>คิวรอ MA จากระบบเช่า (รุ่นนี้)</span></h3>
       <?php if ($matched) { ?>
-        <p class="muted" style="margin:0 0 8px"><?= number_format(count($matched)) ?> รายการลงทะเบียนแล้ว · กดรหัสเครื่องเพื่อเปิดฟอร์ม MA</p>
+        <?php // รุ่นที่มีเครื่องเช่าหลายร้อยเครื่องดันฟอร์ม MA ตกไปท้ายหน้ายาวมาก — ยาวเกินเกณฑ์ให้พับไว้ก่อน ?>
+        <details class="rent-q" data-rent-q="matched"<?= count($matched) <= RENT_QUEUE_FOLD_FROM ? ' open' : '' ?>>
+          <summary>
+            <span class="rent-q-show">แสดงคิวรอ MA <?= number_format(count($matched)) ?> รายการ</span>
+            <span class="rent-q-hide">ซ่อนคิวรอ MA (<?= number_format(count($matched)) ?> รายการ)</span>
+          </summary>
+        <p class="muted" style="margin:8px 0"><?= number_format(count($matched)) ?> รายการลงทะเบียนแล้ว · กดรหัสเครื่องเพื่อเปิดฟอร์ม MA</p>
         <div class="table-wrap" style="margin-bottom:12px">
           <table class="list" style="margin:0">
             <tr><th>S/N</th><th>สินค้า (เช่า)</th><th>วันที่บันทึกเช่า</th><th>สถานะผลิต</th></tr>
@@ -1110,11 +1121,17 @@ function rent_wait_ma_panel_html($productId)
             <?php } ?>
           </table>
         </div>
+        </details>
       <?php } ?>
 
       <?php if ($unmatched && function_exists('can') && can('ma')) { ?>
         <h4 style="margin:12px 0 6px; font-size:14px">ยังไม่ลงทะเบียนผลิต (S/N เก่าจากระบบเช่า)</h4>
-        <p class="muted" style="margin:0 0 8px"><?= number_format(count($unmatched)) ?> รายการ · เลือกแล้วกดลงทะเบียน — วันที่ผลิตจะใช้ตามวันที่บันทึกเข้าระบบเช่า</p>
+        <details class="rent-q" data-rent-q="unmatched"<?= count($unmatched) <= RENT_QUEUE_FOLD_FROM ? ' open' : '' ?>>
+          <summary>
+            <span class="rent-q-show">แสดงรายการที่ยังไม่ลงทะเบียน <?= number_format(count($unmatched)) ?> รายการ</span>
+            <span class="rent-q-hide">ซ่อนรายการที่ยังไม่ลงทะเบียน (<?= number_format(count($unmatched)) ?> รายการ)</span>
+          </summary>
+        <p class="muted" style="margin:8px 0"><?= number_format(count($unmatched)) ?> รายการ · เลือกแล้วกดลงทะเบียน — วันที่ผลิตจะใช้ตามวันที่บันทึกเข้าระบบเช่า</p>
         <form method="post" onsubmit="return confirm('ลงทะเบียน S/N ที่เลือกเข้าระบบผลิต?');">
           <?= csrf_field() ?>
           <input type="hidden" name="register_rent_assets" value="1">
@@ -1148,9 +1165,26 @@ function rent_wait_ma_panel_html($productId)
           });
         })();
         </script>
+        </details>
       <?php } elseif ($unmatched) { ?>
         <p class="muted" style="margin:12px 0 0"><?= number_format(count($unmatched)) ?> รายการยังไม่ลงทะเบียนผลิต — ต้องมีสิทธิ์ MA</p>
       <?php } ?>
+      <script>
+      // จำว่าคนนี้เปิดหรือปิดไว้ — คนที่ใช้คิวนี้ทุกวันจะได้ไม่ต้องกดกางใหม่ทุกครั้ง
+      (function(){
+        document.querySelectorAll('details[data-rent-q]').forEach(function(d){
+          var key = 'rentQueueOpen:' + d.getAttribute('data-rent-q');
+          try {
+            var saved = localStorage.getItem(key);
+            if (saved === '1') { d.open = true; }
+            else if (saved === '0') { d.open = false; }
+          } catch (e) {}
+          d.addEventListener('toggle', function(){
+            try { localStorage.setItem(key, d.open ? '1' : '0'); } catch (e) {}
+          });
+        });
+      })();
+      </script>
     </div>
     <?php
     return ob_get_clean();
@@ -1799,7 +1833,7 @@ function rent_leasing_dl_row($label, $value)
  * @param array<string,mixed> $info จาก asset_leasing_info()
  * @return string
  */
-function asset_leasing_card_html(array $info)
+function asset_leasing_card_html(array $info, $extraHtml = '')
 {
     $icon = function_exists('ui_icon_html') ? ui_icon_html('customers', 16) : '';
     $out = '<div class="asset-sales-card asset-rent-card">';
@@ -1819,6 +1853,8 @@ function asset_leasing_card_html(array $info)
     $out .= '<div class="asset-rent-status-row">';
     $out .= rent_leasing_status_badge_html($pro, $pSt);
     $out .= '</div>';
+    // กล่องผลเทียบสถานะเสื่อมสภาพ (ถ้ามี) — วางใต้ป้ายสถานะให้เห็นทันที ไม่ต้องเลื่อนหาท้ายการ์ด
+    $out .= (string) $extraHtml;
 
     $out .= '<dl class="asset-sales-dl asset-sales-dl-inline">';
     $out .= rent_leasing_dl_row('S/N', '<b>' . h((string) ($info['serial'] ?? '')) . '</b>');
