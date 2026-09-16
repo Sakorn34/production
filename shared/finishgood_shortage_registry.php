@@ -169,15 +169,21 @@ function fg_shortage_registry_rows(?array $codes = null): array
 
         // 3) PO ค้าง — กติกาเดียวกับ setupsystem: status_product ยังว่าง (ปิดงานแล้วระบบจะเขียนประเภทการขายลงไป)
         //    และ order ไม่ได้ถูกยกเลิก
+        //
+        //    ต่างกันข้อเดียว: ใบสั่งงานที่ถูกลบไปแล้วเราไม่นับ — api/delete_order.php ลบเฉพาะหัวใบใน
+        //    biton_setup ส่วนรายการสินค้าอยู่ biton_stockparts จึง cascade ตามไม่ได้ แถวลูกเลยค้างอยู่
+        //    ตลอดไปและถูกนับเป็นความต้องการของใบที่ไม่มีอยู่จริง ทำให้ยอด "ต้องผลิตเพิ่ม" บวมเกิน
         $cancelled = [];
-        $res = $setup->query(
-            "SELECT id FROM setup_orders WHERE status = '" . $setup->real_escape_string(FG_SHORTAGE_PO_CANCELLED_STATUS) . "'"
-        );
+        $live = [];
+        $res = $setup->query('SELECT id, status FROM setup_orders');
         if (!$res) {
-            return $fail('อ่านรายการ PO ที่ยกเลิกไม่ได้');
+            return $fail('อ่านรายการใบสั่งงานไม่ได้');
         }
-        while ($r = $res->fetch_row()) {
-            $cancelled[] = (int) $r[0];
+        while ($r = $res->fetch_assoc()) {
+            $live[] = (int) $r['id'];
+            if (trim((string) $r['status']) === FG_SHORTAGE_PO_CANCELLED_STATUS) {
+                $cancelled[] = (int) $r['id'];
+            }
         }
 
         $po = [];
@@ -195,6 +201,9 @@ function fg_shortage_registry_rows(?array $codes = null): array
                       AND (status_product IS NULL OR status_product = '')";
             if ($cancelled !== []) {
                 $sql .= " AND order_id NOT IN (" . implode(',', $cancelled) . ")";
+            }
+            if ($live !== []) {
+                $sql .= " AND order_id IN (" . implode(',', $live) . ")";
             }
             $sql .= " GROUP BY part_id";
             $res = $stock->query($sql);

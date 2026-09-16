@@ -3719,3 +3719,37 @@ Files:
   finishgoogs_ma_update/rent_retire_sync.php
   finishgoogs_ma_update/settings.php
 
+
+================================================================
+v2026-09-16_100838 | Patch | 2026-09-16 10:08:40
+From: 2026-09-16_094222  ->  To: 84cee74  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_registry.php
+
+
+================================================================
+v2026-09-16_101646 | Patch | 2026-09-16 10:16:48
+From: 2026-09-16_100838  ->  To: 84cee74  |  Files: 2
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+
+
+================================================================
+v2026-09-16_102419 | Patch | 2026-09-16 10:24:21
+From: 2026-09-16_101646  ->  To: 84cee74  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  shared/finishgood_shortage_dashboard.php
+

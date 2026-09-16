@@ -979,35 +979,89 @@ switch ($type) {
         } elseif (!$fgPo['rows']) {
             echo '<p class="muted" style="font-size:13px">ไม่มีใบสั่งงานค้างส่ง</p>';
         } else {
-            echo '<p class="muted" style="font-size:12px;margin:0 0 6px">ใบสั่งงานที่ยังไม่ได้ส่งของ '
-               . number_format(count($fgPo['rows'])) . ' ใบ · ระบบ Setup ถือว่าส่งแล้วเมื่อปิดงานและเขียนประเภทการขายลงในรายการ</p>';
-            echo '<ul class="fg-sn-list fg-po-list">';
+            // แยกสองกอง: ใบที่ยังใช้งานอยู่ กับใบที่ถูกลบไปแล้วแต่รายการค้างในฐานข้อมูล
+            $poLive = [];
+            $poGone = [];
             foreach ($fgPo['rows'] as $po) {
-                $label = $po['po_number'] !== '' ? $po['po_number'] : 'ไม่มีเลข PO';
-                $when = '';
-                if (!empty($po['po_date']) && $po['po_date'] !== '0000-00-00') {
-                    $when = dthai(substr((string) $po['po_date'], 0, 10));
-                } elseif ($po['created_at'] !== '') {
-                    $when = dthai(substr($po['created_at'], 0, 10));
-                }
-                $sub = [];
-                if ($po['customer'] !== '') { $sub[] = $po['customer']; }
-                if ($po['sale_type'] !== '') { $sub[] = $po['sale_type']; }
-                if (!$po['found']) { $sub[] = 'ไม่พบใบสั่งงานแล้ว (ถูกลบ)'; }
-                elseif ($po['status'] !== '') { $sub[] = 'สถานะ ' . $po['status']; }
-
-                echo '<li class="fg-sn fg-po">'
-                   . '<span class="fg-po-main"><b>' . h($label) . '</b>'
-                   . '<span class="muted fg-po-sub">#' . (int) $po['order_id']
-                   . ($sub ? ' · ' . h(implode(' · ', $sub)) : '') . '</span></span>'
-                   . '<span class="muted fg-po-qty">' . number_format($po['qty']) . ' ชิ้น'
-                   . ($when !== '' ? ' · ' . h($when) : '') . '</span></li>';
+                if (!empty($po['orphan'])) { $poGone[] = $po; } else { $poLive[] = $po; }
             }
-            echo '</ul>';
+            $fgPoDate = function (array $po) {
+                if (!empty($po['po_date']) && $po['po_date'] !== '0000-00-00') {
+                    return dthai(substr((string) $po['po_date'], 0, 10));
+                }
+                return $po['created_at'] !== '' ? dthai(substr((string) $po['created_at'], 0, 10)) : '';
+            };
+
+            if ($poLive) {
+                echo '<p class="muted" style="font-size:12px;margin:0 0 6px">ใบสั่งงานที่ยังไม่ได้ส่งของ '
+                   . number_format(count($poLive)) . ' ใบ · ระบบ Setup ถือว่าส่งแล้วเมื่อปิดงานและเขียนประเภทการขายลงในรายการ</p>';
+                echo '<ul class="fg-sn-list fg-po-list">';
+                foreach ($poLive as $po) {
+                    $sub = ['#' . (int) $po['order_id']];
+                    if ($po['customer'] !== '')  { $sub[] = $po['customer']; }
+                    if ($po['sale_type'] !== '') { $sub[] = $po['sale_type']; }
+                    if ($po['status'] !== '')    { $sub[] = 'สถานะ ' . $po['status']; }
+                    $when = $fgPoDate($po);
+                    echo '<li class="fg-sn fg-po">'
+                       . '<span class="fg-po-main"><b>' . h($po['po_number'] !== '' ? $po['po_number'] : 'ไม่มีเลข PO') . '</b>'
+                       . '<span class="muted fg-po-sub">' . h(implode(' · ', $sub)) . '</span></span>'
+                       . '<span class="muted fg-po-qty">' . number_format($po['qty']) . ' ชิ้น'
+                       . ($when !== '' ? ' · ' . h($when) : '') . '</span></li>';
+                }
+                echo '</ul>';
+            } else {
+                echo '<p class="muted" style="font-size:13px">ไม่มีใบสั่งงานค้างส่ง</p>';
+            }
+
+            if ($poGone) {
+                // คำอธิบายพูดครั้งเดียวตรงหัวข้อ ในการ์ดเก็บแต่ข้อมูลของใบนั้นจริง ๆ จะได้ไม่อ่านซ้ำ 5 รอบ
+                echo '<h4 style="margin:18px 0 4px;font-size:14px">ใบสั่งงานที่ถูกลบทิ้งแล้ว '
+                   . '<span class="muted" style="font-weight:400">(' . number_format(count($poGone)) . ' ใบ · '
+                   . number_format((int) $fgPo['orphan_qty']) . ' ชิ้น — ไม่ได้นับรวม)</span></h4>';
+                echo '<p class="muted" style="font-size:12px;margin:0 0 6px">'
+                   . 'ใบ PO ส่วนนี้ถูกลบออกจากระบบ Setup ไปแล้ว แต่รายการสินค้าในใบยังค้างอยู่ในฐานข้อมูล '
+                   . 'ระบบเราจึงไม่นับเป็นของที่ต้องผลิต'
+                   . ($fgFromRegistry ? '' : ' (ตัวเลข PO ค้างด้านบนมาจากระบบ Setup ซึ่งยังนับรวมอยู่)')
+                   . '</p>';
+                echo '<ul class="fg-sn-list fg-po-list fg-po-gone-list">';
+                foreach ($poGone as $po) {
+                    $head = 'ใบสั่งงาน #' . (int) $po['order_id'];
+                    $who = [];
+                    if ($po['customer'] !== '') { $who[] = $po['customer']; }
+                    if ($po['created_at'] !== '') {
+                        $who[] = 'เปิดใบ ' . dthai(substr((string) $po['created_at'], 0, 10));
+                    }
+                    // ระบบ Setup ลบใบทิ้งโดยไม่เก็บ log — บอกวันที่ลบได้เฉพาะใบที่หายไปตอนระบบเราเฝ้าอยู่แล้ว
+                    $who[] = !empty($po['seen_usable']) && (int) $po['seen_first'] > 0
+                        ? 'ถูกลบราววันที่ ' . dthai(date('Y-m-d', (int) $po['seen_first']))
+                        : 'ไม่ทราบวันที่ถูกลบ';
+
+                    echo '<li class="fg-sn fg-po fg-po-gone">'
+                       . '<span class="fg-po-main"><b>' . h($head) . '</b>'
+                       . '<span class="muted fg-po-sub">' . h(implode(' · ', $who)) . '</span>';
+                    if (!empty($po['items'])) {
+                        $bits = [];
+                        foreach (array_slice($po['items'], 0, 10) as $it) {
+                            $bits[] = $it['name'] . ' ×' . number_format((int) $it['qty']);
+                        }
+                        $more = count($po['items']) - count($bits);
+                        echo '<span class="muted fg-po-sub">ในใบมี: ' . h(implode(', ', $bits))
+                           . ($more > 0 ? h(' และอีก ' . number_format($more) . ' รายการ') : '') . '</span>';
+                    }
+                    echo '</span>'
+                       . '<span class="muted fg-po-qty">' . number_format($po['qty']) . ' ชิ้น<br>ไม่นับ</span></li>';
+                }
+                echo '</ul>';
+            }
+
             if ($fgPo['total'] !== (int) $fgItem['po_qty']) {
-                echo '<p class="muted" style="font-size:12px;margin-top:6px;color:var(--warning)">'
-                   . 'รวมจากใบสั่งงาน ' . number_format($fgPo['total']) . ' ชิ้น ไม่ตรงกับเลข PO ค้างด้านบน ('
-                   . number_format((int) $fgItem['po_qty']) . ') — ตัวเลขด้านบนคำนวณไว้ก่อนหน้านี้</p>';
+                $diff = (int) $fgItem['po_qty'] - (int) $fgPo['total'];
+                $msg = ($diff === (int) $fgPo['orphan_qty'] && $diff > 0)
+                    ? 'ตัวเลข PO ค้างด้านบน (' . number_format((int) $fgItem['po_qty']) . ') ยังรวมใบที่ถูกลบทิ้งแล้ว '
+                      . number_format($diff) . ' ชิ้นอยู่ · นับเฉพาะใบที่ยังใช้งานได้ ' . number_format((int) $fgPo['total']) . ' ชิ้น'
+                    : 'ตัวเลข PO ค้างด้านบน (' . number_format((int) $fgItem['po_qty']) . ') มาจากรอบคำนวณก่อนหน้า · '
+                      . 'ตอนนี้นับใบที่ยังใช้งานได้ ' . number_format((int) $fgPo['total']) . ' ชิ้น';
+                echo '<p class="muted" style="font-size:12px;margin-top:6px;color:var(--warning)">' . h($msg) . '</p>';
             }
         }
 

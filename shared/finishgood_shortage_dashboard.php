@@ -127,33 +127,160 @@ function fg_shortage_dashboard_data(bool $force = false): array
 }
 
 /**
+ * ไฟล์จำว่าเราเห็นใบสั่งงานใบไหนหายไปจากระบบ Setup ครั้งแรกเมื่อไหร่
+ *
+ * setupsystem ลบใบสั่งงานโดยไม่เก็บ log และลบข้ามฐานไม่ได้ (รายการสินค้าอยู่ biton_stockparts)
+ * จึงไม่มีทางรู้เวลาลบจริง — เก็บเวลาที่ "ตรวจพบว่าใบหาย" ไว้เองแทน จะได้มีข้อมูลอ้างอิง
+ *
+ * @return string เส้นทางไฟล์ (ว่าง = ยังหาที่เก็บไม่ได้)
+ */
+function fg_shortage_orphan_seen_file(): string
+{
+    if (!function_exists('app_error_log_path')) {
+        return '';
+    }
+    return dirname(app_error_log_path()) . '/fg-po-orphans.json';
+}
+
+/**
+ * บันทึก/อ่านเวลาที่พบว่าใบสั่งงานหายไป
+ *
+ * ใบที่หายไปตั้งแต่ก่อนเราเริ่มเฝ้า (รุ่นแรกที่เขียนไฟล์นี้) บอกวันที่ลบไม่ได้เลย — first_seen
+ * ของใบพวกนั้นคือวันที่เราเริ่มเฝ้า ไม่ใช่วันที่ลบ จึงต้องแยกด้วย reliable ไม่งั้นจะรายงานวันผิด
+ *
+ * @param  array<int,array<string,mixed>> $orders order_id => ข้อมูลใบที่หาไม่เจอแล้ว
+ * @return array<int,array{first_seen:int,last_seen:int,reliable:bool}>
+ */
+function fg_shortage_orphan_seen_touch(array $orders): array
+{
+    $file = fg_shortage_orphan_seen_file();
+    if ($file === '' || $orders === []) {
+        return [];
+    }
+    $now = time();
+    $book = [];
+    if (is_file($file)) {
+        $raw = json_decode((string) @file_get_contents($file), true);
+        if (is_array($raw)) {
+            $book = $raw;
+        }
+    }
+    $dirty = false;
+
+    // เวลาที่เริ่มเฝ้า — ไฟล์รุ่นก่อนยังไม่มี meta จึงถอยไปใช้ค่า first_seen ที่เก่าที่สุดที่มีอยู่
+    if (!isset($book['__meta']['watch_since'])) {
+        $oldest = $now;
+        foreach ($book as $k => $v) {
+            if ($k !== '__meta' && is_array($v) && (int) ($v['first_seen'] ?? 0) > 0) {
+                $oldest = min($oldest, (int) $v['first_seen']);
+            }
+        }
+        $book['__meta'] = ['watch_since' => $oldest];
+        $dirty = true;
+    }
+    $watchSince = (int) $book['__meta']['watch_since'];
+
+    foreach ($orders as $id => $info) {
+        $key = (string) (int) $id;
+        if (!isset($book[$key]) || !is_array($book[$key])) {
+            $book[$key] = ['first_seen' => $now, 'last_seen' => $now];
+            $dirty = true;
+            continue;
+        }
+        // เขียนทับ last_seen ไม่บ่อยเกินวันละครั้ง — ไฟล์นี้ถูกอ่านทุกครั้งที่เปิดโมดัล
+        if ($now - (int) ($book[$key]['last_seen'] ?? 0) > 86400) {
+            $book[$key]['last_seen'] = $now;
+            $dirty = true;
+        }
+    }
+    if ($dirty) {
+        @file_put_contents($file, json_encode($book, JSON_UNESCAPED_UNICODE), LOCK_EX);
+    }
+    $out = [];
+    foreach ($orders as $id => $info) {
+        $key = (string) (int) $id;
+        if (isset($book[$key])) {
+            $first = (int) ($book[$key]['first_seen'] ?? 0);
+            $out[(int) $id] = [
+                'first_seen' => $first,
+                'last_seen'  => (int) ($book[$key]['last_seen'] ?? 0),
+                // ใบที่หายไประหว่างที่เราเฝ้าอยู่แล้วเท่านั้น ถึงจะบอกช่วงเวลาที่ถูกลบได้
+                'reliable'   => $first > $watchSince + 60,
+            ];
+        }
+    }
+    return $out;
+}
+
+/**
+ * รายการสินค้าทั้งใบของใบสั่งงานที่ถูกลบ — ใช้บอกว่าใบนั้นมีอะไรอยู่บ้าง
+ *
+ * @param  mysqli            $stock
+ * @param  array<int,int>    $orderIds
+ * @return array<int,array<int,array{name:string,qty:int}>>
+ */
+function fg_shortage_order_items(\mysqli $stock, array $orderIds): array
+{
+    $ids = [];
+    foreach ($orderIds as $id) {
+        $id = (int) $id;
+        if ($id > 0) {
+            $ids[$id] = $id;
+        }
+    }
+    if ($ids === []) {
+        return [];
+    }
+    $res = $stock->query(
+        "SELECT order_id, part_code, part_name, COALESCE(SUM(quantity), 0) AS qty
+         FROM po_order_parts
+         WHERE order_id IN (" . implode(',', $ids) . ")
+         GROUP BY order_id, part_code, part_name
+         ORDER BY order_id, part_name"
+    );
+    $out = [];
+    while ($res && ($r = $res->fetch_assoc())) {
+        $out[(int) $r['order_id']][] = [
+            'name' => trim((string) $r['part_name']) !== ''
+                ? trim((string) $r['part_name'])
+                : trim((string) $r['part_code']),
+            'qty'  => (int) round((float) $r['qty']),
+        ];
+    }
+    return $out;
+}
+
+/**
  * ใบสั่งงานที่ทำให้เกิดยอด "PO ค้าง" ของรุ่นหนึ่ง
  *
  * กติกาเดียวกับตอนนับ (ดู finishgood_shortage_registry.php): รายการที่ช่องประเภทการขายยังว่าง
- * = ยังไม่ได้ส่งของ และใบสั่งงานไม่ได้ถูกยกเลิก · ผลรวมจำนวนต้องเท่ากับเลข PO ค้างบนการ์ด
+ * = ยังไม่ได้ส่งของ และใบสั่งงานไม่ได้ถูกยกเลิก
  *
- * ใบสั่งงานที่ถูกลบไปแล้วยังนับอยู่ในยอด (setupsystem นับแบบนั้น) จึงต้องแสดงด้วย
- * พร้อมบอกว่าหาใบไม่เจอ ไม่ใช่ซ่อนไปเฉย ๆ แล้วยอดไม่ตรง
+ * ใบที่ถูกลบไปแล้วแต่รายการสินค้ายังค้าง (setupsystem ลบเฉพาะหัวใบ คนละฐานกันจึง cascade ไม่ได้)
+ * ยังแสดงอยู่ในรายการพร้อมรายละเอียดอ้างอิง แต่ไม่รวมใน total — ของเรานับเฉพาะใบที่ยังมีอยู่จริง
  *
  * @param  string $code product_code
- * @return array{ok:bool,error:string,rows:array<int,array<string,mixed>>,total:int}
+ * @return array{ok:bool,error:string,rows:array<int,array<string,mixed>>,total:int,orphan_qty:int,orphan_count:int}
  */
 function fg_shortage_open_pos(string $code): array
 {
-    $out = ['ok' => true, 'error' => '', 'rows' => [], 'total' => 0];
+    $out = ['ok' => true, 'error' => '', 'rows' => [], 'total' => 0, 'orphan_qty' => 0, 'orphan_count' => 0];
+    $fail = function (string $msg) {
+        return ['ok' => false, 'error' => $msg, 'rows' => [], 'total' => 0, 'orphan_qty' => 0, 'orphan_count' => 0];
+    };
     $code = strtoupper(trim($code));
     if ($code === '') {
-        return ['ok' => false, 'error' => 'ไม่มีรหัสรุ่น', 'rows' => [], 'total' => 0];
+        return $fail('ไม่มีรหัสรุ่น');
     }
 
     try {
         $stock = dbStock();
         $setup = dbSetup();
         if (!$stock) {
-            return ['ok' => false, 'error' => 'ต่อฐาน stockparts ไม่ได้', 'rows' => [], 'total' => 0];
+            return $fail('ต่อฐาน stockparts ไม่ได้');
         }
         if (!$setup) {
-            return ['ok' => false, 'error' => 'ต่อฐาน setup ไม่ได้', 'rows' => [], 'total' => 0];
+            return $fail('ต่อฐาน setup ไม่ได้');
         }
 
         $ids = [];
@@ -178,7 +305,9 @@ function fg_shortage_open_pos(string $code): array
             $cancelled[] = (int) $r[0];
         }
 
-        $sql = "SELECT order_id, COALESCE(SUM(quantity), 0) AS qty, MAX(order_product_type) AS ptype, MAX(created_at) AS created_at
+        $sql = "SELECT order_id, COALESCE(SUM(quantity), 0) AS qty, MAX(order_product_type) AS ptype,
+                       MAX(created_at) AS created_at, MAX(updated_at) AS updated_at,
+                       MAX(order_customer_name) AS order_customer_name
                 FROM po_order_parts
                 WHERE part_id IN (" . implode(',', $ids) . ")
                   AND order_product_type IS NOT NULL
@@ -189,7 +318,7 @@ function fg_shortage_open_pos(string $code): array
         $sql .= " GROUP BY order_id ORDER BY created_at DESC, order_id DESC";
         $res = $stock->query($sql);
         if (!$res) {
-            return ['ok' => false, 'error' => 'อ่านรายการ PO ค้างไม่ได้', 'rows' => [], 'total' => 0];
+            return $fail('อ่านรายการ PO ค้างไม่ได้');
         }
         $rows = [];
         while ($r = $res->fetch_assoc()) {
@@ -198,13 +327,19 @@ function fg_shortage_open_pos(string $code): array
                 'qty'        => (int) round((float) $r['qty']),
                 'ptype'      => (string) $r['ptype'],
                 'created_at' => (string) $r['created_at'],
+                'updated_at' => (string) $r['updated_at'],
                 'po_number'  => '',
-                'customer'   => '',
+                'customer'   => trim((string) $r['order_customer_name']),
                 'sale_type'  => '',
                 'status'     => '',
+                'po_date'    => '',
                 'found'      => false,
+                'orphan'      => true,
+                'items'       => [],
+                'seen_first'  => 0,
+                'seen_last'   => 0,
+                'seen_usable' => false,
             ];
-            $out['total'] += (int) round((float) $r['qty']);
         }
         if ($rows !== []) {
             $res = $setup->query(
@@ -221,11 +356,38 @@ function fg_shortage_open_pos(string $code): array
                 $rows[$id]['status']    = trim((string) $r['status']);
                 $rows[$id]['po_date']   = trim((string) $r['po_date']);
                 $rows[$id]['found']     = true;
+                $rows[$id]['orphan']    = false;
+            }
+        }
+
+        // ใบที่หัวใบหายไปแล้ว: ไม่รวมในยอด แต่เก็บรายละเอียดไว้ให้ดูว่าใบนั้นมีอะไร ลูกค้าใคร เห็นว่าหายตั้งแต่เมื่อไหร่
+        $orphans = [];
+        foreach ($rows as $id => $row) {
+            if (!empty($row['orphan'])) {
+                $orphans[$id] = $row;
+            }
+        }
+        if ($orphans !== []) {
+            $items = fg_shortage_order_items($stock, array_keys($orphans));
+            $seen = fg_shortage_orphan_seen_touch($orphans);
+            foreach (array_keys($orphans) as $id) {
+                $rows[$id]['items']       = $items[$id] ?? [];
+                $rows[$id]['seen_first']  = (int) ($seen[$id]['first_seen'] ?? 0);
+                $rows[$id]['seen_last']   = (int) ($seen[$id]['last_seen'] ?? 0);
+                $rows[$id]['seen_usable'] = !empty($seen[$id]['reliable']);
+            }
+        }
+        foreach ($rows as $row) {
+            if (!empty($row['orphan'])) {
+                $out['orphan_qty']   += (int) $row['qty'];
+                $out['orphan_count']++;
+            } else {
+                $out['total'] += (int) $row['qty'];
             }
         }
         $out['rows'] = array_values($rows);
     } catch (\Throwable $e) {
-        return ['ok' => false, 'error' => 'ดึงรายการ PO ไม่สำเร็จ: ' . $e->getMessage(), 'rows' => [], 'total' => 0];
+        return $fail('ดึงรายการ PO ไม่สำเร็จ: ' . $e->getMessage());
     }
 
     return $out;
