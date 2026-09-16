@@ -126,6 +126,111 @@ function fg_shortage_dashboard_data(bool $force = false): array
     return $data;
 }
 
+/**
+ * ใบสั่งงานที่ทำให้เกิดยอด "PO ค้าง" ของรุ่นหนึ่ง
+ *
+ * กติกาเดียวกับตอนนับ (ดู finishgood_shortage_registry.php): รายการที่ช่องประเภทการขายยังว่าง
+ * = ยังไม่ได้ส่งของ และใบสั่งงานไม่ได้ถูกยกเลิก · ผลรวมจำนวนต้องเท่ากับเลข PO ค้างบนการ์ด
+ *
+ * ใบสั่งงานที่ถูกลบไปแล้วยังนับอยู่ในยอด (setupsystem นับแบบนั้น) จึงต้องแสดงด้วย
+ * พร้อมบอกว่าหาใบไม่เจอ ไม่ใช่ซ่อนไปเฉย ๆ แล้วยอดไม่ตรง
+ *
+ * @param  string $code product_code
+ * @return array{ok:bool,error:string,rows:array<int,array<string,mixed>>,total:int}
+ */
+function fg_shortage_open_pos(string $code): array
+{
+    $out = ['ok' => true, 'error' => '', 'rows' => [], 'total' => 0];
+    $code = strtoupper(trim($code));
+    if ($code === '') {
+        return ['ok' => false, 'error' => 'ไม่มีรหัสรุ่น', 'rows' => [], 'total' => 0];
+    }
+
+    try {
+        $stock = dbStock();
+        $setup = dbSetup();
+        if (!$stock) {
+            return ['ok' => false, 'error' => 'ต่อฐาน stockparts ไม่ได้', 'rows' => [], 'total' => 0];
+        }
+        if (!$setup) {
+            return ['ok' => false, 'error' => 'ต่อฐาน setup ไม่ได้', 'rows' => [], 'total' => 0];
+        }
+
+        $ids = [];
+        $st = $stock->prepare(
+            "SELECT id FROM products WHERE is_active = 1 AND UPPER(TRIM(product_code)) = ? ORDER BY id"
+        );
+        $st->bind_param('s', $code);
+        $st->execute();
+        $res = $st->get_result();
+        while ($r = $res->fetch_row()) {
+            $ids[] = (int) $r[0];
+        }
+        if ($ids === []) {
+            return $out;
+        }
+
+        $cancelled = [];
+        $res = $setup->query(
+            "SELECT id FROM setup_orders WHERE status = '" . $setup->real_escape_string(FG_SHORTAGE_PO_CANCELLED_STATUS) . "'"
+        );
+        while ($res && ($r = $res->fetch_row())) {
+            $cancelled[] = (int) $r[0];
+        }
+
+        $sql = "SELECT order_id, COALESCE(SUM(quantity), 0) AS qty, MAX(order_product_type) AS ptype, MAX(created_at) AS created_at
+                FROM po_order_parts
+                WHERE part_id IN (" . implode(',', $ids) . ")
+                  AND order_product_type IS NOT NULL
+                  AND (status_product IS NULL OR status_product = '')";
+        if ($cancelled !== []) {
+            $sql .= " AND order_id NOT IN (" . implode(',', $cancelled) . ")";
+        }
+        $sql .= " GROUP BY order_id ORDER BY created_at DESC, order_id DESC";
+        $res = $stock->query($sql);
+        if (!$res) {
+            return ['ok' => false, 'error' => 'อ่านรายการ PO ค้างไม่ได้', 'rows' => [], 'total' => 0];
+        }
+        $rows = [];
+        while ($r = $res->fetch_assoc()) {
+            $rows[(int) $r['order_id']] = [
+                'order_id'   => (int) $r['order_id'],
+                'qty'        => (int) round((float) $r['qty']),
+                'ptype'      => (string) $r['ptype'],
+                'created_at' => (string) $r['created_at'],
+                'po_number'  => '',
+                'customer'   => '',
+                'sale_type'  => '',
+                'status'     => '',
+                'found'      => false,
+            ];
+            $out['total'] += (int) round((float) $r['qty']);
+        }
+        if ($rows !== []) {
+            $res = $setup->query(
+                "SELECT id, po_number, customer_name, company_name, sale_type, status, po_date
+                 FROM setup_orders WHERE id IN (" . implode(',', array_keys($rows)) . ")"
+            );
+            while ($res && ($r = $res->fetch_assoc())) {
+                $id = (int) $r['id'];
+                $rows[$id]['po_number'] = trim((string) $r['po_number']);
+                $rows[$id]['customer']  = trim((string) $r['customer_name']) !== ''
+                    ? trim((string) $r['customer_name'])
+                    : trim((string) $r['company_name']);
+                $rows[$id]['sale_type'] = trim((string) $r['sale_type']);
+                $rows[$id]['status']    = trim((string) $r['status']);
+                $rows[$id]['po_date']   = trim((string) $r['po_date']);
+                $rows[$id]['found']     = true;
+            }
+        }
+        $out['rows'] = array_values($rows);
+    } catch (\Throwable $e) {
+        return ['ok' => false, 'error' => 'ดึงรายการ PO ไม่สำเร็จ: ' . $e->getMessage(), 'rows' => [], 'total' => 0];
+    }
+
+    return $out;
+}
+
 // ─ หมายเลขสินค้าที่อยู่ในสต็อก (กดการ์ดรายรุ่นบน Dashboard) ─────────────────────
 
 /** @var string หมวดสินค้าที่ setupsystem นับยอดจาก serial ในตาราง stock (หมวดอื่นใช้ยอดนับมือ) */

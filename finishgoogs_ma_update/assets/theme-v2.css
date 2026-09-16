@@ -1703,6 +1703,12 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
 }
 .fg-sn b { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; min-width: 0; }
 .fg-sn .muted { font-size: calc(12px * var(--font-scale, 1)); white-space: nowrap; }
+/* รายการ PO ค้าง — ช่องกว้างกว่าหมายเลขสินค้า เพราะมีชื่อลูกค้ากับสถานะต่อท้าย */
+.fg-po-list { grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
+.fg-po { align-items: flex-start; }
+.fg-po-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fg-po-sub { white-space: normal !important; overflow-wrap: anywhere; }
+.fg-po-qty { text-align: right; }
 
 /* การ์ดรายการ "อะไหล่ควรสั่งเพิ่ม" บนจอมือถือ — 4 คอลัมน์ในแถวเดียวไม่พอให้ชื่อยาว ๆ ขึ้น:
    ย้ายตัวเลขลงไปบรรทัดใต้ชื่อ ให้คอลัมน์ชื่อกว้างเต็มที่ */

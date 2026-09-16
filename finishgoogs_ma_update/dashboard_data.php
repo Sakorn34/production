@@ -970,6 +970,47 @@ switch ($type) {
             $fgTable('เครื่องเช่าพร้อมเช่า', $sr['leasing'], 'จากระบบเช่า — เครื่องที่รับคืนและตรวจแล้ว พร้อมปล่อยเช่ารอบใหม่');
         }
 
+        // ฝั่ง "ต้องการ" — PO ค้างมาจากใบสั่งงานใบไหนบ้าง
+        $fgPo = fg_shortage_open_pos($fgCode);
+        echo '<h4 style="margin:18px 0 6px;font-size:14px">PO ค้าง <span class="muted" style="font-weight:400">('
+           . number_format((int) $fgItem['po_qty']) . ' ชิ้น)</span></h4>';
+        if (!$fgPo['ok']) {
+            echo '<p class="muted" style="font-size:13px;color:var(--warning)">' . h($fgPo['error']) . '</p>';
+        } elseif (!$fgPo['rows']) {
+            echo '<p class="muted" style="font-size:13px">ไม่มีใบสั่งงานค้างส่ง</p>';
+        } else {
+            echo '<p class="muted" style="font-size:12px;margin:0 0 6px">ใบสั่งงานที่ยังไม่ได้ส่งของ '
+               . number_format(count($fgPo['rows'])) . ' ใบ · ระบบ Setup ถือว่าส่งแล้วเมื่อปิดงานและเขียนประเภทการขายลงในรายการ</p>';
+            echo '<ul class="fg-sn-list fg-po-list">';
+            foreach ($fgPo['rows'] as $po) {
+                $label = $po['po_number'] !== '' ? $po['po_number'] : 'ไม่มีเลข PO';
+                $when = '';
+                if (!empty($po['po_date']) && $po['po_date'] !== '0000-00-00') {
+                    $when = dthai(substr((string) $po['po_date'], 0, 10));
+                } elseif ($po['created_at'] !== '') {
+                    $when = dthai(substr($po['created_at'], 0, 10));
+                }
+                $sub = [];
+                if ($po['customer'] !== '') { $sub[] = $po['customer']; }
+                if ($po['sale_type'] !== '') { $sub[] = $po['sale_type']; }
+                if (!$po['found']) { $sub[] = 'ไม่พบใบสั่งงานแล้ว (ถูกลบ)'; }
+                elseif ($po['status'] !== '') { $sub[] = 'สถานะ ' . $po['status']; }
+
+                echo '<li class="fg-sn fg-po">'
+                   . '<span class="fg-po-main"><b>' . h($label) . '</b>'
+                   . '<span class="muted fg-po-sub">#' . (int) $po['order_id']
+                   . ($sub ? ' · ' . h(implode(' · ', $sub)) : '') . '</span></span>'
+                   . '<span class="muted fg-po-qty">' . number_format($po['qty']) . ' ชิ้น'
+                   . ($when !== '' ? ' · ' . h($when) : '') . '</span></li>';
+            }
+            echo '</ul>';
+            if ($fgPo['total'] !== (int) $fgItem['po_qty']) {
+                echo '<p class="muted" style="font-size:12px;margin-top:6px;color:var(--warning)">'
+                   . 'รวมจากใบสั่งงาน ' . number_format($fgPo['total']) . ' ชิ้น ไม่ตรงกับเลข PO ค้างด้านบน ('
+                   . number_format((int) $fgItem['po_qty']) . ') — ตัวเลขด้านบนคำนวณไว้ก่อนหน้านี้</p>';
+            }
+        }
+
         // จำนวนหมายเลขกับตัวเลขหัวรายการมาคนละจังหวะ (ตัวเลขเก็บ cache ไว้ 10 นาที) — ไม่ตรงก็บอกตรง ๆ
         $fgStockShown = $sr['mode'] === 'manual' ? $sr['manual_qty'] : count($sr['stock']);
         $fgLeaseShown = $fgFromRegistry ? 0 : count($sr['leasing']);
