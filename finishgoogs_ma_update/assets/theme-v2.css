@@ -1689,6 +1689,25 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
 }
 .ma-draft-text { flex: 1 1 220px; color: var(--primary-ink, var(--text)); font-weight: 600; }
 
-/* modal "สินค้าที่ต้องผลิตเพิ่ม" — ใช้การ์ดเดียวกับอะไหล่ที่ควรสั่งเพิ่ม เพิ่มแค่ป้ายที่มาของยอด */
+/* แท็บ "ต้องผลิตเพิ่ม" บน Dashboard — ป้ายบอกว่ารุ่นนี้นับยอดจากทะเบียนเครื่องของเรา */
 .fg-src { color: var(--primary); font-weight: 600; }
-.low-stock-card .fg-breakdown { font-size: calc(11.5px * var(--font-scale, 1)); margin-top: 2px; }
+/* หมายเลขสินค้าในสต็อก (modal) — กริดที่ยืดตามความกว้าง จอคอมได้หลายคอลัมน์ มือถือเหลือคอลัมน์เดียว */
+.fg-sn-list {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 6px;
+}
+.fg-sn {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm, 8px);
+  background: var(--surface, #fff); min-width: 0;
+}
+.fg-sn b { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; min-width: 0; }
+.fg-sn .muted { font-size: calc(12px * var(--font-scale, 1)); white-space: nowrap; }
+
+/* การ์ดรายการ "อะไหล่ควรสั่งเพิ่ม" บนจอมือถือ — 4 คอลัมน์ในแถวเดียวไม่พอให้ชื่อยาว ๆ ขึ้น:
+   ย้ายตัวเลขลงไปบรรทัดใต้ชื่อ ให้คอลัมน์ชื่อกว้างเต็มที่ */
+.low-stock-card .ls-name { overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .low-stock-card { grid-template-columns: auto minmax(0, 1fr) auto; row-gap: 6px; }
+  .low-stock-card .ls-qty { grid-column: 2 / 4; grid-row: 2; text-align: left; }
+}

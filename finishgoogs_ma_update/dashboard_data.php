@@ -842,7 +842,7 @@ switch ($type) {
         }
 
         echo '<p class="muted" style="font-size:12px;margin:0 0 10px">'
-           . 'ขาด = คงเหลือ − (ขั้นต่ำ + PO ค้าง) · ข้อมูล ณ ' . h($fgUpdated)
+           . 'ขาด = คงเหลือ − (ขั้นต่ำ + PO ค้าง) · กดการ์ดเพื่อดูหมายเลขสินค้าที่อยู่ในสต็อก · ข้อมูล ณ ' . h($fgUpdated)
            . ($fg['stale'] ? ' <b style="color:var(--warning)">(ดึงรอบล่าสุดไม่สำเร็จ — แสดงข้อมูลเก่า)</b>' : '')
            . ($fg['skipped'] > 0 ? ' · ซ่อน ' . number_format($fg['skipped']) . ' รุ่นที่ปิดแจ้งเตือนไว้' : '')
            . '</p>';
@@ -861,41 +861,124 @@ switch ($type) {
             $fgIcons[mb_strtolower(trim((string) $r['name']), 'UTF-8')] = (string) $r['icon_path'];
         }
 
-        echo '<div class="low-stock-cards">';
+        // การ์ดชุดเดียวกับแท็บ "จำนวนเครื่อง" / "สต็อกอะไหล่" ในแผงเดียวกัน — สลับแท็บแล้วหน้าตาไม่กระโดด
+        echo '<div class="model-card-grid">';
         foreach ($fg['items'] as $it) {
             $name = (string) $it['product_name'];
+            $code = (string) $it['product_code'];
             $available = (int) $it['available'];
             $required = (int) $it['required'];
             $need = (int) $it['need'];
             $fromRegistry = ($it['stock_source'] ?? '') === 'production_registry';
             $icon = $fgIcons[mb_strtolower(trim($name), 'UTF-8')] ?? '';
             $pctHave = $required > 0 ? min(100, (int) round($available / $required * 100)) : 100;
-            $breakdown = $fromRegistry
-                ? 'ใหม่ในทะเบียน ' . number_format((int) $it['stock_qty'])
-                : 'stock ' . number_format((int) $it['stock_qty']) . ((int) $it['leasing_qty'] > 0 ? ' + เช่า ' . number_format((int) $it['leasing_qty']) : '');
-            $url = (string) ($it['detail_url'] ?? '');
+            $critical = $pctHave < 50;
+            $serialUrl = BASE_URL . '/dashboard_data.php?type=fg_shortage_serials&code=' . rawurlencode($code);
+            $tip = 'มี ' . number_format($available) . ' / ต้องการ ' . number_format($required)
+                 . ' (ขั้นต่ำ ' . number_format((int) $it['minimum_stock']) . ' + PO ' . number_format((int) $it['po_qty']) . ')';
 
-            echo '<div class="low-stock-card">';
-            echo '<div class="ls-img">' . ($icon !== ''
-                    ? img_tag($icon, $name, 'ls-thumb')
-                    : '<span class="ls-thumb ls-thumb-ph">' . ui_icon_html('box', 15) . '</span>') . '</div>';
-            echo '<div class="ls-info">'
-               . '<div class="ls-name" title="' . h($name) . '">'
-               . ($url !== '' ? '<a href="' . h($url) . '" target="_blank" rel="noopener">' . h($name) . '</a>' : h($name))
-               . '</div>'
-               . '<div class="ls-code muted">' . h((string) $it['product_code'])
-               . ($fromRegistry ? ' · <span class="fg-src">นับจากทะเบียนเรา</span>' : '') . '</div>'
-               . '<div class="ls-bar" title="มี ' . number_format($available) . ' · ต้องการ ' . number_format($required) . '">'
-               . '<i style="width:' . $pctHave . '%;background:' . ($pctHave < 50 ? 'var(--danger)' : 'var(--warning)') . '"></i></div>'
+            echo '<div class="model-card clickable" role="button" tabindex="0" title="' . h($tip) . '"'
+               . ' onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.click();}"'
+               . ' onclick="showListModal(' . h(json_encode('หมายเลขสินค้าในสต็อก: ' . $name, JSON_UNESCAPED_UNICODE)) . ', '
+               . h(json_encode($serialUrl, JSON_UNESCAPED_UNICODE)) . ', \'\')">';
+            echo '<div class="model-card-img">' . ($icon !== ''
+                    ? img_tag($icon, $name, 'model-thumb')
+                    : '<span class="model-thumb model-thumb-ph">' . ui_icon_html('box', 18) . '</span>') . '</div>';
+            echo '<div class="model-card-body">'
+               . '<div class="model-card-name" title="' . h($name) . '">' . h($name) . '</div>'
+               . '<div class="model-card-sub muted">' . h($code) . ($fromRegistry ? ' · <span class="fg-src">นับจากทะเบียนเรา</span>' : '') . '</div>'
+               . '<div class="model-card-bar"><div class="model-card-fill" style="width:' . $pctHave . '%;background:' . ($critical ? 'var(--danger)' : 'var(--warning)') . '"></div></div>'
+               . '<div class="model-card-foot"><div class="model-card-num">มี ' . number_format($available) . ' / ต้องการ ' . number_format($required)
+               . ' · <span class="' . ($critical ? 'text-danger' : 'text-warn') . '">ขาด ' . number_format(abs($need)) . '</span></div></div>'
                . '</div>';
-            echo '<div class="ls-qty">มี <b>' . number_format($available) . '</b> / ต้องการ <b>' . number_format($required) . '</b>'
-               . '<div class="muted fg-breakdown">' . h($breakdown) . ' · ขั้นต่ำ ' . number_format((int) $it['minimum_stock'])
-               . ' + PO ' . number_format((int) $it['po_qty']) . '</div></div>';
-            echo '<div class="ls-badge"><span class="badge-pill ' . ($pctHave < 50 ? 'bp-danger' : 'bp-warning') . '">ขาด '
-               . number_format(abs($need)) . '</span></div>';
             echo '</div>';
         }
         echo '</div>';
+        echo '<p style="margin-top:10px"><a href="' . h(BASE_URL . '/finishgood_shortage_preview.php') . '">ตั้งค่าการนับและการแจ้งเตือนรายรุ่น ›</a></p>';
+        break;
+
+    case 'fg_shortage_serials': // กดการ์ดรายรุ่น → หมายเลขสินค้าที่ประกอบเป็นตัวเลข "มี"
+        require_once dirname(__DIR__) . '/shared/finishgood_shortage_dashboard.php';
+        $fgCode = strtoupper(trim((string) ($_GET['code'] ?? '')));
+        if (!preg_match('/^[A-Z0-9][A-Z0-9._-]{0,31}$/', $fgCode)) {
+            exit('<p class="muted">รหัสรุ่นไม่ถูกต้อง</p>');
+        }
+        // ใช้แถวจาก cache ชุดเดียวกับการ์ด ตัวเลขหัวรายการจะได้ตรงกับที่เพิ่งกดมา
+        $fg = fg_shortage_dashboard_data();
+        $fgItem = null;
+        foreach ($fg['items'] as $it) {
+            if (strtoupper(trim((string) $it['product_code'])) === $fgCode) {
+                $fgItem = $it;
+                break;
+            }
+        }
+        if ($fgItem === null) {
+            exit('<p class="muted">รุ่นนี้ไม่อยู่ในรายการที่ต้องผลิตเพิ่มแล้ว — ปิดหน้าต่างแล้วโหลด Dashboard ใหม่</p>');
+        }
+        $sr = fg_shortage_serials($fgItem);
+        if (!$sr['ok']) {
+            exit('<p class="muted">' . h($sr['error']) . '</p>');
+        }
+
+        $fgFromRegistry = $sr['mode'] === 'registry';
+        echo '<p style="margin:0 0 4px">มี <b>' . number_format((int) $fgItem['available']) . '</b> · ต้องการ <b>' . number_format((int) $fgItem['required'])
+           . '</b> (ขั้นต่ำ ' . number_format((int) $fgItem['minimum_stock']) . ' + PO ค้าง ' . number_format((int) $fgItem['po_qty'])
+           . ') · <b style="color:var(--danger,#dc2626)">ขาด ' . number_format(abs((int) $fgItem['need'])) . '</b></p>';
+        echo '<p class="muted" style="font-size:12px;margin:0 0 12px">'
+           . ($fgFromRegistry
+               ? 'รุ่นนี้นับจากทะเบียนเครื่องของเรา — เครื่องสถานะ "ใหม่" ที่ยังไม่ถูกเช่าหรือขาย'
+               : 'ตัวเลข "มี" มาจากระบบ Setup = หมายเลขในสต็อก + เครื่องเช่าพร้อมเช่า')
+           . '</p>';
+        if ($sr['error'] !== '') {
+            echo '<p class="muted" style="font-size:12px;color:var(--warning)">' . h($sr['error']) . '</p>';
+        }
+
+        $fgTable = static function (string $heading, array $rows, string $note = '') {
+            echo '<h4 style="margin:14px 0 6px;font-size:14px">' . h($heading) . ' <span class="muted" style="font-weight:400">(' . number_format(count($rows)) . ')</span></h4>';
+            if ($note !== '') {
+                echo '<p class="muted" style="font-size:12px;margin:0 0 6px">' . h($note) . '</p>';
+            }
+            if (!$rows) {
+                echo '<p class="muted" style="font-size:13px">ไม่มี</p>';
+                return;
+            }
+            // กริดแทนตาราง — มีแค่หมายเลขกับวันที่ ตาราง .list ที่พับบนจอเล็กและเลื่อนข้างบนจอกว้างเกินความจำเป็น
+            echo '<ul class="fg-sn-list">';
+            foreach ($rows as $row) {
+                $sn = h($row['sn']);
+                $label = $row['asset_id'] > 0
+                    ? '<a href="' . h(BASE_URL . '/asset.php?id=' . (int) $row['asset_id']) . '">' . $sn . '</a>'
+                    : $sn;
+                echo '<li class="fg-sn"><b>' . $label . '</b><span class="muted">'
+                   . ($row['date'] !== '' ? dthai(substr($row['date'], 0, 10)) : '—') . '</span></li>';
+            }
+            echo '</ul>';
+        };
+
+        if ($fgFromRegistry) {
+            $fgTable('เครื่องสถานะใหม่ในทะเบียน', $sr['stock']);
+        } elseif ($sr['mode'] === 'manual') {
+            echo '<h4 style="margin:14px 0 6px;font-size:14px">สต็อก <span class="muted" style="font-weight:400">(' . number_format($sr['manual_qty']) . ')</span></h4>'
+               . '<p class="muted" style="font-size:13px">ยอดนี้มาจากการนับสต็อกด้วยมือในระบบ Setup ซึ่งไม่ได้เก็บหมายเลขสินค้าไว้</p>';
+        } else {
+            $fgNote = $sr['last_check_at'] !== ''
+                ? 'นับเฉพาะหมายเลขที่บันทึกหลังการนับสต็อกครั้งล่าสุด (' . dthai(substr($sr['last_check_at'], 0, 10)) . ') ที่ยังไม่ถูกเบิกออก'
+                : 'หมายเลขที่ยังไม่ถูกเบิกออก';
+            $fgTable('หมายเลขในสต็อก', $sr['stock'], $fgNote);
+        }
+        if (!$fgFromRegistry && ($sr['leasing'] || (int) $fgItem['leasing_qty'] > 0)) {
+            $fgTable('เครื่องเช่าพร้อมเช่า', $sr['leasing'], 'จากระบบเช่า — เครื่องที่รับคืนและตรวจแล้ว พร้อมปล่อยเช่ารอบใหม่');
+        }
+
+        // จำนวนหมายเลขกับตัวเลขหัวรายการมาคนละจังหวะ (ตัวเลขเก็บ cache ไว้ 10 นาที) — ไม่ตรงก็บอกตรง ๆ
+        $fgStockShown = $sr['mode'] === 'manual' ? $sr['manual_qty'] : count($sr['stock']);
+        $fgLeaseShown = $fgFromRegistry ? 0 : count($sr['leasing']);
+        if ($fgStockShown !== (int) $fgItem['stock_qty'] || $fgLeaseShown !== (int) $fgItem['leasing_qty']) {
+            echo '<p class="muted" style="font-size:12px;margin-top:10px;color:var(--warning)">'
+               . 'จำนวนหมายเลขไม่ตรงกับตัวเลขด้านบน (ในสต็อก ' . number_format((int) $fgItem['stock_qty']) . ' · เช่า ' . number_format((int) $fgItem['leasing_qty'])
+               . ') — ตัวเลขด้านบนคำนวณไว้เมื่อ ' . h($fg['saved_at'] > 0 ? date('H:i', (int) $fg['saved_at']) . ' น.' : '-')
+               . ' ข้อมูลอาจเปลี่ยนไปแล้ว</p>';
+        }
         break;
 
     default:

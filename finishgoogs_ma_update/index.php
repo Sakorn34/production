@@ -368,15 +368,6 @@ $partsBase = ui_parts_base_url();
         echo '<div class="kpi kpi-warning"><div class="kpi-top"><span class="kpi-ic">' . ui_icon_html('alert', 14) . '</span> สต็อกอะไหล่</div><b class="kpi-num">—</b><div class="kpi-sub">เชื่อมต่อระบบสต็อกไม่ได้</div></div>';
     }
     ?>
-    <?php // ตัวเลขมาจาก API ของ setupsystem ซึ่งใช้เวลาหลายวินาที — วาดการ์ดเปล่าไว้ก่อน แล้วโหลด
-         // ทีหลังด้วย JS ท้ายไฟล์ หน้า Dashboard จะได้ไม่ต้องรอ · ตัวเลขชุดเดียวกับการแจ้งเตือน LINE ?>
-    <a class="kpi kpi-info clickable" id="dash-fg-shortage" href="<?= h("$B/finishgood_shortage_preview.php") ?>" aria-busy="true"
-       onclick="if(event.ctrlKey||event.metaKey||event.shiftKey||event.button===1)return true;<?= h(modal_js('สินค้าที่ต้องผลิตเพิ่ม', "$B/dashboard_data.php?type=fg_shortage", "$B/finishgood_shortage_preview.php")) ?>;return false;">
-      <span class="kpi-sys">สินค้า</span>
-      <div class="kpi-top"><span class="kpi-ic"><?= ui_icon_html('box', 14) ?></span> สินค้าที่ต้องผลิตเพิ่ม</div>
-      <b class="kpi-num" id="dash-fg-shortage-num">…</b>
-      <div class="kpi-sub" id="dash-fg-shortage-sub">กำลังโหลดจากระบบ Setup</div>
-    </a>
   </div>
 </div>
 
@@ -445,14 +436,17 @@ $partsBase = ui_parts_base_url();
 <div class="panel" id="dash-inventory-panel">
   <div class="panel-head-row">
     <h3 id="dash-inventory-title">
-      <span id="dash-inventory-title-text">จำนวนเครื่องรายรุ่น</span>
+      <span id="dash-inventory-title-text">จำนวนเครื่องแยกตามรุ่น</span>
       <span class="muted panel-meta" id="dash-inventory-meta"><?= count($perModel) ?> รุ่น</span>
     </h3>
     <div class="panel-head-actions">
-      <div class="dash-view-toggle" role="tablist" aria-label="โหมดรายการ">
-        <button type="button" class="dash-view-btn active" data-view="models" role="tab" aria-selected="true">รุ่นสินค้า</button>
+      <?php // ป้ายปุ่มบอกสิ่งที่จะเห็น ไม่ใช่ชนิดข้อมูล — "รุ่นสินค้า" เดิมอ่านแล้วไม่รู้ว่าเป็นจำนวนเครื่องหรือรายชื่อรุ่น
+           // ปุ่ม "ต้องผลิตเพิ่ม" แทนการ์ดด้านบนเดิม · ตัวเลขในวงเล็บโหลดตามมาทีหลัง (API ของระบบ Setup ช้า) ?>
+      <div class="dash-view-toggle" role="tablist" aria-label="เลือกดู">
+        <button type="button" class="dash-view-btn active" data-view="models" role="tab" aria-selected="true">จำนวนเครื่อง</button>
         <button type="button" class="dash-view-btn" data-view="parts" role="tab" aria-selected="false"
-          <?= ($stock['ok'] && $perPart) ? '' : 'disabled title="เชื่อมต่อสต็อกอะไหล่ไม่ได้"' ?>>รายการอะไหล่</button>
+          <?= ($stock['ok'] && $perPart) ? '' : 'disabled title="เชื่อมต่อสต็อกอะไหล่ไม่ได้"' ?>>สต็อกอะไหล่</button>
+        <button type="button" class="dash-view-btn" data-view="shortage" role="tab" aria-selected="false" id="dash-fg-btn">ต้องผลิตเพิ่ม<span id="dash-fg-count"></span></button>
       </div>
     </div>
   </div>
@@ -576,6 +570,10 @@ $partsBase = ui_parts_base_url();
   <p style="margin-top:10px"><a href="<?= h($partsBase) ?>/pages/products.php">ดูรายการอะไหล่ทั้งหมด ›</a></p>
   <?php } ?>
   </div>
+
+  <div class="dash-view-pane" id="dash-view-shortage" role="tabpanel" hidden>
+    <div id="dash-fg-body"><p class="muted" style="padding:12px 0">กำลังโหลดจากระบบ Setup…</p></div>
+  </div>
 </div>
 
 <script>
@@ -598,10 +596,42 @@ $partsBase = ui_parts_base_url();
   var currentView = 'models';
   var currentPartsFilter = 'all';
   var currentSupplierFilter = '';
+  var paneShortage = document.getElementById('dash-view-shortage');
+  var fgBody = document.getElementById('dash-fg-body');
+  var fgBtn = document.getElementById('dash-fg-btn');
+  var fgCount = document.getElementById('dash-fg-count');
+  var fgLoaded = false;
   var labels = {
-    models: { title: 'จำนวนเครื่องรายรุ่น', meta: '<?= count($perModel) ?> รุ่น' },
-    parts:  { title: 'สต็อกอะไหล่' }
+    models:   { title: 'จำนวนเครื่องแยกตามรุ่น', meta: '<?= count($perModel) ?> รุ่น' },
+    parts:    { title: 'สต็อกอะไหล่' },
+    shortage: { title: 'สินค้าที่ต้องผลิตเพิ่ม', meta: '' }
   };
+
+  // ตัวเลขบนปุ่ม — โหลดหลังหน้าขึ้น ไม่ให้ Dashboard รอ API ของระบบ Setup (ฝั่งเซิร์ฟเวอร์ cache 10 นาที)
+  fetch('<?= h($B) ?>/dashboard_data.php?type=fg_shortage_summary', { credentials: 'same-origin' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d || !d.ok) { return; }
+      if (fgCount) { fgCount.textContent = ' (' + Number(d.models).toLocaleString('en-US') + ')'; }
+      labels.shortage.meta = d.models > 0
+        ? Number(d.models).toLocaleString('en-US') + ' รุ่น · ขาดรวม ' + Number(Math.abs(d.total_shortage)).toLocaleString('en-US') + ' เครื่อง'
+        : 'ทุกรุ่นเพียงพอ';
+      if (fgBtn && d.updated) { fgBtn.title = 'ข้อมูล ณ ' + d.updated; }
+      if (currentView === 'shortage' && metaEl) { metaEl.textContent = labels.shortage.meta; }
+    })
+    .catch(function () {});
+
+  function loadShortage() {
+    if (fgLoaded || !fgBody) { return; }
+    fgLoaded = true;
+    fetch('<?= h($B) ?>/dashboard_data.php?type=fg_shortage', { credentials: 'same-origin' })
+      .then(function (r) { return r.text(); })
+      .then(function (html) { fgBody.innerHTML = html; })
+      .catch(function () {
+        fgLoaded = false;
+        fgBody.innerHTML = '<p class="muted" style="padding:12px 0">โหลดข้อมูลไม่สำเร็จ — กดปุ่มอีกครั้งเพื่อลองใหม่</p>';
+      });
+  }
   var emptyMsgs = {
     all: 'ไม่มีอะไหล่ตามตัวกรองที่เลือก',
     low: 'ไม่มีอะไหล่ที่ควรสั่งเพิ่มตามตัวกรองที่เลือก',
@@ -686,11 +716,16 @@ $partsBase = ui_parts_base_url();
     });
     if (paneModels) paneModels.hidden = view !== 'models';
     if (paneParts) paneParts.hidden = view !== 'parts';
+    if (paneShortage) paneShortage.hidden = view !== 'shortage';
     setPartsFilterVisible(view === 'parts');
     var lb = labels[view] || labels.models;
     if (titleText) titleText.textContent = lb.title;
     if (view === 'parts') {
       applyPartsFilter(currentPartsFilter, currentSupplierFilter, true);
+    } else if (view === 'shortage') {
+      resetPartsFilter();
+      if (metaEl) metaEl.textContent = lb.meta;
+      loadShortage();
     } else {
       resetPartsFilter();
       if (metaEl) metaEl.textContent = lb.meta;
@@ -844,44 +879,6 @@ $partsBase = ui_parts_base_url();
     apply();
   }
   window.dashStatusFilter = { toggle: toggle };
-})();
-
-// การ์ด "สินค้าที่ต้องผลิตเพิ่ม" — โหลดแยกจากหน้า เพราะ API ของ setupsystem ช้า (ฝั่งเซิร์ฟเวอร์ cache ไว้ 10 นาที)
-(function () {
-  var card = document.getElementById('dash-fg-shortage');
-  if (!card) { return; }
-  var num = document.getElementById('dash-fg-shortage-num');
-  var sub = document.getElementById('dash-fg-shortage-sub');
-  function setTone(tone) {
-    card.classList.remove('kpi-info', 'kpi-warning', 'kpi-success');
-    card.classList.add('kpi-' + tone);
-  }
-  fetch('<?= h($B) ?>/dashboard_data.php?type=fg_shortage_summary', { credentials: 'same-origin' })
-    .then(function (r) { return r.json(); })
-    .then(function (d) {
-      card.removeAttribute('aria-busy');
-      if (!d || !d.ok) {
-        num.textContent = '—';
-        sub.textContent = 'ดึงข้อมูลจากระบบ Setup ไม่ได้';
-        setTone('warning');
-        return;
-      }
-      num.textContent = Number(d.models).toLocaleString('en-US') + ' รุ่น';
-      if (d.models > 0) {
-        sub.textContent = 'ขาดรวม ' + Number(Math.abs(d.total_shortage)).toLocaleString('en-US') + ' เครื่อง' + (d.stale ? ' · ข้อมูลเก่า' : '');
-        setTone('warning');
-      } else {
-        sub.textContent = 'ทุกรุ่นเพียงพอ';
-        setTone('success');
-      }
-      if (d.updated) { card.title = 'ข้อมูล ณ ' + d.updated; }
-    })
-    .catch(function () {
-      card.removeAttribute('aria-busy');
-      num.textContent = '—';
-      sub.textContent = 'โหลดข้อมูลไม่สำเร็จ';
-      setTone('warning');
-    });
 })();
 </script>
 
