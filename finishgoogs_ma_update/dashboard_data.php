@@ -818,8 +818,14 @@ switch ($type) {
         render_stock_today_table($rows, $partsBase);
         break;
 
-    case 'fg_shortage_summary': // การ์ด Dashboard — ตัวเลขสรุป (JSON)
-    case 'fg_shortage':         // modal — รายการรุ่นที่ต้องผลิตเพิ่ม
+    case 'fg_model_stock': // การ์ดรุ่นบน Dashboard — ยอดคลัง/ขาด/เกิน รายรหัสรุ่น (JSON)
+        require_once dirname(__DIR__) . '/shared/finishgood_shortage_dashboard.php';
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(fg_model_stock_map(), JSON_UNESCAPED_UNICODE);
+        break;
+
+    case 'fg_shortage_summary': // ตัวเลขสรุปรวม (JSON) — ใช้ในหน้าอื่นที่ต้องการแค่ยอดรวม
+    case 'fg_shortage':         // รายการรุ่นที่ต้องผลิตเพิ่ม (HTML) — หน้า Dashboard ใช้การ์ดรุ่นรวมแทนแล้ว
         require_once dirname(__DIR__) . '/shared/finishgood_shortage_dashboard.php';
         $fg = fg_shortage_dashboard_data(isset($_GET['refresh']));
         $fgUpdated = $fg['saved_at'] > 0 ? date('d/m/Y H:i', (int) $fg['saved_at']) . ' น.' : '';
@@ -912,8 +918,17 @@ switch ($type) {
                 break;
             }
         }
+        $fgFallback = false;
         if ($fgItem === null) {
-            exit('<p class="muted">รุ่นนี้ไม่อยู่ในรายการที่ต้องผลิตเพิ่มแล้ว — ปิดหน้าต่างแล้วโหลด Dashboard ใหม่</p>');
+            // รุ่นที่ไม่ขาด API ไม่ส่งมาให้เลย — นับเองจากทะเบียนเรา จะได้เปิดดูรายละเอียดได้เหมือนกัน
+            $fgFallback = true;
+            $fgReg = fg_shortage_registry_rows([$fgCode]);
+            if (!empty($fgReg['ok']) && isset($fgReg['rows'][$fgCode])) {
+                $fgItem = $fgReg['rows'][$fgCode];
+            } else {
+                exit('<p class="muted">ยังไม่มีข้อมูลของรุ่นนี้'
+                   . (!empty($fgReg['error']) ? ' — ' . h((string) $fgReg['error']) : '') . '</p>');
+            }
         }
         $sr = fg_shortage_serials($fgItem);
         if (!$sr['ok']) {
@@ -921,14 +936,23 @@ switch ($type) {
         }
 
         $fgFromRegistry = $sr['mode'] === 'registry';
+        $fgNeed = (int) $fgItem['need'];
+        $fgVerdict = $fgNeed < 0
+            ? '<b style="color:var(--danger,#dc2626)">ขาด ' . number_format(abs($fgNeed)) . '</b>'
+            : '<b style="color:var(--success,#16a34a)">' . ($fgNeed > 0 ? 'เกิน ' . number_format($fgNeed) : 'ครบพอดี') . '</b>';
         echo '<p style="margin:0 0 4px">มี <b>' . number_format((int) $fgItem['available']) . '</b> · ต้องการ <b>' . number_format((int) $fgItem['required'])
            . '</b> (ขั้นต่ำ ' . number_format((int) $fgItem['minimum_stock']) . ' + PO ค้าง ' . number_format((int) $fgItem['po_qty'])
-           . ') · <b style="color:var(--danger,#dc2626)">ขาด ' . number_format(abs((int) $fgItem['need'])) . '</b></p>';
+           . ') · ' . $fgVerdict . '</p>';
         echo '<p class="muted" style="font-size:12px;margin:0 0 12px">'
            . ($fgFromRegistry
-               ? 'รุ่นนี้นับจากทะเบียนเครื่องของเรา — เครื่องสถานะ "ใหม่" ที่ยังไม่ถูกเช่าหรือขาย'
+               ? 'รุ่นนี้นับจากทะเบียนเครื่องของเรา — เครื่องสถานะ "ใหม่" ที่ยังไม่ถูกเช่าหรือขาย แยกเป็นของผลิตใหม่กับเครื่องเช่าที่วนกลับมา'
                : 'ตัวเลข "มี" มาจากระบบ Setup = หมายเลขในสต็อก + เครื่องเช่าพร้อมเช่า')
            . '</p>';
+        if ($fgFallback && $fgNeed < 0) {
+            // ระบบ Setup ไม่ได้แจ้งว่ารุ่นนี้ขาด แต่ทะเบียนเรานับได้น้อยกว่าที่ต้องมี — บอกไว้ไม่ให้งงว่าทำไมการ์ดกับในนี้ไม่ตรง
+            echo '<p class="muted" style="font-size:12px;margin:-6px 0 12px;color:var(--warning)">'
+               . 'ระบบ Setup ไม่ได้แจ้งว่ารุ่นนี้ขาด — ตัวเลขนี้นับจากทะเบียนเราเอง สองฝั่งจึงอาจไม่ตรงกัน</p>';
+        }
         if ($sr['error'] !== '') {
             echo '<p class="muted" style="font-size:12px;color:var(--warning)">' . h($sr['error']) . '</p>';
         }
@@ -956,7 +980,7 @@ switch ($type) {
         };
 
         if ($fgFromRegistry) {
-            $fgTable('เครื่องสถานะใหม่ในทะเบียน', $sr['stock']);
+            $fgTable('เครื่องผลิตใหม่ในทะเบียน', $sr['stock'], 'เครื่องสถานะใหม่ที่ไม่ได้อยู่ในคลังเช่า — ผลิตแล้วยังไม่ถูกเบิกออก');
         } elseif ($sr['mode'] === 'manual') {
             echo '<h4 style="margin:14px 0 6px;font-size:14px">สต็อก <span class="muted" style="font-weight:400">(' . number_format($sr['manual_qty']) . ')</span></h4>'
                . '<p class="muted" style="font-size:13px">ยอดนี้มาจากการนับสต็อกด้วยมือในระบบ Setup ซึ่งไม่ได้เก็บหมายเลขสินค้าไว้</p>';
@@ -966,8 +990,12 @@ switch ($type) {
                 : 'หมายเลขที่ยังไม่ถูกเบิกออก';
             $fgTable('หมายเลขในสต็อก', $sr['stock'], $fgNote);
         }
-        if (!$fgFromRegistry && ($sr['leasing'] || (int) $fgItem['leasing_qty'] > 0)) {
-            $fgTable('เครื่องเช่าพร้อมเช่า', $sr['leasing'], 'จากระบบเช่า — เครื่องที่รับคืนและตรวจแล้ว พร้อมปล่อยเช่ารอบใหม่');
+        if ($sr['leasing'] || (int) $fgItem['leasing_qty'] > 0) {
+            $fgTable(
+                'เครื่องเช่าวนกลับมาปล่อยใหม่',
+                $sr['leasing'],
+                'รับคืนจากลูกค้าและตรวจ MA แล้ว พร้อมปล่อยเช่ารอบใหม่ — ไม่ใช่ของที่ผลิตใหม่'
+            );
         }
 
         // ฝั่ง "ต้องการ" — PO ค้างมาจากใบสั่งงานใบไหนบ้าง

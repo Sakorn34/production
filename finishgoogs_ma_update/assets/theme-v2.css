@@ -921,6 +921,72 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .model-card-foot {
   display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px;
 }
+
+/* ── การ์ดรุ่น: บรรทัดยอดคลัง + ป้ายขาด/เหลือเกิน (รวมแท็บ "ต้องผลิตเพิ่ม" เข้ามา) ── */
+.dash-fg-filters {
+  display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap;
+  margin: 0 0 12px;
+}
+.dash-fg-filters[hidden] { display: none !important; }
+.dash-fg-filters .dash-parts-filter-btn { color: var(--primary-dark, #5b21b6); }
+.dash-fg-filters .dash-parts-filter-btn:hover:not(.active) { background: var(--surface-soft); color: var(--primary); }
+.dash-fg-hint { font-size: calc(11.5px * var(--font-scale, 1)); line-height: 1.4; }
+.dash-fg-foot { margin: 12px 0 0; font-size: calc(12.5px * var(--font-scale, 1)); }
+.dash-fg-foot[hidden] { display: none !important; }
+
+.model-card[data-fg="short"] { border-left: 3px solid var(--danger, #dc2626); }
+.model-card[data-fg="over"] { border-left: 3px solid var(--success, #16a34a); }
+.mc-barrow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 6px; }
+.mc-blabel {
+  font-size: calc(10px * var(--font-scale, 1)); color: var(--text-muted, #6b6480);
+  white-space: nowrap; letter-spacing: .02em;
+}
+.model-card-fg {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 3px 6px;
+  margin-top: 5px; padding-top: 5px; border-top: 1px dashed var(--border);
+  font-size: calc(11px * var(--font-scale, 1)); color: var(--text-muted, #6b6480);
+}
+.model-card-fg .fg-line-sub { grid-column: 2 / -1; }
+.model-card-fg .fg-line-sub b { color: var(--text, #2a2440); }
+.fg-bar { display: flex; height: 7px; border-radius: 99px; background: var(--surface-soft); overflow: hidden; }
+.fg-bar > span { display: block; height: 100%; flex: 0 0 auto; }
+.fg-line-sub .fg-rent { color: #1d4ed8; }
+.model-card-fg[hidden] { display: none !important; }
+.model-card-fg[role="button"] { cursor: pointer; border-radius: 0 0 6px 6px; margin-inline: -2px; padding-inline: 2px; }
+.model-card-fg[role="button"]:hover { background: var(--surface-soft); }
+.model-card-fg[role="button"]:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+/* ── ชี้แล้วต้องรู้ว่ากำลังจะกดอะไร ─────────────────────────────────────────
+   การ์ดเป็น <a> ครอบทั้งใบ พอชี้ทีเดียวเบราว์เซอร์ขีดเส้นใต้ข้อความทุกบรรทัด
+   ทั้งที่ในใบมีสองปุ่มคนละที่ไป: ตัวการ์ด = กราฟการผลิต · แถบคลัง = รายการ S/N + PO */
+.model-card,
+.model-card:hover,
+.model-card:hover * { text-decoration: none; }
+.model-card:hover .model-card-name {
+  text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px;
+}
+/* ชี้ที่แถบคลัง = กำลังจะเปิดรายการ S/N ไม่ใช่กราฟ — ถอนไฮไลต์ของการ์ดออกให้หมด */
+.model-card.fg-hover { box-shadow: var(--shadow-sm); border-color: var(--border); }
+.model-card.fg-hover .model-card-name { text-decoration: none; }
+.model-card-fg[role="button"]:hover {
+  background: var(--primary-soft, #f3edff);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.model-card-fg[role="button"]:hover .mc-blabel { color: var(--primary); font-weight: 600; }
+.model-card-fg[role="button"]::after {
+  /* วางทับช่องเดียวกับป้ายขาด/เกิน แล้วสลับกันโชว์ตอนชี้ ไม่ให้ดันแถวใหม่ */
+  content: "ดู S/N ›"; grid-row: 1; grid-column: 3; justify-self: end; align-self: center;
+  font-size: calc(10px * var(--font-scale, 1)); color: var(--primary); opacity: 0;
+  transition: opacity .12s; white-space: nowrap; pointer-events: none;
+}
+.model-card-fg[role="button"]:hover::after { opacity: 1; }
+.model-card-fg[role="button"]:hover .fg-chip { opacity: 0; }
+.fg-chip {
+  justify-self: end; font-weight: 600; border-radius: 6px; padding: 1px 7px;
+  font-size: calc(11px * var(--font-scale, 1));
+}
+.fg-chip-short { background: #fee2e2; color: #991b1b; }
+.fg-chip-over { background: #dcfce7; color: #166534; }
 .dash-part-order-btn {
   flex-shrink: 0; padding: 3px 10px !important;
   font-size: calc(11px * var(--font-scale, 1)) !important; white-space: nowrap;

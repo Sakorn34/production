@@ -127,6 +127,72 @@ function fg_shortage_dashboard_data(bool $force = false): array
 }
 
 /**
+ * ตัวเลขคลังรายรหัสรุ่น สำหรับแปะบนการ์ด "จำนวนเครื่องแยกตามรุ่น" บน Dashboard
+ *
+ * รุ่นที่ขาด ใช้ตัวเลขจาก API ของระบบ Setup ตรง ๆ (ชุดเดียวกับที่ส่งเข้าไลน์ ตัวเลขจะได้ไม่ขัดกัน)
+ * ส่วนรุ่นที่ไม่ขาด API ไม่ส่งมาเลย (ตัดทิ้งตั้งแต่ต้นทาง) จึงนับเองจากทะเบียนเครื่องของเรา
+ * ด้วยสูตรเดียวกัน แล้วบอกที่มาไว้ในแต่ละแถวว่า setup หรือ registry
+ *
+ * @return array{ok:bool,error:string,updated:string,stale:bool,codes:array<string,array<string,mixed>>}
+ */
+function fg_model_stock_map(): array
+{
+    $fg = fg_shortage_dashboard_data();
+    $out = [
+        'ok'      => (bool) $fg['ok'],
+        'error'   => (string) $fg['error'],
+        'updated' => $fg['saved_at'] > 0 ? date('d/m/Y H:i', (int) $fg['saved_at']) . ' น.' : '',
+        'stale'   => (bool) $fg['stale'],
+        'codes'   => [],
+    ];
+    foreach ($fg['items'] as $it) {
+        $code = strtoupper(trim((string) $it['product_code']));
+        if ($code === '') {
+            continue;
+        }
+        $out['codes'][$code] = [
+            'state' => 'short',
+            'gap'   => abs((int) $it['need']),
+            'have'  => (int) $it['available'],
+            'req'   => (int) $it['required'],
+            'min'   => (int) $it['minimum_stock'],
+            'po'    => (int) $it['po_qty'],
+            // แยกของที่ผลิตใหม่ ออกจากเครื่องเช่าที่รับคืนแล้ววนกลับมาปล่อยใหม่
+            'new'   => (int) $it['stock_qty'],
+            'rent'  => (int) $it['leasing_qty'],
+            'src'   => (($it['stock_source'] ?? '') === 'production_registry') ? 'registry' : 'setup',
+        ];
+    }
+
+    $all = fg_shortage_registry_rows(null);
+    if (!empty($all['ok'])) {
+        foreach ($all['rows'] as $code => $row) {
+            $code = strtoupper(trim((string) $code));
+            if ($code === '' || isset($out['codes'][$code])) {
+                continue;
+            }
+            $need = (int) $row['need'];
+            $out['codes'][$code] = [
+                // ระบบ Setup บอกว่ารุ่นนี้ไม่ขาด ถ้าเรานับแล้วติดลบก็ไม่เถียงตัวเลขเขา แค่ไม่โชว์ยอดเกิน
+                'state' => $need >= 0 ? 'over' : 'ok',
+                'over'  => max(0, $need),
+                'have'  => (int) $row['available'],
+                'req'   => (int) $row['required'],
+                'min'   => (int) $row['minimum_stock'],
+                'po'    => (int) $row['po_qty'],
+                'new'   => (int) $row['stock_qty'],
+                'rent'  => (int) $row['leasing_qty'],
+                'src'   => 'registry',
+            ];
+        }
+    } elseif ($out['error'] === '') {
+        $out['error'] = (string) $all['error'];
+    }
+
+    return $out;
+}
+
+/**
  * ไฟล์จำว่าเราเห็นใบสั่งงานใบไหนหายไปจากระบบ Setup ครั้งแรกเมื่อไหร่
  *
  * setupsystem ลบใบสั่งงานโดยไม่เก็บ log และลบข้ามฐานไม่ได้ (รายการสินค้าอยู่ biton_stockparts)
@@ -483,8 +549,10 @@ function fg_shortage_serials(array $item): array
     try {
         if (($item['stock_source'] ?? '') === 'production_registry') {
             $out['mode'] = 'registry';
+            // เครื่องเช่าที่รับคืนแล้วรอปล่อยใหม่ ต้องแยกกอง ไม่ใช่ของผลิตใหม่
+            $ready = fg_shortage_leasing_ready_serials();
             $res = qr(
-                "SELECT a.id, a.asset_code, a.produced_at
+                "SELECT a.id, a.asset_code, a.factory_serial, a.produced_at
                  FROM assets a JOIN products p ON p.id = a.product_id
                  WHERE UPPER(TRIM(p.product_code)) = ? AND a.status = 'new'
                  ORDER BY a.produced_at DESC, a.asset_code DESC",
@@ -492,7 +560,14 @@ function fg_shortage_serials(array $item): array
                 [$code]
             );
             while ($r = $res->fetch_assoc()) {
-                $out['stock'][] = ['sn' => (string) $r['asset_code'], 'date' => (string) $r['produced_at'], 'asset_id' => (int) $r['id']];
+                $sn = strtoupper(trim((string) $r['asset_code']));
+                $fs = strtoupper(trim((string) $r['factory_serial']));
+                $row = ['sn' => (string) $r['asset_code'], 'date' => (string) $r['produced_at'], 'asset_id' => (int) $r['id']];
+                if (isset($ready[$sn]) || ($fs !== '' && isset($ready[$fs]))) {
+                    $out['leasing'][] = $row;
+                } else {
+                    $out['stock'][] = $row;
+                }
             }
             return $out;
         }

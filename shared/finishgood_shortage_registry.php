@@ -214,6 +214,28 @@ function fg_shortage_registry_rows(?array $codes = null): array
                 $po[(int) $r['part_id']] = (int) round((float) $r['q']);
             }
         }
+        // 4) แยกเครื่องเช่าที่รับคืนแล้วพร้อมปล่อยใหม่ ออกจากเครื่องที่ผลิตใหม่
+        //    ทั้งคู่อยู่ในทะเบียนเราเป็นสถานะ "ใหม่" เหมือนกัน (cron sync ตั้งให้ตอนระบบเช่ารับคืน)
+        //    แต่คนละเรื่องกัน — เครื่องวนกลับมาไม่ได้แปลว่าเราผลิตเพิ่มได้ ยอดจึงต้องแยกให้เห็น
+        $ready = fg_shortage_leasing_ready_serials();
+        $rentReady = [];
+        if ($ready) {
+            $res = qr(
+                "SELECT UPPER(TRIM(p.product_code)) AS code, UPPER(TRIM(a.asset_code)) AS sn,
+                        UPPER(TRIM(COALESCE(a.factory_serial, ''))) AS fs
+                 FROM products p JOIN assets a ON a.product_id = p.id
+                 WHERE a.status = 'new' AND p.product_code IS NOT NULL AND TRIM(p.product_code) <> ''"
+            );
+            while ($r = $res->fetch_assoc()) {
+                $code = (string) $r['code'];
+                if (!isset($ours[$code])) {
+                    continue;
+                }
+                if (isset($ready[(string) $r['sn']]) || ((string) $r['fs'] !== '' && isset($ready[(string) $r['fs']]))) {
+                    $rentReady[$code] = ($rentReady[$code] ?? 0) + 1;
+                }
+            }
+        }
     } catch (\Throwable $e) {
         return $fail('คำนวณจากทะเบียนเครื่องไม่สำเร็จ: ' . $e->getMessage());
     }
@@ -245,14 +267,18 @@ function fg_shortage_registry_rows(?array $codes = null): array
             $url = (string) line_notify_sanitize_https_uri($url);
         }
 
+        // ยอดรวมที่ใช้คิด "ขาด" ยังเท่าเดิม แค่บอกได้ว่าในนั้นเป็นเครื่องเช่าวนกลับกี่เครื่อง
+        $rentQty = (int) ($rentReady[$code] ?? 0);
+        $newQty = max(0, (int) $o['new'] - $rentQty);
+
         $rows[$code] = [
             'product_id'     => $sp[$code]['ids'][0],
             'product_code'   => $code,
             'product_name'   => $sp[$code]['name'],
             'registry_name'  => $o['name'],
             'registry_total' => $o['all'],
-            'stock_qty'      => $o['new'],
-            'leasing_qty'    => 0,
+            'stock_qty'      => $newQty,
+            'leasing_qty'    => $rentQty,
             'minimum_stock'  => $min,
             'po_qty'         => $poQty,
             'available'      => $o['new'],
@@ -272,6 +298,44 @@ function fg_shortage_registry_rows(?array $codes = null): array
     ksort($rows);
 
     return ['ok' => true, 'error' => '', 'rows' => $rows, 'missing' => $missing];
+}
+
+/**
+ * S/N ของเครื่องเช่าที่รับคืนเข้าคลังแล้ว รอปล่อยเช่ารอบใหม่
+ *
+ * เครื่องพวกนี้ผ่าน MA แล้ววนกลับมาใช้ใหม่ ไม่ใช่ของที่เพิ่งผลิต — ทะเบียนเราตั้งเป็น
+ * สถานะ "ใหม่" เหมือนกันหมดเพราะ cron sync อ่านจากระบบเช่า จึงต้องมีตัวแยกไว้ตรงนี้
+ *
+ * ต่อระบบเช่าไม่ได้ = คืนค่าว่าง แล้วยอดจะรวมกันเหมือนเดิม ไม่ทำให้ทั้งหน้าล้ม
+ *
+ * @return array<string,bool> S/N ตัวใหญ่ => true
+ */
+function fg_shortage_leasing_ready_serials(): array
+{
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+    $cache = [];
+    if (!function_exists('dbLeasing')) {
+        return $cache;
+    }
+    try {
+        $lease = dbLeasing();
+    } catch (\Throwable $e) {
+        return $cache;
+    }
+    if (!$lease) {
+        return $cache;
+    }
+    $res = $lease->query(
+        "SELECT UPPER(TRIM(pro_sn)) AS sn FROM tbl_product
+         WHERE TRIM(pro_status) = 'finished goods' AND pro_sn IS NOT NULL AND TRIM(pro_sn) <> ''"
+    );
+    while ($res && ($r = $res->fetch_row())) {
+        $cache[(string) $r[0]] = true;
+    }
+    return $cache;
 }
 
 /**

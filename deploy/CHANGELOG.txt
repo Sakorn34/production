@@ -3753,3 +3753,89 @@ Files:
   finishgoogs_ma_update/dashboard_data.php
   shared/finishgood_shortage_dashboard.php
 
+
+================================================================
+v2026-09-16_111439 | Patch | 2026-09-16 11:14:40
+From: 2026-09-16_102419  ->  To: 2547c73  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/index.php
+  shared/finishgood_shortage_dashboard.php
+
+
+================================================================
+v2026-09-16_113727 | Patch | 2026-09-16 11:37:28
+From: 2026-09-16_111439  ->  To: 2547c73  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-09-16_133813 | Patch | 2026-09-16 13:38:15
+From: 2026-09-16_111439  ->  To: 2547c73  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/stock_check.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/settings.php
+  finishgoogs_ma_update/stock_check.php
+
+
+================================================================
+v2026-09-16_135757 | Patch | 2026-09-16 13:57:59
+From: 2026-09-16_133813  ->  To: 2547c73  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/stock_check.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/stock_check.php
+
+
+================================================================
+v2026-09-16_140433 | Patch | 2026-09-16 14:04:35
+From: 2026-09-16_135757  ->  To: 2547c73  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-09-16_142338 | Patch | 2026-09-16 14:23:40
+From: 2026-09-16_140433  ->  To: 2547c73  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/index.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_registry.php
+
+
+================================================================
+v2026-09-16_144516 | Patch | 2026-09-16 14:45:17
+From: 2026-09-16_142338  ->  To: 2547c73  |  Files: 2
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+
