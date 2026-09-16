@@ -620,8 +620,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_ma'])) {
         ]);
     }
     $rentRes = rent_apply_after_ma_save_for_asset($a, $rentAction, $repItems, $fixItems, $fw, $remark);
+    // เสื่อมสภาพนับว่าสำเร็จเฉพาะตอนระบบเช่ารับแล้วจริง — ถ้าไม่รับ cron รอบหน้าจะ sync สถานะกลับ
+    // ต้องขึ้นเป็นข้อความเตือน ไม่ใช่เขียวผ่านเหมือนเดิม ไม่งั้นคนบันทึกไม่รู้ว่าสถานะไม่เปลี่ยน
+    $rentDone = $rentAction === 'retire'
+        ? (!empty($rentRes['ok']) && in_array((string)($rentRes['code'] ?? ''), ['closed', 'already'], true))
+        : !empty($rentRes['ok']);
+    if ($rentAction === 'retire' && $rentDone && rent_mark_asset_retired((int)$a['id'])) {
+        $flashMsg = "บันทึก MA ของ {$a['asset_code']} สำเร็จแล้ว — สถานะเครื่อง: " . status_th('retired')
+            . (!empty($w['count']) ? ' · เบิกอะไหล่ ' . (int)$w['count'] . ' รายการ' : '');
+    }
     $flashMsg .= ' · ' . $rentRes['message'];
-    flash_set($flashMsg, $rentRes['ok'] ? 'ok' : 'err', $flashMsg);
+    if ($rentAction === 'retire' && !$rentDone) {
+        $flashMsg .= ' — สถานะเครื่องยังไม่เป็นเสื่อมสภาพ';
+    }
+    flash_set($flashMsg, $rentDone ? 'ok' : 'err', $flashMsg);
     header('Location: ' . BASE_URL . '/ma.php?product=' . $maProductId); exit;
     } finally {
         ma_round_lock_release($maRoundLock);
@@ -683,8 +695,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_ma'])) {
         exit;
     }
     $rentRes = rent_apply_after_ma_save_for_asset($assetRow ?: [], $rentAction, $repItems, $fixItems, $fw, $remark);
+    $rentDone = $rentAction === 'retire'
+        ? (!empty($rentRes['ok']) && in_array((string)($rentRes['code'] ?? ''), ['closed', 'already'], true))
+        : !empty($rentRes['ok']);
+    if ($rentAction === 'retire' && $rentDone) {
+        rent_mark_asset_retired((int)$rec['asset_id']);
+    }
     $flashMsg = 'แก้ไขรายการ MA เรียบร้อยแล้ว · ' . $rentRes['message'];
-    flash_set($flashMsg, $rentRes['ok'] ? 'ok' : 'err', $flashMsg);
+    if ($rentAction === 'retire' && !$rentDone) {
+        $flashMsg .= ' — สถานะเครื่องยังไม่เป็นเสื่อมสภาพ';
+    }
+    flash_set($flashMsg, $rentDone ? 'ok' : 'err', $flashMsg);
     header('Location: ' . BASE_URL . '/ma.php?product=' . $maProductId); exit;
 }
 // ---------------------------------------------------------------

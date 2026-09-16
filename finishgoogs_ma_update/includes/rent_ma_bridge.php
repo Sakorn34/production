@@ -607,12 +607,34 @@ function rent_close_wait_ma($sn, $status, $remarks, $user, $dateYmd = '')
     if (!$prod) {
         return ['ok' => false, 'code' => 'not_found', 'message' => 'ไม่พบ S/N ' . $sn . ' ในระบบเช่า'];
     }
-    if ((string)$prod['pro_status'] !== 'MA') {
-        return [
-            'ok'      => true,
-            'code'    => 'skip_not_ma',
-            'message' => 'S/N ' . $sn . ' ไม่ได้อยู่ในคิวรอ MA (สถานะ ' . (string)$prod['pro_status'] . ')',
-        ];
+    // เสื่อมสภาพต้องสั่งได้แม้เครื่องจะออกจากคิวรอ MA ไปแล้ว — เดิมข้ามเงียบ ๆ ทำให้ระบบเช่ายังขึ้น
+    // "คลังพร้อมเช่า" แล้ว cron sync ก็ตั้งสถานะฝั่งเรากลับเป็นเครื่องใหม่ทุกคืน กดกี่ครั้งก็ไม่ติด
+    $currentStatus = trim((string)$prod['pro_status']);
+    if ($currentStatus !== 'MA') {
+        if ($status !== 'Asset Retirement') {
+            // ปิดงานเป็น "คลังพร้อมเช่า" ยังทำได้เฉพาะเครื่องที่อยู่ในคิวรอ MA จริง ๆ
+            return [
+                'ok'      => true,
+                'code'    => 'skip_not_ma',
+                'message' => 'S/N ' . $sn . ' ไม่ได้อยู่ในคิวรอ MA (สถานะ ' . $currentStatus . ')',
+            ];
+        }
+        if ($currentStatus === 'Asset Retirement') {
+            return [
+                'ok'      => true,
+                'code'    => 'already',
+                'message' => 'S/N ' . $sn . ' เป็นเสื่อมสภาพในระบบเช่าอยู่แล้ว',
+            ];
+        }
+        if (!in_array($currentStatus, RENT_RETIRE_ALLOWED_FROM, true)) {
+            // เครื่องยังอยู่กับลูกค้า/ติดเคลม — ตั้งเสื่อมสภาพตอนนี้จะทำให้สัญญาเช่ากับทะเบียนขัดกัน
+            return [
+                'ok'      => false,
+                'code'    => 'not_retirable',
+                'message' => 'S/N ' . $sn . ' ยังไม่ได้รับคืนเข้าคลัง (สถานะระบบเช่า: ' . $currentStatus
+                           . ') — ต้องรับเครื่องคืนก่อนจึงจะตั้งเป็นเสื่อมสภาพได้',
+            ];
+        }
     }
     $productName = (string)$prod['pro_name'];
 
@@ -670,7 +692,8 @@ function rent_close_wait_ma($sn, $status, $remarks, $user, $dateYmd = '')
         $conn->rollback();
         return ['ok' => false, 'code' => 'sql', 'message' => $conn->error ?: 'อัปเดตสถานะสินค้าไม่สำเร็จ'];
     }
-    $from = 'MA';
+    // เทียบกับสถานะที่อ่านมาตอนต้น (ไม่ใช่ 'MA' ตายตัว) — ยังกันกรณีมีคนแก้สถานะแทรกระหว่างทางเหมือนเดิม
+    $from = $currentStatus;
     $upPro->bind_param('sss', $status, $sn, $from);
     if (!$upPro->execute()) {
         $err = $upPro->error;
@@ -696,6 +719,41 @@ function rent_close_wait_ma($sn, $status, $remarks, $user, $dateYmd = '')
         'code'    => 'closed',
         'message' => 'ปิดงานเช่าสำเร็จ — ' . $label . ' (S/N ' . $sn . ')',
     ];
+}
+
+/**
+ * สถานะในระบบเช่าที่ตั้งเป็นเสื่อมสภาพได้ — ต้องเป็นเครื่องที่อยู่กับเราแล้วเท่านั้น
+ *
+ * @var array<int,string>
+ */
+const RENT_RETIRE_ALLOWED_FROM = ['MA', 'finished goods'];
+
+/**
+ * ตั้งสถานะเครื่องในทะเบียนเราเป็นเสื่อมสภาพ หลังระบบเช่ารับคำสั่งแล้ว
+ *
+ * ทำทันทีไม่ต้องรอ cron — ไม่งั้นกดเสื่อมสภาพแล้วสถานะยังขึ้นว่าเช่า/ใหม่ไปจนกว่าจะถึงรอบ sync
+ * รอบถัดไป cron อ่านจากระบบเช่าได้ค่าเดียวกัน (Asset Retirement) จึงไม่ทับกลับ
+ *
+ * @param int $assetId
+ * @return bool true = เปลี่ยนสถานะให้แล้ว
+ */
+function rent_mark_asset_retired($assetId)
+{
+    $assetId = (int)$assetId;
+    if ($assetId <= 0) {
+        return false;
+    }
+    $cur = qr('SELECT status FROM assets WHERE id = ? LIMIT 1', 'i', [$assetId])->fetch_assoc();
+    if (!$cur || (string)$cur['status'] === 'retired') {
+        return false;
+    }
+    q('UPDATE assets SET status = ? WHERE id = ?', 'si', ['retired', $assetId]);
+    q(
+        'INSERT INTO stock_movements (asset_id, moved_at, direction, reason, made_by) VALUES (?, NOW(), ?, ?, ?)',
+        'isss',
+        [$assetId, 'out', 'MA: เสื่อมสภาพ (' . (string)$cur['status'] . ' → retired)', actor_name() ?: 'system']
+    );
+    return true;
 }
 
 /**
@@ -855,7 +913,10 @@ function rent_bulk_retire(array $serials, $remark)
             $parts[] = 'ไม่พบในทะเบียนผลิต';
         }
         $rent = rent_close_wait_ma($sn, 'Asset Retirement', rent_ensure_retire_remark($remark), actor_name());
-        if ($rent['ok'] && $rent['code'] === 'closed') {
+        if ($rent['ok'] && in_array((string)$rent['code'], ['closed', 'already'], true)) {
+            if ($asset) {
+                rent_mark_asset_retired((int)$asset['id']);
+            }
             $success++;
             $parts[] = $rent['message'];
             $messages[] = $sn . ' — ' . implode(' · ', $parts);
