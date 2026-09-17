@@ -432,7 +432,7 @@ switch ($type) {
         $n = 0;
         while ($r = $res->fetch_assoc()) {
             $n++;
-            echo '<tr class="clickable" style="cursor:pointer" onclick="location.href=\'' . BASE_URL . '/asset.php?id=' . (int)$r['id'] . '\'">'
+            echo '<tr class="clickable" style="cursor:pointer" onclick="openAssetUrl(\'' . BASE_URL . '/asset.php?id=' . (int)$r['id'] . '\')">'
                . '<td><b>' . h($r['asset_code']) . '</b></td>'
                . '<td>' . status_badge($r['status']) . '</td>'
                . '<td>' . dthai($r['produced_at']) . '</td></tr>';
@@ -773,7 +773,7 @@ switch ($type) {
         $n = 0;
         while ($r = $res->fetch_assoc()) {
             $n++;
-            echo '<tr class="clickable" style="cursor:pointer" onclick="location.href=\'' . BASE_URL . '/asset.php?id=' . (int) $r['id'] . '\'">'
+            echo '<tr class="clickable" style="cursor:pointer" onclick="openAssetUrl(\'' . BASE_URL . '/asset.php?id=' . (int) $r['id'] . '\')">'
                . '<td><b>' . h($r['asset_code']) . '</b></td>'
                . '<td>' . status_badge($r['status']) . '</td>'
                . '<td>' . dthai($r['produced_at']) . '</td></tr>';

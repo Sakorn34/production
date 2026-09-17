@@ -124,7 +124,7 @@ if ($updShowFw) {
 
   <div class="upd-actions">
     <button type="submit" class="btn btn-primary"><?= ui_btn_label('save', 'บันทึกการอัปเดต') ?></button>
-    <a class="btn btn-line" href="<?= BASE_URL ?>/asset.php?id=<?= $aid ?>">ยกเลิก</a>
+    <a class="btn btn-line" href="<?= BASE_URL ?>/asset.php?id=<?= $aid ?>" data-same-tab>ยกเลิก</a>
   </div>
 </form>
 <script>

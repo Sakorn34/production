@@ -251,6 +251,14 @@ page_header('ระบบหลังบ้าน — ตั้งค่าร�
     <?= ui_icon_html("clipboard", 28, "h-svg") ?>
     <div><b>เคลียร์เครื่องค้างสถานะ</b><div class="muted">เครื่องที่ยังเป็น "ใหม่" ทั้งที่ออกจากคลังแล้ว · นับสต็อก · ปิดทีละหลายเครื่อง</div></div>
   </a>
+  <a class="card clickable" href="<?= BASE_URL ?>/installation_history.php">
+    <?= ui_icon_html("history", 28, "h-svg") ?>
+    <div><b>ประวัติติดตั้งระบบเดิม</b><div class="muted">นำเข้างานติดตั้งจากระบบ installation (2010–2023) · ขายให้ใคร เมื่อไหร่ invoice อะไร</div></div>
+  </a>
+  <a class="card clickable" href="<?= BASE_URL ?>/unknown_assets.php">
+    <?= ui_icon_html("search", 28, "h-svg") ?>
+    <div><b>ติดตามเครื่องไม่มีสถานะ</b><div class="muted">เครื่องที่นับสต็อกแล้วไม่เจอ · ดูหลักฐานล่าสุด · ตั้งสถานะทีละหลายเครื่อง</div></div>
+  </a>
   <a class="card clickable" href="<?= BASE_URL ?>/stock_movements.php">
     <?= ui_icon_html("history", 28, "h-svg") ?>
     <div><b>ประวัติเข้า-ออกคลัง</b><div class="muted">การเปลี่ยนสถานะเครื่องทั้งหมด · ซิงก์ · เคลียร์ · นับสต็อก · ค้นตาม S/N</div></div>

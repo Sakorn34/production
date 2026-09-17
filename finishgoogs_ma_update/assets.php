@@ -283,7 +283,7 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
         .then(function(items){
           if (!items.length) { box.innerHTML = '<div class="muted" style="padding:6px 10px">ไม่พบเครื่องที่ตรง</div>'; box.hidden = false; return; }
           box.innerHTML = items.map(function(it){
-            return '<div onclick="location.href=\'<?= BASE_URL ?>/asset.php?id=' + it.id + '\'">'
+            return '<div onclick="openAssetUrl(\'<?= BASE_URL ?>/asset.php?id=' + it.id + '\')">'
                  + '<b>' + esc(it.code) + '</b> <span class="muted">' + esc(it.pname) + ' · ' + esc(it.status) + '</span></div>';
           }).join('');
           box.hidden = false;

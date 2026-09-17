@@ -4,6 +4,7 @@ require __DIR__ . '/config.php';
 require __DIR__ . '/includes/layout.php';
 require_once __DIR__ . '/includes/part_stock_bridge.php';
 require_once __DIR__ . '/includes/dashboard_chart.php';
+require_once __DIR__ . '/includes/stock_scan.php';
 require_login();
 
 // สถานะ sync จาก cron/sync_asset_status.php หรือ database/tools/sync_asset_status.php
@@ -491,6 +492,8 @@ $partsBase = ui_parts_base_url();
       <button type="button" class="dash-parts-filter-btn active" data-fg-filter="all" role="tab" aria-selected="true">ทั้งหมด</button>
       <button type="button" class="dash-parts-filter-btn" data-fg-filter="short" role="tab" aria-selected="false">ต้องผลิตเพิ่ม</button>
       <button type="button" class="dash-parts-filter-btn" data-fg-filter="over" role="tab" aria-selected="false">ครบแล้ว</button>
+      <?php // รุ่นที่เกินรอบนับ — นับไว้ฝั่ง PHP เพราะไม่ต้องรอตัวเลขสต็อก ?>
+      <button type="button" class="dash-parts-filter-btn" data-fg-filter="due" role="tab" aria-selected="false" title="รุ่นที่ไม่ได้นับสต็อกเกิน <?= (int) stock_count_interval_days() ?> วัน หรือยังไม่เคยนับ">ถึงรอบนับ</button>
     </div>
     <span class="muted dash-fg-hint" id="dash-fg-hint"></span>
   </div>
@@ -514,10 +517,10 @@ $partsBase = ui_parts_base_url();
     </thead>
     <tbody id="dash-models-grid">
     <?php foreach ($perModel as $m) { ?>
-    <?php $mCode = strtoupper(trim((string) $m['product_code'])); ?>
+    <?php $mCode = strtoupper(trim((string) $m['product_code'])); $mCount = stock_count_status((int) $m['pid']); ?>
     <?php // แบ่งแถวเป็น 2 โซนกด: รูป+ชื่อรุ่น = การผลิตรายปี · แถบสีถึงคอลัมน์สุดท้าย = หมายเลขสินค้าในสต็อก
           // (จัดการคลิกรวมที่ tbody ด้านล่าง) ?>
-    <tr class="dash-model-row" data-code="<?= h($mCode) ?>" data-count="<?= (int) $m['c'] ?>" data-fg="none"
+    <tr class="dash-model-row" data-code="<?= h($mCode) ?>" data-count="<?= (int) $m['c'] ?>" data-fg="none" data-due="<?= $mCount['due'] ? '1' : '0' ?>"
         data-name="<?= h($m['name']) ?>"
         data-years-url="<?= h("$B/dashboard_data.php?type=product_years&v=" . (int) $m['pid']) ?>"
         data-list-url="<?= h("$B/assets.php?product=" . urlencode($m['name'])) ?>">
@@ -525,6 +528,11 @@ $partsBase = ui_parts_base_url();
       <td data-pri="1" class="fg-zone-name" title="กดดูการผลิตรายปี">
         <b class="fg-model-name"><?= h($m['name']) ?></b>
         <?php if ($mCode !== '') { ?><span class="mc-code"><?= h($mCode) ?></span><?php } ?>
+        <?php if ($mCount['due']) { ?>
+        <a class="fg-count-due" href="<?= h($B . '/stock_scan.php?pick=' . (int) $m['pid']) ?>" title="ถึงรอบนับสต็อก — กดเพื่อเริ่มนับรุ่นนี้"><?= h($mCount['label']) ?> · นับเลย ›</a>
+        <?php } else { ?>
+        <div class="fg-count-age"><?= h($mCount['label']) ?></div>
+        <?php } ?>
       </td>
       <td data-pri="1" class="fg-bar-col fg-zone-stock">
         <?php // หมุดอยู่นอก .fg-bar เพราะแถบตัดส่วนที่ล้นทิ้ง (overflow hidden) ?>
@@ -633,7 +641,8 @@ $partsBase = ui_parts_base_url();
   var fgBtns = fgFilters ? fgFilters.querySelectorAll('.dash-parts-filter-btn') : [];
   var modelCards = modelsGrid ? Array.prototype.slice.call(modelsGrid.querySelectorAll('[data-code]')) : [];
   var currentFgFilter = 'all';
-  var fgCounts = { all: modelCards.length, short: 0, over: 0 };
+  var dueCount = modelCards.filter(function (c) { return c.getAttribute('data-due') === '1'; }).length;
+  var fgCounts = { all: modelCards.length, short: 0, over: 0, due: dueCount };
   var labels = {
     models:   { title: 'จำนวนเครื่องแยกตามรุ่น', meta: '<?= count($perModel) ?> รุ่น' },
     parts:    { title: 'สต็อกอะไหล่' }
@@ -753,7 +762,7 @@ $partsBase = ui_parts_base_url();
     });
 
     if (!short && !over) { return; }
-    fgCounts = { all: modelCards.length, short: short, over: over };
+    fgCounts = { all: modelCards.length, short: short, over: over, due: dueCount };
     // ขาดมากสุดขึ้นก่อน → รุ่นที่พอดี → เกินน้อยไปมาก (รุ่นที่ยังไม่มีตัวเลขอยู่ท้ายสุด)
     var rank = function (el) {
       var g = Number(el.getAttribute('data-gap') || -1);
@@ -776,6 +785,7 @@ $partsBase = ui_parts_base_url();
     setFgLabel(fgBtns[1], 'ต้องผลิตเพิ่ม', short);
     setFgLabel(fgBtns[2], 'ครบแล้ว', over);
     setFgLabel(fgBtns[0], 'ทั้งหมด', modelCards.length);
+    setFgLabel(fgBtns[3], 'ถึงรอบนับ', dueCount);
     if (fgHint) {
       fgHint.textContent = 'ขาด = (เครื่องใหม่ + คลังพร้อมเช่า) − (ขั้นต่ำ + PO ค้าง)'
         + (d.updated ? ' · ข้อมูล ณ ' + d.updated : '')
@@ -788,6 +798,7 @@ $partsBase = ui_parts_base_url();
   // คลิกในตารางรุ่น: รูป/ชื่อรุ่น = การผลิตรายปี · แถบสีถึงคอลัมน์สุดท้าย = หมายเลขสินค้าในสต็อก
   if (modelsGrid) {
     modelsGrid.addEventListener('click', function (e) {
+      if (e.target.closest('a')) { return; }   // ลิงก์ "นับเลย" ในแถว — ไปหน้านับสต็อก ไม่เปิด popup
       var tr = e.target.closest('tr.dash-model-row');
       if (!tr) { return; }
       var name = tr.getAttribute('data-name') || '';
@@ -817,7 +828,9 @@ $partsBase = ui_parts_base_url();
     });
     modelCards.forEach(function (card) {
       var state = card.getAttribute('data-fg') || 'none';
-      card.hidden = !(currentFgFilter === 'all' || state === currentFgFilter);
+      card.hidden = currentFgFilter === 'due'
+        ? card.getAttribute('data-due') !== '1'
+        : !(currentFgFilter === 'all' || state === currentFgFilter);
     });
     if (metaEl && currentView === 'models') {
       metaEl.textContent = fgNum(fgCounts[currentFgFilter] || 0) + ' รุ่น';

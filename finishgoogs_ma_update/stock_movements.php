@@ -18,6 +18,7 @@ $groups = [
     'manual' => ['label' => 'เปลี่ยนสถานะเอง', 'where' => "m.reason LIKE 'เปลี่ยนสถานะเป็น%'"],
     'scan'   => ['label' => 'นับสต็อก (สแกน)', 'where' => "m.reason LIKE '%นับสต็อก (สแกน)%'"],
     'clear'  => ['label' => 'เคลียร์/ซิงก์เครื่องค้าง', 'where' => "(m.reason LIKE 'เคลียร์%' OR m.reason LIKE 'ย้อนกลับการเคลียร์%' OR m.reason LIKE 'ซิงก์สถานะทั้งระบบ%' OR m.reason LIKE 'เบิกออกจากคลังแล้วตามระบบ Setup%')"],
+    'follow' => ['label' => 'ติดตามเครื่องไม่มีสถานะ', 'where' => "m.reason LIKE 'ติดตามเครื่องไม่มีสถานะ%'"],
     'sync'   => ['label' => 'Sync อัตโนมัติ', 'where' => "m.reason LIKE 'Sync สถานะ:%'"],
     'import' => ['label' => 'ผลิต / นำเข้าระบบเดิม', 'where' => "(m.reason LIKE 'ผลิตเสร็จเข้าคลัง%' OR m.reason LIKE '%นำเข้าจากระบบเดิม%')"],
 ];

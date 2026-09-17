@@ -9,6 +9,7 @@
 
 require_once __DIR__ . '/stockparts_withdraw.php';
 require_once __DIR__ . '/rent_ma_bridge.php';
+require_once __DIR__ . '/installation_history.php';
 
 /**
  * ระบบเช่าบ่งชี้ว่าเครื่องอยู่ในสายงานเช่า (ไม่ใช่คลังพร้อมเช่า)
@@ -220,7 +221,7 @@ function asset_status_scanned_ids(): array
     return $cache;
 }
 
-function asset_status_sync_row(array $row, array $saleMap, array $leaseMap, bool $write = true): array
+function asset_status_sync_row(array $row, array $saleMap, array $leaseMap, bool $write = true, array $installMap = []): array
 {
     $id = (int) ($row['id'] ?? 0);
     $code = trim((string) ($row['asset_code'] ?? ''));
@@ -237,6 +238,20 @@ function asset_status_sync_row(array $row, array $saleMap, array $leaseMap, bool
     );
     $target = $resolved['target'];
     $reason = (string) ($resolved['reason'] ?? '');
+
+    // ประวัติติดตั้งระบบเดิม (installation) — หลักฐานอ่อนสุด ใช้กับเครื่องที่ยังเป็น "ใหม่" เท่านั้น
+    // เมื่อไม่มีหลักฐานอื่นเลย (ไม่อยู่ในระบบเช่า ไม่มีใบเบิก) เงื่อนไขละเอียดดู installation_history_status_hint
+    if ($target === null && $current === 'new' && $code !== '') {
+        $lease = $leaseMap[strtoupper($code)] ?? ($leaseMap[$code] ?? null);
+        $sale = $saleMap[$code] ?? null;
+        if (empty($lease['found']) && empty($sale['sold'])) {
+            $hint = installation_history_status_hint($row, $installMap[strtoupper($code)] ?? null);
+            if ($hint) {
+                $target = $hint['target'];
+                $reason = $hint['reason'];
+            }
+        }
+    }
 
     if ($target === null || $target === $current || $id <= 0) {
         return ['changed' => false, 'asset_code' => $code, 'from' => $current, 'to' => $current, 'reason' => $reason];
@@ -274,9 +289,12 @@ function asset_status_sync_batch(array $assetRows, bool $write = true): array
 
     $saleMap = $codes ? asset_stockparts_sale_status_by_sn($codes) : [];
     $leaseMap = asset_leasing_status_by_assets($assetRows);
+    // โหลดประวัติติดตั้งเฉพาะเครื่องที่ยังเป็น "ใหม่" — กฎนี้ไม่แตะสถานะอื่น
+    $newRows = array_values(array_filter($assetRows, function ($r) { return trim((string) ($r['status'] ?? '')) === 'new'; }));
+    $installMap = $newRows ? installation_history_map($newRows) : [];
 
     foreach ($assetRows as $row) {
-        $item = asset_status_sync_row($row, $saleMap, $leaseMap, $write);
+        $item = asset_status_sync_row($row, $saleMap, $leaseMap, $write, $installMap);
         if (!empty($item['changed'])) {
             $stats['changed']++;
             $stats['items'][] = $item;
@@ -296,7 +314,7 @@ function asset_status_sync_batch(array $assetRows, bool $write = true): array
 function asset_status_sync_by_id(int $assetId, bool $write = true): array
 {
     $row = qr(
-        'SELECT id, asset_code, factory_serial, status FROM assets WHERE id=? LIMIT 1',
+        'SELECT id, asset_code, factory_serial, status, produced_at FROM assets WHERE id=? LIMIT 1',
         'i',
         [(int) $assetId]
     )->fetch_assoc();
@@ -306,7 +324,8 @@ function asset_status_sync_by_id(int $assetId, bool $write = true): array
     $code = trim((string) ($row['asset_code'] ?? ''));
     $saleMap = $code !== '' ? asset_stockparts_sale_status_by_sn([$code]) : [];
     $leaseMap = asset_leasing_status_by_assets([$row]);
-    $item = asset_status_sync_row($row, $saleMap, $leaseMap, $write);
+    $installMap = trim((string) $row['status']) === 'new' ? installation_history_map([$row]) : [];
+    $item = asset_status_sync_row($row, $saleMap, $leaseMap, $write, $installMap);
     return [
         'changed' => !empty($item['changed']),
         'from' => (string) ($item['from'] ?? ''),
@@ -331,7 +350,7 @@ function asset_status_sync_all(bool $write = true, int $chunkSize = 200): array
 
     while (true) {
         $res = qr(
-            'SELECT id, asset_code, factory_serial, status FROM assets ORDER BY id LIMIT ? OFFSET ?',
+            'SELECT id, asset_code, factory_serial, status, produced_at FROM assets ORDER BY id LIMIT ? OFFSET ?',
             'ii',
             [$chunkSize, $offset]
         );

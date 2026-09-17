@@ -1846,3 +1846,8 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
 @media (max-width: 760px) {
   .dash-models-scroll { max-height: none; overflow: visible; border: 0; border-radius: 0; background: none; }
 }
+
+/* อายุการนับสต็อกใต้ชื่อรุ่นบน Dashboard — เตือนเมื่อเกินรอบนับ */
+.dash-models-table .fg-count-age { font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); margin-top: 2px; }
+.dash-models-table .fg-count-due { display: inline-block; margin-top: 3px; padding: 1px 8px; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: calc(11.5px * var(--font-scale, 1)); font-weight: 600; text-decoration: none; white-space: nowrap; }
+.dash-models-table .fg-count-due:hover { background: #fde68a; }

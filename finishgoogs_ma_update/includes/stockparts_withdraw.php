@@ -1976,6 +1976,10 @@ function asset_stockparts_withdraw_card_html(array $info): string
     $setupHtml = function_exists('setup_sale_history_html')
         ? setup_sale_history_html($serial, empty($info['ok']) ? [] : stockparts_withdraw_summary_fields($info))
         : '';
+    // ประวัติติดตั้งจากระบบ installation เดิม (ปี 2010–2023) — ต่อท้ายประวัติขายของ setup
+    if (function_exists('installation_history_html') && $serial !== '') {
+        $setupHtml .= installation_history_html($serial);
+    }
 
     if (empty($info['ok'])) {
         $msg = '<p class="muted asset-sales-empty">'

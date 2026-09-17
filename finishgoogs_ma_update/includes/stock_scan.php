@@ -678,7 +678,7 @@ function stock_scan_progress(array $session)
  * @param array<string,mixed>      $issued
  * @return array{target:?string, key:string, reason:string}
  */
-function stock_scan_target(array $asset, $scanned, $sale, $lease, array $issued)
+function stock_scan_target(array $asset, $scanned, $sale, $lease, array $issued, $install = null)
 {
     $current = trim((string) ($asset['status'] ?? '')) ?: 'new';
     $pro = $lease && !empty($lease['found']) ? trim((string) ($lease['pro_status'] ?? '')) : '';
@@ -720,6 +720,10 @@ function stock_scan_target(array $asset, $scanned, $sale, $lease, array $issued)
     }
     if ($sale && !empty($sale['sold'])) {
         return ['target' => 'sold', 'key' => 'stock_sold', 'reason' => 'ระบบสต็อก: มีใบเบิกหรือประวัติส่งมอบ'];
+    }
+    if (in_array($current, ['new', 'unknown'], true) && function_exists('installation_history_status_hint')
+        && installation_history_status_hint($asset, $install)) {
+        return ['target' => 'sold', 'key' => 'install_history', 'reason' => 'ระบบ installation เดิม: มีประวัติติดตั้งให้ลูกค้า'];
     }
 
     // คนบันทึกเองว่าเป็นเครื่องสำรอง/เสื่อมสภาพ/สูญหาย — เชื่อตามนั้น ไม่ต้องล้าง
@@ -863,6 +867,7 @@ function stock_scan_plan($sessionId, $apply = false, array $skipKeys = [])
         }
         $saleMap = ($codes && function_exists('asset_stockparts_sale_status_by_sn')) ? asset_stockparts_sale_status_by_sn($codes) : [];
         $leaseMap = function_exists('asset_leasing_status_by_assets') ? asset_leasing_status_by_assets($rows) : [];
+        $installMap = function_exists('installation_history_map') ? installation_history_map($rows) : [];
 
         foreach ($rows as $r) {
             $total++;
@@ -872,7 +877,7 @@ function stock_scan_plan($sessionId, $apply = false, array $skipKeys = [])
                 && empty($leaseMap[$key]['found'])) {
                 $d = ['target' => 'new', 'key' => 'scan_prev', 'reason' => 'สแกนเจอในรอบนับก่อนหน้า (ภายใน 30 วัน)'];
             } else {
-                $d = stock_scan_target($r, isset($scanned[$aid]), $saleMap[$key] ?? null, $leaseMap[$key] ?? null, $issuedMap);
+                $d = stock_scan_target($r, isset($scanned[$aid]), $saleMap[$key] ?? null, $leaseMap[$key] ?? null, $issuedMap, $installMap[$key] ?? null);
             }
             $from = trim((string) $r['status']) ?: 'new';
             $to = $d['target'];
@@ -948,4 +953,94 @@ function stock_scan_cancel($sessionId)
     }
     q("UPDATE stock_scan_sessions SET status = 'cancelled' WHERE id = ? AND status = 'open'", 'i', [(int) $sessionId]);
     return $n;
+}
+
+// ─ รอบนับสต็อก ───────────────────────────────────────────────────────────────
+
+/** @var string คีย์ใน site_settings — นับสต็อกแต่ละรุ่นอย่างน้อยทุกกี่วัน */
+const STOCK_COUNT_INTERVAL_KEY = 'stock_count_interval_days';
+
+/** @var int ค่าเริ่มต้นของรอบนับ (วัน) */
+const STOCK_COUNT_INTERVAL_DEFAULT = 90;
+
+/**
+ * รอบนับสต็อก (วัน)
+ *
+ * @return int
+ */
+function stock_count_interval_days()
+{
+    $v = function_exists('setting') ? (int) setting(STOCK_COUNT_INTERVAL_KEY, STOCK_COUNT_INTERVAL_DEFAULT) : STOCK_COUNT_INTERVAL_DEFAULT;
+    return max(7, min(365, $v > 0 ? $v : STOCK_COUNT_INTERVAL_DEFAULT));
+}
+
+/**
+ * วันที่นับล่าสุดของแต่ละรุ่น
+ *
+ * นับว่า "นับแล้ว" ถ้า: มีผลนับในตาราง stock_counts (ตัดสถานะรอบสแกน / เครื่องมือนับเดิม)
+ * หรือมีเครื่องของรุ่นนั้นถูกสแกนเจอในรอบนับที่ยังไม่ยกเลิก — แบ่งนับทีละรุ่นหลายรอบก็นับ
+ *
+ * @return array<int,string> product_id => วันเวลา (Y-m-d H:i:s)
+ */
+function stock_count_last_by_product()
+{
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+    $cache = [];
+    $has = function ($table) {
+        $r = db()->query("SHOW TABLES LIKE '" . db()->real_escape_string($table) . "'");
+        return $r && $r->num_rows > 0;
+    };
+    try {
+        if ($has('stock_counts')) {
+            $res = qr('SELECT product_id, MAX(counted_at) AS at FROM stock_counts GROUP BY product_id');
+            while ($r = $res->fetch_assoc()) {
+                $cache[(int) $r['product_id']] = (string) $r['at'];
+            }
+        }
+        if ($has('stock_scan_items')) {
+            $res = qr(
+                "SELECT a.product_id, MAX(i.scanned_at) AS at
+                 FROM stock_scan_items i
+                 JOIN stock_scan_sessions s ON s.id = i.session_id
+                 JOIN assets a ON a.id = i.asset_id
+                 WHERE i.result = 'ok' AND s.status IN ('open', 'applied')
+                 GROUP BY a.product_id"
+            );
+            while ($r = $res->fetch_assoc()) {
+                $pid = (int) $r['product_id'];
+                if (!isset($cache[$pid]) || (string) $r['at'] > $cache[$pid]) {
+                    $cache[$pid] = (string) $r['at'];
+                }
+            }
+        }
+    } catch (\Throwable $e) {
+        $cache = [];
+    }
+    return $cache;
+}
+
+/**
+ * สถานะรอบนับของรุ่นหนึ่ง
+ *
+ * @param int $productId
+ * @return array{last:string, days:?int, due:bool, label:string}
+ */
+function stock_count_status($productId)
+{
+    $all = stock_count_last_by_product();
+    $interval = stock_count_interval_days();
+    $last = (string) ($all[(int) $productId] ?? '');
+    if ($last === '') {
+        return ['last' => '', 'days' => null, 'due' => true, 'label' => 'ยังไม่เคยนับ'];
+    }
+    $days = (int) floor((time() - strtotime($last)) / 86400);
+    return [
+        'last'  => $last,
+        'days'  => $days,
+        'due'   => $days > $interval,
+        'label' => $days > $interval ? 'ไม่ได้นับ ' . number_format($days) . ' วัน' : 'นับล่าสุด ' . dthai(substr($last, 0, 10)),
+    ];
 }

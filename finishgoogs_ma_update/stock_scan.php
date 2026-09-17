@@ -54,6 +54,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
 // ── ฟอร์มปกติ ─────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
+    if (isset($_POST['save_interval'])) {
+        $days = max(7, min(365, (int) ($_POST['interval_days'] ?? STOCK_COUNT_INTERVAL_DEFAULT)));
+        set_setting(STOCK_COUNT_INTERVAL_KEY, $days);
+        flash_set('ตั้งรอบนับสต็อกเป็นทุก ' . $days . ' วันแล้ว');
+        header('Location: ' . $B . '/stock_scan.php'); exit;
+    }
     if (isset($_POST['start'])) {
         $all = !empty($_POST['scope_all']);
         $r = stock_scan_start($all ? [] : (array) ($_POST['products'] ?? []), (string) ($_POST['note'] ?? ''));
@@ -108,7 +114,15 @@ page_header('นับสต็อกด้วยการสแกน', true, $
     $res = qr("SELECT p.id, p.name, COUNT(a.id) total, SUM(a.status = 'new') in_stock
                FROM products p JOIN assets a ON a.product_id = p.id
                WHERE p.is_active = 1 GROUP BY p.id ORDER BY in_stock DESC, p.name");
-    while ($r = $res->fetch_assoc()) { $products[] = $r; }
+    while ($r = $res->fetch_assoc()) { $r['count'] = stock_count_status((int) $r['id']); $products[] = $r; }
+    // รุ่นที่ถึงรอบนับขึ้นก่อน (ยังไม่เคยนับ / นานสุด) ที่เหลือเรียงตามจำนวนในคลังเหมือนเดิม
+    usort($products, function ($a, $b) {
+        if ($a['count']['due'] !== $b['count']['due']) { return $a['count']['due'] ? -1 : 1; }
+        if ($a['count']['due']) { return (int) ($b['count']['days'] ?? 99999) - (int) ($a['count']['days'] ?? 99999); }
+        return (int) $b['in_stock'] - (int) $a['in_stock'];
+    });
+    $dueProducts = array_values(array_filter($products, function ($p) { return $p['count']['due']; }));
+    $pick = (int) ($_GET['pick'] ?? 0);
     $last = qr("SELECT * FROM stock_scan_sessions WHERE status = 'applied' ORDER BY id DESC LIMIT 1")->fetch_assoc();
 ?>
 <?php // มีรอบที่จบแล้ว = คนกำลังดูผล พับวิธีใช้เก็บไว้ ให้สรุปผลขึ้นมาอยู่ใกล้ ๆ ?>
@@ -180,17 +194,32 @@ page_header('นับสต็อกด้วยการสแกน', true, $
 <form method="post" class="panel">
   <?= csrf_field() ?>
   <label class="ss-all"><input type="checkbox" name="scope_all" value="1" id="ss-all"> <b>นับทุกรุ่น</b> <span class="muted">(ทั้งคลัง)</span></label>
+  <?php if ($dueProducts) { ?>
+  <div class="ss-due-bar">
+    <span><b><?= number_format(count($dueProducts)) ?></b> รุ่นถึงรอบนับ <span class="muted">(ไม่ได้นับเกิน <?= (int) stock_count_interval_days() ?> วัน หรือยังไม่เคยนับ)</span></span>
+    <button type="button" class="btn btn-line btn-sm" id="ss-pick-due">เลือกรุ่นที่ถึงรอบนับ</button>
+  </div>
+  <?php } ?>
   <div class="ss-products" id="ss-products">
     <?php foreach ($products as $p) { ?>
-    <label class="ss-prod">
-      <input type="checkbox" name="products[]" value="<?= (int) $p['id'] ?>">
-      <span class="ss-prod-name"><?= h($p['name']) ?></span>
+    <label class="ss-prod<?= $p['count']['due'] ? ' is-due' : '' ?>">
+      <input type="checkbox" name="products[]" value="<?= (int) $p['id'] ?>"<?= $p['count']['due'] ? ' data-due="1"' : '' ?><?= $pick === (int) $p['id'] ? ' checked' : '' ?>>
+      <span class="ss-prod-name"><?= h($p['name']) ?>
+        <span class="ss-prod-age<?= $p['count']['due'] ? ' is-due' : '' ?>"><?= h($p['count']['label']) ?></span>
+      </span>
       <span class="muted ss-prod-n"><?= number_format((int) $p['in_stock']) ?> ในคลัง</span>
     </label>
     <?php } ?>
   </div>
   <input type="text" name="note" placeholder="หมายเหตุ (ไม่บังคับ) เช่น นับสิ้นเดือน ก.ย." class="ss-note">
   <button type="submit" name="start" value="1" class="btn btn-primary ss-big">เริ่มนับสต็อก</button>
+</form>
+<form method="post" class="panel ss-interval">
+  <?= csrf_field() ?>
+  <label>รอบนับสต็อก: นับแต่ละรุ่นอย่างน้อยทุก
+    <input type="number" name="interval_days" min="7" max="365" step="1" value="<?= (int) stock_count_interval_days() ?>"> วัน</label>
+  <button type="submit" name="save_interval" value="1" class="btn btn-line btn-sm">บันทึก</button>
+  <span class="muted">รุ่นที่เกินรอบจะขึ้นเตือนบน Dashboard และในรายการด้านบน</span>
 </form>
 <?php $history = stock_scan_sessions_list(10); if ($history) { ?>
 <section class="panel" style="margin-top:14px">
@@ -222,6 +251,13 @@ page_header('นับสต็อกด้วยการสแกน', true, $
   var box = document.getElementById('ss-products');
   if (!all || !box) return;
   all.addEventListener('change', function () { box.classList.toggle('ss-disabled', all.checked); });
+  var pickDue = document.getElementById('ss-pick-due');
+  if (pickDue) {
+    pickDue.addEventListener('click', function () {
+      all.checked = false; box.classList.remove('ss-disabled');
+      box.querySelectorAll('input[name="products[]"]').forEach(function (c) { c.checked = c.getAttribute('data-due') === '1'; });
+    });
+  }
 })();
 </script>
 
@@ -841,6 +877,13 @@ page_header('นับสต็อกด้วยการสแกน', true, $
 .ss-steps { margin: 8px 0 0; padding-left: 20px; font-size: 14px; line-height: 1.75; }
 .ss-intro summary { cursor: pointer; }
 .ss-all { display: flex; align-items: center; gap: 8px; font-size: 15px; margin-bottom: 10px; }
+.ss-due-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; margin-bottom: 10px; border-radius: 8px; background: #fef3c7; color: #854d0e; font-size: 14px; }
+.ss-due-bar .muted { color: #92400e; }
+.ss-prod-age { display: block; font-size: 12px; color: var(--text-muted, #6b6480); font-weight: 400; }
+.ss-prod-age.is-due { color: #b45309; font-weight: 600; }
+.ss-interval { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; font-size: 14px; }
+.ss-interval input[type="number"] { width: 72px; text-align: right; }
+.ss-interval .muted { font-size: 12px; flex-basis: 100%; }
 .ss-products { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 6px; margin-bottom: 12px; }
 .ss-products.ss-disabled { opacity: .4; pointer-events: none; }
 .ss-prod { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface, #fff); }

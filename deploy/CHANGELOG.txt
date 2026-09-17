@@ -4214,3 +4214,81 @@ Files:
   finishgoogs_ma_update/config.php
   finishgoogs_ma_update/index.php
 
+
+================================================================
+v2026-09-17_121609 | Patch | 2026-09-17 12:16:10
+From: 2026-09-17_110158  ->  To: 50d5381  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/settings.php
+  finishgoogs_ma_update/stock_movements.php
+  finishgoogs_ma_update/unknown_assets.php
+
+
+================================================================
+v2026-09-17_124529 | Patch | 2026-09-17 12:45:30
+From: 2026-09-17_121609  ->  To: 50d5381  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/stock_scan.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/stock_scan.php
+
+
+================================================================
+v2026-09-17_143543 | Patch | 2026-09-17 14:35:45
+From: 2026-09-17_121609  ->  To: 50d5381  |  Files: 11
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/asset_status_sync.php
+  finishgoogs_ma_update/includes/installation_history.php
+  finishgoogs_ma_update/includes/stock_scan.php
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/installation_history.php
+  finishgoogs_ma_update/settings.php
+  finishgoogs_ma_update/stock_scan.php
+  finishgoogs_ma_update/unknown_assets.php
+
+
+================================================================
+v2026-09-17_144458 | Patch | 2026-09-17 14:45:00
+From: 2026-09-17_143543  ->  To: 50d5381  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/installation_history.php
+  finishgoogs_ma_update/installation_history.php
+
+
+================================================================
+v2026-09-17_145215 | Patch | 2026-09-17 14:52:16
+From: 2026-09-17_144458  ->  To: 50d5381  |  Files: 2
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/installation_history.php
+
+
+================================================================
+v2026-09-17_150927 | Patch | 2026-09-17 15:09:29
+From: 2026-09-17_145215  ->  To: 50d5381  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/update_new.php
+

@@ -416,6 +416,24 @@ function page_footer() {
 
 <script src="<?= BASE_URL ?>/assets/sidebar.js?v=<?= @filemtime(__DIR__ . '/../assets/sidebar.js') ?: time() ?>"></script>
 <script>
+/* ── หน้าโปรไฟล์เครื่อง (asset.php) เปิดในแท็บใหม่เสมอ ──
+   ไล่ดูรายการแล้วกดเข้าเครื่องทีละตัว ถ้าเปิดทับหน้าเดิม กลับมาแล้วตัวกรอง/ตำแหน่งเลื่อนหาย
+   จับที่ document ช่วง capture ครั้งเดียว ครอบทุกลิงก์ในทุกหน้า ไม่ต้องไล่ใส่ target ทีละที่
+   ข้าม: ลิงก์ที่ตั้ง target ไว้แล้ว · ลิงก์ในหน้าเครื่องเดียวกัน (#anchor) · ใส่ data-same-tab ไว้ */
+function openAssetUrl(url){ window.open(url, '_blank', 'noopener'); }
+document.addEventListener('click', function(e){
+  if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+  var a = e.target.closest ? e.target.closest('a[href]') : null;
+  if (!a || a.getAttribute('target') || a.hasAttribute('data-same-tab') || a.hasAttribute('download')) return;
+  var u;
+  try { u = new URL(a.getAttribute('href'), location.href); } catch (x) { return; }
+  if (u.origin !== location.origin || !/\/asset\.php$/.test(u.pathname)) return;
+  if (!u.searchParams.get('id') && !u.searchParams.get('code')) return;
+  if (u.pathname === location.pathname && u.search === location.search) return;
+  a.setAttribute('target', '_blank');
+  a.setAttribute('rel', 'noopener');
+}, true);
+
 /* ── overlay: ปิดด้วย Esc / คลิกพื้นหลัง · ล็อกการเลื่อนหน้า · คืนโฟกัสให้ที่เดิม ──
    แอปอะไหล่ทำสามอย่างนี้อยู่แล้ว ฝั่งนี้เดิมปิดได้ทางเดียวคือกดปุ่มปิด */
 var __overlayReturnFocus = null;
@@ -564,7 +582,7 @@ document.querySelectorAll('input.list-live-filter').forEach(function(input){
     });
     box.addEventListener('click',function(e){
       var d=e.target.closest('div[data-code]'); if(!d)return;
-      if(input.dataset.nav==='1'){ location.href=B+'/asset.php?id='+d.dataset.id; return; }
+      if(input.dataset.nav==='1'){ openAssetUrl(B+'/asset.php?id='+d.dataset.id); box.hidden=true; return; }
       input.value=d.dataset.code; box.hidden=true;
       // ส่งข้อมูลเครื่องที่เลือกไปให้หน้าที่ใช้งานต่อ (เช่น แสดงอายุเครื่องใต้ช่อง)
       input.dataset.pickedAge = d.dataset.age || '';
