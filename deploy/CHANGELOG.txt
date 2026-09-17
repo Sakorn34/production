@@ -4315,3 +4315,15 @@ Files:
   finishgoogs_ma_update/config.php
   finishgoogs_ma_update/includes/smart_search.php
 
+
+================================================================
+v2026-09-17_154015 | Patch | 2026-09-17 15:40:16
+From: 2026-09-17_153326  ->  To: ebba389  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/production_dedupe.php
+  finishgoogs_ma_update/production_dedupe.php
+  finishgoogs_ma_update/settings.php
+

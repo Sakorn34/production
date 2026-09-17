@@ -251,6 +251,10 @@ page_header('ระบบหลังบ้าน — ตั้งค่าร�
     <?= ui_icon_html("clipboard", 28, "h-svg") ?>
     <div><b>เคลียร์เครื่องค้างสถานะ</b><div class="muted">เครื่องที่ยังเป็น "ใหม่" ทั้งที่ออกจากคลังแล้ว · นับสต็อก · ปิดทีละหลายเครื่อง</div></div>
   </a>
+  <a class="card clickable" href="<?= BASE_URL ?>/production_dedupe.php">
+    <?= ui_icon_html("clipboard", 28, "h-svg") ?>
+    <div><b>รวมบันทึกผลิตที่ซ้ำ</b><div class="muted">บันทึกผลิต / QC สองอันวันเดียวกัน (อันหนึ่งมีแค่ชื่อผู้ผลิต) · รวมเป็นอันเดียว</div></div>
+  </a>
   <a class="card clickable" href="<?= BASE_URL ?>/installation_history.php">
     <?= ui_icon_html("history", 28, "h-svg") ?>
     <div><b>ประวัติติดตั้งระบบเดิม</b><div class="muted">นำเข้างานติดตั้งจากระบบ installation (2010–2023) · ขายให้ใคร เมื่อไหร่ invoice อะไร</div></div>

@@ -33,7 +33,7 @@ function app_base_url() {
 define('BASE_URL', app_base_url());
 define('APP_NAME', 'ระบบทะเบียนเครื่องและซ่อมบำรุง');
 /** รหัสชุด deploy — อัปเมื่อ build patch แล้วเทียบกับ server ว่าอัปครบหรือยัง */
-define('APP_RELEASE_VERSION', '2026-09-17_153326');
+define('APP_RELEASE_VERSION', '2026-09-17_154015');
 
 /**
  * โหลด secrets แบบ cache ต่อ request
@@ -1773,6 +1773,15 @@ function share_fill_asset_made_by_from_stock($serial, ?array $stockRow = null) {
     }
     if (mb_strlen($name) > 100) {
         $name = mb_substr($name, 0, 100);
+    }
+
+    // มีบันทึกผลิตอยู่แล้ว (แค่ยังไม่มีชื่อ) → เติมชื่อลงแถวเดิม
+    // เดิม INSERT แถวใหม่ทุกครั้ง หน้าเครื่องจึงมี "บันทึกผลิต / QC" ซ้ำสองอัน อันหนึ่งไม่มี checklist
+    // (บน dev เกิด 7,714 แถวจากการกดเติมผู้ผลิตรอบเดียว — ล้างได้ที่หน้า production_dedupe.php)
+    $existing = qr("SELECT id FROM production_records WHERE asset_id=? ORDER BY recorded_at ASC, id ASC LIMIT 1", 'i', [$aid])->fetch_assoc();
+    if ($existing) {
+        q("UPDATE production_records SET made_by=? WHERE id=?", 'si', [$name, (int)$existing['id']]);
+        return ['ok' => true, 'asset_id' => $aid];
     }
 
     $recordedAt = !empty($stockRow['timestamp'])
