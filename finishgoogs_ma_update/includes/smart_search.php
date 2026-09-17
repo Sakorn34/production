@@ -974,5 +974,52 @@ function smart_search_query(string $q, int $limitPerKind = 5): array
         }
     }
 
+    return smart_search_link_assets($out, $q);
+}
+
+/**
+ * ผลค้นหาที่เป็นเครื่องในทะเบียนเรา กดแล้วไปหน้าโปรไฟล์เครื่องเท่านั้น
+ *
+ * ทะเบียน stock · งานซ่อม · ขาย/เคลม · ส่งมอบ · เครื่องเช่า · MA เช่า ต่างก็อ้าง S/N — เดิมกดแล้วไป
+ * หน้ารายการของแต่ละระบบ (บางอันออกไปเว็บอื่น) ทั้งที่หน้าเครื่องรวมข้อมูลพวกนี้ไว้ครบแล้ว
+ * S/N ที่ไม่มีในทะเบียนเรา (ไม่มีหน้าเครื่อง) ยังไปที่เดิม
+ *
+ * คำค้นตรงกับ S/N ของเครื่องในทะเบียนพอดี = กำลังหาเครื่องนั้น ทุกผลลัพธ์ (รวมใบเบิกอะไหล่) ไปหน้าเครื่องนั้น
+ *
+ * @param array<int,array<string,mixed>> $out
+ * @param string                         $q
+ * @return array<int,array<string,mixed>>
+ */
+function smart_search_link_assets(array $out, string $q = ''): array
+{
+    $exact = smart_search_asset_ids_by_serial([strtoupper(trim($q))]);
+    if ($exact) {
+        $id = (int) reset($exact);
+        foreach ($out as &$o) {
+            $o['asset_id'] = $id;
+            $o['href'] = 'asset.php?id=' . $id;
+        }
+        unset($o);
+        return $out;
+    }
+    $need = [];
+    foreach ($out as $o) {
+        if ((int) ($o['asset_id'] ?? 0) === 0 && trim((string) ($o['code'] ?? '')) !== ''
+            && !in_array((string) ($o['kind'] ?? ''), ['customer', 'person', 'product', 'part', 'stockout', 'rent'], true)) {
+            $need[strtoupper(trim((string) $o['code']))] = true;
+        }
+    }
+    $map = $need ? smart_search_asset_ids_by_serial(array_keys($need)) : [];
+    foreach ($out as &$o) {
+        $sn = strtoupper(trim((string) ($o['code'] ?? '')));
+        if ((int) ($o['asset_id'] ?? 0) === 0 && $sn !== '' && isset($map[$sn])
+            && !in_array((string) ($o['kind'] ?? ''), ['customer', 'person', 'product', 'part', 'stockout', 'rent'], true)) {
+            $o['asset_id'] = $map[$sn];
+        }
+        if ((int) ($o['asset_id'] ?? 0) > 0) {
+            $o['href'] = 'asset.php?id=' . (int) $o['asset_id'];
+        }
+    }
+    unset($o);
     return $out;
 }

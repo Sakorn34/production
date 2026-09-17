@@ -4292,3 +4292,14 @@ Files:
   finishgoogs_ma_update/includes/layout.php
   finishgoogs_ma_update/update_new.php
 
+
+================================================================
+v2026-09-17_152238 | Patch | 2026-09-17 15:22:40
+From: 2026-09-17_150927  ->  To: 5001feb  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/sidebar.js
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/smart_search.php
+

@@ -188,11 +188,15 @@
                 window.open(href, '_blank', 'noopener');
                 return;
             }
-            if (href.indexOf('http') === 0 || href.indexOf('/') === 0) {
-                window.location.href = href;
+            var url = (href.indexOf('http') === 0 || href.indexOf('/') === 0)
+                ? href
+                : smartAppBase + '/' + href.replace(/^\//, '');
+            // หน้าโปรไฟล์เครื่องเปิดแท็บใหม่ เหมือนลิงก์ไปหน้าเครื่องทุกที่ในระบบ (ดู layout.php)
+            if (/\/asset\.php\?/.test(url)) {
+                window.open(url, '_blank', 'noopener');
                 return;
             }
-            window.location.href = smartAppBase + '/' + href.replace(/^\//, '');
+            window.location.href = url;
         }
 
         function renderSmartSuggest(items) {

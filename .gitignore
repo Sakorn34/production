@@ -34,3 +34,7 @@ ai_studio_code/
 /deploy/release/
 /deploy/.last-deploy.json
 /deploy/.last-build.json
+
+# ข้อมูลส่งออกจากระบบ installation เดิม — มีชื่อลูกค้า ไม่ใส่ใน repo
+**/installation_history.csv
+**/installation_history.csv.gz
