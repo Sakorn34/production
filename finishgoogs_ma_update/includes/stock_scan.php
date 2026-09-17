@@ -721,7 +721,10 @@ function stock_scan_target(array $asset, $scanned, $sale, $lease, array $issued,
     if ($sale && !empty($sale['sold'])) {
         return ['target' => 'sold', 'key' => 'stock_sold', 'reason' => 'ระบบสต็อก: มีใบเบิกหรือประวัติส่งมอบ'];
     }
-    if (in_array($current, ['new', 'unknown'], true) && function_exists('installation_history_status_hint')
+    // รวมเครื่องที่เป็น "ขายแล้ว" อยู่แล้วด้วย — เดิมเช็คเฉพาะใหม่/ไม่มีสถานะ เครื่องที่ขายไปก่อนปี 2023
+    // มีหลักฐานอยู่ในระบบ installation อย่างเดียว เลยหล่นไปกลุ่ม "เคยเป็นขายแล้ว แต่ไม่มีหลักฐานการขาย"
+    // เสื่อมสภาพ/สูญหายที่คนบันทึกเองไม่แตะ (ด้านล่าง)
+    if (!in_array($current, ['retired', 'lost'], true) && function_exists('installation_history_status_hint')
         && installation_history_status_hint($asset, $install)) {
         return ['target' => 'sold', 'key' => 'install_history', 'reason' => 'ระบบ installation เดิม: มีประวัติติดตั้งให้ลูกค้า'];
     }
