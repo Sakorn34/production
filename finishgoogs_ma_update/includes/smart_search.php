@@ -974,7 +974,7 @@ function smart_search_query(string $q, int $limitPerKind = 5): array
         }
     }
 
-    return smart_search_link_assets($out, $q);
+    return smart_search_merge_assets(smart_search_link_assets($out, $q));
 }
 
 /**
@@ -1022,4 +1022,63 @@ function smart_search_link_assets(array $out, string $q = ''): array
     }
     unset($o);
     return $out;
+}
+
+/**
+ * รวมผลลัพธ์ที่เป็นเครื่องเดียวกันให้เหลือรายการเดียว
+ *
+ * ค้น S/N ตัวเดียวเคยได้ 3-6 แถว (เครื่อง · ทะเบียน stock · ซ่อม · ขาย · เช่า) ที่กดแล้วไปหน้าเดียวกัน
+ * รวมไว้ที่ตำแหน่งแรกที่เจอ แล้วบอกแหล่งที่เจอเป็นป้าย (sources) · ผลที่ไม่ใช่เครื่องไม่ถูกแตะ
+ *
+ * @param array<int,array<string,mixed>> $out
+ * @return array<int,array<string,mixed>>
+ */
+function smart_search_merge_assets(array $out): array
+{
+    $groups = [];   // asset_id => index ใน $merged
+    $merged = [];
+    foreach ($out as $o) {
+        $aid = (int) ($o['asset_id'] ?? 0);
+        if ($aid <= 0) {
+            $merged[] = $o;
+            continue;
+        }
+        if (!isset($groups[$aid])) {
+            $groups[$aid] = count($merged);
+            $merged[] = ['kind' => 'asset', 'asset_id' => $aid, 'href' => 'asset.php?id=' . $aid, 'sources' => []];
+        }
+        $i = $groups[$aid];
+        $kind = (string) ($o['kind'] ?? 'asset');
+        $label = (string) ($o['kind_label'] ?? '');
+        if ($label !== '' && !isset($merged[$i]['sources'][$kind])) {
+            $merged[$i]['sources'][$kind] = ['kind' => $kind, 'label' => $label];
+        }
+    }
+    if (!$groups) {
+        return $merged;
+    }
+    // ข้อมูลเครื่องจากทะเบียนทีเดียว — แถวที่รวมมาอาจไม่มีผลประเภท "เครื่อง" อยู่เลย
+    $info = [];
+    $res = qr('SELECT a.id, a.asset_code, a.status, p.name AS pname FROM assets a JOIN products p ON p.id = a.product_id
+               WHERE a.id IN (' . implode(',', array_map('intval', array_keys($groups))) . ')');
+    while ($r = $res->fetch_assoc()) {
+        $info[(int) $r['id']] = $r;
+    }
+    foreach ($groups as $aid => $i) {
+        $a = $info[$aid] ?? null;
+        $st = $a ? (string) $a['status'] : '';
+        $merged[$i] += [
+            'id'           => $aid,
+            'kind_label'   => 'เครื่อง',
+            'code'         => $a ? (string) $a['asset_code'] : '',
+            'title'        => $a ? (string) $a['asset_code'] : '',
+            'model'        => $a ? (string) $a['pname'] : '',
+            'status'       => $st,
+            'status_th'    => $st !== '' ? status_th($st) : '',
+            'status_style' => $st !== '' && function_exists('status_badge_style') ? status_badge_style($st) : '',
+            'subtitle'     => $a ? trim((string) $a['pname'] . ($st !== '' ? ' · ' . status_th($st) : '')) : '',
+        ];
+        $merged[$i]['sources'] = array_values($merged[$i]['sources']);
+    }
+    return $merged;
 }

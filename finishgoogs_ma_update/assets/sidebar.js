@@ -208,6 +208,21 @@
                 return;
             }
             suggestBox.innerHTML = lastResults.map(function (it) {
+                // เครื่องเดียวกันที่เจอหลายแหล่ง รวมเป็นแถวเดียว: S/N + สถานะ · รุ่น · ป้ายแหล่งที่เจอ
+                if (it.sources && it.sources.length) {
+                    return '<button type="button" class="sidebar-smart-item sidebar-smart-machine" data-href="' + escHtml(it.href || '') + '">'
+                        + '<span class="sidebar-smart-row sidebar-smart-machine-head">'
+                        + '<span class="sidebar-smart-title">' + escHtml(it.title || it.code || '') + '</span>'
+                        + (it.status_th ? '<span class="sidebar-smart-status" style="' + escHtml(it.status_style || '') + '">' + escHtml(it.status_th) + '</span>' : '')
+                        + '</span>'
+                        + (it.model ? '<span class="sidebar-smart-meta">' + escHtml(it.model) + '</span>' : '')
+                        + '<span class="sidebar-smart-sources">'
+                        + it.sources.map(function (s) {
+                            return '<span class="sidebar-smart-kind sidebar-smart-kind-' + escHtml(s.kind) + '">' + escHtml(s.label) + '</span>';
+                        }).join('')
+                        + '</span>'
+                        + '</button>';
+                }
                 // ลูกศรบอกว่ากดแล้วออกไปเว็บอื่น ผูกกับ href จริง ไม่ใช่ประเภทของผล —
                 // เครื่องเช่าตัวเดียวกันไปหน้าเครื่องของเราได้ถ้าจับคู่ S/N ติด
                 var ext = isExternalHref(it.href) ? ' is-ext' : '';

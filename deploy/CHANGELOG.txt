@@ -4303,3 +4303,15 @@ Files:
   finishgoogs_ma_update/config.php
   finishgoogs_ma_update/includes/smart_search.php
 
+
+================================================================
+v2026-09-17_153326 | Patch | 2026-09-17 15:33:27
+From: 2026-09-17_152238  ->  To: daa90e9  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/sidebar.css
+  finishgoogs_ma_update/assets/sidebar.js
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/smart_search.php
+

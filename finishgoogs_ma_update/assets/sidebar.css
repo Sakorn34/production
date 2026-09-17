@@ -986,3 +986,9 @@
 @media (max-width: 640px) {
   :root { --input-h: 48px; }
 }
+
+/* ผลค้นหาที่รวมเป็นเครื่องเดียว — S/N กับสถานะบรรทัดบน · ป้ายแหล่งที่เจอบรรทัดล่าง */
+.sidebar-smart-machine-head { justify-content: space-between; }
+.sidebar-smart-machine-head .sidebar-smart-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-smart-status { flex-shrink: 0; font-size: calc(10.5px * var(--font-scale, 1)); font-weight: 600; padding: 1px 8px; border-radius: 999px; line-height: 1.4; white-space: nowrap; }
+.sidebar-smart-sources { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
