@@ -934,59 +934,74 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .dash-fg-foot { margin: 12px 0 0; font-size: calc(12.5px * var(--font-scale, 1)); }
 .dash-fg-foot[hidden] { display: none !important; }
 
-.model-card[data-fg="short"] { border-left: 3px solid var(--danger, #dc2626); }
-.model-card[data-fg="over"] { border-left: 3px solid var(--success, #16a34a); }
-.mc-barrow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 6px; }
-.mc-blabel {
-  font-size: calc(10px * var(--font-scale, 1)); color: var(--text-muted, #6b6480);
-  white-space: nowrap; letter-spacing: .02em;
-}
-.model-card-fg {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 3px 6px;
-  margin-top: 5px; padding-top: 5px; border-top: 1px dashed var(--border);
-  font-size: calc(11px * var(--font-scale, 1)); color: var(--text-muted, #6b6480);
-}
-.model-card-fg .fg-line-sub { grid-column: 2 / -1; }
-.model-card-fg .fg-line-sub b { color: var(--text, #2a2440); }
-.fg-bar { display: flex; height: 7px; border-radius: 99px; background: var(--surface-soft); overflow: hidden; }
-.fg-bar > span { display: block; height: 100%; flex: 0 0 auto; }
-.fg-line-sub .fg-rent { color: #1d4ed8; }
-.model-card-fg[hidden] { display: none !important; }
-.model-card-fg[role="button"] { cursor: pointer; border-radius: 0 0 6px 6px; margin-inline: -2px; padding-inline: 2px; }
-.model-card-fg[role="button"]:hover { background: var(--surface-soft); }
-.model-card-fg[role="button"]:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 
-/* ── ชี้แล้วต้องรู้ว่ากำลังจะกดอะไร ─────────────────────────────────────────
-   การ์ดเป็น <a> ครอบทั้งใบ พอชี้ทีเดียวเบราว์เซอร์ขีดเส้นใต้ข้อความทุกบรรทัด
-   ทั้งที่ในใบมีสองปุ่มคนละที่ไป: ตัวการ์ด = กราฟการผลิต · แถบคลัง = รายการ S/N + PO */
-.model-card,
-.model-card:hover,
-.model-card:hover * { text-decoration: none; }
-.model-card:hover .model-card-name {
-  text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px;
-}
 /* ชี้ที่แถบคลัง = กำลังจะเปิดรายการ S/N ไม่ใช่กราฟ — ถอนไฮไลต์ของการ์ดออกให้หมด */
-.model-card.fg-hover { box-shadow: var(--shadow-sm); border-color: var(--border); }
-.model-card.fg-hover .model-card-name { text-decoration: none; }
-.model-card-fg[role="button"]:hover {
-  background: var(--primary-soft, #f3edff);
-  box-shadow: inset 0 0 0 1px var(--border-strong);
-}
-.model-card-fg[role="button"]:hover .mc-blabel { color: var(--primary); font-weight: 600; }
-.model-card-fg[role="button"]::after {
-  /* วางทับช่องเดียวกับป้ายขาด/เกิน แล้วสลับกันโชว์ตอนชี้ ไม่ให้ดันแถวใหม่ */
-  content: "ดู S/N ›"; grid-row: 1; grid-column: 3; justify-self: end; align-self: center;
-  font-size: calc(10px * var(--font-scale, 1)); color: var(--primary); opacity: 0;
-  transition: opacity .12s; white-space: nowrap; pointer-events: none;
-}
-.model-card-fg[role="button"]:hover::after { opacity: 1; }
-.model-card-fg[role="button"]:hover .fg-chip { opacity: 0; }
 .fg-chip {
   justify-self: end; font-weight: 600; border-radius: 6px; padding: 1px 7px;
   font-size: calc(11px * var(--font-scale, 1));
 }
 .fg-chip-short { background: #fee2e2; color: #991b1b; }
 .fg-chip-over { background: #dcfce7; color: #166534; }
+.fg-chip-muted { background: #f1f5f9; color: #475569; }
+.dash-fg-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0 0 12px; }
+.dash-fg-summary[hidden] { display: none !important; }
+.dash-fg-tile { background: var(--surface-soft, #f6f4fb); border-radius: var(--radius-sm, 10px); padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dash-fg-tile-label { font-size: calc(12.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); }
+.dash-fg-tile-num { font-size: calc(22px * var(--font-scale, 1)); font-weight: 800; font-variant-numeric: tabular-nums; }
+.dash-fg-tile-num.is-short { color: var(--danger, #dc2626); }
+.dash-fg-tile-num.is-pool { color: var(--st-rental-fg, #1e40af); }
+.dash-models-table td[data-fg-cell="pool"] b { color: var(--st-rental-fg, #1e40af); }
+.dash-models-table .fg-bar-col { width: 46%; }
+.fg-bar { height: 12px; border-radius: 6px; background: var(--surface-soft, #efedf5); overflow: hidden; min-width: 90px; }
+.fg-bar i { display: block; height: 100%; width: 0; border-radius: 6px; transition: width .3s; }
+.fg-bar { position: relative; display: flex; }
+.fg-bar i { flex: none; border-radius: 0; }
+.fg-bar i:first-child { border-radius: 6px 0 0 6px; }
+.fg-bar i.is-new, .fg-legend i.is-new { background: var(--st-new-bar, #6ee7b7); }
+.fg-bar i.is-pool, .fg-legend i.is-pool { background: var(--st-rental-bar, #93c5fd); }
+.fg-bar i.is-extra { opacity: .38; }
+/* หมุดขั้นต่ำ / ขั้นต่ำ+PO เหนือแถบ (สีส้มไม่ใช่สีสถานะเครื่อง) */
+.fg-bar-wrap { position: relative; padding-top: 11px; }
+.fg-mark { position: absolute; top: 0; transform: translateX(-50%); font-size: 10px; line-height: 1; color: var(--text, #2a2440); pointer-events: auto; }
+.fg-mark.is-po, .fg-legend-mark.is-po { color: #b45309; }
+.fg-legend-mark { font-size: 10px; color: var(--text, #2a2440); }
+.fg-bar-note { margin-top: 4px; font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); white-space: nowrap; }
+.fg-legend { display: inline-flex; align-items: center; gap: 4px; font-weight: 500; white-space: nowrap; margin-right: 6px; }
+.fg-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.fg-m-only { display: none; }
+@media (max-width: 760px) { .fg-m-only { display: inline; } .dash-models-table .fg-bar-col { width: auto; } }
+@media (max-width: 560px) { .dash-fg-summary { gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); } .dash-fg-tile { padding: 10px; } .dash-fg-tile-num { font-size: calc(17px * var(--font-scale, 1)); } }
+
+/* ── การ์ดรุ่น: คอลัมน์เดียว + ช่องตัวเลขแยกฐานข้อมูล ───────────────────────
+   ยอดคงเหลือมาจาก 3 ฐานที่นับคนละนิยาม (ทะเบียนเรา · ระบบ Setup · ระบบเช่า)
+   ถ้าโชว์แค่ยอดรวม พอตัวเลขไม่ตรงกันจะไม่รู้ว่าฐานไหนพูดว่าอะไร */
+/* ── ตารางรุ่นสินค้าบน Dashboard ─────────────────────────────────────────────
+   35 รุ่นเป็นการ์ดเรียงลงมาต้องเลื่อนยาวมาก ตารางเทียบตัวเลขข้ามรุ่นได้ในจอเดียว
+   คอลัมน์ยุบเองตามความกว้างด้วย data-pri (shared/ui_table.css) */
+.dash-models-table { margin: 0; }
+.dash-models-table .num-col { text-align: right; white-space: nowrap; }
+.dash-models-table td.num-col b { font-size: calc(14px * var(--font-scale, 1)); font-variant-numeric: tabular-nums; }
+.dash-models-table tr.dash-model-row { cursor: pointer; }
+.dash-models-table tr.dash-model-row { cursor: default; }
+.dash-models-table tr.dash-model-row:hover { background: transparent; }
+/* สองโซนกด — ไฮไลต์เฉพาะโซนที่เมาส์อยู่ จะได้รู้ว่ากดแล้วเปิดอะไร */
+.dash-models-table .fg-zone-name, .dash-models-table .fg-zone-stock { cursor: pointer; transition: background .12s; }
+.dash-models-table tr.dash-model-row:has(.fg-zone-name:hover) .fg-zone-name,
+.dash-models-table tr.dash-model-row:has(.fg-zone-stock:hover) .fg-zone-stock { background: var(--surface-soft); }
+.dash-models-table .fg-model-name { color: var(--primary); }
+.dash-models-table .fg-chip { white-space: nowrap; }
+.dash-models-table td[data-fg-cell="verdict"] { white-space: nowrap; }
+.dash-models-table .fg-go { display: inline-block; margin-left: 8px; color: var(--text-faint, #a39fb3); font-size: 18px; line-height: 1; vertical-align: -1px; transition: transform .12s, color .12s; }
+.dash-models-table tr.dash-model-row:has(.fg-zone-stock:hover) .fg-go { color: var(--primary); transform: translateX(2px); }
+.dash-models-table th.fg-bar-col { white-space: nowrap; }
+.dash-models-table .model-thumb { width: 34px; height: 34px; object-fit: contain; }
+.dash-models-table .model-card-bar { min-width: 90px; }
+.dash-models-table .mc-total { font-size: calc(11px * var(--font-scale, 1)); margin-top: 3px; }
+.dash-models-table td[data-fg-cell="ours"] b { color: var(--st-new-fg, #065f46); }
+.mc-code {
+  font-size: calc(10.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480);
+  font-weight: 400; margin-left: 7px; letter-spacing: .02em;
+}
 .dash-part-order-btn {
   flex-shrink: 0; padding: 3px 10px !important;
   font-size: calc(11px * var(--font-scale, 1)) !important; white-space: nowrap;
@@ -1813,4 +1828,21 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
 @media (max-width: 640px) {
   .low-stock-card { grid-template-columns: auto minmax(0, 1fr) auto; row-gap: 6px; }
   .low-stock-card .ls-qty { grid-column: 2 / 4; grid-row: 2; text-align: left; }
+}
+
+/* กรอบตารางรุ่นบน Dashboard — เลื่อนขึ้นลงเฉพาะรายการ หัวตารางติดขอบบนของกรอบ
+   (ยกหลักการมาจาก .table-wrap-fold ใน shared/ui_table.css แต่ความสูงคงที่ ไม่ให้ JS วัด) */
+.dash-models-scroll { overflow: auto; max-height: min(640px, calc(100vh - 140px)); margin: 0; padding: 0;
+  border: 1px solid var(--border, #dfe4ec); border-radius: var(--radius, 12px); background: var(--surface, #fff); }
+.dash-models-scroll table.dash-models-table { overflow: visible; border: 0; border-radius: 0; box-shadow: none; background: none;
+  border-collapse: separate; border-spacing: 0; }
+.dash-models-scroll table.dash-models-table th { position: sticky; top: 0; z-index: 3; border-bottom: 0;
+  box-shadow: 0 1px 0 var(--border, #dfe4ec), 0 6px 10px -8px rgba(15, 23, 42, .28); }
+.dash-models-scroll table.dash-models-table tbody tr:first-child > td { border-top: 0; }
+.dash-models-scroll::-webkit-scrollbar { width: 11px; height: 11px; }
+.dash-models-scroll::-webkit-scrollbar-track { background: transparent; }
+.dash-models-scroll::-webkit-scrollbar-thumb { background: var(--border-strong, #c9d2e0); border: 3px solid transparent; background-clip: content-box; border-radius: 999px; }
+.dash-models-table tr.dash-model-row:hover td { background: transparent; }
+@media (max-width: 760px) {
+  .dash-models-scroll { max-height: none; overflow: visible; border: 0; border-radius: 0; background: none; }
 }

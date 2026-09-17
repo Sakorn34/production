@@ -14,7 +14,7 @@
  *
  * สูตรเหมือน setupsystem ทุกช่อง ยกเว้นยอดคงเหลือ:
  *   ขาด = เครื่องสถานะ new ในทะเบียนเรา − (ขั้นต่ำ + PO ค้าง)
- *   ขั้นต่ำและ PO ค้างอ่านจาก biton_stockparts ตามกติกาเดียวกับ setupsystem
+ *   ขั้นต่ำตั้งที่ระบบเรา (products.min_stock) · PO ค้างอ่านจาก biton_stockparts/biton_setup — ส่วนเดียวที่ยังพึ่ง Setup
  *   ไม่บวกเครื่องเช่าพร้อมเช่าอีก — sync ทำให้เครื่องเหล่านั้นเป็น new อยู่แล้ว บวกซ้ำจะนับสองรอบ
  */
 
@@ -86,6 +86,77 @@ function fg_shortage_save_registry_codes(array $codes): void
 }
 
 /**
+ * คอลัมน์ขั้นต่ำของเราเอง (products.min_stock) — เดิมอ่านจาก biton_stockparts ของระบบ Setup
+ *
+ * ครั้งแรกที่สร้างคอลัมน์ คัดลอกค่าเดิมจาก stockparts มาให้ ตัวเลขบน Dashboard/LINE จะได้ไม่เปลี่ยน
+ * หลังจากนั้นแก้ที่ระบบเราอย่างเดียว (หน้าตั้งค่ารุ่น / หน้าตั้งค่าการนับและการแจ้งเตือน)
+ * NULL = รุ่นที่ยังไม่เคยตั้ง (ไม่อยู่ในรายการต้องผลิต)
+ *
+ * @return void
+ */
+function fg_shortage_ensure_min_schema(): void
+{
+    static $done = false;
+    if ($done || !function_exists('db')) {
+        return;
+    }
+    $done = true;
+    try {
+        $has = db()->query("SHOW COLUMNS FROM products LIKE 'min_stock'");
+        if ($has && $has->num_rows > 0) {
+            return;
+        }
+        db()->query("ALTER TABLE products ADD COLUMN min_stock INT UNSIGNED NULL DEFAULT NULL AFTER category");
+        $stock = function_exists('dbStock') ? dbStock() : null;
+        if (!$stock) {
+            return;
+        }
+        // ค่าแรกของแต่ละรหัส (เรียงตาม id) — ชุดเดียวกับที่เคยใช้คำนวณ
+        $seed = [];
+        $res = $stock->query(
+            "SELECT UPPER(TRIM(product_code)) AS code, COALESCE(minimum_stock, 0) AS mn
+             FROM products WHERE is_active = 1 AND product_code IS NOT NULL AND TRIM(product_code) <> '' ORDER BY id"
+        );
+        while ($res && ($r = $res->fetch_assoc())) {
+            if (!isset($seed[(string) $r['code']])) {
+                $seed[(string) $r['code']] = (int) $r['mn'];
+            }
+        }
+        foreach ($seed as $code => $mn) {
+            q('UPDATE products SET min_stock = ? WHERE UPPER(TRIM(product_code)) = ? AND min_stock IS NULL', 'is', [max(0, $mn), $code]);
+        }
+    } catch (\Throwable $e) {
+        error_log('[fg_shortage_ensure_min_schema] ' . $e->getMessage());
+    }
+}
+
+/**
+ * บันทึกขั้นต่ำหลายรุ่นพร้อมกัน
+ *
+ * @param array<string,mixed> $map product_code => จำนวน ('' = ไม่ตั้ง / ไม่ติดตาม)
+ * @return int จำนวนรุ่นที่บันทึก
+ */
+function fg_shortage_save_min_stock(array $map): int
+{
+    fg_shortage_ensure_min_schema();
+    $n = 0;
+    foreach ($map as $code => $val) {
+        $code = strtoupper(trim((string) $code));
+        if ($code === '' || !preg_match('/^[A-Z0-9][A-Z0-9._-]{0,31}$/', $code)) {
+            continue;
+        }
+        $val = trim((string) $val);
+        if ($val === '') {
+            q('UPDATE products SET min_stock = NULL WHERE UPPER(TRIM(product_code)) = ?', 's', [$code]);
+        } else {
+            q('UPDATE products SET min_stock = ? WHERE UPPER(TRIM(product_code)) = ?', 'is', [max(0, (int) $val), $code]);
+        }
+        $n++;
+    }
+    return $n;
+}
+
+/**
  * คำนวณยอดขาดจากทะเบียนเครื่องของเรา
  *
  * จับคู่รุ่นระหว่างสองระบบด้วย product_code · รุ่นที่ไม่มีทั้งสองฝั่งจะไม่ถูกคืนมา
@@ -123,15 +194,16 @@ function fg_shortage_registry_rows(?array $codes = null): array
     }
 
     try {
-        // 1) จำนวนเครื่องในทะเบียนเรา แยกตามรหัสรุ่น
+        // 1) จำนวนเครื่องในทะเบียนเรา + ขั้นต่ำที่ตั้งไว้ในระบบเรา แยกตามรหัสรุ่น
+        fg_shortage_ensure_min_schema();
         $ours = [];
         $res = qr(
-            "SELECT UPPER(TRIM(p.product_code)) AS code, p.name,
+            "SELECT UPPER(TRIM(p.product_code)) AS code, p.name, p.min_stock,
                     COALESCE(SUM(a.status = 'new'), 0) AS n_new, COUNT(a.id) AS n_all
              FROM products p
              LEFT JOIN assets a ON a.product_id = p.id
              WHERE p.product_code IS NOT NULL AND TRIM(p.product_code) <> ''
-             GROUP BY p.id, p.product_code, p.name"
+             GROUP BY p.id, p.product_code, p.name, p.min_stock"
         );
         while ($r = $res->fetch_assoc()) {
             $code = (string) $r['code'];
@@ -139,13 +211,16 @@ function fg_shortage_registry_rows(?array $codes = null): array
                 continue;
             }
             if (!isset($ours[$code])) {
-                $ours[$code] = ['name' => (string) $r['name'], 'new' => 0, 'all' => 0];
+                $ours[$code] = ['name' => (string) $r['name'], 'new' => 0, 'all' => 0, 'min' => null];
             }
             $ours[$code]['new'] += (int) $r['n_new'];
             $ours[$code]['all'] += (int) $r['n_all'];
+            if ($r['min_stock'] !== null) {
+                $ours[$code]['min'] = max((int) $ours[$code]['min'], (int) $r['min_stock']);
+            }
         }
 
-        // 2) ขั้นต่ำ — ตารางเดียวกับที่ setupsystem ใช้ (biton_stockparts ไม่ใช่ biton_setup ซึ่งมีค่าคนละชุด)
+        // 2) รหัสสินค้าฝั่ง stockparts — ใช้จับคู่กับรายการใน PO เท่านั้น (ขั้นต่ำไม่อ่านจากที่นี่แล้ว)
         $sp = [];
         $res = $stock->query(
             "SELECT id, UPPER(TRIM(product_code)) AS code, product_name, COALESCE(minimum_stock, 0) AS mn
@@ -214,10 +289,9 @@ function fg_shortage_registry_rows(?array $codes = null): array
                 $po[(int) $r['part_id']] = (int) round((float) $r['q']);
             }
         }
-        // 4) แยกเครื่องเช่าที่รับคืนแล้วพร้อมปล่อยใหม่ ออกจากเครื่องที่ผลิตใหม่
-        //    ทั้งคู่อยู่ในทะเบียนเราเป็นสถานะ "ใหม่" เหมือนกัน (cron sync ตั้งให้ตอนระบบเช่ารับคืน)
-        //    แต่คนละเรื่องกัน — เครื่องวนกลับมาไม่ได้แปลว่าเราผลิตเพิ่มได้ ยอดจึงต้องแยกให้เห็น
-        $ready = fg_shortage_leasing_ready_serials();
+        // 4) เครื่องที่ลงทะเบียนในระบบเช่าแล้วเป็นเครื่องเช่า ไม่ใช่สต็อกเครื่องใหม่
+        //    ปกติ sync ตั้งเป็น "เช่า" ให้อยู่แล้ว แต่ระหว่างรอ cron อาจยังค้างเป็น "ใหม่" — ตัดออกตรงนี้กันนับเกิน
+        $ready = fg_shortage_leasing_all_serials();
         $rentReady = [];
         if ($ready) {
             $res = qr(
@@ -236,6 +310,24 @@ function fg_shortage_registry_rows(?array $codes = null): array
                 }
             }
         }
+        // 5) คลังพร้อมเช่า (ระบบเช่า finished goods) — นับรวมในยอดที่มี แต่แยกตัวเลขไว้ให้เห็น
+        //    ชุดเดียวกับคอลัมน์ "คลังพร้อมเช่า" บนการ์ด Dashboard
+        $poolReady = fg_shortage_leasing_ready_serials();
+        $poolQty = [];
+        if ($poolReady) {
+            $res = qr(
+                "SELECT UPPER(TRIM(p.product_code)) AS code, UPPER(TRIM(a.asset_code)) AS sn,
+                        UPPER(TRIM(COALESCE(a.factory_serial, ''))) AS fs
+                 FROM products p JOIN assets a ON a.product_id = p.id
+                 WHERE a.status IN ('new', 'rental') AND p.product_code IS NOT NULL AND TRIM(p.product_code) <> ''"
+            );
+            while ($r = $res->fetch_assoc()) {
+                $code = (string) $r['code'];
+                if (isset($ours[$code]) && (isset($poolReady[(string) $r['sn']]) || ((string) $r['fs'] !== '' && isset($poolReady[(string) $r['fs']])))) {
+                    $poolQty[$code] = ($poolQty[$code] ?? 0) + 1;
+                }
+            }
+        }
     } catch (\Throwable $e) {
         return $fail('คำนวณจากทะเบียนเครื่องไม่สำเร็จ: ' . $e->getMessage());
     }
@@ -248,17 +340,18 @@ function fg_shortage_registry_rows(?array $codes = null): array
     $rows = [];
     $missing = [];
     foreach ($ours as $code => $o) {
-        if (!isset($sp[$code])) {
+        // ติดตามเฉพาะรุ่นที่ตั้งขั้นต่ำไว้ในระบบเรา หรือมีรายการสินค้าฝั่ง PO ให้จับคู่
+        if ($o['min'] === null && !isset($sp[$code])) {
             if ($want !== null) {
                 $missing[] = $code;
             }
             continue;
         }
         $poQty = 0;
-        foreach ($sp[$code]['ids'] as $id) {
+        foreach ((isset($sp[$code]) ? $sp[$code]['ids'] : []) as $id) {
             $poQty += $po[$id] ?? 0;
         }
-        $min = $sp[$code]['min'];
+        $min = (int) $o['min'];
         $required = $min + $poQty;
 
         // ลิงก์ในการ์ดไปหน้ารายการเครื่องที่อยู่ในคลังจริง — หน้า serial ของ setupsystem จะโชว์เครื่องที่ปล่อยเช่าไปแล้วปนมา
@@ -267,23 +360,27 @@ function fg_shortage_registry_rows(?array $codes = null): array
             $url = (string) line_notify_sanitize_https_uri($url);
         }
 
-        // ยอดรวมที่ใช้คิด "ขาด" ยังเท่าเดิม แค่บอกได้ว่าในนั้นเป็นเครื่องเช่าวนกลับกี่เครื่อง
-        $rentQty = (int) ($rentReady[$code] ?? 0);
-        $newQty = max(0, (int) $o['new'] - $rentQty);
+        // สต็อก = เครื่องใหม่ในทะเบียนเรา ที่ไม่ได้ลงทะเบียนในระบบเช่า
+        $leaseStuck = (int) ($rentReady[$code] ?? 0);
+        $newQty = max(0, (int) $o['new'] - $leaseStuck);
+        // คลังพร้อมเช่าใช้ส่งงานแทนเครื่องผลิตใหม่ได้ — นับรวมในยอดที่มี (ตกลงกันเมื่อ 17 ก.ย. 2026)
+        $rentQty = (int) ($poolQty[$code] ?? 0);
 
         $rows[$code] = [
-            'product_id'     => $sp[$code]['ids'][0],
+            'product_id'     => isset($sp[$code]) ? $sp[$code]['ids'][0] : 0,
             'product_code'   => $code,
-            'product_name'   => $sp[$code]['name'],
+            'product_name'   => isset($sp[$code]) ? $sp[$code]['name'] : $o['name'],
+            'min_set'        => $o['min'] !== null,
             'registry_name'  => $o['name'],
             'registry_total' => $o['all'],
             'stock_qty'      => $newQty,
             'leasing_qty'    => $rentQty,
+            'pool_qty'       => (int) ($poolQty[$code] ?? 0),
             'minimum_stock'  => $min,
             'po_qty'         => $poQty,
-            'available'      => $o['new'],
+            'available'      => $newQty + $rentQty,
             'required'       => $required,
-            'need'           => $o['new'] - $required,
+            'need'           => $newQty + $rentQty - $required,
             'detail_url'     => $url,
             'stock_source'   => 'production_registry',
         ];
@@ -339,7 +436,37 @@ function fg_shortage_leasing_ready_serials(): array
 }
 
 /**
- * แทนตัวเลขของ setupsystem ด้วยยอดจากทะเบียนเรา สำหรับรุ่นที่เลือกไว้
+ * S/N ทุกเครื่องที่ลงทะเบียนในระบบเช่า (ทุกสถานะ)
+ *
+ * @return array<string,bool>
+ */
+function fg_shortage_leasing_all_serials(): array
+{
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+    $cache = [];
+    if (!function_exists('dbLeasing')) {
+        return $cache;
+    }
+    try {
+        $lease = dbLeasing();
+    } catch (\Throwable $e) {
+        return $cache;
+    }
+    if (!$lease) {
+        return $cache;
+    }
+    $res = $lease->query("SELECT UPPER(TRIM(pro_sn)) AS sn FROM tbl_product WHERE pro_sn IS NOT NULL AND TRIM(pro_sn) <> ''");
+    while ($res && ($r = $res->fetch_row())) {
+        $cache[(string) $r[0]] = true;
+    }
+    return $cache;
+}
+
+/**
+ * แทนตัวเลขของ setupsystem ด้วยยอดจากทะเบียนเรา — ทุกรุ่นที่มีในทะเบียน
  *
  * API ของ setupsystem คืนมาเฉพาะรุ่นที่ขาด — รุ่นที่เลือกไว้จึงต้องคำนวณเองทุกครั้ง
  * ไม่ใช่แค่แก้แถวที่ API ส่งมา (Portable Printer ไม่อยู่ในรายการของ API เลยเพราะนับว่าเหลือเยอะ)
@@ -351,12 +478,9 @@ function fg_shortage_leasing_ready_serials(): array
  */
 function fg_shortage_apply_registry(array $apiItems): array
 {
-    $codes = fg_shortage_registry_codes();
-    if ($codes === []) {
-        return ['items' => $apiItems, 'replaced' => [], 'missing' => [], 'error' => ''];
-    }
-
-    $calc = fg_shortage_registry_rows($codes);
+    // ใช้ยอดทะเบียนเราทั้งหมด — ไม่เรียก API สต็อกของ setupsystem แล้ว ($apiItems ส่งมาว่าง)
+    // รายการที่ส่งมา (ถ้ามี) และไม่มีในทะเบียนเรายังผ่านไปตามเดิม
+    $calc = fg_shortage_registry_rows(null);
     if (!$calc['ok']) {
         return ['items' => $apiItems, 'replaced' => [], 'missing' => [], 'error' => $calc['error']];
     }

@@ -942,10 +942,12 @@ switch ($type) {
             : '<b style="color:var(--success,#16a34a)">' . ($fgNeed > 0 ? 'เกิน ' . number_format($fgNeed) : 'ครบพอดี') . '</b>';
         echo '<p style="margin:0 0 4px">มี <b>' . number_format((int) $fgItem['available']) . '</b> · ต้องการ <b>' . number_format((int) $fgItem['required'])
            . '</b> (ขั้นต่ำ ' . number_format((int) $fgItem['minimum_stock']) . ' + PO ค้าง ' . number_format((int) $fgItem['po_qty'])
-           . ') · ' . $fgVerdict . '</p>';
+           . ') · ' . $fgVerdict
+           . ($fgFromRegistry && $sr['leasing'] ? ' · <span class="muted">เครื่องใหม่ ' . number_format(count($sr['stock'])) . ' + คลังพร้อมเช่า ' . number_format(count($sr['leasing'])) . '</span>' : '')
+           . '</p>';
         echo '<p class="muted" style="font-size:12px;margin:0 0 12px">'
            . ($fgFromRegistry
-               ? 'รุ่นนี้นับจากทะเบียนเครื่องของเรา — เครื่องสถานะ "ใหม่" ที่ยังไม่ถูกเช่าหรือขาย แยกเป็นของผลิตใหม่กับเครื่องเช่าที่วนกลับมา'
+               ? 'รุ่นนี้นับจากทะเบียนเครื่องของเรา — มี = เครื่องใหม่ (ไม่ได้ลงทะเบียนในระบบเช่า) + คลังพร้อมเช่า (ระบบเช่าเป็น finished goods)'
                : 'ตัวเลข "มี" มาจากระบบ Setup = หมายเลขในสต็อก + เครื่องเช่าพร้อมเช่า')
            . '</p>';
         if ($fgFallback && $fgNeed < 0) {
@@ -971,7 +973,8 @@ switch ($type) {
             foreach ($rows as $row) {
                 $sn = h($row['sn']);
                 $label = $row['asset_id'] > 0
-                    ? '<a href="' . h(BASE_URL . '/asset.php?id=' . (int) $row['asset_id']) . '">' . $sn . '</a>'
+                    // เปิดแท็บใหม่ — กลับมาแล้ว popup กับรายการที่ไล่ดูอยู่ยังค้างไว้เหมือนเดิม
+                    ? '<a href="' . h(BASE_URL . '/asset.php?id=' . (int) $row['asset_id']) . '" target="_blank" rel="noopener">' . $sn . '</a>'
                     : $sn;
                 echo '<li class="fg-sn"><b>' . $label . '</b><span class="muted">'
                    . ($row['date'] !== '' ? dthai(substr($row['date'], 0, 10)) : '—') . '</span></li>';
@@ -980,7 +983,7 @@ switch ($type) {
         };
 
         if ($fgFromRegistry) {
-            $fgTable('เครื่องผลิตใหม่ในทะเบียน', $sr['stock'], 'เครื่องสถานะใหม่ที่ไม่ได้อยู่ในคลังเช่า — ผลิตแล้วยังไม่ถูกเบิกออก');
+            $fgTable('เครื่องผลิตใหม่ในทะเบียน', $sr['stock'], 'เครื่องสถานะใหม่ที่ไม่ได้ลงทะเบียนในระบบเช่า — ผลิตแล้วยังไม่ถูกเบิกออก');
         } elseif ($sr['mode'] === 'manual') {
             echo '<h4 style="margin:14px 0 6px;font-size:14px">สต็อก <span class="muted" style="font-weight:400">(' . number_format($sr['manual_qty']) . ')</span></h4>'
                . '<p class="muted" style="font-size:13px">ยอดนี้มาจากการนับสต็อกด้วยมือในระบบ Setup ซึ่งไม่ได้เก็บหมายเลขสินค้าไว้</p>';
@@ -992,9 +995,11 @@ switch ($type) {
         }
         if ($sr['leasing'] || (int) $fgItem['leasing_qty'] > 0) {
             $fgTable(
-                'เครื่องเช่าวนกลับมาปล่อยใหม่',
+                $fgFromRegistry ? 'คลังพร้อมเช่า' : 'เครื่องเช่าวนกลับมาปล่อยใหม่',
                 $sr['leasing'],
-                'รับคืนจากลูกค้าและตรวจ MA แล้ว พร้อมปล่อยเช่ารอบใหม่ — ไม่ใช่ของที่ผลิตใหม่'
+                $fgFromRegistry
+                    ? 'ระบบเช่าเป็น finished goods รอปล่อยเช่า — นับรวมในยอดที่มี'
+                    : 'รับคืนจากลูกค้าและตรวจ MA แล้ว พร้อมปล่อยเช่ารอบใหม่ — ไม่ใช่ของที่ผลิตใหม่'
             );
         }
 
@@ -1095,7 +1100,7 @@ switch ($type) {
 
         // จำนวนหมายเลขกับตัวเลขหัวรายการมาคนละจังหวะ (ตัวเลขเก็บ cache ไว้ 10 นาที) — ไม่ตรงก็บอกตรง ๆ
         $fgStockShown = $sr['mode'] === 'manual' ? $sr['manual_qty'] : count($sr['stock']);
-        $fgLeaseShown = $fgFromRegistry ? 0 : count($sr['leasing']);
+        $fgLeaseShown = count($sr['leasing']);
         if ($fgStockShown !== (int) $fgItem['stock_qty'] || $fgLeaseShown !== (int) $fgItem['leasing_qty']) {
             echo '<p class="muted" style="font-size:12px;margin-top:10px;color:var(--warning)">'
                . 'จำนวนหมายเลขไม่ตรงกับตัวเลขด้านบน (ในสต็อก ' . number_format((int) $fgItem['stock_qty']) . ' · เช่า ' . number_format((int) $fgItem['leasing_qty'])

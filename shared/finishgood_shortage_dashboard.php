@@ -45,7 +45,8 @@ function fg_shortage_dash_cache_read(): ?array
         return null;
     }
     $data = json_decode((string) @file_get_contents($file), true);
-    return is_array($data) && isset($data['saved_at'], $data['items']) ? $data : null;
+    // cache รุ่นเก่าเก็บผลที่คิดยอดทะเบียนไปแล้ว (ไม่มี api_items) — ทิ้งไป ไม่งั้นการ์ดค้างตัวเลขเก่า
+    return is_array($data) && isset($data['saved_at'], $data['api_items']) ? $data : null;
 }
 
 /**
@@ -77,33 +78,25 @@ function fg_shortage_dash_cache_clear(): void
 }
 
 /**
- * รายการสินค้าที่ต้องผลิตเพิ่ม (ผ่าน cache)
+ * รายการสินค้าที่ต้องผลิตเพิ่ม
  *
- * @param bool $force true = ไม่ใช้ cache
+ * cache เฉพาะผลจาก API ของ setupsystem (ช้า ~5 วินาที) — ยอดจากทะเบียนเราคิดใหม่ทุกครั้ง
+ * เพราะเป็น query ในฐานเราเองที่เร็ว และสถานะเครื่องเปลี่ยนตลอด (สแกนนับ/ซิงก์/ตัดสถานะ)
+ * ถ้า cache ทั้งก้อน การ์ดจะค้างตัวเลขเก่าไม่ตรงกับรายการ S/N ที่นับสด
+ *
+ * @param bool $force true = ดึง API ใหม่ ไม่ใช้ cache
  * @return array{ok:bool,error:string,items:array<int,array<string,mixed>>,total_shortage:int,skipped:int,registry_error:string,saved_at:int,timestamp_text:string,stale:bool}
  */
 function fg_shortage_dashboard_data(bool $force = false): array
 {
-    $cached = fg_shortage_dash_cache_read();
-    if (!$force && $cached !== null && (time() - (int) $cached['saved_at']) < FG_SHORTAGE_DASH_CACHE_TTL) {
-        $cached['stale'] = false;
-        return $cached;
+    static $memo = null;
+    if (!$force && $memo !== null) {
+        return $memo;
     }
 
-    $fetched = finishgood_shortage_fetch();
-    if (empty($fetched['ok'])) {
-        if ($cached !== null) {
-            $cached['stale'] = true;
-            $cached['error'] = (string) $fetched['error'];
-            return $cached;
-        }
-        return [
-            'ok' => false, 'error' => (string) $fetched['error'], 'items' => [], 'total_shortage' => 0,
-            'skipped' => 0, 'registry_error' => '', 'saved_at' => 0, 'timestamp_text' => '', 'stale' => false,
-        ];
-    }
-
-    $registry = fg_shortage_apply_registry($fetched['items']);
+    // ไม่เรียก API สต็อกของ setupsystem แล้ว — ยอดทุกรุ่นมาจากทะเบียนเรา (ขั้นต่ำก็ตั้งที่ระบบเรา)
+    // ส่วนที่ยังอ่านจากฝั่ง Setup มีแค่ใบ PO ค้าง ซึ่งเป็น query ตรงในฐานข้อมูล ไม่ผ่าน API
+    $registry = fg_shortage_apply_registry([]);
     $filtered = fg_shortage_filter_items($registry['items']);
 
     $total = 0;
@@ -111,19 +104,18 @@ function fg_shortage_dashboard_data(bool $force = false): array
         $total += (int) ($it['need'] ?? 0);
     }
 
-    $data = [
-        'ok'             => true,
-        'error'          => '',
+    $memo = [
+        'ok'             => $registry['error'] === '',
+        'error'          => (string) $registry['error'],
         'items'          => $filtered['items'],
         'total_shortage' => $total,
         'skipped'        => (int) $filtered['skipped'],
         'registry_error' => (string) $registry['error'],
         'saved_at'       => time(),
-        'timestamp_text' => (string) $fetched['timestamp_text'],
+        'timestamp_text' => date('d/m/Y H:i'),
         'stale'          => false,
     ];
-    fg_shortage_dash_cache_write($data);
-    return $data;
+    return $memo;
 }
 
 /**
@@ -138,6 +130,37 @@ function fg_shortage_dashboard_data(bool $force = false): array
 function fg_model_stock_map(): array
 {
     $fg = fg_shortage_dashboard_data();
+    // ไม่คำนวณยอดนับของระบบ Setup แล้ว (เคยใช้โชว์เทียบบนการ์ด เอาคอลัมน์ออกไปแล้ว)
+    $setupStock = [];
+    $ourNew = [];
+    $ourPool = [];
+    if (function_exists('qr')) {
+        $ready = fg_shortage_leasing_ready_serials();
+        $res = qr(
+            "SELECT UPPER(TRIM(p.product_code)) AS code, UPPER(TRIM(a.asset_code)) AS sn,
+                    UPPER(TRIM(COALESCE(a.factory_serial, ''))) AS fs, a.status
+             FROM products p JOIN assets a ON a.product_id = p.id
+             WHERE p.product_code IS NOT NULL AND TRIM(p.product_code) <> ''
+               AND a.status IN ('new', 'rental')"
+        );
+        while ($r = $res->fetch_assoc()) {
+            $code = (string) $r['code'];
+            $pool = isset($ready[(string) $r['sn']]) || ((string) $r['fs'] !== '' && isset($ready[(string) $r['fs']]));
+            if ($pool) {
+                $ourPool[$code] = ($ourPool[$code] ?? 0) + 1;
+            } elseif ((string) $r['status'] === 'new') {
+                $ourNew[$code] = ($ourNew[$code] ?? 0) + 1;
+            }
+        }
+    }
+    $sources = static function (string $code) use ($setupStock, $ourNew, $ourPool): array {
+        return [
+            'ours'  => (int) ($ourNew[$code] ?? 0),
+            'setup' => isset($setupStock[$code]) ? (int) $setupStock[$code]['qty'] : -1,
+            'pool'  => (int) ($ourPool[$code] ?? 0),
+            'mode'  => isset($setupStock[$code]) ? (string) $setupStock[$code]['mode'] : '',
+        ];
+    };
     $out = [
         'ok'      => (bool) $fg['ok'],
         'error'   => (string) $fg['error'],
@@ -161,7 +184,7 @@ function fg_model_stock_map(): array
             'new'   => (int) $it['stock_qty'],
             'rent'  => (int) $it['leasing_qty'],
             'src'   => (($it['stock_source'] ?? '') === 'production_registry') ? 'registry' : 'setup',
-        ];
+        ] + $sources($code);
     }
 
     $all = fg_shortage_registry_rows(null);
@@ -173,9 +196,10 @@ function fg_model_stock_map(): array
             }
             $need = (int) $row['need'];
             $out['codes'][$code] = [
-                // ระบบ Setup บอกว่ารุ่นนี้ไม่ขาด ถ้าเรานับแล้วติดลบก็ไม่เถียงตัวเลขเขา แค่ไม่โชว์ยอดเกิน
-                'state' => $need >= 0 ? 'over' : 'ok',
+                // ไม่อยู่ในรายการขาดแต่นับแล้วติดลบ = รุ่นที่ตั้งปิดแจ้งเตือนไว้
+                'state' => $need >= 0 ? 'over' : 'muted',
                 'over'  => max(0, $need),
+                'gap'   => max(0, -$need),
                 'have'  => (int) $row['available'],
                 'req'   => (int) $row['required'],
                 'min'   => (int) $row['minimum_stock'],
@@ -183,7 +207,7 @@ function fg_model_stock_map(): array
                 'new'   => (int) $row['stock_qty'],
                 'rent'  => (int) $row['leasing_qty'],
                 'src'   => 'registry',
-            ];
+            ] + $sources($code);
         }
     } elseif ($out['error'] === '') {
         $out['error'] = (string) $all['error'];
@@ -459,6 +483,121 @@ function fg_shortage_open_pos(string $code): array
     return $out;
 }
 
+/**
+ * ยอดคงคลังที่ระบบ Setup นับได้จริง ของทุกรุ่นในรอบเดียว
+ *
+ * สำคัญ: หมวด "อุปกรณ์ผลิตใหม่" (เกือบทุกรุ่น) setupsystem <b>ไม่ได้ใช้</b>เลข quantity ใน
+ * finishgood_stock_balance เป็นยอดคงคลัง — เลขนั้นคือผลนับด้วยมือครั้งล่าสุดเฉย ๆ บางรุ่นเป็น 0
+ * ยอดจริงเขานับจาก serial ในตาราง stock ที่บันทึกหลังวันนับและยังไม่ถูกเบิกออก
+ * เอาเลข quantity ไปเทียบตรง ๆ จึงเพี้ยนทั้งกระดาน — ฟังก์ชันนี้คิดแบบเดียวกับเขาให้ครบทุกรุ่น
+ *
+ * @return array<string,array{qty:int, mode:string, date:string}> product_code => ยอด
+ */
+function fg_shortage_setup_stock_all(): array
+{
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+    $cache = [];
+    $stock = dbStock();
+    if (!$stock) {
+        return $cache;
+    }
+
+    $products = [];
+    $index = [];
+    $res = $stock->query(
+        "SELECT UPPER(TRIM(p.product_code)) AS code, p.product_name, COALESCE(c.category_name, '-') AS cat,
+                COALESCE(f.quantity, 0) AS qty, f.last_check_at
+         FROM products p
+         LEFT JOIN product_categories c ON c.id = p.category_id
+         LEFT JOIN finishgood_stock_balance f ON f.product_id = p.id
+         WHERE p.is_active = 1 AND p.product_code IS NOT NULL AND TRIM(p.product_code) <> ''"
+    );
+    while ($res && ($r = $res->fetch_assoc())) {
+        $code = (string) $r['code'];
+        $raw = (string) $r['last_check_at'];
+        $raw = ($raw !== '' && substr($raw, 0, 10) !== '0000-00-00') ? $raw : '';
+        $date = $raw !== '' ? substr($raw, 0, 10) : '';
+        $serialMode = ((string) $r['cat'] === FG_SHORTAGE_SERIAL_CATEGORY);
+        $products[$code] = [
+            'name'  => (string) $r['product_name'],
+            'date'  => $date,
+            'ts'    => $raw !== '' ? strtotime($raw) : null,
+            'qty'   => $serialMode ? 0 : (int) round((float) $r['qty']),
+            'mode'  => $serialMode ? 'serial' : 'manual',
+        ];
+        foreach ([(string) $r['product_name'], $code] as $k) {
+            $k = mb_strtolower(trim(preg_replace('/\s+/u', ' ', $k)), 'UTF-8');
+            if ($k !== '' && !isset($index[$k])) {
+                $index[$k] = $code;
+            }
+        }
+    }
+    if (!$products) {
+        return $cache;
+    }
+
+    // serial ที่ถูกเบิกออกไปแล้ว — ตัดออกเหมือนที่ setupsystem ทำ
+    $issued = [];
+    $setup = dbSetup();
+    if ($setup) {
+        $res = $setup->query(
+            "SELECT DISTINCT UPPER(TRIM(serial_number)) AS sn FROM po_order_part_serials
+             WHERE serial_number IS NOT NULL AND TRIM(serial_number) <> ''
+               AND issue_date IS NOT NULL AND issue_date <> '0000-00-00'"
+        );
+        while ($res && ($r = $res->fetch_row())) {
+            $issued[(string) $r[0]] = true;
+        }
+    }
+
+    $res = $stock->query('SELECT model, serial_number, timestamp, setup_id, active FROM stock');
+    while ($res && ($r = $res->fetch_assoc())) {
+        $sn = strtoupper(trim((string) $r['serial_number']));
+        if ($sn === '' || isset($issued[$sn])) {
+            continue;
+        }
+        $setupId = $r['setup_id'] === null ? '' : trim((string) $r['setup_id']);
+        if ($setupId !== '' && $setupId !== '0') {
+            continue;
+        }
+        if ($r['active'] !== null && (int) $r['active'] !== 1) {
+            continue;
+        }
+        $key = mb_strtolower(trim(preg_replace('/\s+/u', ' ', (string) $r['model'])), 'UTF-8');
+        $code = $index[$key] ?? '';
+        if ($code === '') {
+            foreach ($products as $c => $_) {
+                if (stripos((string) $r['model'], $c) === 0) {
+                    $code = $c;
+                    break;
+                }
+            }
+        }
+        if ($code === '' || $products[$code]['mode'] !== 'serial') {
+            continue;
+        }
+        $ts = (string) ($r['timestamp'] ?? '');
+        $tsEmpty = ($ts === '' || $ts === '0000-00-00 00:00:00');
+        if (!$tsEmpty && (int) date('Y', strtotime($ts)) < FG_SHORTAGE_SERIAL_YEAR_FROM) {
+            continue;
+        }
+        // เทียบเวลาเต็ม ไม่ใช่แค่วันที่ — ให้ตรงกับที่ setupsystem ตัด (นับสต็อกตอนบ่าย ของที่ลงตอนเช้าไม่นับ)
+        $lastTs = $products[$code]['ts'];
+        if ($lastTs !== null && ($tsEmpty || strtotime($ts) < $lastTs)) {
+            continue;
+        }
+        $products[$code]['qty']++;
+    }
+
+    foreach ($products as $code => $p) {
+        $cache[$code] = ['qty' => (int) $p['qty'], 'mode' => (string) $p['mode'], 'date' => (string) $p['date']];
+    }
+    return $cache;
+}
+
 // ─ หมายเลขสินค้าที่อยู่ในสต็อก (กดการ์ดรายรุ่นบน Dashboard) ─────────────────────
 
 /** @var string หมวดสินค้าที่ setupsystem นับยอดจาก serial ในตาราง stock (หมวดอื่นใช้ยอดนับมือ) */
@@ -549,12 +688,15 @@ function fg_shortage_serials(array $item): array
     try {
         if (($item['stock_source'] ?? '') === 'production_registry') {
             $out['mode'] = 'registry';
-            // เครื่องเช่าที่รับคืนแล้วรอปล่อยใหม่ ต้องแยกกอง ไม่ใช่ของผลิตใหม่
+            // stock   = เครื่องใหม่ที่ไม่ได้ลงทะเบียนในระบบเช่า (ยอดที่ใช้คิดขาด)
+            // leasing = คลังพร้อมเช่า (ระบบเช่าเป็น finished goods) — แสดงแยก ไม่นับรวมในยอดขาด
+            //           ชุดเดียวกับคอลัมน์ "คลังพร้อมเช่า" บนการ์ด (fg_model_stock_map → pool)
             $ready = fg_shortage_leasing_ready_serials();
+            $inLease = fg_shortage_leasing_all_serials();
             $res = qr(
-                "SELECT a.id, a.asset_code, a.factory_serial, a.produced_at
+                "SELECT a.id, a.asset_code, a.factory_serial, a.produced_at, a.status
                  FROM assets a JOIN products p ON p.id = a.product_id
-                 WHERE UPPER(TRIM(p.product_code)) = ? AND a.status = 'new'
+                 WHERE UPPER(TRIM(p.product_code)) = ? AND a.status IN ('new', 'rental')
                  ORDER BY a.produced_at DESC, a.asset_code DESC",
                 's',
                 [$code]
@@ -565,7 +707,7 @@ function fg_shortage_serials(array $item): array
                 $row = ['sn' => (string) $r['asset_code'], 'date' => (string) $r['produced_at'], 'asset_id' => (int) $r['id']];
                 if (isset($ready[$sn]) || ($fs !== '' && isset($ready[$fs]))) {
                     $out['leasing'][] = $row;
-                } else {
+                } elseif ((string) $r['status'] === 'new' && !isset($inLease[$sn]) && ($fs === '' || !isset($inLease[$fs]))) {
                     $out['stock'][] = $row;
                 }
             }

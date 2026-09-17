@@ -2,21 +2,23 @@
 /**
  * stock_check.php — เคลียร์เครื่องที่ค้างสถานะ "เครื่องใหม่" + นับสต็อกของเราเอง
  *
- * 3 แท็บ:
+ * 4 แท็บ:
  *   หลักฐาน  — S/N ที่ระบบ Setup บันทึกว่าเบิกออกไปแล้ว ปิดได้ทันที
  *   ค้างเก่า — เครื่องที่ยังใหม่แต่เก่ากว่าวันนับสต็อก ให้คนเลือกปิดเอง
  *   นับสต็อก — ติ๊กเครื่องที่เจอจริงในคลัง เครื่องที่ไม่เจอจะไปโผล่ในแท็บค้างเก่า
+ *   ประวัติ  — ย้อนสถานะกลับทีละรุ่น
  */
 require __DIR__ . '/config.php';
 require __DIR__ . '/includes/layout.php';
+require_once __DIR__ . '/includes/asset_status_sync.php';
 require_once __DIR__ . '/includes/stock_check.php';
 require_login();
 ensure_stock_check_schema();
 
 $B = BASE_URL;
-$tab = isset($_GET['tab']) ? (string) $_GET['tab'] : 'evidence';
-if (!in_array($tab, ['evidence', 'stale', 'count', 'undo'], true)) {
-    $tab = 'evidence';
+$tab = isset($_GET['tab']) ? (string) $_GET['tab'] : 'sync';
+if (!in_array($tab, ['sync', 'evidence', 'stale', 'count', 'undo'], true)) {
+    $tab = 'sync';
 }
 $pid = (int) (isset($_GET['product']) ? $_GET['product'] : 0);
 $q = trim((string) (isset($_GET['q']) ? $_GET['q'] : ''));
@@ -43,12 +45,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: ' . $backUrl); exit;
     }
 
-    if (isset($_POST['undo_batch'])) {
+    if (isset($_POST['undo_batch']) || isset($_POST['undo_limit'])) {
         $r = stock_check_undo_apply(
             (int) ($_POST['min_id'] ?? 0),
             (int) ($_POST['max_id'] ?? 0),
             (string) ($_POST['reason_full'] ?? ''),
-            (int) ($_POST['undo_product'] ?? 0)
+            (int) ($_POST['undo_product'] ?? 0),
+            (int) ($_POST['undo_limit'] ?? 0)
+        );
+        flash_set($r['message'], $r['ok'] ? 'ok' : 'err');
+        header('Location: ' . $B . '/stock_check.php?tab=undo'); exit;
+    }
+
+    if (isset($_POST['run_sync'])) {
+        $r = stock_sync_plan(true);
+        flash_set(
+            'ซิงก์สถานะแล้ว — เปลี่ยน ' . number_format((int) $r['changed']) . ' เครื่อง จากทั้งหมด ' . number_format((int) $r['total']),
+            $r['ok'] ? 'ok' : 'err'
+        );
+        header('Location: ' . $B . '/stock_check.php?tab=sync'); exit;
+    }
+
+    if (isset($_POST['close_excess'])) {
+        $r = stock_check_close_excess(
+            (int) ($_POST['undo_product'] ?? 0),
+            (int) ($_POST['close_excess'] ?? 0)
         );
         flash_set($r['message'], $r['ok'] ? 'ok' : 'err');
         header('Location: ' . $B . '/stock_check.php?tab=undo'); exit;
@@ -79,6 +100,7 @@ page_header('เคลียร์เครื่องค้างสถาน�
 ?>
 <div class="panel" style="margin-bottom:14px">
   <div class="sc-tabs">
+    <a class="btn btn-sm <?= $tab === 'sync' ? 'btn-primary' : 'btn-line' ?>" href="<?= h($B) ?>/stock_check.php?tab=sync">ซิงก์ทั้งหมดในปุ่มเดียว</a>
     <a class="btn btn-sm <?= $tab === 'evidence' ? 'btn-primary' : 'btn-line' ?>" href="<?= h($B) ?>/stock_check.php?tab=evidence">1 · มีหลักฐานว่าเบิกออกแล้ว</a>
     <a class="btn btn-sm <?= $tab === 'stale' ? 'btn-primary' : 'btn-line' ?>" href="<?= h($B) ?>/stock_check.php?tab=stale">2 · ค้างเก่ากว่าวันนับสต็อก</a>
     <a class="btn btn-sm <?= $tab === 'count' ? 'btn-primary' : 'btn-line' ?>" href="<?= h($B) ?>/stock_check.php?tab=count">3 · นับสต็อกของเรา</a>
@@ -86,7 +108,56 @@ page_header('เคลียร์เครื่องค้างสถาน�
   </div>
 </div>
 
-<?php if ($tab === 'evidence') { ?>
+<?php if ($tab === 'sync') {
+    $plan = stock_sync_plan(false);
+?>
+<div class="panel">
+  <p class="muted" style="margin:0 0 6px">
+    ไล่ตัดสินสถานะเครื่องทั้งทะเบียนรอบเดียว จากแหล่งข้อมูลที่เชื่อถือได้ ตามลำดับนี้
+  </p>
+  <ol class="sc-rules">
+    <li><b>ระบบเช่า</b> — อยู่กับลูกค้า → เครื่องเช่า · ปลดระวาง/สูญหาย → ตามที่แจ้ง · รับคืนแล้วหรือ MA เสร็จรอส่งลูกค้า → <b>เครื่องเช่า</b> (ไม่ใช่ของผลิตใหม่)</li>
+    <li><b>หลักฐานการเบิกออก</b> — S/N ที่ระบบ Setup มีเลข PO ว่าเบิกออกไปแล้ว หรือมีใบเบิกขายในระบบสต็อก → ขายแล้ว</li>
+    <li><b>นับเจอกับตา</b> — เครื่องที่นับเจอในรอบนับล่าสุดของเรา → อยู่ในคลัง</li>
+    <li><b>เครื่องเก่าที่ไม่มีหลักฐานอะไรเลย</b> — ผลิตก่อนวันนับสต็อกของรุ่นนั้น → ถือว่าขายไปแล้ว</li>
+  </ol>
+  <p class="muted" style="font-size:12px;margin:0 0 12px">
+    เครื่องที่ปิดไปแล้วจะไม่ถูกเปิดกลับ ถ้าไม่มีหลักฐานใหม่มายืนยัน · เครื่องสำรองไม่ถูกแตะเลย ·
+    ทุกการเปลี่ยนเขียนประวัติไว้ ย้อนกลับได้ที่แท็บ "ประวัติ / ย้อนกลับ"
+  </p>
+
+  <?php if ($plan['error'] !== '') { ?>
+  <p style="margin:0 0 10px;color:var(--warning,#b45309)">อ่านข้อมูลบางส่วนไม่ได้: <?= h($plan['error']) ?></p>
+  <?php } ?>
+
+  <?php if (!$plan['changed']) { ?>
+  <p style="margin:0;color:var(--success,#16a34a)">สถานะตรงกับทุกแหล่งข้อมูลแล้ว — ไม่มีอะไรต้องเปลี่ยน (ตรวจ <?= number_format((int) $plan['total']) ?> เครื่อง)</p>
+  <?php } else { ?>
+  <form method="post" onsubmit="return confirm('ซิงก์สถานะ <?= (int) $plan['changed'] ?> เครื่องตามรายการนี้?');">
+    <?= csrf_field() ?>
+    <div class="sc-bulk">
+      <span>ตรวจ <b><?= number_format((int) $plan['total']) ?></b> เครื่อง · จะเปลี่ยน <b style="color:var(--primary)"><?= number_format((int) $plan['changed']) ?></b> เครื่อง</span>
+      <button type="submit" name="run_sync" value="1" class="btn btn-primary btn-sm">ซิงก์เลย</button>
+    </div>
+    <div class="table-wrap">
+      <table class="list" style="margin:0">
+        <tr><th>เปลี่ยนเป็น</th><th>จากสถานะ</th><th>เพราะ</th><th style="text-align:right">จำนวน</th><th>ตัวอย่าง</th></tr>
+        <?php foreach ($plan['groups'] as $g) { ?>
+        <tr>
+          <td><b><?= h(status_th((string) $g['to'])) ?></b></td>
+          <td class="muted"><?= h(status_th((string) $g['from'])) ?></td>
+          <td><?= h($g['reason'] !== '' ? $g['reason'] : '—') ?></td>
+          <td style="text-align:right"><b><?= number_format((int) $g['n']) ?></b></td>
+          <td class="muted" style="font-size:12px"><?= h(implode(', ', $g['sample'])) ?><?= (int) $g['n'] > count($g['sample']) ? ' …' : '' ?></td>
+        </tr>
+        <?php } ?>
+      </table>
+    </div>
+  </form>
+  <?php } ?>
+</div>
+
+<?php } elseif ($tab === 'evidence') { ?>
 <div class="panel">
   <p class="muted" style="margin:0 0 10px">
     เครื่องที่ระบบ Setup บันทึกไว้แล้วว่าเบิกออกจากคลังไป (ขาย · สั่งซื้อ · เคลม) แต่ทะเบียนเรายังขึ้นว่า "เครื่องใหม่"
@@ -100,7 +171,7 @@ page_header('เคลียร์เครื่องค้างสถาน�
   <form method="post" onsubmit="return confirm('เปลี่ยนสถานะเครื่องที่เลือกเป็น &quot;ขายแล้ว&quot;?');">
     <?= csrf_field() ?>
     <input type="hidden" name="new_status" value="sold">
-    <input type="hidden" name="reason" value="เบิกออกจากคลังแล้วตามระบบ Setup">
+    <input type="hidden" name="reason" value="<?= h(STOCK_CHECK_EVIDENCE_REASON) ?>">
     <div class="sc-bulk">
       <label class="sc-check"><input type="checkbox" id="sc-all-ev"> เลือกทั้งหมด (<?= number_format(count($evidence['rows'])) ?>)</label>
       <button type="submit" name="apply_status" value="1" class="btn btn-primary btn-sm">ตั้งเป็น "ขายแล้ว"</button>
@@ -132,18 +203,27 @@ page_header('เคลียร์เครื่องค้างสถาน�
     $batches = stock_check_undo_batches();
 ?>
 <div class="panel">
+  <?php
+  $suspectTotal = 0;
+  foreach ($batches as $b) { $suspectTotal += (int) $b['suspect']; }
+  ?>
   <p class="muted" style="margin:0 0 10px">
     ทุกครั้งที่เปลี่ยนสถานะจากหน้านี้ ระบบเก็บไว้ว่าเปลี่ยนจากอะไรเป็นอะไร จึงย้อนกลับได้ทีละรุ่น
-    · ใช้ตอนเผลอปิดเครื่องที่ยังอยู่ในคลังจริง เช่น รุ่นที่ของค้างคลังมานานแต่ยังขายอยู่
+    · คอลัมน์ <b>ตอนนี้เหลือ</b> คือจำนวนเครื่องใหม่ของรุ่นนั้นในทะเบียนเราตอนนี้
   </p>
+  <?php if ($suspectTotal > 0) { ?>
+  <p style="margin:0 0 10px;color:var(--danger,#dc2626)">
+    พบที่น่าจะปิดเกิน <b><?= number_format($suspectTotal) ?></b> เครื่อง — รายการที่ต้องดูถูกยกขึ้นบนสุดให้แล้ว
+  </p>
+  <?php } ?>
   <?php if (!$batches) { ?>
   <p class="muted" style="margin:0">ยังไม่มีประวัติการเปลี่ยนสถานะจากหน้านี้</p>
   <?php } else { ?>
   <div class="table-wrap" style="max-height:70vh;overflow:auto">
     <table class="list" style="margin:0">
-      <tr><th>วันที่</th><th>รุ่น</th><th>เหตุผล</th><th>เปลี่ยน</th><th style="text-align:right">จำนวน</th><th style="width:110px"></th></tr>
+      <tr><th>วันที่</th><th>รุ่น</th><th>เหตุผล</th><th>เปลี่ยน</th><th style="text-align:right">จำนวน</th><th style="text-align:right">ตอนนี้เหลือ</th><th style="width:110px"></th></tr>
       <?php foreach ($batches as $b) { ?>
-      <tr>
+      <tr<?= (int) $b['suspect'] > 0 ? ' style="background:var(--danger-soft,#fef2f2)"' : '' ?>>
         <td style="white-space:nowrap"><?= h(dthai((string) $b['day'])) ?></td>
         <td><b><?= h((string) $b['pname']) ?></b><div class="muted" style="font-size:12px">โดย <?= h((string) $b['made_by']) ?></div></td>
         <td class="muted"><?= h((string) $b['label']) ?></td>
@@ -153,15 +233,19 @@ page_header('เคลียร์เครื่องค้างสถาน�
           <div class="muted" style="font-size:12px">ย้อนได้ <?= number_format((int) $b['undoable']) ?></div>
           <?php } ?>
         </td>
+        <td style="text-align:right;white-space:nowrap"><?= number_format((int) $b['now_new']) ?> <span class="muted" style="font-size:12px">เครื่องใหม่</span></td>
         <td>
           <?php if ((int) $b['undoable'] > 0) { ?>
-          <form method="post" onsubmit="return confirm('ย้อนสถานะ <?= (int) $b['undoable'] ?> เครื่องของรุ่น <?= h((string) $b['pname']) ?> กลับเป็น &quot;<?= h(status_th((string) $b['from'])) ?>&quot;?');">
+          <form method="post" class="sc-undo-form">
             <?= csrf_field() ?>
             <input type="hidden" name="min_id" value="<?= (int) $b['min_id'] ?>">
             <input type="hidden" name="max_id" value="<?= (int) $b['max_id'] ?>">
             <input type="hidden" name="reason_full" value="<?= h((string) $b['reason']) ?>">
             <input type="hidden" name="undo_product" value="<?= (int) $b['product_id'] ?>">
-            <button type="submit" name="undo_batch" value="1" class="btn btn-line btn-sm">ย้อนกลับ</button>
+
+            <button type="submit" name="undo_batch" value="1" class="btn btn-line btn-sm"
+              onclick="return confirm('ย้อนทั้งกลุ่ม <?= (int) $b['undoable'] ?> เครื่องของรุ่น <?= h((string) $b['pname']) ?> กลับเป็น &quot;<?= h(status_th((string) $b['from'])) ?>&quot;?');">ย้อนทั้งกลุ่ม (<?= number_format((int) $b['undoable']) ?>)</button>
+
           </form>
           <?php } else { ?>
           <span class="muted" style="font-size:12px">ย้อนไม่ได้</span>
@@ -334,6 +418,9 @@ page_header('เคลียร์เครื่องค้างสถาน�
 .sc-tabs { display:flex; gap:6px; flex-wrap:wrap; }
 .sc-bulk { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 10px; }
 .sc-check { display:inline-flex; align-items:center; gap:6px; font-size:13px; }
+.sc-undo-form { display:flex; flex-direction:column; gap:4px; align-items:stretch; }
+.sc-rules { margin:0 0 10px; padding-left:20px; font-size:13.5px; line-height:1.7; }
+.sc-rules li { margin:2px 0; }
 </style>
 
 <?php page_footer();

@@ -3,9 +3,10 @@
  * finishgood_shortage_preview.php — ดูตัวอย่าง Flex "สินค้าที่ต้องผลิตเพิ่ม" ก่อนส่งจริง
  *
  * วัตถุประสงค์: ตรวจหน้าตา/ตัวเลขของการ์ดก่อนให้ cron ส่งเข้า LINE
- *              ข้อมูลดึงจาก API ของ setupsystem (แหล่งเดียวกับที่ cron ใช้)
+ *              ข้อมูลชุดเดียวกับที่ cron ส่งจริงและการ์ด Dashboard (fg_shortage_dashboard_data)
+ *              + ตั้งค่าสต็อกขั้นต่ำรายรุ่น (เก็บที่ระบบเรา products.min_stock)
  *
- * Flow: finishgood_shortage_fetch() → line_flex_finishgood_shortage_messages() → render + JSON
+ * Flow: fg_shortage_dashboard_data() → line_flex_finishgood_shortage_messages() → render + JSON
  */
 require __DIR__ . '/config.php';
 require_once dirname(__DIR__) . '/shared/finishgood_shortage_client.php';
@@ -16,13 +17,12 @@ require_once dirname(__DIR__) . '/shared/finishgood_shortage_dashboard.php';
 
 require_login();
 
-// บันทึกรุ่นที่ให้นับยอดคงเหลือจากทะเบียนเครื่องของเรา
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_registry'])) {
+// บันทึกสต็อกขั้นต่ำรายรุ่น (ระบบเรา)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_min'])) {
     csrf_check();
-    $posted = isset($_POST['registry']) && is_array($_POST['registry']) ? $_POST['registry'] : [];
-    fg_shortage_save_registry_codes($posted);
-    fg_shortage_dash_cache_clear();
-    header('Location: ' . BASE_URL . '/finishgood_shortage_preview.php?saved=registry');
+    $posted = isset($_POST['min']) && is_array($_POST['min']) ? $_POST['min'] : [];
+    $n = fg_shortage_save_min_stock($posted);
+    header('Location: ' . BASE_URL . '/finishgood_shortage_preview.php?saved=min&n=' . $n);
     exit;
 }
 
@@ -37,27 +37,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_skip'])) {
     exit;
 }
 
-$fetchedAll = finishgood_shortage_fetch();
-// เก็บตัวเลขดิบของ setupsystem ไว้เทียบในตาราง ก่อนแทนด้วยยอดจากทะเบียนเรา
-$apiRawByCode = [];
-$registryApplied = ['replaced' => [], 'missing' => [], 'error' => ''];
-if (!empty($fetchedAll['ok'])) {
-    foreach ($fetchedAll['items'] as $__raw) {
-        $apiRawByCode[strtoupper(trim((string)($__raw['product_code'] ?? '')))] = $__raw;
-    }
-    $registryApplied = fg_shortage_apply_registry($fetchedAll['items']);
-    $fetchedAll['items'] = $registryApplied['items'];
-}
-$registryCodes = fg_shortage_registry_codes();
-$registryAll   = fg_shortage_registry_rows(null);
-$skipCodes  = fg_shortage_skipped_codes();
-$fetched    = $fetchedAll;
-if (!empty($fetchedAll['ok'])) {
-    $flt = fg_shortage_filter_items($fetchedAll['items']);
-    $fetched['items'] = $flt['items'];
-    $fetched['total_shortage'] = 0;
-    foreach ($flt['items'] as $__it) { $fetched['total_shortage'] += (int)($__it['need'] ?? 0); }
-}
+// ทุกตัวเลขมาจากทะเบียนเรา — ไม่เรียก API สต็อกของ setupsystem แล้ว
+$registryAll = fg_shortage_registry_rows(null);
+// รุ่นที่ขาดทั้งหมด (ก่อนตัดรุ่นที่ปิดแจ้งเตือน) ใช้ทำรายการให้ติ๊กปิด
+$allShort = fg_shortage_apply_registry([]);
+$skipCodes = fg_shortage_skipped_codes();
+$fgSame = fg_shortage_dashboard_data();
+$fetched = [
+    'ok'             => !empty($fgSame['ok']),
+    'error'          => (string) $fgSame['error'],
+    'items'          => $fgSame['items'],
+    'total_shortage' => (int) $fgSame['total_shortage'],
+    'timestamp_text' => (string) $fgSame['timestamp_text'],
+];
 $messages = $fetched['ok']
     ? line_flex_finishgood_shortage_messages($fetched['items'], $fetched['timestamp_text'])
     : [];
@@ -263,7 +255,7 @@ $allJson = $messages !== []
 <div class="panel">
     <strong>ตัวอย่าง LINE Flex — สินค้าที่ต้องผลิตเพิ่ม</strong>
     <div style="color:#777;font-size:12px;margin-top:4px;">
-        ข้อมูลจาก <code><?= htmlspecialchars(finishgood_shortage_api_config()['url']) ?></code>
+        ข้อมูลจากทะเบียนเครื่องของเรา · ขั้นต่ำตั้งในหน้านี้ · PO ค้างจากใบสั่งงาน — ชุดเดียวกับการ์ด Dashboard
     </div>
 
     <?php if (!$fetched['ok']): ?>
@@ -296,60 +288,55 @@ $allJson = $messages !== []
 </div>
 
 <div class="panel" style="margin-bottom:12px">
-    <h2 style="margin:0 0 4px;font-size:16px">นับยอดคงเหลือจากทะเบียนเครื่องของเรา</h2>
+    <h2 style="margin:0 0 4px;font-size:16px">สต็อกขั้นต่ำรายรุ่น</h2>
     <p style="margin:0 0 10px;font-size:13px;color:#666">
-        ติ๊กรุ่นที่ให้ใช้จำนวนเครื่องสถานะ <b>ใหม่ (อยู่ในคลัง)</b> จากทะเบียนเครื่อง แทนยอดคงเหลือของ setupsystem ·
-        ใช้กับรุ่นที่ setupsystem ยังนับเครื่องที่ปล่อยเช่าไปแล้วเป็นของในคลัง · ขั้นต่ำและ PO ค้างใช้ค่าเดียวกับ setupsystem
+        ตั้งค่าที่ระบบเรา — ใช้ทั้งการ์ด Dashboard และการแจ้งเตือน LINE ·
+        ขาด = (เครื่องใหม่ + คลังพร้อมเช่า) − (ขั้นต่ำ + PO ค้าง) · เว้นว่าง = ไม่ติดตามยอดขาดของรุ่นนั้น
     </p>
-    <?php if (($_GET['saved'] ?? '') === 'registry'): ?><div class="ok" style="margin-bottom:10px">บันทึกแล้ว</div><?php endif; ?>
-    <?php if ($registryApplied['error'] !== ''): ?>
-        <div class="err" style="margin-bottom:10px">คำนวณจากทะเบียนเครื่องไม่ได้ จึงใช้ตัวเลขของ setupsystem แทน: <?= htmlspecialchars($registryApplied['error'], ENT_QUOTES, 'UTF-8') ?></div>
-    <?php endif; ?>
-    <?php if (!empty($registryApplied['missing'])): ?>
-        <div class="err" style="margin-bottom:10px">รุ่นที่เลือกไว้แต่จับคู่กับทะเบียนเราไม่ได้ (ใช้ตัวเลขของ setupsystem): <?= htmlspecialchars(implode(', ', $registryApplied['missing']), ENT_QUOTES, 'UTF-8') ?></div>
-    <?php endif; ?>
+    <?php if (($_GET['saved'] ?? '') === 'min'): ?><div class="ok" style="margin-bottom:10px">บันทึกขั้นต่ำแล้ว</div><?php endif; ?>
     <?php if (!$registryAll['ok']): ?>
         <div class="err">โหลดรายการรุ่นไม่ได้: <?= htmlspecialchars($registryAll['error'], ENT_QUOTES, 'UTF-8') ?></div>
-    <?php else: ?>
+    <?php else:
+        // รุ่นที่ยังไม่ตั้งขั้นต่ำก็ต้องตั้งได้จากที่นี่ — ดึงรายการรุ่นทั้งหมดของเรา
+        $minAll = [];
+        $__res = qr("SELECT UPPER(TRIM(product_code)) code, name, min_stock FROM products WHERE is_active = 1 AND product_code IS NOT NULL AND TRIM(product_code) <> '' ORDER BY name");
+        while ($__r = $__res->fetch_assoc()) { if (!isset($minAll[$__r['code']])) { $minAll[$__r['code']] = $__r; } } ?>
     <form method="post">
         <?= csrf_field() ?>
         <div class="reg-wrap">
         <table class="reg-table">
             <thead>
                 <tr>
-                    <th>ใช้</th>
                     <th>รุ่น</th>
-                    <th class="n">setupsystem: มี → ขาด</th>
-                    <th class="n">ทะเบียนเรา: ใหม่ → ขาด</th>
+                    <th class="n">เครื่องใหม่</th>
+                    <th class="n">คลังพร้อมเช่า</th>
+                    <th class="n">ขั้นต่ำ</th>
+                    <th class="n">PO ค้าง</th>
+                    <th class="n">ขาด / เกิน</th>
                 </tr>
             </thead>
             <tbody>
-            <?php foreach ($registryAll['rows'] as $code => $row):
-                $on = in_array($code, $registryCodes, true);
-                // รุ่นที่ไม่มีเครื่องในทะเบียนเลย (หมวด STK) เลือกไปก็ได้ 0 ตลอด — ซ่อนไว้ ยกเว้นที่เลือกค้างอยู่
-                if ((int)$row['registry_total'] === 0 && !$on) { continue; }
-                $api = $apiRawByCode[$code] ?? null; ?>
-                <tr class="<?= $on ? 'reg-on' : '' ?>">
-                    <td><input type="checkbox" name="registry[]" value="<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>" <?= $on ? 'checked' : '' ?> aria-label="นับ <?= htmlspecialchars((string)$row['product_name'], ENT_QUOTES, 'UTF-8') ?> จากทะเบียนเครื่อง"></td>
-                    <td><?= htmlspecialchars((string)$row['product_name'], ENT_QUOTES, 'UTF-8') ?> <span style="color:#999">(<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>)</span></td>
-                    <td class="n"><?php if (empty($fetchedAll['ok'])): ?>—<?php elseif ($api): ?><?= (int)$api['available'] ?> → <b style="color:#c0392b"><?= (int)$api['need'] ?></b><?php else: ?><span style="color:#1e6b33">ไม่ขาด</span><?php endif; ?></td>
-                    <td class="n">
-                        <a href="<?= htmlspecialchars(BASE_URL . '/assets.php?' . http_build_query(['product' => $row['registry_name'], 'status' => 'new']), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= (int)$row['stock_qty'] ?></a>
-                        → <b style="color:<?= (int)$row['need'] < 0 ? '#c0392b' : '#1e6b33' ?>"><?= (int)$row['need'] ?></b>
-                        <span style="color:#999;font-size:12px">(ขั้นต่ำ <?= (int)$row['minimum_stock'] ?> + PO <?= (int)$row['po_qty'] ?>)</span>
-                    </td>
+            <?php foreach ($minAll as $code => $p):
+                $row = $registryAll['rows'][$code] ?? null; ?>
+                <tr>
+                    <td><?= htmlspecialchars((string)$p['name'], ENT_QUOTES, 'UTF-8') ?> <span style="color:#999">(<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>)</span></td>
+                    <td class="n"><?= $row ? (int)$row['stock_qty'] : '—' ?></td>
+                    <td class="n"><?= $row ? (int)$row['leasing_qty'] : '—' ?></td>
+                    <td class="n"><input type="number" name="min[<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>]" min="0" step="1" style="width:80px;text-align:right"
+                        value="<?= $p['min_stock'] !== null ? (int)$p['min_stock'] : '' ?>" placeholder="—"></td>
+                    <td class="n"><?= $row ? (int)$row['po_qty'] : '—' ?></td>
+                    <td class="n"><?php if ($row): ?><b style="color:<?= (int)$row['need'] < 0 ? '#c0392b' : '#1e6b33' ?>"><?= (int)$row['need'] ?></b><?php else: ?><span style="color:#999">ไม่ติดตาม</span><?php endif; ?></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
         </table>
         </div>
-        <button type="submit" name="save_registry" value="1" style="margin-top:10px">บันทึกการเลือก</button>
-        <span style="margin-left:10px;font-size:13px;color:#666">นับจากทะเบียนเรา <?= count($registryCodes) ?> รุ่น</span>
+        <button type="submit" name="save_min" value="1" style="margin-top:10px">บันทึกขั้นต่ำ</button>
     </form>
     <?php endif; ?>
 </div>
 
-<?php if (!empty($fetchedAll['ok'])): ?>
+<?php if ($allShort['error'] === ''): ?>
 <div class="panel" style="margin-bottom:12px">
     <h2 style="margin:0 0 4px;font-size:16px">เลือกรุ่นที่จะแจ้งเตือน</h2>
     <p style="margin:0 0 10px;font-size:13px;color:#666">
@@ -359,14 +346,14 @@ $allJson = $messages !== []
     <form method="post">
         <?= csrf_field() ?>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:6px 16px;margin-bottom:12px">
-        <?php foreach ($fetchedAll['items'] as $it):
+        <?php foreach ($allShort['items'] as $it):
             $code = (string)($it['product_code'] ?? '');
             $off  = in_array(strtoupper(trim($code)), $skipCodes, true); ?>
             <label style="display:flex;gap:7px;align-items:baseline;font-size:13.5px;<?= $off ? 'opacity:.55' : '' ?>">
                 <input type="checkbox" name="skip[]" value="<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>" <?= $off ? 'checked' : '' ?>>
                 <span><?= htmlspecialchars((string)$it['product_name'], ENT_QUOTES, 'UTF-8') ?>
                     <span style="color:#999">(<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>)</span>
-                    <b style="color:#c0392b"><?= (int)($it['need'] ?? 0) ?></b><?php if (($it['stock_source'] ?? '') === 'production_registry'): ?> <span style="font-size:11px;color:#1a5fb4">· นับจากทะเบียนเรา</span><?php endif; ?></span>
+                    <b style="color:#c0392b"><?= (int)($it['need'] ?? 0) ?></b></span>
             </label>
         <?php endforeach; ?>
         </div>

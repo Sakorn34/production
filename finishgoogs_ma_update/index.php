@@ -476,8 +476,16 @@ $partsBase = ui_parts_base_url();
     </div>
   </div>
 
-  <div class="dash-view-pane" id="dash-view-models" role="tabpanel">
-  <?php // แถบกรองโผล่เมื่อดึงตัวเลขจากระบบ Setup มาได้แล้ว — ไม่มีตัวเลขก็ไม่มีอะไรให้กรอง ?>
+  <?php // สีเครื่องใหม่/เครื่องเช่าต้องมาจาก palette สถานะชุดเดียวกับกราฟด้านบนเท่านั้น (shared/ui_status_palette.php)
+        $stNew = status_palette_entry('new'); $stRent = status_palette_entry('rental'); ?>
+  <div class="dash-view-pane" id="dash-view-models" role="tabpanel" style="<?= h('--st-new-bar:' . $stNew['bar'] . ';--st-new-fg:' . $stNew['fg'] . ';--st-rental-bar:' . $stRent['bar'] . ';--st-rental-fg:' . $stRent['fg']) ?>">
+  <?php // สรุปยอดทั้งคลังก่อน แล้วค่อยไล่รายรุ่น — โผล่เมื่อคำนวณตัวเลขเสร็จ ?>
+  <div class="dash-fg-summary" id="dash-fg-summary" hidden>
+    <div class="dash-fg-tile"><span class="dash-fg-tile-label">เครื่องใหม่ในคลัง</span><span class="dash-fg-tile-num" id="dash-fg-sum-new">—</span></div>
+    <div class="dash-fg-tile"><span class="dash-fg-tile-label">คลังพร้อมเช่า</span><span class="dash-fg-tile-num is-pool" id="dash-fg-sum-pool">—</span></div>
+    <div class="dash-fg-tile"><span class="dash-fg-tile-label">ต้องผลิตเพิ่ม</span><span class="dash-fg-tile-num is-short" id="dash-fg-sum-models">—</span></div>
+    <div class="dash-fg-tile"><span class="dash-fg-tile-label">ขาดรวม</span><span class="dash-fg-tile-num is-short" id="dash-fg-sum-gap">—</span></div>
+  </div>
   <div class="dash-fg-filters" id="dash-fg-filters" hidden>
     <div class="dash-parts-filter" id="dash-fg-filter" role="tablist" aria-label="กรองรุ่นสินค้า">
       <button type="button" class="dash-parts-filter-btn active" data-fg-filter="all" role="tab" aria-selected="true">ทั้งหมด</button>
@@ -486,45 +494,50 @@ $partsBase = ui_parts_base_url();
     </div>
     <span class="muted dash-fg-hint" id="dash-fg-hint"></span>
   </div>
-  <div class="model-card-grid" id="dash-models-grid">
-    <?php foreach ($perModel as $m) {
-        // สัดส่วนตามสถานะ ใช้สีเดียวกับกราฟด้านบน (dash_chart_color) ให้ legend เดียวอ่านได้ทั้งหน้า
-        $segs = [];
-        $tipParts = [];
-        foreach (status_list() as $st) {
-            $n = (int) ($perModelStatus[(int) $m['pid']][$st] ?? 0);
-            if ($n <= 0) { continue; }
-            $segs[] = '<span class="model-card-seg" style="flex:' . $n
-                . ';background:' . h(dash_chart_color($st)) . '"></span>';
-            $tipParts[] = status_th($st) . ' ' . number_format($n);
-        }
-        $barTip = $m['name'] . ' — ' . number_format($m['c']) . ' เครื่อง'
-            . ($tipParts ? ' · ' . implode(' · ', $tipParts) : '');
-    ?>
-    <?php // เป็น <a> เพื่อให้ Tab ถึงและเปิดแท็บใหม่ได้ · คลิกปกติยังเปิด modal เหมือนเดิม ?>
-    <a class="model-card clickable" href="<?= h("$B/assets.php?product=" . urlencode($m['name'])) ?>"
-         data-code="<?= h(strtoupper(trim((string) $m['product_code']))) ?>" data-count="<?= (int) $m['c'] ?>" data-fg="none"
-         onclick="if(event.ctrlKey||event.metaKey||event.shiftKey||event.button===1)return true;showListModal(<?= h(json_encode('การผลิตรุ่น ' . $m['name'] . ' รายปี', JSON_UNESCAPED_UNICODE)) ?>, '<?= h("$B/dashboard_data.php?type=product_years&v=" . (int)$m['pid']) ?>', '<?= h("$B/assets.php?product=" . urlencode($m['name'])) ?>');return false;">
-      <div class="model-card-img">
-        <?= img_tag($m['icon_path'], $m['name'], 'model-thumb') ?>
-      </div>
-      <div class="model-card-body">
-        <div class="model-card-name" title="<?= h($m['name']) ?>"><?= h($m['name']) ?></div>
-        <?php // สองแถบคนละเรื่องกัน ติดป้ายไว้ให้ชัด: แถบบน = เครื่องทั้งหมดในทะเบียนแยกสถานะ
-              // แถบล่าง (เติมด้วย JS) = เฉพาะของในคลังพร้อมขายเทียบกับที่ต้องมี ?>
-        <div class="mc-barrow">
-          <span class="mc-blabel">ทะเบียน</span>
-          <div class="model-card-bar" title="<?= h($barTip) ?>">
-            <?php // เต็มแถบเสมอ แล้วแบ่งสัดส่วนตามสถานะของรุ่นนั้นเอง — เทียบ "ในรุ่นนี้มีอะไรกี่%"
-                  // อ่านง่ายกว่าการเอาความยาวไปเทียบกับรุ่นที่มีเครื่องเยอะสุด ซึ่งไม่ได้บอกอะไรเลย ?>
-            <div class="model-card-fill" style="width:100%"><?= implode('', $segs) ?></div>
-          </div>
-          <span class="model-card-num"><?= number_format($m['c']) ?> <span class="muted" style="font-weight:400">เครื่อง</span></span>
-        </div>
-        <div class="model-card-fg" hidden></div>
-      </div>
-    </a>
+  <?php // ตาราง ไม่ใช่การ์ด — 35 รุ่นเป็นการ์ดเรียงลงมาแล้วเลื่อนยาวมาก ตารางอ่านเทียบกันได้ในจอเดียว
+        // data-pri = ระดับความสำคัญของคอลัมน์ (shared/ui_table.css ยุบ/ซ่อนให้เองตามความกว้าง)
+        // กรอบเลื่อนเฉพาะรายการรุ่น หัวตารางติดขอบบน — ไม่ใช้ .table-wrap-fold เพราะ ui_table.js
+        // ตั้งความสูงจากตำแหน่งบนจอ ตารางนี้อยู่ล่างของ Dashboard จะได้กรอบเตี้ยเกินไป ?>
+  <div class="table-wrap dash-models-scroll">
+  <?php // นับเฉพาะเครื่องสถานะ "ใหม่" ในทะเบียนเรา (ไม่รวมเครื่องที่ลงทะเบียนในระบบเช่า)
+        // แถบ = เครื่องใหม่ ÷ ต้องมี — เต็มแถบคือพอแล้ว ?>
+  <table class="list dash-models-table">
+    <thead>
+      <tr>
+        <th data-pri="2" style="width:44px"></th>
+        <th data-pri="1">รุ่น</th>
+        <th data-pri="2" class="fg-bar-col" title="เต็มแถบ = ยอดที่ต้องมี · ส่วนสีจาง = เกินจากที่ต้องมี"><span class="fg-legend"><i class="is-new"></i>เครื่องใหม่</span> <span class="fg-legend"><i class="is-pool"></i>คลังพร้อมเช่า</span> <span class="fg-legend"><b class="fg-legend-mark">▼</b>ขั้นต่ำ</span> <span class="fg-legend"><b class="fg-legend-mark is-po">▼</b>ขั้นต่ำ+PO</span></th>
+        <th data-pri="1" class="num-col">เครื่องใหม่</th>
+        <th data-pri="2" class="num-col" title="ระบบเช่าเป็น finished goods รอปล่อยเช่า — นับรวมในยอดที่มี">คลังพร้อมเช่า</th>
+        <th data-pri="1">ผล</th>
+      </tr>
+    </thead>
+    <tbody id="dash-models-grid">
+    <?php foreach ($perModel as $m) { ?>
+    <?php $mCode = strtoupper(trim((string) $m['product_code'])); ?>
+    <?php // แบ่งแถวเป็น 2 โซนกด: รูป+ชื่อรุ่น = การผลิตรายปี · แถบสีถึงคอลัมน์สุดท้าย = หมายเลขสินค้าในสต็อก
+          // (จัดการคลิกรวมที่ tbody ด้านล่าง) ?>
+    <tr class="dash-model-row" data-code="<?= h($mCode) ?>" data-count="<?= (int) $m['c'] ?>" data-fg="none"
+        data-name="<?= h($m['name']) ?>"
+        data-years-url="<?= h("$B/dashboard_data.php?type=product_years&v=" . (int) $m['pid']) ?>"
+        data-list-url="<?= h("$B/assets.php?product=" . urlencode($m['name'])) ?>">
+      <td data-pri="2" class="fg-zone-name" title="กดดูการผลิตรายปี"><?= img_tag($m['icon_path'], $m['name'], 'model-thumb') ?></td>
+      <td data-pri="1" class="fg-zone-name" title="กดดูการผลิตรายปี">
+        <b class="fg-model-name"><?= h($m['name']) ?></b>
+        <?php if ($mCode !== '') { ?><span class="mc-code"><?= h($mCode) ?></span><?php } ?>
+      </td>
+      <td data-pri="1" class="fg-bar-col fg-zone-stock">
+        <?php // หมุดอยู่นอก .fg-bar เพราะแถบตัดส่วนที่ล้นทิ้ง (overflow hidden) ?>
+        <div class="fg-bar-wrap" data-fg-cell="marks"><div class="fg-bar" data-fg-cell="bar"><i></i></div></div>
+        <div class="fg-bar-note" data-fg-cell="note"></div>
+      </td>
+      <td data-pri="1" class="num-col fg-cell fg-zone-stock" data-fg-cell="ours">—</td>
+      <td data-pri="2" class="num-col fg-cell fg-zone-stock" data-fg-cell="pool">—</td>
+      <td data-pri="1" class="fg-cell fg-zone-stock" data-fg-cell="verdict"></td>
+    </tr>
     <?php } ?>
+    </tbody>
+  </table>
   </div>
   </div>
 
@@ -615,9 +628,10 @@ $partsBase = ui_parts_base_url();
   var modelsGrid = document.getElementById('dash-models-grid');
   var fgFilters = document.getElementById('dash-fg-filters');
   var fgHint = document.getElementById('dash-fg-hint');
+  var fgSummary = document.getElementById('dash-fg-summary');
   var fgFoot = document.getElementById('dash-fg-foot');
   var fgBtns = fgFilters ? fgFilters.querySelectorAll('.dash-parts-filter-btn') : [];
-  var modelCards = modelsGrid ? Array.prototype.slice.call(modelsGrid.querySelectorAll('.model-card[data-code]')) : [];
+  var modelCards = modelsGrid ? Array.prototype.slice.call(modelsGrid.querySelectorAll('[data-code]')) : [];
   var currentFgFilter = 'all';
   var fgCounts = { all: modelCards.length, short: 0, over: 0 };
   var labels = {
@@ -638,97 +652,156 @@ $partsBase = ui_parts_base_url();
     .catch(function () {});
 
   function applyFgData(d) {
-    var short = 0, over = 0, gapTotal = 0;
-    modelCards.forEach(function (card) {
-      var row = d.codes[card.getAttribute('data-code') || ''];
-      var line = card.querySelector('.model-card-fg');
-      if (!row || !line) { return; }
-      var base = 'ขั้นต่ำ ' + fgNum(row.min) + ' + PO ' + fgNum(row.po);
-      var pct = Number(row.req) > 0 ? Math.min(100, Math.round(Number(row.have) / Number(row.req) * 100)) : 100;
-      var color = pct >= 100 ? 'var(--success,#16a34a)' : (pct < 50 ? 'var(--danger,#dc2626)' : 'var(--warning,#d97706)');
-      if (row.state === 'ok') {
-        // ระบบ Setup บอกว่าไม่ขาด แต่ทะเบียนเรานับได้น้อยกว่า — ยอดฝั่งเราไม่น่าเชื่อถือพอจะลากแถบ
-        pct = 100;
-        color = 'var(--border-strong,#cbd5e1)';
-      }
+    var short = 0, over = 0, gapTotal = 0, newTotal = 0, poolTotal = 0;
+    modelCards.forEach(function (row0) {
+      var row = d.codes[row0.getAttribute('data-code') || ''];
+      if (!row) { return; }
+      // บอกให้ชัดว่า PO ค้างต้องใช้เครื่องกี่เครื่อง ไม่ใช่แค่ "+ PO 2" ที่อ่านแล้วไม่รู้ว่า 2 อะไร
+      var base = 'ขั้นต่ำ ' + fgNum(row.min) + ' + PO ต้องใช้ ' + fgNum(row.po) + ' เครื่อง';
+      // have = เครื่องใหม่อย่างเดียว · pool = คลังพร้อมเช่า · ยอดที่มีใช้คิดขาด = ทั้งสองรวมกัน
+      var have = Number(row.new) || 0;
+      var pool = Math.max(0, Number(row.rent) || 0);
+      var req = Number(row.req) || 0;
+      newTotal += have;
       var tag = '';
+      var gap = -1;
       if (row.state === 'short') {
         short++;
-        gapTotal += Number(row.gap) || 0;
-        card.setAttribute('data-fg', 'short');
+        gap = Number(row.gap) || 0;
+        gapTotal += gap;
+        row0.setAttribute('data-fg', 'short');
         tag = '<span class="fg-chip fg-chip-short">ขาด ' + fgNum(row.gap) + '</span>';
-      } else if (row.state === 'over') {
-        over++;
-        card.setAttribute('data-fg', 'over');
-        tag = '<span class="fg-chip fg-chip-over">เกิน ' + fgNum(row.over) + '</span>';
+      } else if (row.state === 'muted') {
+        // ขาดจริง แต่ตั้งไม่ให้แจ้งเตือนรุ่นนี้ไว้ — โชว์ยอด แต่ไม่นับรวมในยอดขาด
+        short++;
+        gap = Number(row.gap) || 0;
+        row0.setAttribute('data-fg', 'short');
+        tag = '<span class="fg-chip fg-chip-muted" title="ปิดแจ้งเตือนรุ่นนี้ไว้ ไม่นับรวมในยอดขาด">ขาด ' + fgNum(row.gap) + ' · ปิดแจ้งเตือน</span>';
       } else {
-        card.setAttribute('data-fg', 'over');
         over++;
-        tag = '<span class="fg-chip fg-chip-over">ครบตามขั้นต่ำ</span>';
+        row0.setAttribute('data-fg', 'over');
+        // เกิน 0 = มีเท่าที่ต้องมีพอดี — เขียนว่า "ครบพอดี" อ่านง่ายกว่าเลข 0
+        tag = Number(row.over) > 0
+          ? '<span class="fg-chip fg-chip-over">เกิน ' + fgNum(row.over) + '</span>'
+          : '<span class="fg-chip fg-chip-over">ครบพอดี</span>';
       }
-      card.setAttribute('data-gap', row.state === 'short' ? String(row.gap) : '-1');
-      // แยกสองอย่างที่ปนกันอยู่: ของที่ผลิตใหม่ กับเครื่องเช่าที่รับคืนแล้ววนกลับมาปล่อยใหม่
-      var rentQty = Number(row.rent) || 0;
-      var newQty = Number(row.new_qty !== undefined ? row.new_qty : row['new']) || 0;
-      var pctRent = 0;
-      if (row.state !== 'ok' && rentQty > 0 && Number(row.req) > 0) {
-        pctRent = Math.min(pct, Math.round(rentQty / Number(row.req) * 100));
-      }
-      var sub = row.state === 'ok'
-        ? 'ตามระบบ Setup · ' + base
-        : '<b>' + fgNum(row.have) + '</b>/' + fgNum(row.req) + ' · ' + base
-          + (rentQty > 0 ? ' · <span class="fg-rent">เช่าวนกลับ ' + fgNum(rentQty) + '</span>' : '');
-      line.innerHTML = '<span class="mc-blabel">คลัง</span>'
-        + '<div class="fg-bar" title="ผลิตใหม่ ' + fgNum(newQty) + ' · เช่าวนกลับ ' + fgNum(rentQty)
-        + ' · รวม ' + fgNum(row.have) + ' จากที่ต้องมี ' + fgNum(row.req) + '">'
-        + '<span style="width:' + (pct - pctRent) + '%;background:' + color + '"></span>'
-        + (pctRent > 0 ? '<span style="width:' + pctRent + '%;background:var(--st-rental,#93c5fd)"></span>' : '')
-        + '</div>'
-        + tag
-        + '<span class="fg-line-sub">' + sub + '</span>';
-      line.hidden = false;
-      card.title = 'คลังพร้อมขาย ' + fgNum(row.have) + ' · ต้องการ ' + fgNum(row.req) + ' (' + base + ')'
-        + (row.src === 'registry' ? ' · นับจากทะเบียนเรา' : ' · ตัวเลขจากระบบ Setup');
+      row0.setAttribute('data-gap', String(gap));
+      row0.setAttribute('data-over', row.state === 'over' ? String(Number(row.over) || 0) : '-1');
 
-      // กดบรรทัดนี้ = รายการ S/N ในสต็อก + เลข PO ค้าง (ของเดิมที่เคยอยู่ในแท็บ "ต้องผลิตเพิ่ม")
-      var code = card.getAttribute('data-code') || '';
-      var title = card.querySelector('.model-card-name');
-      line.setAttribute('role', 'button');
-      line.setAttribute('tabindex', '0');
-      line.title = 'ดูหมายเลขสินค้าในสต็อก + PO ค้างของรุ่นนี้';
-      line.addEventListener('click', function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        showListModal('หมายเลขสินค้าในสต็อก: ' + (title ? title.textContent : code),
-          fgBase + '?type=fg_shortage_serials&code=' + encodeURIComponent(code), '');
-      });
-      line.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); line.click(); }
-      });
-      // ชี้ที่แถบคลังแล้วให้การ์ดหยุดทำตัวเหมือนกำลังจะถูกกด — จะได้รู้ว่ากดตรงนี้ไปคนละที่
-      line.addEventListener('mouseenter', function () { card.classList.add('fg-hover'); });
-      line.addEventListener('mouseleave', function () { card.classList.remove('fg-hover'); });
+      var cell = function (key) { return row0.querySelector('[data-fg-cell="' + key + '"]'); };
+      var put = function (key, val, sub2) {
+        var c = cell(key);
+        if (!c) { return; }
+        c.innerHTML = '<b>' + fgNum(val) + '</b>'
+          + (sub2 ? '<div class="cell-sub muted">' + sub2 + '</div>' : '');
+      };
+      // จอมือถือซ่อนคอลัมน์ต้องมี/คลังพร้อมเช่า — สรุปไว้ใต้ตัวเลขแทน
+      // สูตรอยู่ใต้แถบแล้ว — บนมือถือเหลือแค่คำกำกับตัวเลข
+      put('ours', have, '<span class="fg-m-only">เครื่องใหม่'
+        + (pool > 0 ? ' · คลังพร้อมเช่า ' + fgNum(pool) : '') + '</span>');
+      // ขั้นต่ำ / PO / ต้องมี อยู่ในบรรทัดสูตรใต้แถบแล้ว ไม่แยกคอลัมน์ซ้ำ
+      poolTotal += pool;
+      put('pool', pool, '');
+      // แถบแบ่งสีตามชนิด (สีสถานะ "ใหม่" / "เช่า") · เต็มแถบ = ยอดที่ต้องมี
+      // มีเกินกว่าที่ต้องมี → ขยายสเกล แล้วส่วนที่เกินเป็นสีจาง
+      var bar = cell('bar');
+      if (bar) {
+        var scale = Math.max(req, have + pool, 1);
+        var pc = function (n) { return Math.round(n / scale * 1000) / 10; };
+        var newIn = Math.min(have, req);
+        var poolIn = Math.min(pool, Math.max(0, req - newIn));
+        var seg = function (cls, n) { return n > 0 ? '<i class="' + cls + '" style="width:' + pc(n) + '%"></i>' : ''; };
+        bar.innerHTML = seg('is-new', newIn) + seg('is-pool', poolIn)
+          + seg('is-new is-extra', have - newIn) + seg('is-pool is-extra', pool - poolIn);
+        bar.title = 'เครื่องใหม่ ' + fgNum(have) + (pool > 0 ? ' · คลังพร้อมเช่า ' + fgNum(pool) : '')
+          + ' · ต้องมี ' + fgNum(req) + (pool > 0 ? ' (ยอดขาดนับเฉพาะเครื่องใหม่)' : '');
+
+        // หมุด ▼ เหนือแถบ: ดำ = ขั้นต่ำ · ส้ม = ขั้นต่ำ + PO (= ต้องมี) — PO เป็น 0 จะทับกัน เหลือหมุดเดียว
+        var minQ = Number(row.min) || 0;
+        var poQ = Number(row.po) || 0;
+        var marks = cell('marks');
+        if (marks) {
+          marks.querySelectorAll('.fg-mark').forEach(function (m) { m.remove(); });
+          // ชิดขอบไม่ให้หมุดครึ่งซีกล้นออกนอกช่อง
+          var at = function (n) { return Math.min(99, Math.max(1, pc(n))); };
+          var mark = function (cls, n, tip) {
+            var el = document.createElement('span');
+            el.className = 'fg-mark' + cls;
+            el.style.left = at(n) + '%';
+            el.textContent = '▼';
+            el.title = tip;
+            marks.appendChild(el);
+          };
+          if (minQ > 0) { mark('', minQ, 'ขั้นต่ำ ' + fgNum(minQ)); }
+          if (poQ > 0 || minQ === 0) { mark(' is-po', req, 'ขั้นต่ำ ' + fgNum(minQ) + ' + PO ' + fgNum(poQ) + ' = ต้องมี ' + fgNum(req)); }
+        }
+        var note = cell('note');
+        if (note) {
+          note.textContent = 'ขั้นต่ำ ' + fgNum(minQ) + ' + PO ' + fgNum(poQ) + ' = ต้องมี ' + fgNum(req);
+        }
+      }
+      var v = cell('verdict');
+      if (v) {
+        // ปุ่ม "ดู S/N" ไม่มีแล้ว — ทั้งโซนตั้งแต่แถบสีถึงคอลัมน์นี้กดดูได้ มีลูกศรบอกไว้
+        v.innerHTML = tag + '<span class="fg-go" aria-hidden="true">›</span>';
+      }
+      var stockTip = 'เครื่องใหม่ ' + fgNum(have) + (pool > 0 ? ' · คลังพร้อมเช่า ' + fgNum(pool) + ' · รวม ' + fgNum(have + pool) : '')
+        + ' · ต้องมี ' + fgNum(req) + ' (' + base + ')'
+        + (row.src === 'registry' ? '' : ' · ตัวเลขจากระบบ Setup (รุ่นนี้ไม่มีในทะเบียนเรา)')
+        + ' — กดดูหมายเลขสินค้าในสต็อก';
+      row0.querySelectorAll('.fg-zone-stock').forEach(function (td) { td.title = stockTip; });
     });
 
     if (!short && !over) { return; }
     fgCounts = { all: modelCards.length, short: short, over: over };
-    // รุ่นที่ขาดหนักสุดขึ้นก่อน ที่เหลือเรียงตามจำนวนเครื่องเหมือนเดิม
+    // ขาดมากสุดขึ้นก่อน → รุ่นที่พอดี → เกินน้อยไปมาก (รุ่นที่ยังไม่มีตัวเลขอยู่ท้ายสุด)
+    var rank = function (el) {
+      var g = Number(el.getAttribute('data-gap') || -1);
+      if (g >= 0) { return 100000 + g; }
+      var o = Number(el.getAttribute('data-over'));
+      return el.hasAttribute('data-over') && o >= 0 ? 50000 - o : -1;
+    };
     modelCards.slice().sort(function (a, b) {
-      var ga = Number(a.getAttribute('data-gap') || -1), gb = Number(b.getAttribute('data-gap') || -1);
-      return gb - ga || Number(b.getAttribute('data-count') || 0) - Number(a.getAttribute('data-count') || 0);
+      return rank(b) - rank(a) || Number(b.getAttribute('data-count') || 0) - Number(a.getAttribute('data-count') || 0);
     }).forEach(function (card) { modelsGrid.appendChild(card); });
+
+    if (fgSummary) {
+      document.getElementById('dash-fg-sum-new').textContent = fgNum(newTotal) + ' เครื่อง';
+      document.getElementById('dash-fg-sum-pool').textContent = fgNum(poolTotal) + ' เครื่อง';
+      document.getElementById('dash-fg-sum-models').textContent = fgNum(short) + ' รุ่น';
+      document.getElementById('dash-fg-sum-gap').textContent = fgNum(gapTotal) + ' เครื่อง';
+      fgSummary.hidden = currentView !== 'models';
+    }
 
     setFgLabel(fgBtns[1], 'ต้องผลิตเพิ่ม', short);
     setFgLabel(fgBtns[2], 'ครบแล้ว', over);
     setFgLabel(fgBtns[0], 'ทั้งหมด', modelCards.length);
     if (fgHint) {
-      fgHint.textContent = 'ขาด = คลังพร้อมขาย − (ขั้นต่ำ + PO ค้าง)'
-        + (gapTotal > 0 ? ' · ขาดรวม ' + fgNum(gapTotal) + ' เครื่อง' : '')
+      fgHint.textContent = 'ขาด = (เครื่องใหม่ + คลังพร้อมเช่า) − (ขั้นต่ำ + PO ค้าง)'
         + (d.updated ? ' · ข้อมูล ณ ' + d.updated : '')
         + (d.stale ? ' (ดึงรอบล่าสุดไม่สำเร็จ — แสดงข้อมูลเก่า)' : '');
     }
     if (fgFilters) { fgFilters.hidden = currentView !== 'models'; }
     if (fgFoot) { fgFoot.hidden = currentView !== 'models'; }
+  }
+
+  // คลิกในตารางรุ่น: รูป/ชื่อรุ่น = การผลิตรายปี · แถบสีถึงคอลัมน์สุดท้าย = หมายเลขสินค้าในสต็อก
+  if (modelsGrid) {
+    modelsGrid.addEventListener('click', function (e) {
+      var tr = e.target.closest('tr.dash-model-row');
+      if (!tr) { return; }
+      var name = tr.getAttribute('data-name') || '';
+      var code = tr.getAttribute('data-code') || '';
+      var stockZone = e.target.closest('.fg-zone-stock');
+      if (stockZone && code && tr.getAttribute('data-fg') !== 'none') {
+        showListModal('หมายเลขสินค้าในสต็อก: ' + name,
+          fgBase + '?type=fg_shortage_serials&code=' + encodeURIComponent(code), '');
+        return;
+      }
+      if (e.target.closest('.fg-zone-name') || stockZone) {
+        showListModal('การผลิตรุ่น ' + name + ' รายปี', tr.getAttribute('data-years-url'), tr.getAttribute('data-list-url'));
+      }
+    });
   }
 
   function setFgLabel(btn, text, n) {
@@ -845,6 +918,7 @@ $partsBase = ui_parts_base_url();
     // แถบกรองรุ่นกับลิงก์ตั้งค่าเป็นของฝั่งจำนวนเครื่อง — ซ่อนตามแท็บ และซ่อนไว้ก่อนถ้ายังไม่มีตัวเลข
     var fgReady = fgCounts.short > 0 || fgCounts.over > 0;
     if (fgFilters) fgFilters.hidden = !(view === 'models' && fgReady);
+    if (fgSummary) fgSummary.hidden = !(view === 'models' && fgReady);
     if (fgFoot) fgFoot.hidden = !(view === 'models' && fgReady);
     var lb = labels[view] || labels.models;
     if (titleText) titleText.textContent = lb.title;

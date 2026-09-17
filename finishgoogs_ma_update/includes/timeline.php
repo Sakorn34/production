@@ -214,26 +214,8 @@ function asset_timeline_items($id) {
         $body[] = 'สถานะงาน: ' . $stmap[$r['status']] . ($r['closed_at'] ? ' (ปิดงาน ' . dthai($r['closed_at']) . ')' : '');
         $tl[] = ['d' => timeline_dt($r['d']), 'type_key' => 'repair', 'type' => ui_timeline_type_html('repair'), 'html' => implode('<br>', $body)];
     }
-    // ตัดแถวที่มาจากการ sync สถานะออก — ไม่ใช่การเคลื่อนไหวของเครื่องจริง แค่ระบบคำนวณ
-    // ป้ายสถานะใหม่ แต่เดิมมันขึ้นเป็น "เข้าคลัง/ออกจากคลัง" ตาม direction ที่เดามาว่า
-    // "ปลายทางไม่ใช่ new ก็ถือว่าออก" เครื่องที่แค่เปลี่ยนจากเช่าเป็นเสื่อมสภาพจึงขึ้นว่า
-    // ออกจากคลัง ทั้งที่ไม่ได้ไปไหน · 11,022 จาก 13,142 แถวเป็นแบบนี้
-    $syncPrefix = function_exists('asset_status_sync_log_prefix')
-        ? asset_status_sync_log_prefix() : 'Sync สถานะ: ';
-    $res = qr(
-        "SELECT moved_at d, direction, reason, made_by, remark FROM stock_movements
-         WHERE asset_id=? AND (reason IS NULL OR reason NOT LIKE ?)",
-        'is',
-        [$id, $syncPrefix . '%']
-    );
-    while ($r = $res->fetch_assoc()) {
-        $body = [];
-        if ($r['reason']) $body[] = h($r['reason']);
-        if ($r['made_by']) $body[] = 'โดย: ' . h($r['made_by']);
-        if ($r['remark']) $body[] = h($r['remark']);
-        $typeKey = $r['direction'] === 'in' ? 'stock_in' : 'stock_out';
-        $tl[] = ['d' => timeline_dt($r['d']), 'type_key' => $typeKey, 'type' => ui_timeline_type_html($typeKey), 'html' => implode('<br>', $body)];
-    }
+    // ประวัติเข้า-ออกคลัง (stock_movements) ไม่แสดงใน timeline แล้ว — ส่วนใหญ่เป็นงานที่ระบบทำเอง
+    // (ซิงก์ · เคลียร์เครื่องค้าง · นับสต็อก) ปนกับงานจริงจนอ่านไม่ออก ย้ายไปดูที่ stock_movements.php (หลังบ้าน)
     $res = qr("SELECT s.out_at d, s.expected_return_at, s.returned_at, s.status, a2.asset_code replaces, c.name cust
                FROM spare_loans s LEFT JOIN assets a2 ON a2.id=s.replaces_asset_id LEFT JOIN customers c ON c.id=s.customer_id
                WHERE s.spare_asset_id=?", 'i', [$id]);

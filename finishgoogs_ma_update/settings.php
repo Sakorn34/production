@@ -4,6 +4,8 @@ require __DIR__ . '/includes/settings_gate.php';
 require_settings_access();
 require __DIR__ . '/includes/layout.php';
 require __DIR__ . '/includes/product_admin.php';
+require_once dirname(__DIR__) . '/shared/finishgood_shortage_registry.php';
+fg_shortage_ensure_min_schema();
 
 ensure_product_code_schema();
 ensure_field_input_mode_schema();
@@ -241,9 +243,17 @@ page_header('ระบบหลังบ้าน — ตั้งค่าร�
     <?= ui_icon_html('palette', 28, 'h-svg') ?>
     <div><b>ปรับแต่งหน้าตาระบบ</b><div class="muted">ข้อความ · โลโก้ · สีธีม · เมนู (ไอคอน/ลำดับ/ตำแหน่ง)</div></div>
   </a>
+  <a class="card clickable" href="<?= BASE_URL ?>/stock_scan.php">
+    <?= ui_icon_html("scan", 28, "h-svg") ?>
+    <div><b>นับสต็อกด้วยการสแกน</b><div class="muted">สแกน QR ด้วยมือถือ · ตัดสถานะเครื่องที่ไม่เจอ</div></div>
+  </a>
   <a class="card clickable" href="<?= BASE_URL ?>/stock_check.php">
     <?= ui_icon_html("clipboard", 28, "h-svg") ?>
     <div><b>เคลียร์เครื่องค้างสถานะ</b><div class="muted">เครื่องที่ยังเป็น "ใหม่" ทั้งที่ออกจากคลังแล้ว · นับสต็อก · ปิดทีละหลายเครื่อง</div></div>
+  </a>
+  <a class="card clickable" href="<?= BASE_URL ?>/stock_movements.php">
+    <?= ui_icon_html("history", 28, "h-svg") ?>
+    <div><b>ประวัติเข้า-ออกคลัง</b><div class="muted">การเปลี่ยนสถานะเครื่องทั้งหมด · ซิงก์ · เคลียร์ · นับสต็อก · ค้นตาม S/N</div></div>
   </a>
   <a class="card clickable" href="<?= BASE_URL ?>/rent_retire_sync.php">
     <?= ui_icon_html("wrench", 28, "h-svg") ?>
@@ -327,6 +337,7 @@ page_header('ระบบหลังบ้าน — ตั้งค่าร�
         <label>รหัสสินค้า (PRD)</label><input type="text" name="product_code" required placeholder="เช่น PRD004" maxlength="20">
         <label>ชื่อรุ่น</label><input type="text" name="name" required maxlength="150">
         <label>หมวด</label><input type="text" name="category" placeholder="PRD / ACC / STK" maxlength="50">
+        <label>สต็อกขั้นต่ำ</label><input type="number" name="min_stock" min="0" step="1" placeholder="เว้นว่าง = ไม่ติดตามยอดขาด">
         <?php product_admin_code_fields(null, 'new'); ?>
         <label>รูปสินค้า</label><input type="file" name="icon" accept="image/*">
         <div class="full form-modal-actions">
@@ -375,6 +386,7 @@ productCodeToggle('new');
   <label>รหัสสินค้า (PRD)</label><input type="text" name="product_code" value="<?= h($product['product_code']) ?>" required maxlength="20">
   <label>ชื่อรุ่น</label><input type="text" name="name" value="<?= h($product['name']) ?>" required maxlength="150">
   <label>หมวด</label><input type="text" name="category" value="<?= h($product['category']) ?>" maxlength="50">
+  <label>สต็อกขั้นต่ำ</label><input type="number" name="min_stock" min="0" step="1" value="<?= isset($product['min_stock']) && $product['min_stock'] !== null ? (int) $product['min_stock'] : '' ?>" placeholder="เว้นว่าง = ไม่ติดตามยอดขาด">
   <?php product_admin_code_fields($product, 'edit'); ?>
   <label>รูปสินค้า</label>
   <div>

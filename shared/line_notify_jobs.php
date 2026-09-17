@@ -515,37 +515,30 @@ function line_notify_run_job(string $job, array $opts = []): array
             break;
 
         case 'finishgood_shortage':
-            // ตัวเลขหลักมาจาก setupsystem · รุ่นที่เลือกไว้นับยอดคงเหลือจากทะเบียนเครื่องของเราแทน
-            require_once __DIR__ . '/finishgood_shortage_client.php';
-            require_once __DIR__ . '/finishgood_shortage_filter.php';
-            require_once __DIR__ . '/finishgood_shortage_registry.php';
+            // ชุดข้อมูลเดียวกับการ์ด "จำนวนเครื่องแยกตามรุ่น" บน Dashboard ทุกตัว —
+            // นับเครื่องใหม่จากทะเบียนเรา · ขั้นต่ำ/PO จาก biton_stockparts · ตัดรุ่นที่ปิดแจ้งเตือน
+            // ดึง API ของ setupsystem ใหม่ทุกรอบ (ต่อไม่ได้ก็ยังคิดจากทะเบียนเราได้ ไม่ข้ามการแจ้งเตือน)
+            require_once __DIR__ . '/finishgood_shortage_dashboard.php';
             try {
-                $fetched = finishgood_shortage_fetch();
-                if (!$fetched['ok']) {
-                    $result['skipped'] = $fetched['error'];
+                $fg = fg_shortage_dashboard_data(true);
+                if (!$fg['ok']) {
+                    $result['skipped'] = $fg['registry_error'] !== '' ? $fg['registry_error'] : $fg['error'];
                     break;
                 }
-                // รุ่นที่เลือกไว้ใช้ยอดคงเหลือจากทะเบียนเครื่องของเรา — setupsystem ยังนับเครื่องที่ปล่อยเช่าเป็นของในคลัง
-                // คำนวณไม่ได้ = ใช้ตัวเลขของ setupsystem ตามเดิม ไม่ใช่ข้ามการแจ้งเตือนทั้งชุด
-                $registry = fg_shortage_apply_registry($fetched['items']);
-                $fetched['items'] = $registry['items'];
-                $result['registry'] = array_keys($registry['replaced']);
-                if ($registry['error'] !== '') {
-                    $result['registry_error'] = $registry['error'];
+                if ($fg['error'] !== '') {
+                    $result['api_error'] = $fg['error'];
                 }
-                // ตัดรุ่นที่ปิดแจ้งเตือนไว้ออกก่อน
-                $filtered = fg_shortage_filter_items($fetched['items']);
-                $fetched['items'] = $filtered['items'];
-                $result['excluded'] = $filtered['skipped'];
-                if ($fetched['items'] === []) {
-                    $result['skipped'] = $filtered['skipped'] > 0
+                $result['excluded'] = $fg['skipped'];
+                if ($fg['items'] === []) {
+                    $result['skipped'] = $fg['skipped'] > 0
                         ? 'ทุกรุ่นที่ขาดถูกปิดแจ้งเตือนไว้'
                         : 'no shortage';
                     break;
                 }
+                $fetched = ['items' => $fg['items']];
                 line_notify_dispatch('finishgood.shortage', [
                     'items'     => $fetched['items'],
-                    'timestamp' => $fetched['timestamp_text'],
+                    'timestamp' => $fg['timestamp_text'] !== '' ? $fg['timestamp_text'] : date('d/m/Y H:i'),
                 ], array_merge($dispatchOpts, ['dedup_key' => 'finishgood.shortage:scan:' . date('Y-m-d')]));
                 $result['dispatched'] = 1;
                 $result['event_key'] = 'finishgood.shortage';

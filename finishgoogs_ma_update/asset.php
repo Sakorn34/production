@@ -491,7 +491,8 @@ page_header('เครื่อง ' . $a['asset_code'], false);
 <?= asset_maintenance_section_html($maRepairInfo) ?>
 
 <h2>ประวัติทั้งหมด (<?= count($tl) ?> รายการ) — เรียงตามเวลาบันทึก</h2>
-<p class="muted" style="margin:-6px 0 12px; font-size:13px">ทุกประเภทงานอยู่ในเส้นเดียวกัน เรียงจากอดีต → ปัจจุบัน</p>
+<?php $moveCount = (int) qr('SELECT COUNT(*) FROM stock_movements WHERE asset_id = ?', 'i', [$id])->fetch_row()[0]; ?>
+<p class="muted" style="margin:-6px 0 12px; font-size:13px">ทุกประเภทงานอยู่ในเส้นเดียวกัน เรียงจากอดีต → ปัจจุบัน<?php if ($moveCount > 0) { ?> · <a href="<?= h(BASE_URL . '/stock_movements.php?q=' . urlencode((string) $a['asset_code'])) ?>">ประวัติเข้า-ออกคลัง (<?= number_format($moveCount) ?>) ›</a><?php } ?></p>
 <?php asset_timeline_chrono_html($tl, 'asset_tl_actions', $id); ?>
 
 <div id="asset-snippet-overlay" class="notif-overlay ma-sn-overlay" hidden>

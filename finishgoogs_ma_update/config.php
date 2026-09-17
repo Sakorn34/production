@@ -33,7 +33,7 @@ function app_base_url() {
 define('BASE_URL', app_base_url());
 define('APP_NAME', 'ระบบทะเบียนเครื่องและซ่อมบำรุง');
 /** รหัสชุด deploy — อัปเมื่อ build patch แล้วเทียบกับ server ว่าอัปครบหรือยัง */
-define('APP_RELEASE_VERSION', '2026-09-16_144516');
+define('APP_RELEASE_VERSION', '2026-09-17_110158');
 
 /**
  * โหลด secrets แบบ cache ต่อ request
@@ -451,7 +451,8 @@ function ensure_asset_status_sold_schema()
         if ($res && ($row = $res->fetch_assoc())) {
             $type = (string) ($row['Type'] ?? '');
             $missing = false;
-            foreach (['sold', 'retired', 'lost'] as $val) {
+            // unknown = "ไม่มีสถานะ" จากการนับสต็อกด้วยการสแกน (เครื่องที่ไม่เจอและไม่มีหลักฐานอะไรเลย)
+            foreach (['sold', 'retired', 'lost', 'unknown'] as $val) {
                 if (stripos($type, "'" . $val . "'") === false) {
                     $missing = true;
                     break;
@@ -460,7 +461,7 @@ function ensure_asset_status_sold_schema()
             if ($missing) {
                 db()->query(
                     "ALTER TABLE assets MODIFY status"
-                    . " ENUM('new','rental','spare','sold','retired','lost') NOT NULL DEFAULT 'new'"
+                    . " ENUM('new','rental','spare','sold','retired','lost','unknown') NOT NULL DEFAULT 'new'"
                 );
             }
         }

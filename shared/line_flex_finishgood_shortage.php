@@ -3,7 +3,7 @@
  * shared/line_flex_finishgood_shortage.php — Flex แจ้งเตือนสินค้าสำเร็จรูปที่ต้องผลิตเพิ่ม
  *
  * วัตถุประสงค์: ประกอบ Flex carousel จากรายการที่ "Stock ที่ต้องผลิต" ติดลบ
- *              (คงเหลือ + ระบบเช่า) − (ขั้นต่ำ + PO) < 0
+ *              (เครื่องใหม่ + คลังพร้อมเช่า) − (ขั้นต่ำ + PO) < 0  (ชุดเดียวกับการ์ด Dashboard)
  *
  * ไฟล์นี้ไม่แตะฐานข้อมูล — รับ array ที่คำนวณมาแล้วเท่านั้น จึงเทสต์ได้โดยไม่ต้องต่อ DB
  *
@@ -233,6 +233,7 @@ function line_flex_fg_row(array $item): array
                     line_flex_fg_bar($available, $required, $color),
 
                     line_flex_fg_metric_pill(
+                        // ใช้รูปแบบเดิมที่คนอ่านคุ้น — "คงเหลือ  2 (+11 เช่า)  = 13"
                         'คงเหลือ',
                         (int)$item['stock_qty'] . $leasingSuffix,
                         $available,
@@ -370,7 +371,7 @@ function line_flex_fg_bubble(array $items, int $page, int $totalPages, int $tota
             'contents' => [
                 ['type' => 'text', 'text' => 'แถบเส้น = Stock คงเหลือ(+เช่า) ต่อ ขั้นต่ำ+PO', 'size' => 'xxs', 'color' => '#b02a1e', 'align' => 'center', 'wrap' => true],
                 ['type' => 'separator', 'margin' => 'sm', 'color' => '#ffd9d3'],
-                ['type' => 'text', 'text' => '✅ Setup System · เช็ค Stock สินค้าสำเร็จรูป', 'size' => 'xxs', 'color' => '#bbbbbb', 'align' => 'center', 'margin' => 'sm'],
+                ['type' => 'text', 'text' => '✅ เช็ค Stock สินค้าสำเร็จรูป', 'size' => 'xxs', 'color' => '#bbbbbb', 'align' => 'center', 'margin' => 'sm'],
             ],
         ],
     ];

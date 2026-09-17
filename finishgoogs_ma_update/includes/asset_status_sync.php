@@ -3,7 +3,7 @@
  * includes/asset_status_sync.php
  * ────────────────────────────────────────────────────────────────────────────────
  * sync assets.status จากระบบเช่า (biton_leasing) และการเบิกขาย (biton_stockparts)
- * ลำดับความสำคัญ: sold > rental (เช่าอยู่/MA) > new (รับคืนแล้ว) · ไม่ทับ spare ยกเว้นขายแล้ว
+ * กติกา: ลงทะเบียนในระบบเช่า = เครื่องเช่า (ยกเว้นปลดระวาง/สูญหาย) > เบิกขาย = ขายแล้ว · ไม่ทับ spare
  * ────────────────────────────────────────────────────────────────────────────────
  */
 
@@ -105,9 +105,9 @@ function asset_status_target_from_external(string $current, ?array $sale, ?array
         if (asset_status_leasing_implies_retired($lease)) {
             return ['target' => 'retired', 'reason' => 'ระบบเช่าแจ้งปลดระวาง'];
         }
-        if (asset_status_leasing_implies_rental($lease)) {
-            return ['target' => 'rental', 'reason' => 'สถานะระบบเช่า'];
-        }
+        // ลงทะเบียนในระบบเช่าแล้ว = เครื่องเช่า ไม่ว่าจะอยู่กับลูกค้า รอ MA หรือรับคืนรอปล่อยเช่าใหม่
+        // (เดิมเครื่องที่รับคืนเข้าคลังเช่าถูกนับเป็น "ใหม่" ทำให้ยอดสต็อกผลิตใหม่ปนเครื่องเช่าวนกลับ)
+        return ['target' => 'rental', 'reason' => asset_status_leasing_implies_rental($lease) ? 'สถานะระบบเช่า' : 'ลงทะเบียนในระบบเช่า (คลังเช่า)'];
     }
 
     if ($sale && !empty($sale['sold']) && empty($sale['from_delivery'])) {
@@ -118,12 +118,6 @@ function asset_status_target_from_external(string $current, ?array $sale, ?array
         return ['target' => null, 'reason' => 'เครื่องสำรอง — ไม่ sync อัตโนมัติ'];
     }
 
-    // เครื่องที่เคยปลดระวาง/สูญหายแล้วระบบเช่าเปลี่ยนใจ ก็ต้องกลับเข้าคลังได้เหมือนเครื่องเช่า
-    // (มาถึงตรงนี้ได้แปลว่าไม่เข้ากฎ Lost/Asset Retirement ข้างบนแล้ว)
-    if (in_array($current, ['rental', 'retired', 'lost'], true)
-        && $lease && asset_status_leasing_implies_new($lease)) {
-        return ['target' => 'new', 'reason' => 'รับคืน/คลังพร้อมเช่า'];
-    }
 
     // ส่งมอบไปไซต์งานแล้วและไม่มีชื่อในระบบเช่าเลย = ขายขาด
     // วางท้ายสุดเพราะหลักฐานเป็นแค่ประวัติการส่งมอบ ไม่มีใบเบิกขายรองรับ
@@ -169,6 +163,63 @@ function asset_status_sync_log(int $assetId, string $from, string $to, string $r
  * @param bool                                  $write
  * @return array{changed:bool,asset_code:string,from:string,to:string,reason:string}
  */
+/**
+ * asset id ที่สแกนเจอในคลังตอนนับสต็อกรอบล่าสุด (รอบที่ยังเปิดหรือจบแล้ว ไม่นับรอบที่ยกเลิก)
+ *
+ * @return array<int,bool>
+ */
+if (!defined('ASSET_STATUS_SCAN_WINDOW_DAYS')) {
+    define('ASSET_STATUS_SCAN_WINDOW_DAYS', 30);
+}
+
+function asset_status_scanned_ids(): array
+{
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+    $cache = [];
+    try {
+        $t = db()->query("SHOW TABLES LIKE 'stock_scan_items'");
+        if (!$t || $t->num_rows === 0) {
+            return $cache;
+        }
+        // นับสต็อกมักแบ่งทำหลายรอบ (ทีละรุ่น/ทีละโซน) — ถือว่าเครื่องที่สแกนเจอในรอบไหนก็ได้
+        // ภายใน ASSET_STATUS_SCAN_WINDOW_DAYS วันยังอยู่ในคลัง ไม่ใช่ดูแค่รอบล่าสุด
+        // (เดิมดูรอบล่าสุดรอบเดียว รอบใหม่ที่สแกนแค่บางรุ่นเลยทำให้เครื่องจากรอบก่อนถูกตัดออก)
+        $res = qr(
+            "SELECT i.asset_id, MAX(i.scanned_at) AS at, MAX(i.session_id) AS sid
+             FROM stock_scan_items i JOIN stock_scan_sessions s ON s.id = i.session_id
+             WHERE i.result = 'ok' AND i.asset_id IS NOT NULL
+               AND s.status IN ('open','applied')
+               AND i.scanned_at >= NOW() - INTERVAL " . (int) ASSET_STATUS_SCAN_WINDOW_DAYS . " DAY
+             GROUP BY i.asset_id"
+        );
+        while ($r = $res->fetch_assoc()) {
+            $cache[(int) $r['asset_id']] = ['at' => (string) $r['at'], 'session' => (int) $r['sid']];
+        }
+        if ($cache) {
+            // มีคนเปลี่ยนสถานะเครื่องนั้นเองหลังสแกน (ขาย/ส่งเช่า/ซิงก์) = เชื่อการเปลี่ยนครั้งหลัง
+            // ไม่นับการเปลี่ยนที่มาจากหน้านับสต็อกเอง (รวมการย้อนกลับของมัน)
+            $res = qr(
+                "SELECT asset_id, MAX(moved_at) AS at FROM stock_movements
+                 WHERE moved_at >= NOW() - INTERVAL " . (int) ASSET_STATUS_SCAN_WINDOW_DAYS . " DAY
+                   AND reason NOT LIKE '%นับสต็อก (สแกน)%'
+                 GROUP BY asset_id"
+            );
+            while ($r = $res->fetch_assoc()) {
+                $id = (int) $r['asset_id'];
+                if (isset($cache[$id]) && (string) $r['at'] > $cache[$id]['at']) {
+                    unset($cache[$id]);
+                }
+            }
+        }
+    } catch (\Throwable $e) {
+        $cache = [];
+    }
+    return $cache;
+}
+
 function asset_status_sync_row(array $row, array $saleMap, array $leaseMap, bool $write = true): array
 {
     $id = (int) ($row['id'] ?? 0);
@@ -177,6 +228,7 @@ function asset_status_sync_row(array $row, array $saleMap, array $leaseMap, bool
     if ($current === '') {
         $current = 'new';
     }
+
 
     $resolved = asset_status_target_from_external(
         $current,

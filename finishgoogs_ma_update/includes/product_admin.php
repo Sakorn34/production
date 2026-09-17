@@ -69,6 +69,9 @@ function product_admin_handle_post() {
           [$pcode, $name, $cat, $code['code_mode'], $code['code_prefix'], $code['code_year_era'],
            $code['running_digits'], $code['code_use_prefix'], $code['code_use_year'], $code['code_use_month'],
            $icon, $pid]);
+        if (array_key_exists('min_stock', $_POST) && function_exists('fg_shortage_save_min_stock')) {
+            fg_shortage_save_min_stock([$pcode => (string) $_POST['min_stock']]);
+        }
         flash_set('บันทึกข้อมูลรุ่นและรูปแบบรหัสแล้ว');
         return BASE_URL . '/settings.php?product=' . $pid;
     }
@@ -102,6 +105,9 @@ function product_admin_handle_post() {
           [$pcode, $name, $cat !== '' ? $cat : null, $code['code_mode'], $code['code_prefix'], $code['code_year_era'],
            $code['running_digits'], $code['code_use_prefix'], $code['code_use_year'], $code['code_use_month'], $icon]);
         $newId = (int)db()->insert_id;
+        if (array_key_exists('min_stock', $_POST) && function_exists('fg_shortage_save_min_stock')) {
+            fg_shortage_save_min_stock([$pcode => (string) $_POST['min_stock']]);
+        }
         flash_set('เพิ่มรุ่นสินค้าใหม่แล้ว');
         return BASE_URL . '/settings.php?product=' . ($newId > 0 ? $newId : 0);
     }
