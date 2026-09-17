@@ -1216,3 +1216,19 @@ button:active, .btn:active { transform: scale(.96); }
   color: var(--text-muted, #6b7280);
   font-style: italic;
 }
+
+/* เมนูหลังบ้านแบบจัดหมวด (settings.php) — หัวหมวด + รายการแถวเดียว แทนการ์ดใหญ่เรียงยาว */
+.admin-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; margin-bottom: 20px; align-items: start; }
+.admin-group { background: var(--surface, #fff); border: 1px solid var(--border); border-radius: var(--radius, 12px); padding: 12px 6px 6px; }
+.admin-group-title { font-size: calc(14px * var(--font-scale, 1)); font-weight: 700; margin: 0 10px 6px !important; padding: 0; }
+.admin-group-title .muted { font-size: calc(12px * var(--font-scale, 1)); font-weight: 400; margin-left: 4px; }
+.admin-links { display: flex; flex-direction: column; }
+.admin-link { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 8px; color: inherit; text-decoration: none; }
+.admin-link:hover, .admin-link:focus-visible { background: var(--surface-soft, #f4f1fa); }
+.admin-link-ic { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; background: var(--surface-soft, #f4f1fa); color: var(--primary); }
+.admin-link-text { display: flex; flex-direction: column; min-width: 0; }
+.admin-link-text b { font-size: calc(14px * var(--font-scale, 1)); font-weight: 600; }
+.admin-link-text .muted { font-size: calc(12px * var(--font-scale, 1)); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-link-go { color: var(--text-faint, #a39fb3); font-size: 18px; }
+.admin-link:hover .admin-link-go { color: var(--primary); }
+@media (max-width: 520px) { .admin-groups { grid-template-columns: 1fr; } .admin-link-text .muted { white-space: normal; } }

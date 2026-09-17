@@ -226,69 +226,55 @@ if ($pid) {
 }
 page_header('ระบบหลังบ้าน — ตั้งค่ารุ่นและฟิลด์');
 ?>
-<div class="admin-cards">
-  <a class="card clickable" href="<?= BASE_URL ?>/line_notify_settings.php">
-    <?= ui_icon_html('bell', 28, 'h-svg') ?>
-    <div><b>แจ้งเตือน LINE</b><div class="muted">Token · Group ID · เปิด/ปิด event · ทดสอบส่ง · Outbox</div></div>
-  </a>
-  <a class="card clickable" href="<?= BASE_URL ?>/work_report.php">
-    <?= ui_icon_html('chart', 28, 'h-svg') ?>
-    <div><b>สรุปงานรายคน</b><div class="muted">งานรายคนต่อรอบเดือน · ทะเบียนคน · ผูกไลน์ · ส่งสรุป</div></div>
-  </a>
-  <a class="card clickable" href="<?= BASE_URL ?>/server_config.php">
-    <?= ui_icon_html('settings', 28, 'h-svg') ?>
-    <div><b>ตั้งค่า Server / Deploy</b><div class="muted">Path secrets · DB ทั้ง 3 ตัว · SSO · ทดสอบการเชื่อมต่อ</div></div>
-  </a>
-  <a class="card clickable" href="<?= BASE_URL ?>/appearance.php">
-    <?= ui_icon_html('palette', 28, 'h-svg') ?>
-    <div><b>ปรับแต่งหน้าตาระบบ</b><div class="muted">ข้อความ · โลโก้ · สีธีม · เมนู (ไอคอน/ลำดับ/ตำแหน่ง)</div></div>
-  </a>
-  <a class="card clickable" href="<?= BASE_URL ?>/stock_scan.php">
-    <?= ui_icon_html("scan", 28, "h-svg") ?>
-    <div><b>นับสต็อกด้วยการสแกน</b><div class="muted">สแกน QR ด้วยมือถือ · ตัดสถานะเครื่องที่ไม่เจอ</div></div>
-  </a>
-  <a class="card clickable" href="<?= BASE_URL ?>/stock_check.php">
-    <?= ui_icon_html("clipboard", 28, "h-svg") ?>
-    <div><b>เคลียร์เครื่องค้างสถานะ</b><div class="muted">เครื่องที่ยังเป็น "ใหม่" ทั้งที่ออกจากคลังแล้ว · นับสต็อก · ปิดทีละหลายเครื่อง</div></div>
-  </a>
-  <a class="card clickable" href="<?= BASE_URL ?>/production_dedupe.php">
-    <?= ui_icon_html("clipboard", 28, "h-svg") ?>
-    <div><b>รวมบันทึกผลิตที่ซ้ำ</b><div class="muted">บันทึกผลิต / QC สองอันวันเดียวกัน (อันหนึ่งมีแค่ชื่อผู้ผลิต) · รวมเป็นอันเดียว</div></div>
-  </a>
-  <a class="card clickable" href="<?= BASE_URL ?>/installation_history.php">
-    <?= ui_icon_html("history", 28, "h-svg") ?>
-    <div><b>ประวัติติดตั้งระบบเดิม</b><div class="muted">นำเข้างานติดตั้งจากระบบ installation (2010–2023) · ขายให้ใคร เมื่อไหร่ invoice อะไร</div></div>
-  </a>
-  <a class="card clickable" href="<?= BASE_URL ?>/unknown_assets.php">
-    <?= ui_icon_html("search", 28, "h-svg") ?>
-    <div><b>ติดตามเครื่องไม่มีสถานะ</b><div class="muted">เครื่องที่นับสต็อกแล้วไม่เจอ · ดูหลักฐานล่าสุด · ตั้งสถานะทีละหลายเครื่อง</div></div>
-  </a>
-  <a class="card clickable" href="<?= BASE_URL ?>/stock_movements.php">
-    <?= ui_icon_html("history", 28, "h-svg") ?>
-    <div><b>ประวัติเข้า-ออกคลัง</b><div class="muted">การเปลี่ยนสถานะเครื่องทั้งหมด · ซิงก์ · เคลียร์ · นับสต็อก · ค้นตาม S/N</div></div>
-  </a>
-  <a class="card clickable" href="<?= BASE_URL ?>/rent_retire_sync.php">
-    <?= ui_icon_html("wrench", 28, "h-svg") ?>
-    <div><b>ตรวจสถานะเสื่อมสภาพ ↔ ระบบเช่า</b><div class="muted">เครื่องที่ลง MA เสื่อมสภาพแล้ว · เทียบกับระบบเช่า · กดซิงก์ย้อนหลัง</div></div>
-  </a>
-  <a class="card clickable" href="<?= BASE_URL ?>/share_admin.php">
-    <?= ui_icon_html('switch', 28, 'h-svg') ?>
-    <div><b>เปรียบเทียบ assets ↔ stock</b><div class="muted">รายการไม่ตรงกัน · ค้นหา · แก้ไข · ลบ · Sync · Import</div></div>
-  </a>
-  <a class="card clickable" href="<?= BASE_URL ?>/share.php">
-    <?= ui_icon_html('clipboard', 28, 'h-svg') ?>
-    <div><b>ทะเบียนสินค้า (stock)</b><div class="muted">ดู · ค้นหา · แก้ไข · ลบรายการประจำวัน</div></div>
-  </a>
-  <a class="card clickable" href="<?= BASE_URL ?>/system_doc.php">
-    <?= ui_icon_html('book', 28, 'h-svg') ?>
-    <div><b>หลักการทำงานของระบบ</b><div class="muted">DB · ตาราง · Data flow · ฟังก์ชัน · สิทธิ์ผู้ใช้</div></div>
-  </a>
-  <a class="card clickable" href="<?= BASE_URL ?>/activity_logs.php">
-    <?= ui_icon_html('history', 28, 'h-svg') ?>
-    <div><b>Activity Log</b><div class="muted">ความเคลื่อนไหวผู้ใช้ · Production + Parts · Export CSV</div></div>
-  </a>
+<?php
+// เมนูหลังบ้านจัดเป็นหมวดตามงานที่คนเข้ามาทำ — เดิมเป็นการ์ด 15 ใบเรียงต่อกันไม่มีลำดับ อ่านแล้วลายตา
+// ซ่อนตอนกำลังตั้งค่ารุ่นใดรุ่นหนึ่ง (?product=) เพราะหน้านั้นมีเนื้อหายาวของตัวเองอยู่แล้ว
+$adminGroups = [
+    ['title' => 'สต็อกและสถานะเครื่อง', 'note' => 'ใช้ประจำ', 'items' => [
+        ['stock_scan.php', 'scan', 'นับสต็อกด้วยการสแกน', 'สแกน QR ด้วยมือถือ · ตัดสถานะเครื่องที่ไม่เจอ · รอบนับ'],
+        ['unknown_assets.php', 'search', 'ติดตามเครื่องไม่มีสถานะ', 'ดูหลักฐานล่าสุด · ตั้งสถานะทีละหลายเครื่อง'],
+        ['finishgood_shortage_preview.php', 'box', 'ขั้นต่ำและการแจ้งเตือนรายรุ่น', 'ตั้งสต็อกขั้นต่ำ · ปิดแจ้งเตือนบางรุ่น · ดูตัวอย่าง LINE'],
+        ['stock_movements.php', 'history', 'ประวัติเข้า-ออกคลัง', 'การเปลี่ยนสถานะเครื่องทั้งหมด · ค้นตาม S/N'],
+    ]],
+    ['title' => 'รายงานและแจ้งเตือน', 'note' => '', 'items' => [
+        ['line_notify_settings.php', 'bell', 'แจ้งเตือน LINE', 'Token · เปิด/ปิด event · ทดสอบส่ง · Outbox'],
+        ['work_report.php', 'chart', 'สรุปงานรายคน', 'งานรายคนต่อรอบเดือน · ผูกไลน์ · ส่งสรุป'],
+        ['activity_logs.php', 'user', 'Activity Log', 'ความเคลื่อนไหวผู้ใช้ · Production + Parts · Export CSV'],
+    ]],
+    ['title' => 'ทะเบียนและเทียบข้อมูลกับระบบอื่น', 'note' => '', 'items' => [
+        ['share.php', 'clipboard', 'ทะเบียนสินค้า (stock)', 'ดู · ค้นหา · แก้ไข · ลบรายการประจำวัน'],
+        ['share_admin.php', 'switch', 'เปรียบเทียบ assets ↔ stock', 'รายการไม่ตรงกัน · Sync · Import'],
+        ['rent_retire_sync.php', 'repairs', 'เสื่อมสภาพ ↔ ระบบเช่า', 'เทียบสถานะเครื่องที่ลง MA เสื่อมสภาพ · ซิงก์ย้อนหลัง'],
+        ['installation_history.php', 'download', 'ประวัติติดตั้งระบบเดิม', 'นำเข้าจากระบบ installation (2010–2023)'],
+    ]],
+    ['title' => 'เครื่องมือแก้ข้อมูล', 'note' => 'ใช้เป็นครั้งคราว', 'items' => [
+        ['stock_check.php', 'refresh', 'เคลียร์เครื่องค้างสถานะ', 'ปิดเครื่องที่ค้างเป็น "ใหม่" · ย้อนกลับการเคลียร์'],
+        ['production_dedupe.php', 'copy', 'รวมบันทึกผลิตที่ซ้ำ', 'บันทึกผลิต / QC สองอันวันเดียวกัน'],
+    ]],
+    ['title' => 'ตั้งค่าระบบ', 'note' => '', 'items' => [
+        ['appearance.php', 'palette', 'ปรับแต่งหน้าตาระบบ', 'ข้อความ · โลโก้ · สีธีม · เมนู'],
+        ['server_config.php', 'settings', 'Server / Deploy', 'Path secrets · ฐานข้อมูล · SSO · ทดสอบการเชื่อมต่อ'],
+        ['system_doc.php', 'book', 'หลักการทำงานของระบบ', 'DB · ตาราง · Data flow · ฟังก์ชัน · สิทธิ์ผู้ใช้'],
+    ]],
+];
+if (!$product) { ?>
+<div class="admin-groups">
+  <?php foreach ($adminGroups as $g) { ?>
+  <section class="admin-group">
+    <h2 class="admin-group-title"><?= h($g['title']) ?><?php if ($g['note'] !== '') { ?> <span class="muted"><?= h($g['note']) ?></span><?php } ?></h2>
+    <div class="admin-links">
+      <?php foreach ($g['items'] as $it) { ?>
+      <a class="admin-link" href="<?= h(BASE_URL . '/' . $it[0]) ?>">
+        <span class="admin-link-ic"><?= ui_icon_html($it[1], 18, 'h-svg') ?></span>
+        <span class="admin-link-text"><b><?= h($it[2]) ?></b><span class="muted"><?= h($it[3]) ?></span></span>
+        <span class="admin-link-go" aria-hidden="true">›</span>
+      </a>
+      <?php } ?>
+    </div>
+  </section>
+  <?php } ?>
 </div>
-<p class="muted" style="margin-bottom:14px">
+<?php } ?><p class="muted" style="margin-bottom:14px">
   จัดการรุ่นสินค้า · ตั้งรูปแบบออกรหัสเครื่อง · กำหนดฟิลด์ในหน้า "บันทึกผลิตใหม่", "บันทึก MA" และ "อัปเดต FW/HW"
   · ถ้าไม่ตั้งค่าฟิลด์ ระบบจะใช้ฟิลด์อัตโนมัติจากประวัติการใช้งานจริง
 </p>
