@@ -3,14 +3,34 @@
  * scan.php — สแกน QR / Barcode บนตัวเครื่อง
  *
  * นอกจากหน้าตา ยังเพิ่มของที่ใช้จริงหน้างาน:
- *   - ไฟฉาย (โรงงาน/หลังตู้มักมืด) และสลับกล้องหน้า-หลัง
- *   - ตอบสนองตอนสแกนติด: กรอบเขียว + สั่น + เสียง ก่อนเด้งไปหน้าเครื่อง
- *     เดิมเด้งทันทีเงียบ ๆ จนไม่แน่ใจว่าอ่านรหัสได้หรือยัง
+ *   - ตัวอ่านชุดเดียวกับหน้า "นับสต็อกด้วยการสแกน" (assets/fast-scan.js) — ใช้ตัวอ่านของมือถือเมื่อมี
+ *   - เปิด/ปิดกล้อง · สลับกล้องหน้า-หลัง · ไฟฉาย · ซูม · เปิด/ปิดเสียง (จำค่าไว้ในเครื่อง)
+ *   - เช็กรหัสกับทะเบียนก่อนเปิดหน้าเครื่อง: เจอ = เสียงสั้น + กรอบเขียว แล้วไปหน้าเครื่อง
+ *     ไม่เจอ = เสียงต่ำ + กรอบแดง กล้องสแกนต่อได้เลย ไม่ต้องย้อนกลับมาเปิดกล้องใหม่
  *   - ประวัติที่เพิ่งสแกน เก็บใน localStorage ของเครื่องผู้ใช้เอง
  */
 require __DIR__ . '/config.php';
 require __DIR__ . '/includes/layout.php';
 require_login();
+
+// เช็กรหัสจากกล้องก่อนเปิดหน้าเครื่อง
+if (($_GET['ajax'] ?? '') === 'lookup') {
+    header('Content-Type: application/json; charset=utf-8');
+    $code = trim((string) ($_GET['code'] ?? ''));
+    $a = $code === '' ? null : qr(
+        'SELECT a.id, a.asset_code, a.status, p.name AS pname FROM assets a JOIN products p ON p.id = a.product_id
+         WHERE a.asset_code = ? OR a.factory_serial = ? ORDER BY a.asset_code = ? DESC LIMIT 1',
+        'sss', [$code, $code, $code]
+    )->fetch_assoc();
+    echo json_encode($a ? [
+        'found'     => true,
+        'id'        => (int) $a['id'],
+        'code'      => (string) $a['asset_code'],
+        'model'     => (string) $a['pname'],
+        'status_th' => status_th((string) $a['status']),
+    ] : ['found' => false, 'code' => $code], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 page_header('สแกน QR / Barcode');
 ?>
 
@@ -31,28 +51,35 @@ page_header('สแกน QR / Barcode');
     <div class="scan-card-head">
       <span class="scan-dot" id="scan-dot"></span>
       <h3>กล้องสแกน</h3>
-      <div class="scan-cam-tools">
-        <button type="button" class="scan-tool" id="btn-torch" hidden title="ไฟฉาย"><?= ui_icon_html('updates', 18) ?></button>
-        <button type="button" class="scan-tool" id="btn-flip" hidden title="สลับกล้อง"><?= ui_icon_html('refresh', 18) ?></button>
-      </div>
     </div>
 
     <div class="scan-stage" id="scan-stage">
-      <div id="reader"></div>
       <div class="scan-frame" aria-hidden="true">
         <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
         <div class="scan-laser"></div>
       </div>
       <div class="scan-hit" id="scan-hit" hidden>
-        <div class="scan-hit-mark">✓</div>
-        <div class="scan-hit-text">พบรหัสแล้ว</div>
+        <div class="scan-hit-mark" id="scan-hit-mark">✓</div>
+        <div class="scan-hit-text" id="scan-hit-text">พบเครื่องแล้ว</div>
         <div class="scan-hit-code" id="scan-hit-code"></div>
+        <div class="scan-hit-sub" id="scan-hit-sub"></div>
       </div>
     </div>
 
     <p class="scan-status" id="cam-status">
       <span class="scan-spin" aria-hidden="true"></span> กำลังเปิดกล้อง…
     </p>
+
+    <div class="scan-ctl">
+      <button type="button" class="scan-ctl-btn" id="btn-power"><?= ui_icon_html('scan', 16) ?><span>ปิดกล้อง</span></button>
+      <button type="button" class="scan-ctl-btn" id="btn-flip"><?= ui_icon_html('refresh', 16) ?><span>สลับเป็นกล้องหน้า</span></button>
+      <button type="button" class="scan-ctl-btn" id="btn-torch" hidden><?= ui_icon_html('updates', 16) ?><span>ไฟฉาย</span></button>
+      <button type="button" class="scan-ctl-btn" id="btn-sound"><?= ui_icon_html('bell', 16) ?><span>เสียง: เปิด</span></button>
+    </div>
+    <div class="scan-zoom" id="zoom-wrap" hidden>
+      <span>ซูม</span>
+      <input type="range" id="zoom" min="1" max="4" step="0.1" value="1">
+    </div>
   </section>
 
   <aside class="scan-side">
@@ -91,7 +118,7 @@ page_header('สแกน QR / Barcode');
    กฎกลาง button{display:inline-block} ใน style.css มี specificity สูงกว่า [hidden]
    ของเบราว์เซอร์ ทำให้ของที่สั่งซ่อนไว้โผล่ออกมาหมด */
 .scan-stage [hidden],
-.scan-cam-tools [hidden],
+.scan-ctl [hidden], .scan-zoom[hidden],
 .scan-grid [hidden] { display: none !important; }
 
 /* ── Hero ── */
@@ -134,14 +161,18 @@ page_header('สแกน QR / Barcode');
 .scan-dot.err { background: var(--danger, #b91c1c); }
 @keyframes scanPulse { 70% { box-shadow: 0 0 0 9px rgba(22,163,74,0); } 100% { box-shadow: 0 0 0 0 rgba(22,163,74,0); } }
 
-.scan-cam-tools { display: flex; gap: 6px; }
-.scan-tool {
+/* ปุ่มกล้อง — ชุดเดียวกับหน้านับสต็อก: เปิด/ปิด · สลับ · ไฟฉาย · เสียง */
+.scan-ctl { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px; margin-top: 10px; }
+.scan-ctl-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
   background: var(--bg, #f4f1fb); border: 1px solid var(--border, #e7e0f5); color: inherit;
-  width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: 10px;
-  font-size: 16px; line-height: 1; cursor: pointer; transition: transform .12s, background .15s;
+  border-radius: 10px; padding: 10px 8px; min-height: 44px; font: inherit; font-size: calc(14px * var(--font-scale, 1)); cursor: pointer;
 }
-.scan-tool:hover { background: #ece5fb; transform: translateY(-1px); }
-.scan-tool.on { background: #fef9c3; border-color: #fde047; }
+.scan-ctl-btn:hover { background: #ece5fb; }
+.scan-ctl-btn.on { background: #fef9c3; border-color: #fde047; }
+.scan-ctl-btn:disabled { opacity: .45; cursor: default; }
+.scan-zoom { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: calc(13px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); }
+.scan-zoom input { flex: 1; }
 
 /* ── เวทีกล้อง + กรอบเล็ง ── */
 /* จำกัดขนาดไม่ให้กล้องบานจนดันเนื้อหาตกจอบนหน้าจอกว้าง */
@@ -150,8 +181,13 @@ page_header('สแกน QR / Barcode');
   background: #150f22; aspect-ratio: 4 / 3; display: flex; align-items: center; justify-content: center;
   width: 100%; max-width: 520px; max-height: 56vh; margin: 0 auto;
 }
-.scan-stage #reader { width: 100%; }
-.scan-stage #reader video { width: 100% !important; height: 100% !important; object-fit: cover; display: block; }
+.scan-stage .fs-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.scan-stage .fs-reader { position: absolute; inset: 0; width: 100%; height: 100%; }
+.scan-stage .fs-reader video { width: 100% !important; height: 100% !important; object-fit: cover; }
+.scan-stage .fs-mirror, .scan-stage .fs-mirror video { transform: scaleX(-1); }
+.scan-frame, .scan-hit { z-index: 2; }
+.scan-stage.is-off::after { content: 'กล้องปิดอยู่'; position: absolute; inset: 0; display: grid; place-items: center; color: #a39fb3; background: #150f22; z-index: 3; }
+.scan-stage.is-off .scan-frame { display: none; }
 .scan-frame { position: absolute; inset: 12%; pointer-events: none; }
 .scan-frame .c { position: absolute; width: 30px; height: 30px; border: 3px solid var(--primary, #e11d74); border-radius: 4px; }
 .scan-frame .tl { top: 0; left: 0; border-right: 0; border-bottom: 0; }
@@ -177,7 +213,9 @@ page_header('สแกน QR / Barcode');
 .scan-hit-mark { font-size: 46px; line-height: 1; animation: scanPop .35s cubic-bezier(.2,1.6,.4,1); }
 @keyframes scanPop { from { transform: scale(0); } to { transform: scale(1); } }
 .scan-hit-text { font-weight: 700; }
-.scan-hit-code { font-size: calc(15px * var(--font-scale, 1)); font-weight: 800; letter-spacing: .04em; }
+.scan-hit-code { font-size: calc(15px * var(--font-scale, 1)); font-weight: 800; letter-spacing: .04em; overflow-wrap: anywhere; padding: 0 12px; text-align: center; }
+.scan-hit-sub { font-size: calc(13px * var(--font-scale, 1)); opacity: .9; padding: 0 12px; text-align: center; }
+.scan-hit.is-miss { background: rgba(185,28,28,.92); }
 
 .scan-status {
   margin: 10px 0 0; font-size: calc(12.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480);
@@ -219,21 +257,28 @@ page_header('สแกน QR / Barcode');
 </style>
 
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="<?= BASE_URL ?>/assets/fast-scan.js?v=<?= (int) @filemtime(__DIR__ . '/assets/fast-scan.js') ?>"></script>
 <script>
 (function () {
   var BASE = <?= json_encode(BASE_URL) ?>;
   var RECENT_KEY = 'scan_recent_v1';
   var statusEl = document.getElementById('cam-status');
   var dot = document.getElementById('scan-dot');
+  var stage = document.getElementById('scan-stage');
   var hit = document.getElementById('scan-hit');
-  var hitCode = document.getElementById('scan-hit-code');
-  var btnTorch = document.getElementById('btn-torch');
+  var btnPower = document.getElementById('btn-power');
   var btnFlip = document.getElementById('btn-flip');
+  var btnTorch = document.getElementById('btn-torch');
+  var btnSound = document.getElementById('btn-sound');
+  var zoomWrap = document.getElementById('zoom-wrap');
+  var zoomEl = document.getElementById('zoom');
 
-  function setStatus(html, state) {
-    statusEl.innerHTML = html;
+  function store(k, v) { try { if (v === undefined) { return localStorage.getItem(k); } localStorage.setItem(k, v); } catch (e) {} return null; }
+  function setStatus(text, state) {
+    statusEl.textContent = text;
     dot.className = 'scan-dot' + (state ? ' ' + state : '');
   }
+  function label(btn, text) { btn.querySelector('span').textContent = text; }
 
   // ── ประวัติที่เพิ่งสแกน (เก็บในเครื่องผู้ใช้ ไม่ขึ้นเซิร์ฟเวอร์) ──
   function readRecent() {
@@ -259,7 +304,7 @@ page_header('สแกน QR / Barcode');
     panel.hidden = false;
     box.innerHTML = list.map(function (r) {
       var code = String(r.c).replace(/[<>&"]/g, '');
-      return '<a href="' + BASE + '/asset.php?code=' + encodeURIComponent(r.c) + '">'
+      return '<a href="' + BASE + '/asset.php?code=' + encodeURIComponent(r.c) + '" data-same-tab="1">'
            + '<b>' + code + '</b><span class="t">' + ago(r.t) + '</span></a>';
     }).join('');
   }
@@ -269,81 +314,190 @@ page_header('สแกน QR / Barcode');
   });
   renderRecent();
 
-  // ── ตอบสนองตอนสแกนติด ──
-  function beep() {
+  // ── เสียง — มือถือไม่ให้ส่งเสียงจนกว่าจะแตะจอสักครั้ง จึงใช้ AudioContext ตัวเดียวแล้วปลุกตอนแตะ ──
+  var audioCtx = null;
+  var unlockedAt = 0;
+  var soundOn = store('ssSound') !== '0';   // ใช้ค่าร่วมกับหน้านับสต็อก
+  function unlockAudio() {
     try {
       var Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return;
-      var ctx = new Ctx(), o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = 'sine'; o.frequency.value = 880;
-      g.gain.setValueAtTime(.09, ctx.currentTime);
-      g.gain.exponentialRampToValueAtTime(.0001, ctx.currentTime + .18);
-      o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + .18);
+      var wasOn = audioCtx && audioCtx.state === 'running';
+      if (!audioCtx) { audioCtx = new Ctx(); }
+      if (!wasOn) { unlockedAt = Date.now(); }
+      if (audioCtx.state === 'suspended') { audioCtx.resume().then(renderButtons); } else { renderButtons(); }
     } catch (e) {}
   }
-
-  if (typeof Html5Qrcode === 'undefined') {
-    setStatus('โหลดตัวสแกนไม่ได้ (ไม่มีอินเทอร์เน็ต) — พิมพ์รหัสในช่องด้านขวาแทนได้', 'err');
-    return;
+  ['pointerdown', 'touchend', 'click', 'keydown'].forEach(function (ev) {
+    document.addEventListener(ev, unlockAudio, true);
+  });
+  var SOUND = {
+    ok:  [[1047, 0.09], [1397, 0.14]],
+    bad: [[196, 0.45, 'square']]
+  };
+  function tone(kind) {
+    if (!soundOn || !audioCtx) return;
+    try {
+      var t = audioCtx.currentTime + 0.01;
+      (SOUND[kind] || SOUND.ok).forEach(function (s) {
+        var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = s[2] || 'sine';
+        o.frequency.value = s[0];
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(s[2] === 'square' ? 0.18 : 0.4, t + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + s[1]);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(t); o.stop(t + s[1] + 0.02);
+        t += s[1] + 0.06;
+      });
+    } catch (e) {}
   }
+  function vibrate(p) { if (navigator.vibrate) { try { navigator.vibrate(p); } catch (e) {} } }
 
-  var scanner = new Html5Qrcode('reader');
-  var cameras = [];
-  var camIndex = 0;
-  var torchOn = false;
-  var done = false;
+  // ── กล้อง: เปิด/ปิด · สลับหน้า-หลัง · ไฟฉาย · ซูม ──
+  var ctl = null, camOn = true, starting = false, torch = false;
+  var facing = store('ssFacing') === 'user' ? 'user' : 'environment';
 
-  function onScan(text) {
-    if (done) return;
-    done = true;
-    var code = String(text).trim();
-    hitCode.textContent = code;
+  // ── ผลการสแกน ──
+  var busy = false, lastCode = '', lastAt = 0, missTimer = null;
+  function showHit(found, code, sub) {
+    hit.classList.toggle('is-miss', !found);
+    document.getElementById('scan-hit-mark').textContent = found ? '✓' : '✕';
+    document.getElementById('scan-hit-text').textContent = found ? 'พบเครื่องแล้ว' : 'ไม่พบรหัสนี้ในทะเบียน';
+    document.getElementById('scan-hit-code').textContent = code;
+    document.getElementById('scan-hit-sub').textContent = sub || '';
     hit.hidden = false;
-    if (navigator.vibrate) { try { navigator.vibrate([40, 50, 40]); } catch (e) {} }
-    beep();
-    pushRecent(code);
-    scanner.stop().catch(function () {});
-    setTimeout(function () {
-      window.location = BASE + '/asset.php?code=' + encodeURIComponent(code);
-    }, 620);
   }
-
-  function start(camConfig) {
-    return scanner.start(camConfig, { fps: 10, qrbox: 240 }, onScan, function () {})
-      .then(function () {
-        setStatus('เล็งกล้องไปที่ QR หรือบาร์โค้ดบนตัวเครื่อง', 'live');
-        // ไฟฉายรองรับเฉพาะบางกล้อง/บางเบราว์เซอร์ — ซ่อนปุ่มถ้าใช้ไม่ได้จริง
-        try {
-          var caps = scanner.getRunningTrackCapabilities();
-          if (caps && caps.torch) { btnTorch.hidden = false; }
-        } catch (e) {}
-        if (cameras.length > 1) { btnFlip.hidden = false; }
+  function onScan(text) {
+    var code = String(text || '').trim();
+    if (!code || busy) return;
+    if (code === lastCode && Date.now() - lastAt < 2500) return;   // ป้ายเดิมยังค้างอยู่หน้ากล้อง
+    busy = true; lastCode = code; lastAt = Date.now();
+    clearTimeout(missTimer);
+    fetch(BASE + '/scan.php?ajax=lookup&code=' + encodeURIComponent(code), { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.found) {
+          tone('ok'); vibrate([40, 50, 40]);
+          showHit(true, d.code, [d.model, d.status_th].filter(Boolean).join(' · '));
+          pushRecent(d.code);
+          camOn = false; stopCam();
+          setTimeout(function () { window.location = BASE + '/asset.php?id=' + d.id; }, 650);
+          return;
+        }
+        tone('bad'); vibrate([300]);
+        showHit(false, code, 'สแกนป้ายอื่นต่อได้เลย หรือพิมพ์รหัสเอง');
+        missTimer = setTimeout(function () { hit.hidden = true; busy = false; }, 1800);
+      })
+      .catch(function () {
+        // เช็กไม่ได้ (เน็ตหลุด) — เปิดหน้าเครื่องด้วยรหัสแบบเดิม ให้หน้านั้นบอกเองถ้าไม่พบ
+        pushRecent(code);
+        window.location = BASE + '/asset.php?code=' + encodeURIComponent(code);
       });
   }
 
-  Html5Qrcode.getCameras().then(function (list) {
-    cameras = list || [];
-  }).catch(function () {}).then(function () {
-    return start({ facingMode: 'environment' });
-  }).catch(function (e) {
-    setStatus('เปิดกล้องไม่ได้ (' + e + ') — พิมพ์รหัสในช่องด้านขวาแทนได้', 'err');
-  });
+  function renderButtons() {
+    label(btnPower, camOn ? 'ปิดกล้อง' : 'เปิดกล้อง');
+    btnPower.classList.toggle('on', !camOn);
+    label(btnFlip, facing === 'user' ? 'สลับเป็นกล้องหลัง' : 'สลับเป็นกล้องหน้า');
+    btnFlip.disabled = !camOn || starting;
+    var ready = audioCtx && audioCtx.state === 'running';
+    label(btnSound, !soundOn ? 'เสียง: ปิด' : (ready ? 'เสียง: เปิด' : 'แตะเพื่อเปิดเสียง'));
+    btnSound.classList.toggle('on', !soundOn);
+    stage.classList.toggle('is-off', !camOn);
+  }
+  function stopCam() {
+    var c = ctl;
+    ctl = null; torch = false;
+    btnTorch.hidden = true; btnTorch.classList.remove('on');
+    zoomWrap.hidden = true;
+    return c ? c.stop() : Promise.resolve();
+  }
+  function startCam() {
+    if (starting || ctl) return Promise.resolve();
+    if (typeof FastScan === 'undefined') {
+      setStatus('โหลดตัวสแกนไม่ได้ — พิมพ์รหัสเองแทนได้', 'err');
+      return Promise.resolve();
+    }
+    starting = true;
+    renderButtons();
+    return FastScan.start({
+      stage: stage,
+      facing: facing,
+      onCode: onScan,
+      onStatus: function (t) { setStatus(t); }
+    }).then(function (c) {
+      starting = false;
+      if (!camOn) { c.stop(); renderButtons(); return; }   // กดปิดระหว่างกำลังเปิด
+      ctl = c;
+      setStatus((facing === 'user' ? 'กล้องหน้า' : 'กล้องหลัง') + ' · '
+        + (c.engine === 'native' ? 'โหมดเร็ว (ตัวอ่านของมือถือ)' : 'โหมดมาตรฐาน')
+        + ' · เล็งไปที่ QR หรือบาร์โค้ดบนตัวเครื่อง', 'live');
+      if (c.canTorch) { btnTorch.hidden = false; }
+      if (c.zoom && c.zoom.max > c.zoom.min) {
+        zoomEl.min = c.zoom.min;
+        zoomEl.max = Math.min(c.zoom.max, 8);
+        zoomEl.step = c.zoom.step;
+        zoomEl.value = c.zoom.min;
+        zoomWrap.hidden = false;
+      }
+      renderButtons();
+    }).catch(function (e) {
+      starting = false;
+      setStatus('เปิดกล้องไม่ได้ (' + (e && e.message ? e.message : e) + ') — พิมพ์รหัสเองแทนได้', 'err');
+      renderButtons();
+    });
+  }
 
+  btnPower.addEventListener('click', function () {
+    camOn = !camOn;
+    renderButtons();
+    if (camOn) {
+      hit.hidden = true; busy = false;
+      startCam();
+    } else {
+      stopCam().then(function () { setStatus('ปิดกล้องแล้ว — กด "เปิดกล้อง" เพื่อสแกนต่อ'); });
+    }
+  });
   btnFlip.addEventListener('click', function () {
-    if (!cameras.length) return;
-    camIndex = (camIndex + 1) % cameras.length;
-    btnTorch.hidden = true; btnTorch.classList.remove('on'); torchOn = false;
-    setStatus('<span class="scan-spin"></span> กำลังสลับกล้อง…');
-    scanner.stop().then(function () { return start({ deviceId: { exact: cameras[camIndex].id } }); })
-      .catch(function (e) { setStatus('สลับกล้องไม่ได้: ' + e, 'err'); });
+    if (!camOn || starting) return;
+    facing = facing === 'user' ? 'environment' : 'user';
+    store('ssFacing', facing);
+    setStatus('กำลังสลับกล้อง…');
+    stopCam().then(startCam);
   });
-
+  btnSound.addEventListener('click', function () {
+    // แตะครั้งแรกคือการปลุกเสียง ไม่ใช่กดปิด
+    if (soundOn && Date.now() - unlockedAt < 1500) { tone('ok'); return; }
+    soundOn = !soundOn;
+    store('ssSound', soundOn ? '1' : '0');
+    renderButtons();
+    if (soundOn) { tone('ok'); }
+  });
   btnTorch.addEventListener('click', function () {
-    torchOn = !torchOn;
-    scanner.applyVideoConstraints({ advanced: [{ torch: torchOn }] })
-      .then(function () { btnTorch.classList.toggle('on', torchOn); })
+    if (!ctl) return;
+    torch = !torch;
+    ctl.setTorch(torch).then(function () { btnTorch.classList.toggle('on', torch); })
       .catch(function () { btnTorch.hidden = true; });
   });
+  zoomEl.addEventListener('input', function () {
+    if (ctl) { ctl.setZoom(zoomEl.value).catch(function () {}); }
+  });
+  // สลับแอป/ล็อกจอ → ปิดกล้อง กลับมาแล้วเปิดให้เอง (ถ้าไม่ได้กดปิดไว้)
+  document.addEventListener('visibilitychange', function () {
+    if (!camOn) return;
+    if (document.hidden) { stopCam(); } else { startCam(); }
+  });
+  // กลับมาหน้านี้ด้วยปุ่มย้อนกลับ (เบราว์เซอร์เก็บหน้าไว้ทั้งหน้า) → เปิดกล้องใหม่
+  window.addEventListener('pageshow', function (e) {
+    if (!e.persisted) return;
+    hit.hidden = true; busy = false; camOn = true;
+    renderButtons(); startCam();
+  });
+
+  renderButtons();
+  startCam();
 })();
 </script>
 <?php page_footer();
+

@@ -453,10 +453,6 @@ page_header('บันทึกเครื่องผลิตใหม่');
       <div class="field">
         <label>ข้อมูลประจำรุ่น <span class="muted">(จากตั้งค่าหลังบ้าน · กด ▾ เลือก หรือพิมพ์ใหม่ได้อิสระ)</span></label>
         <div id="dyn-fields"><span class="muted">เลือกรุ่นสินค้าก่อน</span></div>
-        <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center">
-          <button type="button" class="btn btn-line btn-sm" id="add-free-field" onclick="addFreeField()" disabled><?= ui_btn_label('plus', 'เพิ่มฟิลด์กรอกเอง') ?></button>
-          <span class="muted" style="font-size:12px">เพิ่มฟิลด์นอกเหนือจากที่ตั้งไว้หลังบ้านได้</span>
-        </div>
       </div>
       <?php // สามแถวนี้ใช้กริดเดียวกับแถว "ข้อมูลประจำรุ่น" ด้านบน — เดิมเป็น .field ซึ่งวาง
             // label ไว้บรรทัดบน ทำให้หัวข้อไม่ตรงคอลัมน์เดียวกับฟิลด์อื่นในกล่องเดียวกัน ?>
@@ -577,7 +573,6 @@ function loadProduct(pid){
       cfg = d;
       document.getElementById('add-unit').disabled = false;
       document.getElementById('save-btn').disabled = false;
-      document.getElementById('add-free-field').disabled = false;
       document.getElementById('unit-hint').textContent = d.mode === 'generated'
         ? '(ระบบออกเลข running อัตโนมัติ — รหัสเครื่องจริงยืนยันตอนกดบันทึก)'
         : '(กรอกรหัสเครื่องเองหรือสแกน QR ทีละเครื่อง)';
@@ -653,26 +648,13 @@ function fieldRowHtml(f){
        + '<label>' + esc(f.name) + '</label>'
        + control + '</div>';
 }
-/** เพิ่มฟิลด์กรอกเองนอกเหนือจากที่ตั้งค่าหลังบ้าน */
-function addFreeField(){
-  var name = prompt('ชื่อฟิลด์ที่ต้องการเพิ่ม (เช่น สีเครื่อง / หมายเหตุพิเศษ)');
-  if (!name) return;
-  name = name.trim();
-  if (!name) return;
-  var box = document.getElementById('dyn-fields');
-  if (box.querySelector('.muted') && !box.querySelector('.dyn-field-row')) box.innerHTML = '';
-  box.insertAdjacentHTML('beforeend', fieldRowHtml({ name: name, kind: 'extra', last: '', options: [], from_settings: false }));
-  initChipDd(box);
-  initNamePick(box);
-}
 function renderFields(d){
   var html = '';
   if (!d.fields.length) {
-    html = '<span class="muted">รุ่นนี้ยังไม่ได้ตั้งค่าฟิลด์หลังบ้าน — กด "เพิ่มฟิลด์กรอกเอง" หรือไปตั้งค่าที่เมนูระบบหลังบ้าน</span>';
+    html = '<span class="muted">รุ่นนี้ยังไม่ได้ตั้งค่าฟิลด์หลังบ้าน — เพิ่มฟิลด์ได้ที่ระบบหลังบ้าน (ตั้งค่ารุ่น)</span>';
   }
   d.fields.forEach(function(f){ html += fieldRowHtml(f); });
   document.getElementById('dyn-fields').innerHTML = html;
-  document.getElementById('add-free-field').disabled = false;
   // แสดง FW / Lot ตามที่ตั้งค่าหลังบ้านของรุ่นนี้
   var showFw = d.show_fw !== false;
   var showLot = d.show_lot !== false;
