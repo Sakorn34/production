@@ -894,6 +894,8 @@ span.thumb-sm { display: inline-flex; align-items: center; justify-content: cent
 /* margin-bottom 6px แน่นเกินจะแยกออกว่า label ไหนคู่กับกล่องไหน — 14px ให้ระยะ
    ระหว่างฟิลด์มากกว่าระยะภายในฟิลด์ (gap 8px) ตาจึงจับกลุ่มถูกเอง */
 .dyn-field-row { display: grid; grid-template-columns: minmax(100px, 140px) minmax(0, 1fr); gap: 8px 10px; align-items: start; margin-bottom: 14px; }
+/* ต้องมีคู่กับ display:grid ข้างบน — ไม่งั้นแถว FW/Lot ที่หลังบ้านปิดไว้ (hidden) ยังโผล่ชื่อฟิลด์ */
+.dyn-field-row[hidden] { display: none !important; }
 .dyn-field-row label { font-size: calc(13px * var(--font-scale, 1)); }
 
 /* แถบปุ่มบันทึกลอยติดขอบล่าง — ฟอร์มนี้สูง 2,000px และปุ่มอยู่ที่ y=1943 คือท้ายสุด
