@@ -101,7 +101,7 @@ function page_back_button_html(string $fallbackHref): string
 {
     $href = h($fallbackHref);
     $jsFallback = json_encode($fallbackHref, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
-    return '<a href="' . $href . '" class="btn btn-line btn-sm backbtn" onclick="return fgPageBack(event, ' . $jsFallback . ')">← ย้อนกลับ</a>';
+    return '<a href="' . $href . '" class="btn btn-line btn-sm backbtn" onclick="return fgPageBack(event, ' . h($jsFallback) . ')">← ย้อนกลับ</a>';
 }
 
 /**
@@ -491,18 +491,91 @@ document.addEventListener('click', function(e){
   if (e.target.classList && e.target.classList.contains('notif-overlay')) closeOverlay(e.target.id);
 });
 
-/** ปุ่มย้อนกลับ — ใช้ประวัติเบราว์เซอร์ก่อน ไม่มีประวัติค่อยไป fallback */
+/*
+ * ปุ่มย้อนกลับ — จำเส้นทางหน้าที่เปิดในแท็บนี้เอง (sessionStorage) แทน history.back()
+ *
+ * history.back() ถอยทีละรายการประวัติเบราว์เซอร์ หลังบันทึกฟอร์มประวัติจะเป็น
+ * [เครื่อง, ฟอร์มแก้ไข, เครื่อง] กดย้อนกลับจึงเด้งไปฟอร์ม → เครื่อง → ฟอร์ม สลับไปมา
+ * และแท็บที่เปิดใหม่ถ้าถอยจนสุดแล้วกดไม่ไปไหน
+ * ที่นี่: หน้าที่ส่งฟอร์มแล้วถูกแทนด้วยหน้าผลลัพธ์ · กลับมาหน้าที่เคยผ่านให้ตัดวนทิ้ง
+ * ย้อนกลับจึงไปหน้าก่อนหน้าจริงๆ เสมอ
+ */
+var FG_NAV_KEY = 'fgNavStack', FG_NAV_BACK = 'fgNavBack', FG_NAV_SUBMIT = 'fgNavSubmit';
+function fgNavKey(href) {
+  try {
+    var u = new URL(href, window.location.href);
+    ['saved', 'n', 'ok', 'msg', 'done'].forEach(function (p) { u.searchParams.delete(p); });
+    var q = u.searchParams.toString();
+    return u.pathname + (q ? '?' + q : '');
+  } catch (e) { return String(href); }
+}
+function fgNavRead() {
+  try { var s = JSON.parse(sessionStorage.getItem(FG_NAV_KEY) || '[]'); return Array.isArray(s) ? s : []; } catch (e) { return []; }
+}
+function fgNavWrite(s) {
+  try { sessionStorage.setItem(FG_NAV_KEY, JSON.stringify(s.slice(-40))); } catch (e) {}
+}
+function fgNavTake(k) {
+  try { var v = sessionStorage.getItem(k); sessionStorage.removeItem(k); return v; } catch (e) { return null; }
+}
+function fgNavPathOf(key) { return String(key).split('?')[0]; }
+function fgNavRecord(isHistoryNav) {
+  var cur = fgNavKey(window.location.href);
+  var st = fgNavRead();
+  var back = fgNavTake(FG_NAV_BACK);
+  var sub = null;
+  try { sub = JSON.parse(fgNavTake(FG_NAV_SUBMIT) || 'null'); } catch (e) {}
+  var at = st.lastIndexOf(cur);
+  if (back !== null || isHistoryNav) {
+    // มาจากปุ่มย้อนกลับ/ปุ่ม back ของเบราว์เซอร์: ตัดทุกหน้าหลังตำแหน่งนี้ · ไม่เคยผ่าน = เริ่มเส้นทางใหม่
+    st = at >= 0 ? st.slice(0, at + 1) : (back !== null ? [cur] : st.concat([cur]));
+  } else {
+    // ส่งฟอร์มแล้วได้หน้าใหม่: หน้าฟอร์ม (POST) หรือหน้ารายการที่แค่เปลี่ยนตัวกรอง (GET หน้าเดิม) ไม่ต้องย้อนไปอีก
+    if (sub && Date.now() - sub.t < 120000 && st.length && st[st.length - 1] === sub.from && sub.from !== cur
+        && (sub.method === 'post' || fgNavPathOf(sub.from) === fgNavPathOf(cur))) {
+      st.pop();
+      at = st.lastIndexOf(cur);
+    }
+    // กลับมาหน้าที่เคยผ่าน (เช่น บันทึกแล้วเด้งกลับหน้าเครื่อง) = ตัดวงวนทิ้ง
+    st = at >= 0 ? st.slice(0, at + 1) : st.concat([cur]);
+  }
+  fgNavWrite(st);
+}
+(function () {
+  var nav = null;
+  try { nav = performance.getEntriesByType('navigation')[0]; } catch (e) {}
+  fgNavRecord(!!(nav && nav.type === 'back_forward'));
+  window.addEventListener('pageshow', function (e) { if (e.persisted) fgNavRecord(true); });
+  // บันทึกว่าหน้านี้ส่งฟอร์มจริง (ฟอร์มที่ JS ดักไว้ทำ ajax ไม่นับ)
+  function mark(f) {
+    var target = (f.getAttribute('target') || '').toLowerCase();
+    if (target && target !== '_self') return;
+    try {
+      sessionStorage.setItem(FG_NAV_SUBMIT, JSON.stringify({
+        from: fgNavKey(window.location.href),
+        method: (f.getAttribute('method') || 'get').toLowerCase(),
+        t: Date.now()
+      }));
+    } catch (err) {}
+  }
+  window.addEventListener('submit', function (e) { if (!e.defaultPrevented) mark(e.target); });
+  // form.submit() หลังกล่องยืนยันไม่ยิง event submit
+  var nativeSubmit = HTMLFormElement.prototype.submit;
+  HTMLFormElement.prototype.submit = function () { mark(this); return nativeSubmit.apply(this, arguments); };
+})();
 function fgPageBack(e, fallbackHref) {
-  if (e && typeof e.preventDefault === 'function' && window.history.length > 1) {
-    e.preventDefault();
-    window.history.back();
-    return false;
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+  var cur = fgNavKey(window.location.href);
+  var st = fgNavRead();
+  while (st.length && st[st.length - 1] === cur) st.pop();
+  var target = st.length ? st[st.length - 1] : (fallbackHref ? fgNavKey(fallbackHref) : '');
+  if (!target || target === cur) {
+    target = fallbackHref && fgNavKey(fallbackHref) !== cur ? fgNavKey(fallbackHref) : '';
   }
-  if (fallbackHref) {
-    window.location.href = fallbackHref;
-    return false;
-  }
-  return true;
+  if (!target) return false;
+  try { sessionStorage.setItem(FG_NAV_BACK, target); } catch (err) {}
+  window.location.href = target;
+  return false;
 }
 
 /**
