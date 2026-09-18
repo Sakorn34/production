@@ -382,12 +382,12 @@ page_header('สแกน QR / Barcode');
           showHit(true, d.code, [d.model, d.status_th].filter(Boolean).join(' · '));
           pushRecent(d.code);
           camOn = false; stopCam();
-          setTimeout(function () { window.location = BASE + '/asset.php?id=' + d.id; }, 650);
+          setTimeout(function () { window.location = BASE + '/asset.php?id=' + d.id; }, 350);
           return;
         }
         tone('bad'); vibrate([300]);
         showHit(false, code, 'สแกนป้ายอื่นต่อได้เลย หรือพิมพ์รหัสเอง');
-        missTimer = setTimeout(function () { hit.hidden = true; busy = false; }, 1800);
+        missTimer = setTimeout(function () { hit.hidden = true; busy = false; }, 1000);
       })
       .catch(function () {
         // เช็กไม่ได้ (เน็ตหลุด) — เปิดหน้าเครื่องด้วยรหัสแบบเดิม ให้หน้านั้นบอกเองถ้าไม่พบ

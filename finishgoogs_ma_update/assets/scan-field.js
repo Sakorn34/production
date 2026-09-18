@@ -206,7 +206,7 @@
     ui.hitText.textContent = text || '';
     ui.hit.hidden = false;
     clearTimeout(hitTimer);
-    hitTimer = setTimeout(function () { ui.hit.hidden = true; }, kind === 'ok' ? 700 : 1500);
+    hitTimer = setTimeout(function () { ui.hit.hidden = true; }, kind === 'ok' ? 300 : 900);
   }
 
   function onCode(text) {
@@ -214,7 +214,7 @@
     var code = String(text || '').trim();
     if (!s || !code || s.done) { return; }
     // ป้ายเดิมยังค้างอยู่หน้ากล้อง — อ่านซ้ำได้หลายรอบต่อวินาที
-    if (code === s.lastCode && Date.now() - s.lastAt < 2500) { return; }
+    if (code === s.lastCode && Date.now() - s.lastAt < 1500) { return; }
     s.lastCode = code;
     s.lastAt = Date.now();
     var api = { feedback: feedback, close: close, setCount: setCount };
@@ -225,7 +225,7 @@
       setTimeout(function () {
         close();
         if (s.opts.onCode) { s.opts.onCode(code, api); }
-      }, 450);
+      }, 250);
       return;
     }
     if (s.opts.onCode) { s.opts.onCode(code, api); } else { feedback('ok', code); }
