@@ -30,6 +30,7 @@ const LINE_NOTIFY_DEDUP_TTL = [
     'production.summary.weekly'     => 604800,
     'production.summary.monthly'    => 2678400,
     'work.summary.monthly'          => 5184000,
+    'support.report'                => 60,
     'line.test'                     => 60,
 ];
 
@@ -44,6 +45,7 @@ const LINE_NOTIFY_EVENT_LABELS = [
     'production.summary.weekly'         => 'สรุปผลิตรายสัปดาห์',
     'production.summary.monthly'        => 'สรุปผลิตรายเดือน',
     'work.summary.monthly'              => 'สรุปงานรายคน (รายเดือน)',
+    'support.report'                    => 'แจ้งปัญหาจากผู้ใช้ (ส่งถึงผู้ดูแลระบบ)',
     'line.test'                         => 'ทดสอบการส่ง',
 ];
 

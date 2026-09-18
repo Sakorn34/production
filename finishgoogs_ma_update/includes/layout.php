@@ -391,6 +391,9 @@ function page_pager_html($page, $pages, $per, $total, callable $urlFor, $unit = 
 }
 
 function page_footer() {
+    require_once dirname(__DIR__, 2) . '/shared/ui_footer.php';
+    // ส่วนท้ายอยู่ท้ายเนื้อหา (ไม่ลอยทับ) · หน้าต่างแจ้งปัญหาอยู่ในนี้ด้วย
+    echo ui_app_footer_html(BASE_URL, defined('APP_RELEASE_VERSION') ? (string) APP_RELEASE_VERSION : '', csrf());
     ?>
   </main>
 </div>
@@ -406,9 +409,6 @@ function page_footer() {
 
 <!-- toast แจ้งเตือนสถานะ (จางหายอัตโนมัติ) -->
 <div id="flash-toast-host" class="flash-toast-host" aria-live="polite" aria-atomic="true"></div>
-<?php if (defined('APP_RELEASE_VERSION') && APP_RELEASE_VERSION !== '') { ?>
-<p class="app-release-ver" title="รหัสชุด deploy — ใช้เทียบว่าเซิร์ฟเวอร์ได้ไฟล์ล่าสุดแล้วหรือยัง">Version <?= h(APP_RELEASE_VERSION) ?></p>
-<?php } ?>
 
 <!-- modal รายการเจาะลึก (dashboard ฯลฯ) — เจาะได้หลายชั้น มีปุ่มย้อนกลับ -->
 <div id="list-overlay" class="notif-overlay" hidden>
@@ -1077,6 +1077,7 @@ window.qtyStepClick = function(btn){
 <script>window.FG_BASE_URL = <?= json_encode(BASE_URL) ?>;</script>
 <script src="<?= BASE_URL ?>/assets/fast-scan.js?v=<?= (int) @filemtime(__DIR__ . '/../assets/fast-scan.js') ?>"></script>
 <script src="<?= BASE_URL ?>/assets/scan-field.js?v=<?= (int) @filemtime(__DIR__ . '/../assets/scan-field.js') ?>"></script>
+<script src="<?= BASE_URL ?>/assets/app-footer.js?v=<?= (int) @filemtime(__DIR__ . '/../assets/app-footer.js') ?>"></script>
 </body>
 </html>
 <?php

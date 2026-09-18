@@ -580,6 +580,8 @@ function line_flex_build_messages(string $eventKey, array $payload): array
         case 'work.summary.monthly':
             require_once __DIR__ . '/line_flex_work_summary.php';
             return line_flex_work_summary_messages($payload);
+        case 'support.report':
+            return line_flex_support_report_messages($payload);
         case 'line.test':
             return [['type' => 'text', 'text' => line_flex_text((string)($payload['message'] ?? 'ทดสอบ LINE ✅'), 500)]];
         default:
@@ -1518,4 +1520,48 @@ function line_flex_production_no_data_summary(string $period, string $timestamp)
             ],
         ],
     ];
+}
+
+// ─ Event: support.report ─────────────────────────────────────────────────────
+
+/**
+ * แจ้งปัญหาจากปุ่มท้ายหน้าเว็บ — ข้อความธรรมดา 1 อัน + รูปที่แนบ (สูงสุด 4 รูป · LINE ส่งได้ 5 ข้อความต่อครั้ง)
+ * ใช้ข้อความธรรมดาแทน Flex: ข้อความที่ผู้ใช้เล่ามายาวได้ และลิงก์ในข้อความกดเปิดได้เองใน LINE
+ *
+ * @param array<string,mixed> $p
+ * @return array<int,array<string,mixed>>
+ */
+function line_flex_support_report_messages(array $p): array
+{
+    $lines = ['🛠 แจ้งปัญหา · Production'];
+    $lines[] = 'จาก: ' . line_flex_text((string) ($p['from'] ?? '-'), 60) . ' · ' . (string) ($p['at'] ?? '');
+    if (!empty($p['page_title'])) {
+        $lines[] = 'หน้า: ' . line_flex_text((string) $p['page_title'], 120);
+    }
+    $msg = trim((string) ($p['message'] ?? ''));
+    $lines[] = '';
+    $lines[] = $msg !== '' ? '"' . line_flex_text($msg, 1500) . '"' : '(แนบรูปอย่างเดียว)';
+    $imgs = isset($p['images']) && is_array($p['images']) ? array_slice($p['images'], 0, 4) : [];
+    if ($imgs) {
+        $lines[] = '📎 รูปแนบ ' . count($imgs) . ' รูป (ข้อความถัดไป)';
+    }
+    $lines[] = '';
+    if (!empty($p['page_url'])) {
+        $lines[] = 'เปิดหน้าที่แจ้ง: ' . (string) $p['page_url'];
+    }
+    $meta = [];
+    if (!empty($p['version'])) { $meta[] = 'v' . $p['version']; }
+    if (!empty($p['sync_at'])) { $meta[] = 'ซิงก์สถานะล่าสุด ' . $p['sync_at']; }
+    if ($meta) {
+        $lines[] = implode(' · ', $meta);
+    }
+    $out = [['type' => 'text', 'text' => mb_substr(implode("\n", $lines), 0, 4900)]];
+    foreach ($imgs as $im) {
+        $full = (string) ($im['full'] ?? '');
+        if (!preg_match('#^https://#i', $full)) {
+            continue;   // LINE ดึงรูปได้เฉพาะ https — เครื่อง dev (http://localhost) จะได้แค่ข้อความ
+        }
+        $out[] = ['type' => 'image', 'originalContentUrl' => $full, 'previewImageUrl' => (string) ($im['preview'] ?? $full)];
+    }
+    return $out;
 }

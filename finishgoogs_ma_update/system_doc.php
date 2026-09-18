@@ -1098,6 +1098,7 @@ $B = BASE_URL;
     <tr><td class="col-key">production.summary.weekly</td><td>สรุปผลิตรายสัปดาห์</td><td>cron/plesk_line_job_weekly.php</td></tr>
     <tr><td class="col-key">production.summary.monthly</td><td>สรุปผลิตรายเดือน</td><td>cron/plesk_line_job_monthly.php</td></tr>
     <tr><td class="col-key">work.summary.monthly</td><td>สรุปงานรายคน (รายเดือน)</td><td>cron/plesk_line_job_work_summary.php — ส่งรายคน</td></tr>
+    <tr><td class="col-key">support.report</td><td>แจ้งปัญหาจากผู้ใช้</td><td>ปุ่ม "แจ้งปัญหา" ท้ายทุกหน้า → support_report.php — ส่งเข้า LINE ผู้ดูแล (Tom) พร้อมรูปแนบ</td></tr>
     <tr><td class="col-key">line.test</td><td>ทดสอบการส่ง</td><td>ปุ่มในหน้าตั้งค่า (รายแถว)</td></tr>
   </table>
   </div>
