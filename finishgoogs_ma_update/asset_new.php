@@ -1046,9 +1046,9 @@ function addUnit(noFocus){
   } else {
     row.innerHTML = '<span class="badge st-new">#' + unitCount + '</span>'
       + '<input type="text" name="serials[]" placeholder="รหัสเครื่อง" style="flex:1; min-width:0" required autocomplete="off">'
-      + '<div style="display:flex; gap:8px; margin-left:auto; flex-shrink:0">'
-      + '<button type="button" class="btn-sm btn-line" onclick="scanUnits(this)">สแกน</button>'
-      + '<button type="button" class="btn-sm btn-line" onclick="removeUnit(this)">ลบ</button>'
+      + '<div class="unit-row-btns">'
+      + '<button type="button" class="btn-sm btn-line unit-scan" onclick="scanUnits(this)">สแกน</button>'
+      + '<button type="button" class="btn-sm btn-line unit-del" onclick="removeUnit(this)" aria-label="ลบแถวนี้"><span class="u-txt">ลบ</span><span class="u-ic" aria-hidden="true">✕</span></button>'
       + '</div>';
     list.appendChild(row);
     var serialInp = row.querySelector('input[name="serials[]"]');

@@ -1318,3 +1318,30 @@ html.fgs-open, html.fgs-open body { overflow: hidden; }
   /* ปุ่มบันทึกท้ายฟอร์มไม่ลอยบนมือถือ (หน้าแจ้งเตือน LINE · ตั้งค่ารุ่นหลายรุ่น) — วางท้ายฟอร์มตามปกติ */
   .ln-form-actions, .bulk-save-bar { position: static !important; box-shadow: none !important; }
 }
+/* แถวรหัสเครื่อง (หน้าบันทึกผลิต) — S/N ยาว 16 หลัก ต้องเห็นครบ
+   มือถือ: ซ่อนปุ่มสแกนรายแถว (ใช้ "สแกนต่อเนื่อง" แทน) และย่อปุ่มลบเป็น ✕ ให้ช่องกรอกได้ที่เต็ม */
+.unit-row-btns { display: flex; gap: 8px; margin-left: auto; flex-shrink: 0; }
+.unit-row .u-ic { display: none; }
+@media (max-width: 640px) {
+  .unit-row { gap: 6px !important; }
+  .unit-row .unit-scan { display: none; }
+  .unit-row .u-txt { display: none; }
+  .unit-row .u-ic { display: inline; font-size: 16px; }
+  .unit-row .unit-del { width: 44px; min-width: 44px; padding: 0; justify-content: center; }
+  .unit-row input[name="serials[]"] { padding-left: 10px; padding-right: 10px; font-variant-numeric: tabular-nums; }
+}
+@media (max-width: 640px) {
+  /* จอ ~327px: ป้าย #1 + ปุ่ม ✕ ข้างช่องเหลือที่ให้รหัสแค่ 144px แต่ S/N 16 หลักต้องใช้ ~168px
+     → ช่องรหัสกินเต็มแถว · #เลข ลอยเป็นป้ายเล็กบนขอบช่อง · ✕ อยู่ในช่องด้านขวา */
+  #unit-list { counter-reset: unit; }
+  .unit-row:has(input[name="serials[]"]) { position: relative; counter-increment: unit; margin-top: 10px; }
+  .unit-row:has(input[name="serials[]"]) > .badge { display: none; }
+  .unit-row:has(input[name="serials[]"])::before {
+    content: '#' counter(unit); position: absolute; left: 10px; top: -8px; z-index: 1;
+    padding: 0 5px; border-radius: 6px; background: var(--surface, #fff);
+    font-size: 11.5px; font-weight: 700; line-height: 16px; color: var(--success, #15803d);
+  }
+  .unit-row:has(input[name="serials[]"]) > input { padding-right: 46px; }
+  .unit-row:has(input[name="serials[]"]) > .unit-row-btns { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); }
+  .unit-row .unit-del { width: 40px; min-width: 40px; min-height: 40px; height: 40px; border: 0; background: transparent; color: var(--text-muted); }
+}
