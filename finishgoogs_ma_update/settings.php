@@ -237,6 +237,7 @@ $adminGroups = [
         ['stock_movements.php', 'history', 'ประวัติเข้า-ออกคลัง', 'การเปลี่ยนสถานะเครื่องทั้งหมด · ค้นตาม S/N'],
     ]],
     ['title' => 'รายงานและแจ้งเตือน', 'note' => '', 'items' => [
+        ['support_reports.php', 'alert', 'เรื่องที่แจ้งเข้ามา', 'จากปุ่มแจ้งปัญหา · รูปที่แนบ · ติดตามสถานะการแก้'],
         ['line_notify_settings.php', 'bell', 'แจ้งเตือน LINE', 'Token · เปิด/ปิด event · ทดสอบส่ง · Outbox'],
         ['work_report.php', 'chart', 'สรุปงานรายคน', 'งานรายคนต่อรอบเดือน · ผูกไลน์ · ส่งสรุป'],
         ['activity_logs.php', 'user', 'Activity Log', 'ความเคลื่อนไหวผู้ใช้ · Production + Parts · Export CSV'],

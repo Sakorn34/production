@@ -1533,7 +1533,7 @@ function line_flex_production_no_data_summary(string $period, string $timestamp)
  */
 function line_flex_support_report_messages(array $p): array
 {
-    $lines = ['🛠 แจ้งปัญหา · Production'];
+    $lines = ['🛠 แจ้งปัญหา · Production' . (!empty($p['report_id']) ? ' #' . (int) $p['report_id'] : '')];
     $lines[] = 'จาก: ' . line_flex_text((string) ($p['from'] ?? '-'), 60) . ' · ' . (string) ($p['at'] ?? '');
     if (!empty($p['page_title'])) {
         $lines[] = 'หน้า: ' . line_flex_text((string) $p['page_title'], 120);
@@ -1546,14 +1546,12 @@ function line_flex_support_report_messages(array $p): array
         $lines[] = '📎 รูปแนบ ' . count($imgs) . ' รูป (ข้อความถัดไป)';
     }
     $lines[] = '';
-    if (!empty($p['page_url'])) {
+    // ลิงก์ไปหน้ารายละเอียดเรื่อง (รูปเต็ม · หน้าที่แจ้ง · เวอร์ชัน · เปลี่ยนสถานะ) — เดิมลิงก์ไปหน้าที่แจ้ง
+    // ซึ่งถ้าแจ้งจาก Dashboard ก็เหมือนเปิดเว็บเฉย ๆ
+    if (!empty($p['report_url'])) {
+        $lines[] = 'ดูรายละเอียด / เปลี่ยนสถานะ: ' . (string) $p['report_url'];
+    } elseif (!empty($p['page_url'])) {
         $lines[] = 'เปิดหน้าที่แจ้ง: ' . (string) $p['page_url'];
-    }
-    $meta = [];
-    if (!empty($p['version'])) { $meta[] = 'v' . $p['version']; }
-    if (!empty($p['sync_at'])) { $meta[] = 'ซิงก์สถานะล่าสุด ' . $p['sync_at']; }
-    if ($meta) {
-        $lines[] = implode(' · ', $meta);
     }
     $out = [['type' => 'text', 'text' => mb_substr(implode("\n", $lines), 0, 4900)]];
     foreach ($imgs as $im) {

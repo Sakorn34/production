@@ -26,11 +26,6 @@ if (!$u || empty($u['host']) || strcasecmp((string) $u['host'], preg_replace('/:
     $pageUrl = '';
 }
 
-$pre = support_report_precheck();
-if ($pre !== '') {
-    echo json_encode(['ok' => false, 'message' => $pre], JSON_UNESCAPED_UNICODE);
-    exit;
-}
 
 $full = support_files('img_full');
 $prev = support_files('img_preview');

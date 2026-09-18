@@ -24,6 +24,53 @@ const SUPPORT_MAX_IMAGES = 4;
 /** @var int ขนาดไฟล์สูงสุดต่อรูป (ไบต์) — รูปผ่านการย่อจากเบราว์เซอร์มาแล้ว เกินนี้ถือว่าผิดปกติ */
 const SUPPORT_MAX_BYTES = 4194304;
 
+/** @var array<string,string> สถานะเรื่องที่แจ้ง */
+const SUPPORT_STATUSES = ['new' => 'รับเรื่องแล้ว', 'doing' => 'กำลังแก้', 'done' => 'แก้แล้ว'];
+
+/**
+ * ตารางเก็บเรื่องที่แจ้ง — เรื่องไม่หายไปกับแชต LINE และตามได้ว่าแก้แล้วหรือยัง
+ * collation ตรงกับตารางอื่นของระบบ (utf8mb4_unicode_ci)
+ *
+ * @return void
+ */
+function ensure_support_reports_schema(): void
+{
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+    db()->query("CREATE TABLE IF NOT EXISTS support_reports (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        created_at DATETIME NOT NULL,
+        reporter VARCHAR(100) NOT NULL DEFAULT '',
+        page_title VARCHAR(200) NOT NULL DEFAULT '',
+        page_url VARCHAR(500) NOT NULL DEFAULT '',
+        message TEXT NULL,
+        images_json TEXT NULL,
+        app_version VARCHAR(40) NOT NULL DEFAULT '',
+        sync_at VARCHAR(20) NOT NULL DEFAULT '',
+        status ENUM('new','doing','done') NOT NULL DEFAULT 'new',
+        status_by VARCHAR(100) NULL,
+        status_at DATETIME NULL,
+        admin_note TEXT NULL,
+        line_result VARCHAR(255) NULL,
+        KEY idx_status (status, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+}
+
+/**
+ * จำนวนเรื่องที่ยังไม่แก้ (ป้ายตัวเลขในเมนูหลังบ้าน)
+ *
+ * @return int
+ */
+function support_open_count(): int
+{
+    ensure_support_reports_schema();
+    $r = db()->query("SELECT COUNT(*) FROM support_reports WHERE status <> 'done'");
+    return $r ? (int) $r->fetch_row()[0] : 0;
+}
+
 /**
  * LINE userId ของผู้รับแจ้ง
  *
@@ -139,12 +186,7 @@ function support_report_send(string $message, string $pageUrl, string $pageTitle
     if ($message === '' && !$images) {
         return ['ok' => false, 'message' => 'เล่าปัญหาหรือแนบรูปอย่างน้อย 1 อย่าง'];
     }
-    $err = support_report_precheck();
-    if ($err !== '') {
-        return ['ok' => false, 'message' => $err];
-    }
-    $to = support_contact_line_id();
-
+    ensure_support_reports_schema();
     $base = work_summary_app_base_url();
     $imgUrls = [];
     foreach (array_slice($images, 0, SUPPORT_MAX_IMAGES) as $im) {
@@ -154,32 +196,68 @@ function support_report_send(string $message, string $pageUrl, string $pageTitle
         ];
     }
     $sync = support_last_sync_at();
+    $syncText = $sync ? date('d/m/Y H:i', $sync) : '';
+    $version = defined('APP_RELEASE_VERSION') ? (string) APP_RELEASE_VERSION : '';
+    $from = actor_name();
+
+    // เก็บเรื่องก่อนเสมอ — ส่ง LINE ไม่ได้ก็ยังเปิดดูได้ในหน้าเรื่องที่แจ้งเข้ามา
+    $st = db()->prepare('INSERT INTO support_reports (created_at, reporter, page_title, page_url, message, images_json, app_version, sync_at)
+                         VALUES (NOW(), ?, ?, ?, ?, ?, ?, ?)');
+    $title = mb_substr(trim($pageTitle), 0, 200);
+    $url = mb_substr($pageUrl, 0, 500);
+    $msg = mb_substr($message, 0, 3000);
+    $imgJson = json_encode($images, JSON_UNESCAPED_UNICODE);
+    $st->bind_param('sssssss', $from, $title, $url, $msg, $imgJson, $version, $syncText);
+    $st->execute();
+    $reportId = (int) $st->insert_id;
+    $st->close();
+
+    $err = support_report_precheck();
+    if ($err !== '') {
+        support_report_set_line_result($reportId, $err);
+        return ['ok' => true, 'message' => 'บันทึกเรื่องแล้ว (#' . $reportId . ') แต่ยังส่ง LINE ไม่ได้: ' . $err];
+    }
     $payload = [
-        'from'       => actor_name(),
+        'report_id'  => $reportId,
+        'report_url' => $base . '/support_reports.php?id=' . $reportId,
+        'from'       => $from,
         'at'         => date('d/m/Y H:i'),
-        'page_title' => mb_substr(trim($pageTitle), 0, 120),
-        'page_url'   => $pageUrl,
+        'page_title' => $title,
         'message'    => mb_substr($message, 0, 1500),
         'images'     => $imgUrls,
-        'sync_at'    => $sync ? date('d/m/Y H:i', $sync) : '',
-        'version'    => defined('APP_RELEASE_VERSION') ? (string) APP_RELEASE_VERSION : '',
     ];
     $id = line_notify_dispatch('support.report', $payload, [
-        'recipient_id' => $to,
+        'recipient_id' => support_contact_line_id(),
         'bot'          => WORK_SUMMARY_LINE_BOT,
         'skip_dedup'   => true,
     ]);
     if ($id === null) {
-        return ['ok' => false, 'message' => 'เข้าคิวส่ง LINE ไม่ได้'];
+        support_report_set_line_result($reportId, 'เข้าคิวส่ง LINE ไม่ได้');
+        return ['ok' => true, 'message' => 'บันทึกเรื่องแล้ว (#' . $reportId . ') แต่เข้าคิวส่ง LINE ไม่ได้'];
     }
     // ส่งทันที ไม่รอ cron รอบถัดไป — คนแจ้งควรรู้ผลตอนนี้เลยว่าถึงแล้ว
     line_notify_process_outbox(10);
     $row = line_notify_db() ? line_notify_db()->query('SELECT status, last_error FROM notification_outbox WHERE id = ' . (int) $id)->fetch_assoc() : null;
     if ($row && $row['status'] === 'sent') {
-        return ['ok' => true, 'message' => 'ส่งถึง ' . SUPPORT_CONTACT_LABEL . ' ทาง LINE แล้ว'];
+        support_report_set_line_result($reportId, 'ส่งแล้ว');
+        return ['ok' => true, 'message' => 'ส่งถึง ' . SUPPORT_CONTACT_LABEL . ' ทาง LINE แล้ว (เรื่อง #' . $reportId . ')'];
     }
     if ($row && in_array($row['status'], ['failed', 'dead'], true)) {
-        return ['ok' => false, 'message' => 'ส่ง LINE ไม่สำเร็จ: ' . mb_substr((string) $row['last_error'], 0, 120)];
+        support_report_set_line_result($reportId, 'ส่งไม่สำเร็จ: ' . mb_substr((string) $row['last_error'], 0, 200));
+        return ['ok' => true, 'message' => 'บันทึกเรื่องแล้ว (#' . $reportId . ') แต่ส่ง LINE ไม่สำเร็จ: ' . mb_substr((string) $row['last_error'], 0, 120)];
     }
-    return ['ok' => true, 'message' => 'รับเรื่องแล้ว — ระบบจะส่งเข้า LINE ในไม่กี่นาที'];
+    support_report_set_line_result($reportId, 'รอส่ง');
+    return ['ok' => true, 'message' => 'รับเรื่องแล้ว (#' . $reportId . ') — ระบบจะส่งเข้า LINE ในไม่กี่นาที'];
+}
+
+/**
+ * บันทึกผลการส่ง LINE ไว้กับเรื่อง
+ *
+ * @param int    $id
+ * @param string $text
+ * @return void
+ */
+function support_report_set_line_result(int $id, string $text): void
+{
+    qr('UPDATE support_reports SET line_result = ? WHERE id = ?', 'si', [mb_substr($text, 0, 255), $id]);
 }
