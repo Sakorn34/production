@@ -151,6 +151,23 @@ $topics = [
     ],
 ];
 
+/*
+ * ภาพประกอบ (assets/guide/*.jpg) — ถ่ายจากหน้าจอจริงขนาดมือถือ กรอบชมพู = ปุ่ม/ช่องที่ต้องกด
+ * [หัวข้อ => [ลำดับขั้นตอน (เริ่ม 0) => [ไฟล์, คำอธิบายใต้ภาพ]]] · ภาพแสดงใต้ขั้นตอนนั้น
+ * ถ่ายใหม่ทั้งชุด: node finishgoogs_ma_update/database/tools/guide_shots.mjs (ดู assets/guide/README.txt)
+ */
+$shots = [
+    'start'     => [1 => ['start-bar', 'แถบเมนูด้านล่างบนมือถือ']],
+    'scan'      => [2 => ['scan-found', 'สแกนเจอเครื่อง — กรอบเขียวบอกรหัสและรุ่น'], 5 => ['asset-actions', 'หน้าเครื่อง: ปุ่มบันทึก MA และเมนูอื่นๆ']],
+    'produce'   => [3 => ['produce-units', 'กดสแกนต่อเนื่อง แล้วสแกนทีละเครื่อง'], 7 => ['produce-save', 'ชุดอะไหล่ที่จะเบิก และปุ่มบันทึกทั้งชุด']],
+    'ma'        => [2 => ['ma-form', 'เลือกสถานะเครื่องหลังตรวจ']],
+    'update'    => [3 => ['update-form', 'ใส่ค่าใหม่ของเฟิร์มแวร์/ชิ้นส่วน']],
+    'parts'     => [1 => ['parts-list', 'ปุ่มรับเข้า · เบิกรายชิ้น · เบิก Set']],
+    'count'     => [1 => ['count-pick', 'เลือกรุ่นที่ถึงรอบนับ']],
+    'dashboard' => [0 => ['dashboard-stock', 'ตัวเลขสรุปในแท็บสต็อกเครื่อง']],
+    'report'    => [3 => ['report-modal', 'หน้าต่างแจ้งปัญหา — เล่าปัญหาแล้วกดส่งเข้า LINE']],
+];
+
 $t = (string) ($_GET['t'] ?? '');
 $topic = $topics[$t] ?? null;
 page_header($topic ? $topic['title'] : 'คู่มือการใช้งาน', $topic !== null, $topic ? 'คู่มือการใช้งาน' : 'อยากทำอะไร เลือกหัวข้อได้เลย', $topic ? $B . '/guide.php' : '');
@@ -173,7 +190,10 @@ if (!$topic) { ?>
 <div class="guide-topic">
   <p class="guide-intro"><span class="guide-tile-ic"><?= ui_icon_html($topic['icon'], 22) ?></span><?= h($topic['intro']) ?></p>
   <ol class="guide-steps">
-    <?php foreach ($topic['steps'] as $s) { ?><li><?= $s ?></li><?php } ?>
+    <?php foreach ($topic['steps'] as $si => $s) { ?><li><?= $s ?>
+      <?php if (isset($shots[$t][$si])) { $sh = $shots[$t][$si]; $src = $B . '/assets/guide/' . $sh[0] . '.jpg'; ?>
+      <figure class="guide-shot"><a href="<?= h($src) ?>" target="_blank" rel="noopener"><img src="<?= h($src . '?v=' . (int) @filemtime(__DIR__ . '/assets/guide/' . $sh[0] . '.jpg')) ?>" alt="<?= h($sh[1]) ?>" loading="lazy"></a><figcaption><?= h($sh[1]) ?></figcaption></figure>
+      <?php } ?></li><?php } ?>
   </ol>
   <?php if ($topic['tips']) { ?>
   <div class="guide-tips">
@@ -218,6 +238,9 @@ if (!$topic) { ?>
   content: counter(gs); position: absolute; left: 14px; top: 12px; width: 26px; height: 26px; border-radius: 50%;
   display: grid; place-items: center; background: var(--primary); color: #fff; font-weight: 700; font-size: 13px;
 }
+.guide-shot { margin: 10px 0 2px; }
+.guide-shot img { display: block; width: 100%; max-width: 300px; height: auto; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 6px 18px rgba(15, 23, 42, .12); }
+.guide-shot figcaption { margin-top: 6px; font-size: calc(12px * var(--font-scale, 1)); color: var(--text-muted); }
 .guide-tips { margin-top: 14px; padding: 12px 14px; border-radius: var(--radius, 12px); background: var(--surface-soft, #f4f1fa); }
 .guide-tips ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.6; }
 .guide-go { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }

@@ -1083,7 +1083,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .upd-img-input input[type=file] { max-width: 100%; }
 .upd-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 @media (max-width: 860px) {
-  .upd-cols { grid-template-columns: 1fr; }
+  .upd-cols { grid-template-columns: minmax(0, 1fr); }
   .upd-grid2 { grid-template-columns: 1fr; }
   .upd-change { grid-template-columns: 1fr; }
   .upd-arrow { display: none; }
