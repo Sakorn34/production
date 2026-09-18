@@ -148,7 +148,7 @@ page_header('อัปเดต FW/HW — ' . $product['name'] . ' (' . number_f
 <?php // แถบเครื่องมือรูปแบบเดียวกับหน้า MA — ปุ่มหลักซ้ายสุด ตามด้วยช่องค้นหาแถวเดียว ?>
 <div class="list-toolbar">
   <form method="get" action="<?= BASE_URL ?>/asset.php">
-    <input type="text" name="code" placeholder="รหัสเครื่องที่จะบันทึกอัปเดต" required style="width:230px">
+    <input type="text" name="code" data-scan="submit" placeholder="รหัสเครื่องที่จะบันทึกอัปเดต" required style="width:230px">
     <button type="submit" class="btn btn-primary btn-with-icon"><?= ui_btn_label('updates', 'บันทึกอัปเดตเครื่องนี้', 15) ?></button>
   </form>
 </div>
@@ -156,7 +156,7 @@ page_header('อัปเดต FW/HW — ' . $product['name'] . ' (' . number_f
 <div class="list-toolbar">
   <form method="get">
     <input type="hidden" name="product" value="<?= (int)$productId ?>">
-    <input type="text" name="sn" value="<?= h($searchSn) ?>" placeholder="รหัสเครื่อง" style="width:180px">
+    <input type="text" name="sn" data-scan="submit" value="<?= h($searchSn) ?>" placeholder="รหัสเครื่อง" style="width:180px">
     <input type="text" name="d" value="<?= h($searchDetail) ?>" placeholder="รายละเอียดการอัปเดต" style="min-width:220px">
     <button type="submit" class="btn btn-with-icon"><?= ui_btn_label('search', 'ค้นหา', 15) ?></button>
     <?php if ($searchSn !== '' || $searchDetail !== '') { ?>

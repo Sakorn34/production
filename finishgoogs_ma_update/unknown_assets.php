@@ -167,7 +167,7 @@ page_header('ติดตามเครื่องไม่มีสถาน�
 <?php } else { ?>
 <form method="get" class="panel ua-search">
   <?php if ($pid > 0) { ?><input type="hidden" name="product" value="<?= $pid ?>"><?php } ?>
-  <input type="search" name="q" value="<?= h($q) ?>" placeholder="ค้นหา S/N">
+  <input type="search" name="q" data-scan="submit" value="<?= h($q) ?>" placeholder="ค้นหา S/N">
   <button type="submit" class="btn btn-line btn-sm">ค้นหา</button>
 </form>
 

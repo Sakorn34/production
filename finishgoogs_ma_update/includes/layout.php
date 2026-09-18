@@ -247,7 +247,7 @@ a.classList.remove('nav-collapsed');a.classList.add('nav-expanded');}}catch(e){}
     <div class="sidebar-search" data-smart-search="<?= BASE_URL ?>/smart_search.php">
       <div class="sidebar-search-inner">
         <span class="sidebar-search-icon"><?= ui_icon_html('search', 16) ?></span>
-        <input type="search" class="sidebar-search-input" placeholder="ค้นหา S/N, MA, อัปเดต..." autocomplete="off" aria-label="ค้นหาอัจฉริยะ S/N MA อัปเดต">
+        <input type="search" class="sidebar-search-input" data-scan="nav" data-scan-inline placeholder="ค้นหา S/N, MA, อัปเดต..." autocomplete="off" aria-label="ค้นหาอัจฉริยะ S/N MA อัปเดต">
       </div>
       <?php // ตอนหุบเมนู ช่องค้นหาเต็มไม่มีที่ยืน — ปุ่มนี้แทนที่ กดแล้วขยายเมนูพร้อมโฟกัสช่องค้นหา ?>
       <button type="button" class="sidebar-search-mini" aria-label="ค้นหา" title="ค้นหา"><?= ui_icon_html('search', 16) ?></button>
@@ -1073,6 +1073,10 @@ window.qtyStepClick = function(btn){
   inp.value = (v % 1 === 0) ? String(v) : v.toFixed(1);
 };
 </script>
+<?php // ปุ่มสแกน S/N ชุดเดียวทั้งระบบ — ตัวอ่านเดียวกับหน้านับสต็อก (ติดปุ่มให้ช่อง .asset-search และ [data-scan] เอง) ?>
+<script>window.FG_BASE_URL = <?= json_encode(BASE_URL) ?>;</script>
+<script src="<?= BASE_URL ?>/assets/fast-scan.js?v=<?= (int) @filemtime(__DIR__ . '/../assets/fast-scan.js') ?>"></script>
+<script src="<?= BASE_URL ?>/assets/scan-field.js?v=<?= (int) @filemtime(__DIR__ . '/../assets/scan-field.js') ?>"></script>
 </body>
 </html>
 <?php

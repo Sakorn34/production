@@ -306,7 +306,7 @@ page_header('หลังบ้าน — เปรียบเทียบ asse
 <h2 style="margin:0 0 10px; font-size:17px">📋 รายการที่ไม่ตรงกัน</h2>
 
 <form method="get" class="filter rc-search">
-  <input type="text" name="q" value="<?= h($search) ?>" placeholder="ค้นหา serial / รุ่น / ชื่อ" style="min-width:220px">
+  <input type="text" name="q" data-scan="submit" value="<?= h($search) ?>" placeholder="ค้นหา serial / รุ่น / ชื่อ" style="min-width:220px">
   <input type="hidden" name="f" value="<?= h($flt) ?>">
   <button type="submit">ค้นหา</button>
   <?php if ($search !== '' || $flt !== '') { ?><a class="btn btn-line" href="<?= BASE_URL ?>/share_admin.php">ล้าง</a><?php } ?>

@@ -373,7 +373,7 @@ page_header('ทะเบียนสินค้า (stock)');
 
 <div class="stock-toolbar">
 <form method="get" class="filter stock-search-form">
-  <input type="text" name="q" value="<?= h($search) ?>" placeholder="ค้นหา serial / รุ่น / ผู้บันทึก" style="min-width:230px">
+  <input type="text" name="q" data-scan="submit" value="<?= h($search) ?>" placeholder="ค้นหา serial / รุ่น / ผู้บันทึก" style="min-width:230px">
   <select name="model">
     <option value="">— ทุกรุ่น —</option>
     <?php $modelList->data_seek(0); while ($m = $modelList->fetch_assoc()) { ?>

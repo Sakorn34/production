@@ -86,7 +86,7 @@ page_header('สแกน QR / Barcode');
     <section class="scan-panel">
       <div class="scan-card-head"><h3><?= ui_icon_html('edit', 14, 'h-svg') ?> พิมพ์รหัสเอง</h3></div>
       <form method="get" action="<?= BASE_URL ?>/asset.php" class="scan-manual">
-        <input type="text" name="code" id="manual-code" class="asset-search" data-nav="1"
+        <input type="text" name="code" id="manual-code" class="asset-search" data-nav="1" data-scan="off"
                placeholder="เช่น BP23021294" autocomplete="off" autofocus>
         <button type="submit" class="btn btn-primary btn-with-icon"><?= ui_btn_label('search', 'เปิดหน้าเครื่อง', 15) ?></button>
       </form>

@@ -447,7 +447,10 @@ page_header('บันทึกเครื่องผลิตใหม่');
         <label>รายการเครื่องในชุดนี้ <span class="muted" id="unit-hint"></span></label>
         <div id="last-asset-hint" class="muted" style="font-size:12px; margin-bottom:4px; display:none"></div>
         <div id="unit-list"></div>
-        <button type="button" class="btn btn-line btn-sm" id="add-unit" onclick="addUnit()" disabled><?= ui_btn_label('plus', 'เพิ่มเครื่อง') ?></button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap">
+          <button type="button" class="btn btn-line btn-sm" id="add-unit" onclick="addUnit()" disabled><?= ui_btn_label('plus', 'เพิ่มเครื่อง') ?></button>
+          <button type="button" class="btn btn-line btn-sm" id="scan-units" onclick="scanUnits(null)" hidden><?= ui_btn_label('scan', 'สแกนหลายเครื่องต่อกัน') ?></button>
+        </div>
         <input type="hidden" name="gen_count" id="gen_count" value="0">
       </div>
       <div class="field">
@@ -520,19 +523,6 @@ page_header('บันทึกเครื่องผลิตใหม่');
   </div>
 </div>
 
-<!-- modal สแกน QR -->
-<div id="qr-overlay" class="notif-overlay" hidden>
-  <div class="notif-box" style="width:min(460px,94vw)">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
-      <h2 style="margin:0" class="h-with-icon"><?= ui_icon_html('scan', 17, 'h-svg') ?><span>สแกนรหัสเครื่อง</span></h2>
-      <button type="button" class="btn-sm btn-line" onclick="stopScan()"><?= ui_btn_label('close', 'ปิด') ?></button>
-    </div>
-    <div id="qr-reader"></div>
-    <p class="muted" id="qr-status">กำลังเปิดกล้อง…</p>
-  </div>
-</div>
-
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="<?= BASE_URL ?>/assets/ma-snippets.js?v=<?= @filemtime(__DIR__ . '/assets/ma-snippets.js') ?: time() ?>"></script>
 <script>
 var cfg = null, unitCount = 0;
@@ -572,6 +562,7 @@ function loadProduct(pid){
     .then(function(d){
       cfg = d;
       document.getElementById('add-unit').disabled = false;
+      document.getElementById('scan-units').hidden = d.mode === 'generated';
       document.getElementById('save-btn').disabled = false;
       document.getElementById('unit-hint').textContent = d.mode === 'generated'
         ? '(ระบบออกเลข running อัตโนมัติ — รหัสเครื่องจริงยืนยันตอนกดบันทึก)'
@@ -1055,7 +1046,7 @@ function addUnit(){
     row.innerHTML = '<span class="badge st-new">#' + unitCount + '</span>'
       + '<input type="text" name="serials[]" placeholder="รหัสเครื่อง" style="flex:1; min-width:0" required autocomplete="off">'
       + '<div style="display:flex; gap:8px; margin-left:auto; flex-shrink:0">'
-      + '<button type="button" class="btn-sm btn-line" onclick="scanInto(this)">สแกน</button>'
+      + '<button type="button" class="btn-sm btn-line" onclick="scanUnits(this)">สแกน</button>'
       + '<button type="button" class="btn-sm btn-line" onclick="removeUnit(this)">ลบ</button>'
       + '</div>';
     list.appendChild(row);
@@ -1096,30 +1087,46 @@ function refreshPreviews(){
   updateAssetHints();
 }
 
-// ---------- สแกน QR เข้าช่องกรอก ----------
-var qrScanner = null, qrTarget = null;
-function scanInto(btn){
-  var row = btn.closest('.unit-row');
-  qrTarget = row ? row.querySelector('input[name="serials[]"]') : btn.parentNode.querySelector('input[name="serials[]"]');
-  document.getElementById('qr-overlay').hidden = false;
-  document.getElementById('qr-status').textContent = 'กำลังเปิดกล้อง…';
-  if (typeof Html5Qrcode === 'undefined') {
-    document.getElementById('qr-status').textContent = 'โหลดตัวสแกนไม่ได้ (ไม่มีอินเทอร์เน็ต) — พิมพ์รหัสเองได้';
-    return;
-  }
-  qrScanner = new Html5Qrcode('qr-reader');
-  qrScanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: 200 },
-    function(text){
-      if (qrTarget) qrTarget.value = text.trim();
-      updateProdSnippets();
-      stopScan();
-    }, function(){}
-  ).then(function(){ document.getElementById('qr-status').textContent = 'เล็งกล้องไปที่ QR/Barcode'; })
-   .catch(function(e){ document.getElementById('qr-status').textContent = 'เปิดกล้องไม่ได้: ' + e; });
+// ---------- สแกนรหัสเครื่องเข้าช่องกรอก (ตัวสแกนชุดเดียวทั้งระบบ assets/scan-field.js) ----------
+// เปิดกล้องค้างไว้ สแกนทีละเครื่องได้ต่อกัน: ใส่ช่องว่างถัดไปหรือเพิ่มแถวให้เอง · รหัสซ้ำในชุดนี้เตือนแล้วข้าม
+function serialInputs(){
+  return Array.prototype.slice.call(document.querySelectorAll('#unit-list input[name="serials[]"]'));
 }
-function stopScan(){
-  document.getElementById('qr-overlay').hidden = true;
-  if (qrScanner) { try { qrScanner.stop(); } catch(e){} qrScanner = null; }
+function scanUnits(btn){
+  if (!cfg || cfg.mode === 'generated' || !window.FgScan) return;
+  var row = btn && btn.closest ? btn.closest('.unit-row') : null;
+  var first = row ? row.querySelector('input[name="serials[]"]') : null;
+  function countText(){ return serialInputs().filter(function(i){ return i.value.trim() !== ''; }).length + ' เครื่องในชุดนี้'; }
+  FgScan.open({
+    title: 'สแกนรหัสเครื่อง — ต่อกันได้หลายเครื่อง',
+    continuous: true,
+    count: countText(),
+    onCode: function(code, api){
+      var key = code.toUpperCase();
+      var inputs = serialInputs();
+      // สแกนแรกลงแถวที่กดปุ่ม (ทับค่าเดิมได้) · ถัดไปลงช่องว่างแรก ไม่มีก็เพิ่มแถว
+      var target = first && inputs.indexOf(first) >= 0 ? first : null;
+      var dup = inputs.some(function(i){ return i !== target && i.value.trim().toUpperCase() === key; });
+      if (dup) { api.feedback('dup', code + ' — มีในรายการแล้ว'); return; }
+      first = null;
+      if (!target) target = inputs.filter(function(i){ return i.value.trim() === ''; })[0] || null;
+      if (!target) {
+        addUnit();
+        var all = serialInputs();
+        target = all[all.length - 1];
+      }
+      target.value = code;
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+      updateProdSnippets();
+      refreshPreviews();
+      api.feedback('ok', code);
+      api.setCount(countText());
+    },
+    onClose: function(){
+      var empty = serialInputs().filter(function(i){ return i.value.trim() === ''; });
+      if (empty.length) empty[0].focus();
+    }
+  });
 }
 </script>
 <?php page_footer();

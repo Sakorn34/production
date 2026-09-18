@@ -74,7 +74,7 @@ while ($r = $res->fetch_assoc()) { $rows[] = $r; }
 page_header('ประวัติเข้า-ออกคลัง', true, 'การเปลี่ยนสถานะเครื่องทั้งหมด — ทั้งที่คนทำเองและที่ระบบทำ (ซิงก์ · เคลียร์ · นับสต็อก)', $B . '/settings.php');
 ?>
 <form method="get" class="panel sm-filters">
-  <input type="search" name="q" value="<?= h($q) ?>" placeholder="ค้นหา S/N · เหตุผล · ผู้ทำ">
+  <input type="search" name="q" data-scan="submit" value="<?= h($q) ?>" placeholder="ค้นหา S/N · เหตุผล · ผู้ทำ">
   <select name="g">
     <?php foreach ($groups as $k => $gr) { ?>
     <option value="<?= h($k) ?>"<?= $k === $g ? ' selected' : '' ?>><?= h($gr['label']) ?></option>

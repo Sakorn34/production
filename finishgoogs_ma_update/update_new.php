@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 page_header('บันทึกอัปเดต FW/HW');
 if (!$a) { ?>
   <form class="filter" method="get">
-    <input type="text" name="code" placeholder="กรอกรหัสเครื่อง เช่น BP23021294" required>
+    <input type="text" name="code" data-scan="submit" placeholder="กรอกรหัสเครื่อง เช่น BP23021294" required>
     <button formaction="<?= BASE_URL ?>/asset.php" type="submit">ค้นหาเครื่องก่อน</button>
   </form>
 <?php page_footer(); exit; }

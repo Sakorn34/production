@@ -95,7 +95,7 @@ page_header('ตรวจสถานะเสื่อมสภาพ ↔ ร�
   </div>
   <form method="get" class="filter" style="margin:10px 0 0">
     <input type="hidden" name="state" value="<?= h($state) ?>">
-    <input type="text" name="q" value="<?= h($q) ?>" placeholder="ค้นหา S/N" style="max-width:240px">
+    <input type="text" name="q" value="<?= h($q) ?>" placeholder="ค้นหา S/N" style="max-width:240px" data-scan="submit">
     <button class="btn btn-line btn-sm" type="submit">ค้นหา</button>
     <?php if ($q !== '') { ?>
     <a class="btn btn-sm btn-line" href="<?= h($B . '/rent_retire_sync.php?state=' . urlencode($state)) ?>">ล้าง</a>

@@ -992,3 +992,7 @@
 .sidebar-smart-machine-head .sidebar-smart-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .sidebar-smart-status { flex-shrink: 0; font-size: calc(10.5px * var(--font-scale, 1)); font-weight: 600; padding: 1px 8px; border-radius: 999px; line-height: 1.4; white-space: nowrap; }
 .sidebar-smart-sources { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+
+/* ปุ่มสแกนในช่องค้นหาเมนูข้าง (assets/scan-field.js) — สแกนแล้วเปิดหน้าเครื่อง */
+.sidebar-search-inner .scan-field-btn { width: 28px; min-width: 28px; min-height: 28px; border: 0; background: transparent; color: rgba(255, 255, 255, .75); margin-right: -4px; }
+.sidebar-search-inner .scan-field-btn:hover { background: rgba(255, 255, 255, .12); color: #fff; }

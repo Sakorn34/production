@@ -272,7 +272,7 @@ page_header('เคลียร์เครื่องค้างสถาน�
       <option value="<?= (int) $b['product_id'] ?>" <?= $pid === (int) $b['product_id'] ? 'selected' : '' ?>><?= h($b['name']) ?> (<?= number_format($b['n']) ?>)</option>
       <?php } ?>
     </select>
-    <input type="text" name="q" value="<?= h($q) ?>" placeholder="ค้นหารหัสเครื่อง" style="max-width:200px">
+    <input type="text" name="q" data-scan="submit" value="<?= h($q) ?>" placeholder="ค้นหารหัสเครื่อง" style="max-width:200px">
     <label class="muted" style="font-size:12px">เก่ากว่าวันที่ <input type="date" name="before" value="<?= h($before) ?>"></label>
     <button class="btn btn-line btn-sm" type="submit">กรอง</button>
     <?php if ($pid || $q !== '' || $before !== '') { ?>

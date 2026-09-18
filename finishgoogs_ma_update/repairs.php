@@ -47,7 +47,7 @@ page_header('ประวัติการซ่อม');
       </option>
     <?php } ?>
   </select>
-  <input type="text" name="q" value="<?= h($search) ?>" placeholder="ค้นหารหัสเครื่อง/ลูกค้า/อาการ" style="width:230px">
+  <input type="text" name="q" data-scan="submit" value="<?= h($search) ?>" placeholder="ค้นหารหัสเครื่อง/ลูกค้า/อาการ" style="width:230px">
   <button type="submit">ค้นหา</button>
   <?php if ($custId || $search !== '') { ?><a class="btn btn-line" href="<?= BASE_URL ?>/repairs.php">ล้าง</a><?php } ?>
 </form>

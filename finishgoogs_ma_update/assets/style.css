@@ -1234,3 +1234,49 @@ button:active, .btn:active { transform: scale(.96); }
 .admin-link-go { color: var(--text-faint, #a39fb3); font-size: 18px; }
 .admin-link:hover .admin-link-go { color: var(--primary); }
 @media (max-width: 520px) { .admin-groups { grid-template-columns: 1fr; } .admin-link-text .muted { white-space: normal; } }
+
+/* ── ปุ่มสแกน S/N ชุดเดียวทั้งระบบ (assets/scan-field.js) ── */
+.scan-field { display: inline-flex; align-items: stretch; gap: 6px; max-width: 100%; vertical-align: middle; }
+.scan-field > input, .scan-field > .ac-wrap { flex: 1 1 auto; min-width: 0; }
+.scan-field > .ac-wrap > input { width: 100%; }
+.scan-field-btn {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; min-width: 40px; min-height: 38px; padding: 0; margin: 0;
+  border: 1px solid var(--border); border-radius: var(--radius-sm, 8px);
+  background: var(--surface, #fff); color: var(--primary); cursor: pointer;
+}
+.scan-field-btn:hover, .scan-field-btn:focus-visible { background: var(--surface-soft, #f4f1fa); border-color: var(--primary); }
+.fgs-overlay { position: fixed; inset: 0; z-index: 1200; background: rgba(12, 10, 20, .6); display: flex; align-items: center; justify-content: center; padding: 12px; }
+.fgs-overlay[hidden] { display: none !important; }
+html.fgs-open, html.fgs-open body { overflow: hidden; }
+.fgs-box { width: min(440px, 100%); max-height: calc(100vh - 24px); overflow: auto; background: #0b0a10; color: #fff; border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,.4); }
+.fgs-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; }
+.fgs-head b { flex: 1; font-size: 15px; }
+.fgs-count { font-size: 13px; background: rgba(255,255,255,.14); padding: 2px 10px; border-radius: 999px; }
+.fgs-count[hidden] { display: none !important; }
+.fgs-close { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.3); border-radius: 8px; padding: 6px 14px; min-height: 36px; font: inherit; font-size: 14px; cursor: pointer; }
+.fgs-stage { position: relative; aspect-ratio: 1 / 1; max-height: 60vh; margin: 0 auto; overflow: hidden; background: #150f22; }
+.fgs-stage .fs-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.fgs-stage .fs-reader { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fgs-stage .fs-reader video { width: 100% !important; height: 100% !important; object-fit: cover; }
+.fgs-stage .fs-mirror, .fgs-stage .fs-mirror video { transform: scaleX(-1); }
+.fgs-frame { position: absolute; inset: 15%; pointer-events: none; z-index: 2; }
+.fgs-frame i { position: absolute; width: 26px; height: 26px; border: 3px solid #fff; }
+.fgs-frame i:nth-child(1) { top: 0; left: 0; border-right: 0; border-bottom: 0; }
+.fgs-frame i:nth-child(2) { top: 0; right: 0; border-left: 0; border-bottom: 0; }
+.fgs-frame i:nth-child(3) { bottom: 0; left: 0; border-right: 0; border-top: 0; }
+.fgs-frame i:nth-child(4) { bottom: 0; right: 0; border-left: 0; border-top: 0; }
+.fgs-hit { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; padding: 12px; background: rgba(22,163,74,.9); }
+.fgs-hit[hidden] { display: none !important; }
+.fgs-hit.fgs-dup { background: rgba(202,138,4,.92); }
+.fgs-hit.fgs-bad { background: rgba(185,28,28,.92); }
+.fgs-hit-mark { font-size: 42px; line-height: 1; font-weight: 800; }
+.fgs-hit-text { font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
+.fgs-status { margin: 0; padding: 8px 12px; font-size: 13px; color: #d6d2e4; }
+.fgs-ctl { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; padding: 0 10px 10px; }
+.fgs-btn { background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.3); border-radius: 8px; padding: 10px 8px; min-height: 44px; font: inherit; font-size: 14px; cursor: pointer; }
+.fgs-btn.on { background: #fde68a; color: #422006; }
+.fgs-btn:disabled { opacity: .45; }
+.fgs-ctl [hidden], .fgs-zoom[hidden] { display: none !important; }
+.fgs-zoom { display: flex; align-items: center; gap: 10px; padding: 0 12px 12px; color: #d6d2e4; font-size: 13px; }
+.fgs-zoom input { flex: 1; }

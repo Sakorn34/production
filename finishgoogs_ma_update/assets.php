@@ -193,7 +193,7 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
 <div class="filter assets-filter">
 <form method="get" style="display:contents">
   <span class="livesearch-wrap">
-    <input type="text" name="q" id="live-q" value="<?= h($search) ?>" placeholder="ค้นหา รหัสเครื่อง / รุ่น / ผู้ผลิต / FW" style="width:min(360px,100%)" autocomplete="off">
+    <input type="text" name="q" id="live-q" data-scan="submit" value="<?= h($search) ?>" placeholder="ค้นหา รหัสเครื่อง / รุ่น / ผู้ผลิต / FW" style="width:min(360px,100%)" autocomplete="off">
     <div id="live-results" class="combo-list" hidden></div>
   </span>
   <select name="product" onchange="this.form.submit()">
