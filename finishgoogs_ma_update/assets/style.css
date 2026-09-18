@@ -910,7 +910,8 @@ span.thumb-sm { display: inline-flex; align-items: center; justify-content: cent
   box-shadow: var(--shadow-md);
 }
 @media (max-width: 640px) {
-  .produce-save-bar { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  /* มือถือไม่ลอย — จอเล็ก แถบลอยบังช่องกรอกด้านล่าง (18 ก.ย. 2026) · อยู่ท้ายฟอร์มตามปกติ */
+  .produce-save-bar { position: static; box-shadow: none; }
   .produce-save-bar > button { width: 100%; }
 }
 @media (max-width: 900px) { .produce-cols { grid-template-columns: minmax(0, 1fr); } .note-grid { grid-template-columns: 1fr; } }
@@ -1313,3 +1314,7 @@ html.fgs-open, html.fgs-open body { overflow: hidden; }
   .bom-row { padding-bottom: 8px; border-bottom: 1px dashed var(--border); }
 }
 .unit-actions > [hidden] { display: none !important; }
+@media (max-width: 640px) {
+  /* ปุ่มบันทึกท้ายฟอร์มไม่ลอยบนมือถือ (หน้าแจ้งเตือน LINE · ตั้งค่ารุ่นหลายรุ่น) — วางท้ายฟอร์มตามปกติ */
+  .ln-form-actions, .bulk-save-bar { position: static !important; box-shadow: none !important; }
+}

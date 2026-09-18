@@ -237,6 +237,8 @@
   }
 
   function open(opts) {
+    // ปิดแป้นพิมพ์มือถือที่อาจค้างจากช่องที่เพิ่งแตะ ก่อนเปิดกล้อง
+    if (document.activeElement && document.activeElement !== document.body && document.activeElement.blur) { document.activeElement.blur(); }
     buildUi();
     unlockAudio();
     if (state) { stopCam(); }
@@ -284,7 +286,10 @@
       if (typeof input.form.requestSubmit === 'function') { input.form.requestSubmit(); } else { input.form.submit(); }
       return;
     }
-    try { input.focus({ preventScroll: true }); } catch (e) { input.focus(); }
+    // จอสัมผัสไม่โฟกัสช่อง — ไม่งั้นแป้นพิมพ์มือถือเด้งขึ้นหลังสแกนทุกครั้ง (สแกนแล้วไม่ต้องพิมพ์อะไรต่อ)
+    if (!window.matchMedia('(pointer: coarse)').matches) {
+      try { input.focus({ preventScroll: true }); } catch (e) { input.focus(); }
+    }
     // ช่องเลือกเครื่อง (.asset-search) — รอรายการแนะนำแล้วเลือกตัวที่ตรงรหัสให้เลย หน้านั้นจะได้ข้อมูลเครื่อง (อายุ ฯลฯ) ครบ
     if (input.classList.contains('asset-search')) {
       var tries = 0, key = code.toUpperCase();

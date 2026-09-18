@@ -1030,7 +1030,8 @@ function previewCode(idx){
   while (run.length < digits) run = '0' + run;
   return out + run;
 }
-function addUnit(){
+// noFocus = เพิ่มแถวจากการสแกนต่อเนื่อง — ห้ามโฟกัสช่อง ไม่งั้นมือถือเด้งแป้นพิมพ์ขึ้นทุกครั้งที่สแกนเจอ
+function addUnit(noFocus){
   if (!cfg) return;
   var list = document.getElementById('unit-list');
   var row = document.createElement('div');
@@ -1051,7 +1052,7 @@ function addUnit(){
       + '</div>';
     list.appendChild(row);
     var serialInp = row.querySelector('input[name="serials[]"]');
-    if (serialInp) serialInp.focus();
+    if (serialInp && noFocus !== true) serialInp.focus();
     refreshPreviews();
     return;
   }
@@ -1111,7 +1112,7 @@ function scanUnits(btn){
       first = null;
       if (!target) target = inputs.filter(function(i){ return i.value.trim() === ''; })[0] || null;
       if (!target) {
-        addUnit();
+        addUnit(true);
         var all = serialInputs();
         target = all[all.length - 1];
       }
@@ -1124,7 +1125,8 @@ function scanUnits(btn){
     },
     onClose: function(){
       var empty = serialInputs().filter(function(i){ return i.value.trim() === ''; });
-      if (empty.length) empty[0].focus();
+      // จอสัมผัสไม่โฟกัสให้ — แป้นพิมพ์จะเด้งขึ้นมาบังฟอร์มทันทีที่ปิดกล้อง
+      if (empty.length && !window.matchMedia('(pointer: coarse)').matches) empty[0].focus();
     }
   });
 }

@@ -7,6 +7,7 @@ const OUT = 'D:/AppServ/www/production/finishgoogs_ma_update/assets/guide';
 const BASE = 'http://localhost/production/finishgoogs_ma_update';
 const PARTS = 'http://localhost/production/parts/pages';
 const PORT = 9333;
+let VIEW_W = 390;   // ความกว้างจอที่กำลังถ่าย (มือถือ 390 · คอม 1280)
 mkdirSync(OUT, { recursive: true });
 
 const edge = spawn(EDGE, ['--headless=new', `--remote-debugging-port=${PORT}`, '--user-data-dir=' + process.env.TEMP + '/guide-shots-profile',
@@ -71,7 +72,7 @@ function hl(selector, text) {
 }
 async function shot(name, clipH = 0) {
   const params = { format: 'jpeg', quality: 78 };
-  if (clipH) params.clip = { x: 0, y: 0, width: 390, height: clipH, scale: 1 };
+  if (clipH) params.clip = { x: 0, y: 0, width: VIEW_W, height: clipH, scale: 1 };
   const r = await send('Page.captureScreenshot', params);
   writeFileSync(`${OUT}/${name}.jpg`, Buffer.from(r.data, 'base64'));
   console.log('saved', name);
@@ -124,7 +125,8 @@ try {
   await go(BASE + '/asset_new.php', 1500);
   await js(`pickProduct(document.querySelector('.pp[data-id="22"]')); await new Promise(r=>setTimeout(r,3000));`);
   await hl('#save-btn');
-  await scrollTo('#bom-list', 120);
+  // มือถือ: ปุ่มบันทึกอยู่ท้ายฟอร์ม (ไม่ลอย) — เลื่อนให้เห็นท้ายชุดอะไหล่กับปุ่ม
+  await scrollTo('.produce-save-bar', 560);
   await shot('produce-save');
 
   // 4 MA — ฟอร์มบันทึก MA ของเครื่อง
@@ -163,6 +165,86 @@ try {
   await sleep(300);
   await hl('#support-send');
   await shot('report-modal');
+
+  // ─── ชุดจอคอม (ไฟล์ *-pc.jpg) — guide.php เลือกชุดตามขนาดจอของคนอ่าน ───
+  VIEW_W = 1280;
+  await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 760, deviceScaleFactor: 1, mobile: false });
+  await send('Emulation.setUserAgentOverride', { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36 Edg/128.0' });
+  const expandNav = `const a=document.querySelector('.app'); if(a){ a.classList.remove('nav-collapsed'); a.classList.add('nav-expanded'); }`;
+
+  // 1 เริ่มต้น — เมนูซ้าย (กางไว้)
+  await go(BASE + '/index.php', 4000);
+  await js(expandNav);
+  await sleep(500);
+  await hl('.sidebar');
+  await shot('start-bar-pc');
+
+  // 2 สแกน
+  await go(BASE + '/scan.php', 1500);
+  await js(`const h=document.getElementById('scan-hit'); h.hidden=false; h.classList.remove('is-miss');
+    document.getElementById('scan-hit-mark').textContent='✓'; document.getElementById('scan-hit-text').textContent='พบเครื่องแล้ว';
+    document.getElementById('scan-hit-code').textContent='BP25061757'; document.getElementById('scan-hit-sub').textContent='bitVisitor Plus · เครื่องเช่า';
+    document.getElementById('cam-status').textContent='กล้องหลัง · โหมดเร็ว · เล็งไปที่ QR หรือบาร์โค้ดบนตัวเครื่อง'; window.scrollTo(0,0);`);
+  await sleep(1200);
+  await shot('scan-found-pc');
+
+  // 2b หน้าเครื่อง — จอคอมปุ่มเรียงแถวเดียว
+  await go(BASE + '/asset.php?id=8755', 2000);
+  await js(`document.querySelector('.asset-sales-card')?.remove();`);
+  await hl('.asset-toolbar-actions');
+  await shot('asset-actions-pc', 420);
+
+  // 3 ลงทะเบียนผลิต
+  await go(BASE + '/asset_new.php', 1500);
+  await js(`pickProduct(document.querySelector('.pp[data-id="2"]')); await new Promise(r=>setTimeout(r,2500));
+    const inp=document.querySelector('#unit-list input[name="serials[]"]'); if(inp){ inp.value='A2041560966203'; }
+    addUnit(); const all=document.querySelectorAll('#unit-list input[name="serials[]"]'); all[1].value='A2041560966204';`);
+  await hl('#scan-units');
+  await scrollTo('#unit-list', 260);
+  await shot('produce-units-pc');
+
+  await go(BASE + '/asset_new.php', 1500);
+  await js(`pickProduct(document.querySelector('.pp[data-id="22"]')); await new Promise(r=>setTimeout(r,3000));`);
+  await hl('#save-btn');
+  await scrollTo('#bom-list', 160);
+  await shot('produce-save-pc');
+
+  // 4 MA
+  await go(BASE + '/ma.php?record=8755', 2500);
+  await scrollTo('#ma_visited_at', 200);
+  await js(`const l=document.getElementById('machine_status_label'); const n=l && l.nextElementSibling; if(n) n.classList.add('guide-hl');`);
+  await shot('ma-form-pc');
+
+  // 5 อัปเดต FW/HW
+  await go(BASE + '/update_new.php?asset=8755', 1800);
+  await js(`const l=[...document.querySelectorAll('label')].find(x=>x.textContent.trim()==='ค่าใหม่'); if(l) l.parentElement.classList.add('guide-hl');`);
+  await shot('update-form-pc');
+
+  // 6 อะไหล่
+  await go(PARTS + '/products.php', 2000);
+  await js(`const b=[...document.querySelectorAll('a,button')].find(e=>e.textContent.trim()==='รับเข้า'); if(b) b.parentElement.classList.add('guide-hl');`);
+  await shot('parts-list-pc', 560);
+
+  // 7 นับสต็อก
+  await go(BASE + '/stock_scan.php', 2000);
+  await js(`document.querySelector('details')?.removeAttribute('open');`);
+  await hl('button, a.btn', 'เลือกรุ่นที่ถึงรอบนับ');
+  await scrollTo('.guide-hl', 260);
+  await shot('count-pick-pc');
+
+  // 8 Dashboard — จอคอมไม่มีแท็บ ทุกส่วนอยู่หน้าเดียว
+  await go(BASE + '/index.php', 4500);
+  await hl('#dash-fg-summary');
+  await scrollTo('#dash-inventory-panel', 20);
+  await shot('dashboard-stock-pc');
+
+  // 9 แจ้งปัญหา
+  await go(BASE + '/assets.php', 1500);
+  await js(`document.querySelector('[data-support-open]').click();
+    document.getElementById('support-msg').value='กดค้นหาแล้วไม่ขึ้นรายการ ลองสองรอบแล้ว';`);
+  await sleep(300);
+  await hl('#support-send');
+  await shot('report-modal-pc');
 } catch (e) {
   console.error('ERROR', e.message);
 } finally {

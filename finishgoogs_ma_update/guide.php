@@ -152,21 +152,51 @@ $topics = [
 ];
 
 /*
- * ภาพประกอบ (assets/guide/*.jpg) — ถ่ายจากหน้าจอจริงขนาดมือถือ กรอบชมพู = ปุ่ม/ช่องที่ต้องกด
- * [หัวข้อ => [ลำดับขั้นตอน (เริ่ม 0) => [ไฟล์, คำอธิบายใต้ภาพ]]] · ภาพแสดงใต้ขั้นตอนนั้น
+ * ภาพประกอบ (assets/guide/*.jpg) — ถ่ายจากหน้าจอจริง กรอบชมพู = ปุ่ม/ช่องที่ต้องกด
+ * มี 2 ชุด: มือถือ (ชื่อ.jpg) · จอคอม (ชื่อ-pc.jpg) — หน้าเลือกชุดตามขนาดจอเอง และสลับเองได้
+ * [หัวข้อ => [ลำดับขั้นตอน (เริ่ม 0) => [ไฟล์, คำอธิบาย, เฉพาะจอ ('' ทั้งคู่ · 'm' มือถือ · 'pc' คอม), คำอธิบายจอคอม]]]
  * ถ่ายใหม่ทั้งชุด: node finishgoogs_ma_update/database/tools/guide_shots.mjs (ดู assets/guide/README.txt)
  */
 $shots = [
-    'start'     => [1 => ['start-bar', 'แถบเมนูด้านล่างบนมือถือ']],
-    'scan'      => [2 => ['scan-found', 'สแกนเจอเครื่อง — กรอบเขียวบอกรหัสและรุ่น'], 5 => ['asset-actions', 'หน้าเครื่อง: ปุ่มบันทึก MA และเมนูอื่นๆ']],
-    'produce'   => [3 => ['produce-units', 'กดสแกนต่อเนื่อง แล้วสแกนทีละเครื่อง'], 7 => ['produce-save', 'ชุดอะไหล่ที่จะเบิก และปุ่มบันทึกทั้งชุด']],
+    'start'     => [1 => ['start-bar', 'แถบเมนูด้านล่างบนมือถือ', 'm'], 2 => ['start-bar-pc', 'เมนูด้านซ้ายบนคอม (กางอยู่)', 'pc']],
+    'scan'      => [2 => ['scan-found', 'สแกนเจอเครื่อง — กรอบเขียวบอกรหัสและรุ่น'],
+                    5 => ['asset-actions', 'หน้าเครื่อง: ปุ่มบันทึก MA และเมนูอื่นๆ', '', 'หน้าเครื่องบนคอม: ปุ่มคำสั่งทั้งหมดเรียงแถวเดียว']],
+    'produce'   => [3 => ['produce-units', 'กดสแกนต่อเนื่อง แล้วสแกนทีละเครื่อง'], 7 => ['produce-save', 'ท้ายฟอร์ม: Checklist แล้วปุ่มบันทึกทั้งชุด', '', 'ชุดอะไหล่ที่จะเบิก และปุ่มบันทึกทั้งชุด']],
     'ma'        => [2 => ['ma-form', 'เลือกสถานะเครื่องหลังตรวจ']],
     'update'    => [3 => ['update-form', 'ใส่ค่าใหม่ของเฟิร์มแวร์/ชิ้นส่วน']],
     'parts'     => [1 => ['parts-list', 'ปุ่มรับเข้า · เบิกรายชิ้น · เบิก Set']],
     'count'     => [1 => ['count-pick', 'เลือกรุ่นที่ถึงรอบนับ']],
-    'dashboard' => [0 => ['dashboard-stock', 'ตัวเลขสรุปในแท็บสต็อกเครื่อง']],
+    'dashboard' => [0 => ['dashboard-stock', 'ตัวเลขสรุปในแท็บสต็อกเครื่อง', '', 'ตัวเลขสรุปและตารางรุ่น (จอคอมไม่มีแท็บ ทุกส่วนอยู่หน้าเดียว)']],
     'report'    => [3 => ['report-modal', 'หน้าต่างแจ้งปัญหา — เล่าปัญหาแล้วกดส่งเข้า LINE']],
 ];
+
+/**
+ * ภาพประกอบ 1 ขั้นตอน — ใส่ทั้งภาพมือถือและภาพจอคอม ให้ CSS เลือกแสดงตามโหมด
+ *
+ * @param array<int,string> $sh
+ * @return string
+ */
+function guide_shot_html(array $sh): string
+{
+    $only = $sh[2] ?? '';
+    $one = function ($file, $cap, $cls) {
+        $path = __DIR__ . '/assets/guide/' . $file . '.jpg';
+        if (!is_file($path)) {
+            return '';
+        }
+        $src = BASE_URL . '/assets/guide/' . $file . '.jpg';
+        return '<figure class="guide-shot ' . $cls . '"><a href="' . h($src) . '" target="_blank" rel="noopener">'
+            . '<img src="' . h($src . '?v=' . (int) filemtime($path)) . '" alt="' . h($cap) . '" loading="lazy"></a>'
+            . '<figcaption>' . h($cap) . '</figcaption></figure>';
+    };
+    if ($only === 'm') {
+        return $one($sh[0], $sh[1], 'is-m');
+    }
+    if ($only === 'pc') {
+        return $one($sh[0], $sh[1], 'is-pc');
+    }
+    return $one($sh[0], $sh[1], 'is-m') . $one($sh[0] . '-pc', $sh[3] ?? $sh[1], 'is-pc');
+}
 
 $t = (string) ($_GET['t'] ?? '');
 $topic = $topics[$t] ?? null;
@@ -187,13 +217,16 @@ if (!$topic) { ?>
     $prev = $i > 0 ? $keys[$i - 1] : null;
     $next = $i < count($keys) - 1 ? $keys[$i + 1] : null;
 ?>
-<div class="guide-topic">
+<div class="guide-topic" id="guide-topic">
+  <div class="guide-view" role="group" aria-label="ภาพประกอบแบบ">
+    <span>ภาพประกอบ:</span>
+    <button type="button" data-view="m">มือถือ</button>
+    <button type="button" data-view="pc">คอม</button>
+  </div>
   <p class="guide-intro"><span class="guide-tile-ic"><?= ui_icon_html($topic['icon'], 22) ?></span><?= h($topic['intro']) ?></p>
   <ol class="guide-steps">
     <?php foreach ($topic['steps'] as $si => $s) { ?><li><?= $s ?>
-      <?php if (isset($shots[$t][$si])) { $sh = $shots[$t][$si]; $src = $B . '/assets/guide/' . $sh[0] . '.jpg'; ?>
-      <figure class="guide-shot"><a href="<?= h($src) ?>" target="_blank" rel="noopener"><img src="<?= h($src . '?v=' . (int) @filemtime(__DIR__ . '/assets/guide/' . $sh[0] . '.jpg')) ?>" alt="<?= h($sh[1]) ?>" loading="lazy"></a><figcaption><?= h($sh[1]) ?></figcaption></figure>
-      <?php } ?></li><?php } ?>
+      <?= isset($shots[$t][$si]) ? guide_shot_html($shots[$t][$si]) : '' ?></li><?php } ?>
   </ol>
   <?php if ($topic['tips']) { ?>
   <div class="guide-tips">
@@ -214,6 +247,25 @@ if (!$topic) { ?>
   </nav>
 </div>
 <?php } ?>
+
+<script>
+/* เลือกชุดภาพตามจอ (≤ 760px = มือถือ) — กดสลับได้ และจำไว้ในเครื่อง */
+(function(){
+  var box = document.getElementById('guide-topic');
+  if (!box) return;
+  var saved = null;
+  try { saved = localStorage.getItem('guideView'); } catch (e) {}
+  function set(v, remember){
+    box.setAttribute('data-view', v);
+    box.querySelectorAll('.guide-view button').forEach(function(b){ b.classList.toggle('is-on', b.getAttribute('data-view') === v); });
+    if (remember) { try { localStorage.setItem('guideView', v); } catch (e) {} }
+  }
+  set(saved === 'm' || saved === 'pc' ? saved : (window.matchMedia('(max-width: 760px)').matches ? 'm' : 'pc'), false);
+  box.querySelectorAll('.guide-view button').forEach(function(b){
+    b.addEventListener('click', function(){ set(b.getAttribute('data-view'), true); });
+  });
+})();
+</script>
 
 <style>
 .guide-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
@@ -239,6 +291,11 @@ if (!$topic) { ?>
   display: grid; place-items: center; background: var(--primary); color: #fff; font-weight: 700; font-size: 13px;
 }
 .guide-shot { margin: 10px 0 2px; }
+.guide-view { display: flex; align-items: center; gap: 6px; margin: 0 0 12px; font-size: calc(13px * var(--font-scale, 1)); color: var(--text-muted); }
+.guide-view button { min-height: 34px; padding: 4px 14px; border-radius: 999px; border: 1px solid var(--border-strong, #d6cfe6); background: var(--surface, #fff); color: var(--text-muted); font: inherit; cursor: pointer; }
+.guide-view button.is-on { background: var(--primary-soft, #fce7f3); border-color: var(--primary); color: var(--primary); font-weight: 600; }
+.guide-topic[data-view="m"] .guide-shot.is-pc, .guide-topic[data-view="pc"] .guide-shot.is-m { display: none; }
+.guide-shot.is-pc img { max-width: 100%; }
 .guide-shot img { display: block; width: 100%; max-width: 300px; height: auto; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 6px 18px rgba(15, 23, 42, .12); }
 .guide-shot figcaption { margin-top: 6px; font-size: calc(12px * var(--font-scale, 1)); color: var(--text-muted); }
 .guide-tips { margin-top: 14px; padding: 12px 14px; border-radius: var(--radius, 12px); background: var(--surface-soft, #f4f1fa); }
