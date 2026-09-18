@@ -859,7 +859,7 @@ $B = BASE_URL;
       ['dthai($d)', 'วันที่ d/m/Y'],
       ['setting($key) / set_setting($key,$val)', 'อ่าน/เขียน site_settings'],
       ['nav_effective()', 'Build sidebar ฝั่ง production จาก site_settings.nav_items (parts ใช้ shared/ui_icons.php::ui_nav_apply_override() อ่าน settings ชุดเดียวกัน — ทั้ง 2 แอปจึงเห็นเมนูตรงกัน)'],
-      ['ui_mobile_bar_html(...)', 'shared/ui_icons.php — แถบลัดล่างจอสำหรับมือถือ (สแกน / เครื่อง / บันทึก MA / อะไหล่) ใช้ร่วมกันทั้ง 2 แอป'],
+      ['ui_mobile_bar_html(...)', 'shared/ui_icons.php — แถบลัดล่างจอสำหรับมือถือ (Dashboard / สแกน / เครื่อง / อะไหล่) ใช้ร่วมกันทั้ง 2 แอป'],
       ['smart_search_query($q, $limitPerKind=5)', 'includes/smart_search.php — ค้น 14 แหล่งข้าม 5 ฐานในครั้งเดียว คืน array ผลลัพธ์พร้อม kind/href (ฐานที่ต่อไม่ติดถูกข้าม ไม่ทำให้ทั้งช่องค้นหาพัง)'],
       ['asset_status_sync_*()', 'includes/asset_status_sync.php — คิดสถานะเครื่องใหม่จากระบบเช่า + การเบิกขาย ตามลำดับ sold > rental > new (ไม่ทับ spare)'],
       ['work_people_ensure_schema() / work_people_resolve($raw)', 'includes/work_people.php — สร้างตารางทะเบียนคนอัตโนมัติ · แปลงชื่อดิบเป็นรหัสคน (แยก comma + เทียบไม่สนตัวพิมพ์ + ตาม alias)'],
@@ -1123,7 +1123,7 @@ $B = BASE_URL;
     จึงต้องมี <span class="inline-code">&lt;meta name="viewport" content="width=device-width, initial-scale=1"&gt;</span> ในทุกหน้า
   </div>
   <ul style="font-size:13px; color:var(--text-muted, #4b5563); margin:0 0 12px 18px; line-height:1.85">
-    <li><b>แถบลัดล่างจอ</b> (<span class="inline-code">.mbar</span>): สแกน · เครื่อง · บันทึก MA · อะไหล่ — สร้างจาก <span class="inline-code">ui_mobile_bar_html()</span> ใช้ร่วมกัน 2 แอป</li>
+    <li><b>แถบลัดล่างจอ</b> (<span class="inline-code">.mbar</span>): Dashboard · สแกน · เครื่อง · อะไหล่ — สร้างจาก <span class="inline-code">ui_mobile_bar_html()</span> ใช้ร่วมกัน 2 แอป</li>
     <li><b>เป้าสัมผัส 48px</b>: <span class="inline-code">:root { --input-h: 48px }</span> บนจอเล็ก</li>
     <li>กฎมือถือทั้งหมดอยู่ใน <span class="inline-code">assets/sidebar.css</span> <b>ไม่ใช่ style.css</b> — เพราะแอป parts ไม่ได้โหลด style.css ของ production</li>
     <li>เนื้อหาท้ายหน้าเว้นที่ให้แถบลอย: <span class="inline-code">padding-bottom: calc(64px + env(safe-area-inset-bottom))</span></li>

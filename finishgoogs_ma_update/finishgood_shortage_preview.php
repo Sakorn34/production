@@ -248,11 +248,17 @@ $allJson = $messages !== []
         .reg-table th { color: #777; font-weight: 600; font-size: 12px; }
         .reg-table .n { text-align: right; font-variant-numeric: tabular-nums; }
         .reg-table tr.reg-on td { background: #f2f8ff; }
+        /* หน้านี้ไม่ได้ใช้ layout หลัก — ปุ่มเลยเป็นปุ่มดิบของเบราว์เซอร์ สูง 23px กดยากบนมือถือ */
+        button { min-height: 40px; padding: 8px 18px; border-radius: 8px; border: 1px solid #c9c2da; background: #fff; font: inherit; font-size: 14px; cursor: pointer; }
+        button[type=submit] { background: #e11d74; border-color: #e11d74; color: #fff; font-weight: 600; }
+        .back-link { display: inline-flex; align-items: center; min-height: 40px; margin-bottom: 6px; color: #e11d74; text-decoration: none; font-weight: 600; }
+        @media (max-width: 640px) { body { padding: 10px; } .panel { padding: 14px; } button { min-height: 44px; } }
     </style>
 </head>
 <body>
 
 <div class="panel">
+    <a class="back-link" href="<?= h(BASE_URL . '/settings.php') ?>">← ระบบหลังบ้าน</a><br>
     <strong>ตัวอย่าง LINE Flex — สินค้าที่ต้องผลิตเพิ่ม</strong>
     <div style="color:#777;font-size:12px;margin-top:4px;">
         ข้อมูลจากทะเบียนเครื่องของเรา · ขั้นต่ำตั้งในหน้านี้ · PO ค้างจากใบสั่งงาน — ชุดเดียวกับการ์ด Dashboard

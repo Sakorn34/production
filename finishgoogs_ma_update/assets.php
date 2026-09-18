@@ -197,22 +197,22 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
     <div id="live-results" class="combo-list" hidden></div>
   </span>
   <select name="product" onchange="this.form.submit()">
-    <option value="">— ทุกรุ่น —</option>
+    <option value="">ทุกรุ่น</option>
     <?php while ($p = $productList->fetch_assoc()) { ?>
       <option value="<?= h($p['name']) ?>" <?= $product === $p['name'] ? 'selected' : '' ?>><?= h($p['name']) ?></option>
     <?php } ?>
   </select>
   <select name="status" onchange="this.form.submit()">
-    <option value="">— ทุกสถานะ —</option>
+    <option value="">ทุกสถานะ</option>
     <?php foreach (status_list() as $s) { ?>
       <option value="<?= $s ?>" <?= $status === $s ? 'selected' : '' ?>><?= h(status_th($s)) ?></option>
     <?php } ?>
   </select>
   <select name="sort" onchange="this.form.submit()">
-    <option value="time_code" <?= $sort === 'time_code' ? 'selected' : '' ?>>เวลาบันทึกล่าสุด+รหัสเครื่องมากสุด</option>
-    <option value="date_desc" <?= $sort === 'date_desc' ? 'selected' : '' ?>>วันที่ผลิต ใหม่ → เก่า</option>
-    <option value="date_asc" <?= $sort === 'date_asc' ? 'selected' : '' ?>>วันที่ผลิต เก่า → ใหม่</option>
-    <option value="code" <?= $sort === 'code' ? 'selected' : '' ?>>เรียงตามรหัสเครื่อง</option>
+    <option value="time_code" <?= $sort === 'time_code' ? 'selected' : '' ?>>บันทึกล่าสุด</option>
+    <option value="date_desc" <?= $sort === 'date_desc' ? 'selected' : '' ?>>ผลิต ใหม่ → เก่า</option>
+    <option value="date_asc" <?= $sort === 'date_asc' ? 'selected' : '' ?>>ผลิต เก่า → ใหม่</option>
+    <option value="code" <?= $sort === 'code' ? 'selected' : '' ?>>รหัสเครื่อง</option>
     <option value="recent" <?= $sort === 'recent' ? 'selected' : '' ?>>เพิ่มเข้าระบบล่าสุด</option>
   </select>
   <button type="submit">ค้นหา</button>

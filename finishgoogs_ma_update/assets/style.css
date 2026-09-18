@@ -1280,3 +1280,24 @@ html.fgs-open, html.fgs-open body { overflow: hidden; }
 .fgs-ctl [hidden], .fgs-zoom[hidden] { display: none !important; }
 .fgs-zoom { display: flex; align-items: center; gap: 10px; padding: 0 12px 12px; color: #d6d2e4; font-size: 13px; }
 .fgs-zoom input { flex: 1; }
+/* ปุ่มสแกนอยู่ในช่องกรอกด้านขวา (แบบ ก) — ไม่ต้องกินที่ข้างช่องอีกปุ่ม */
+.scan-field { position: relative; }
+.scan-field > input, .scan-field > .ac-wrap > input { padding-right: 44px; }
+.scan-field > .scan-field-btn {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%); z-index: 2;
+  width: 36px !important; min-width: 36px; height: 36px; min-height: 0 !important;
+  border: 0; background: transparent;
+}
+.scan-field > .scan-field-btn:hover, .scan-field > .scan-field-btn:focus-visible { background: var(--surface-soft, #f4f1fa); }
+/* ชื่อไฟล์/พาธยาว ๆ ใน <code> (เช่นคำแนะนำหน้าประวัติติดตั้ง) ห้ามดันหน้าให้เลื่อนขวาง */
+.content code { overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  /* ตัวเลือกรุ่นหน้าบันทึกผลิต — เดิมกล่องละ 128px จอมือถือได้แถวละรุ่นเดียว เลื่อนหาไกล */
+  .prod-pick { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; padding: 8px; }
+  .prod-pick .pp { padding: 8px 4px; }
+  .prod-pick .pp img, .prod-pick .pp .noimg { width: 44px; height: 44px; }
+}
+/* popup ต้องอยู่เหนือแถบเมนูล่างของมือถือ (.mbar z-index 75) — เดิม 50 ท้าย popup จมอยู่ใต้แถบ กดปุ่มล่างไม่ได้ */
+.notif-overlay { z-index: 80; }
+/* ปุ่ม "← ย้อน" ใน popup ชั้นแรกต้องซ่อน — กฎ display ของ .btn-sm ชนะแอตทริบิวต์ hidden */
+#list-back[hidden] { display: none !important; }

@@ -307,7 +307,7 @@ a.classList.remove('nav-collapsed');a.classList.add('nav-expanded');}}catch(e){}
         // ส่งไฟล์ที่ผู้ใช้ซ่อนไว้ไปด้วย ปุ่มที่ถูกซ่อนในเมนูจะได้ไม่โผล่ที่นี่
         $mbarShown = [];
         foreach ($nav as $n) { $mbarShown[] = $n['file']; }
-        $mbarHidden = array_values(array_diff(['scan.php', 'assets.php', 'ma.php'], $mbarShown));
+        $mbarHidden = array_values(array_diff(['index.php', 'scan.php', 'assets.php'], $mbarShown));
   ?>
   <?= ui_mobile_bar_html($cur, rtrim(BASE_URL, '/'), ui_parts_base_url(), $mbarHidden) ?>
   <main class="content">

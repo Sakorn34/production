@@ -556,9 +556,9 @@ function ui_mobile_bar_html(string $currentFile, string $fgBase, string $partsBa
     $pt = rtrim($partsBase, '/');
 
     $items = [
+        ['file' => 'index.php',          'href' => $fg . '/index.php',          'icon' => 'dashboard', 'label' => 'Dashboard'],
         ['file' => 'scan.php',           'href' => $fg . '/scan.php',           'icon' => 'scan',     'label' => 'สแกน'],
         ['file' => 'assets.php',         'href' => $fg . '/assets.php',         'icon' => 'assets',   'label' => 'เครื่อง'],
-        ['file' => 'ma.php',             'href' => $fg . '/ma.php',             'icon' => 'ma',       'label' => 'บันทึก MA'],
         ['file' => 'pages/products.php', 'href' => $pt . '/pages/products.php', 'icon' => 'products', 'label' => 'อะไหล่'],
     ];
 

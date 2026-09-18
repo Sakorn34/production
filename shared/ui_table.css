@@ -239,3 +239,65 @@ table.products-table th { position: sticky; top: 0; z-index: 2; }
      ยังมีตารางที่ไม่ใส่คลาสเลย · ไล่ทีละชื่อจะตกหล่นอีกเรื่อย ๆ */
   .table-wrap-fold:not(:has(table.list)):not(:has(table.products-table)) { overflow-x: auto; }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   การ์ดบนมือถือแบบกระชับ (แบบ ก · 18 ก.ย. 2026)
+   เดิมการ์ดสูง ~130px เห็นได้ 3 แถวต่อจอ — สถานะตกไปอยู่บรรทัดของตัวเอง
+   แถวที่มีช่องระดับ 1 สองช่อง (เช่น รหัสเครื่อง + สถานะ) วางคู่กันซ้าย-ขวา
+   แถวที่มีสามช่องขึ้นไปยังเรียงลงมาแบบเดิม (ไม่เดาว่าช่องไหนควรอยู่ข้างไหน)
+   ───────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 760px) {
+  table.list tr, table.products-table tr { padding: 9px 12px; margin-bottom: 6px; }
+  table.list tr:has(> td[data-pri="1"] ~ td[data-pri="1"]):not(:has(> td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"])),
+  table.products-table tr:has(> td[data-pri="1"] ~ td[data-pri="1"]):not(:has(> td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"])) {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; align-items: center;
+  }
+  table.list td a, table.list td button,
+  table.products-table td a, table.products-table td button { min-height: 40px; }
+  table.list .cell-sub, table.products-table .cell-sub { margin-top: -4px; }
+}
+@media (max-width: 760px) {
+  /* คอลัมน์ขวาห้ามกินจนคอลัมน์ซ้าย (รหัสเครื่อง) เหลือศูนย์ — เจอที่หน้าอัปเดต (รายละเอียดยาว)
+     และหน้างานซ่อม (ชื่อลูกค้ายาว) ข้อความคอลัมน์ขวาตัดบรรทัดในกรอบของตัวเองแทน */
+  table.list tr:has(> td[data-pri="1"] ~ td[data-pri="1"]):not(:has(> td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"])),
+  table.products-table tr:has(> td[data-pri="1"] ~ td[data-pri="1"]):not(:has(> td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"])) {
+    grid-template-columns: minmax(42%, 1fr) minmax(0, auto);
+  }
+  table.list tr > td[data-pri="1"] ~ td[data-pri="1"],
+  table.products-table tr > td[data-pri="1"] ~ td[data-pri="1"] { min-width: 0; overflow-wrap: anywhere; justify-self: end; text-align: right; }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ตารางที่ไม่ได้ใส่ data-pri เลย (ราว 20 หน้า รวมตารางใน popup) — กฎโหมดการ์ดด้านบนซ่อนทุกช่องที่ไม่ใช่
+   ระดับ 1 ตารางพวกนี้จึงเหลือการ์ดเปล่าบนมือถือ (เจอตอนไล่ตรวจ 18 ก.ย. 2026 · เช่นประวัติเบิกอะไหล่)
+   แสดงทุกช่องเรียงต่อกันในการ์ด: ช่องแรกเป็นหัวการ์ดเต็มบรรทัด ที่เหลือเป็นข้อมูลรองเรียงไหลต่อกัน
+   ───────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 760px) {
+  table.list:not(:has([data-pri])) tr:has(> td),
+  table.products-table:not(:has([data-pri])) tr:has(> td) { display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: baseline; }
+  table.list:not(:has([data-pri])) td,
+  table.products-table:not(:has([data-pri])) td { display: block !important; min-width: 0; overflow-wrap: anywhere; font-size: calc(13px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); }
+  table.list:not(:has([data-pri])) td:first-child,
+  table.products-table:not(:has([data-pri])) td:first-child { flex: 1 1 100%; font-size: calc(14px * var(--font-scale, 1)); font-weight: 600; color: var(--text); }
+  table.list:not(:has([data-pri])) td:empty,
+  table.products-table:not(:has([data-pri])) td:empty { display: none !important; }
+}
+@media (max-width: 760px) {
+  /* ช่องปุ่มจัดการตั้ง width:1% ไว้ให้ตารางจอใหญ่ (หดพอดีปุ่ม) — ในโหมดการ์ดช่องเป็น block
+     1% จึงเหลือ ~3px แล้วปุ่มล้นออกขวาดันทั้งหน้าให้เลื่อนขวาง (หน้าอะไหล่ 425px บนจอ 375px) */
+  table.list td.col-actions, table.products-table td.col-actions { width: auto; }
+}
+@media (max-width: 760px) {
+  /* แถวที่มีช่องระดับ 1 สามช่อง (เช่น อะไหล่: ชื่อ · คงเหลือ · ปุ่ม) — ช่องแรกเต็มบรรทัด อีกสองช่องคู่กันซ้าย-ขวา */
+  table.list tr:has(> td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"]):not(:has(> td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"])),
+  table.products-table tr:has(> td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"]):not(:has(> td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"])) {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; row-gap: 6px; align-items: center;
+  }
+  table.list tr:has(> td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"]):not(:has(> td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"])) > td[data-pri="1"]:not(td[data-pri="1"] ~ td),
+  table.products-table tr:has(> td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"]):not(:has(> td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"])) > td[data-pri="1"]:not(td[data-pri="1"] ~ td) { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) {
+  table.list tr:has(> td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"]):not(:has(> td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"])) > td[data-pri="1"]:not(td[data-pri="1"] ~ td) + td,
+  table.list tr:has(> td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"]):not(:has(> td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"])) > td[data-pri="1"]:nth-last-of-type(n+2),
+  table.products-table tr:has(> td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"]):not(:has(> td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"] ~ td[data-pri="1"])) > td[data-pri="1"]:nth-last-of-type(n+2) { justify-self: start; text-align: left; }
+}

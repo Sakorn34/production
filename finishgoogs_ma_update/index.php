@@ -276,6 +276,13 @@ function modal_js($title, $dataUrl, $moreUrl = '') {
 $B = BASE_URL;
 $partsBase = ui_parts_base_url();
 ?>
+<?php // แท็บเฉพาะมือถือ (แบบ ข · 18 ก.ย. 2026) — จอเล็กเห็นทีละเรื่อง ไม่ต้องเลื่อนผ่านทุกการ์ด
+      // จอใหญ่ซ่อนแท็บ ทุกส่วนแสดงพร้อมกันเหมือนเดิม (ดู .dash-m-tabs ใน theme-v2.css) ?>
+<div class="dash-m-tabs" role="tablist" aria-label="เลือกดูบน Dashboard">
+  <button type="button" class="dash-m-tab" data-mtab="stock" role="tab">สต็อกเครื่อง</button>
+  <button type="button" class="dash-m-tab" data-mtab="prod" role="tab">ภาพรวมการผลิต</button>
+  <button type="button" class="dash-m-tab" data-mtab="parts" role="tab">อะไหล่</button>
+</div>
 <div class="dash-top-row">
   <?php
   // การ์ดรวมสถานะเครื่อง — เดิมแยกเป็น 7 ใบ (ทั้งหมด + 6 สถานะ) กินพื้นที่ทั้งแถวแรก
@@ -612,6 +619,42 @@ $partsBase = ui_parts_base_url();
     <a href="<?= h($B . '/finishgood_shortage_preview.php') ?>">ตั้งค่าการนับและการแจ้งเตือนรายรุ่น ›</a>
   </p>
 </div>
+
+<script>
+/* แท็บมือถือ: สต็อกเครื่อง = ตารางรุ่น · ภาพรวม = การ์ดสถานะ + กราฟรายปี · อะไหล่ = การ์ดอะไหล่ + สต็อกอะไหล่
+   สลับมุมมองในกล่องรุ่น/อะไหล่ด้วยปุ่มเดิมของกล่อง (ซ่อนบนมือถือ) — ตัวกรองและตัวนับทำงานตามเดิม */
+(function(){
+  var tabs = document.querySelectorAll('.dash-m-tab');
+  if (!tabs.length) return;
+  var mq = window.matchMedia('(max-width: 640px)');
+  var partsBtn = document.querySelector('.dash-view-btn[data-view="parts"]');
+  var canParts = partsBtn && !partsBtn.disabled;
+  function pick(name, remember){
+    if (name === 'parts' && !canParts) name = 'stock';
+    document.documentElement.setAttribute('data-dash-tab', name);
+    tabs.forEach(function(t){
+      var on = t.getAttribute('data-mtab') === name;
+      t.classList.toggle('is-on', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    if (mq.matches) {
+      var v = document.querySelector('.dash-view-btn[data-view="' + (name === 'parts' ? 'parts' : 'models') + '"]');
+      if (v && !v.classList.contains('active')) v.click();
+    }
+    if (remember) { try { localStorage.setItem('dashMobileTab', name); } catch (e) {} }
+  }
+  tabs.forEach(function(t){
+    if (t.getAttribute('data-mtab') === 'parts' && !canParts) t.hidden = true;
+    t.addEventListener('click', function(){ pick(t.getAttribute('data-mtab'), true); window.scrollTo(0, 0); });
+  });
+  var saved = null;
+  try { saved = localStorage.getItem('dashMobileTab'); } catch (e) {}
+  var first = saved === 'prod' || saved === 'parts' ? saved : 'stock';
+  document.documentElement.setAttribute('data-dash-tab', first);   // ซ่อนส่วนอื่นทันที ไม่กระพริบ
+  // ปุ่มสลับมุมมองของกล่องรุ่นผูก event ในสคริปต์ถัดไป — รอให้หน้าโหลดครบก่อนกด
+  document.addEventListener('DOMContentLoaded', function(){ pick(first, false); });
+})();
+</script>
 
 <script>
 (function(){
