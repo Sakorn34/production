@@ -447,9 +447,9 @@ page_header('บันทึกเครื่องผลิตใหม่');
         <label>รายการเครื่องในชุดนี้ <span class="muted" id="unit-hint"></span></label>
         <div id="last-asset-hint" class="muted" style="font-size:12px; margin-bottom:4px; display:none"></div>
         <div id="unit-list"></div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap">
+        <div class="unit-actions">
           <button type="button" class="btn btn-line btn-sm" id="add-unit" onclick="addUnit()" disabled><?= ui_btn_label('plus', 'เพิ่มเครื่อง') ?></button>
-          <button type="button" class="btn btn-line btn-sm" id="scan-units" onclick="scanUnits(null)" hidden><?= ui_btn_label('scan', 'สแกนหลายเครื่องต่อกัน') ?></button>
+          <button type="button" class="btn btn-line btn-sm" id="scan-units" onclick="scanUnits(null)" hidden><?= ui_btn_label('scan', 'สแกนต่อเนื่อง') ?></button>
         </div>
         <input type="hidden" name="gen_count" id="gen_count" value="0">
       </div>
@@ -483,7 +483,7 @@ page_header('บันทึกเครื่องผลิตใหม่');
         <label>Checklist ที่ตรวจแล้ว <span class="muted">(ติ๊กเฉพาะข้อที่ตรวจ)</span></label>
         <div class="chk-list" id="chk-list"><span class="muted">เลือกรุ่นสินค้าก่อน</span></div>
         <div style="display:flex; gap:8px; margin-top:8px">
-          <input type="text" id="chk-new" placeholder="เพิ่มข้อตรวจใหม่…" style="flex:1">
+          <input type="text" id="chk-new" placeholder="เพิ่มข้อตรวจใหม่…" style="flex:1; min-width:0">
           <button type="button" class="btn btn-line btn-sm" onclick="addChkItem()"><?= ui_btn_label('plus', 'เพิ่มข้อ') ?></button>
         </div>
       </div>

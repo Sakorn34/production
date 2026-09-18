@@ -280,7 +280,7 @@ $partsBase = ui_parts_base_url();
       // จอใหญ่ซ่อนแท็บ ทุกส่วนแสดงพร้อมกันเหมือนเดิม (ดู .dash-m-tabs ใน theme-v2.css) ?>
 <div class="dash-m-tabs" role="tablist" aria-label="เลือกดูบน Dashboard">
   <button type="button" class="dash-m-tab" data-mtab="stock" role="tab">สต็อกเครื่อง</button>
-  <button type="button" class="dash-m-tab" data-mtab="prod" role="tab">ภาพรวมการผลิต</button>
+  <button type="button" class="dash-m-tab" data-mtab="prod" role="tab">การผลิต</button>
   <button type="button" class="dash-m-tab" data-mtab="parts" role="tab">อะไหล่</button>
 </div>
 <div class="dash-top-row">

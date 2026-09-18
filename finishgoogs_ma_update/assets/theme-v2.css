@@ -1931,3 +1931,12 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
   .dash-prod-stacked .dash-chart-bars { justify-content: safe center; }
   .dash-prod-stacked .dash-bar-total-inline { font-size: calc(11px * var(--font-scale, 1)); }
 }
+@media (max-width: 640px) {
+  /* จอมือถือจริงแคบกว่า 375px (เช่น 327px) — แท็บต้องพอดีสามอัน ไม่ให้อันขวาหลุดขอบ */
+  .dash-m-tab { flex: 1 1 0; padding: 6px 8px; text-align: center; }
+  /* ตัวกรองรุ่น 4 ปุ่มเป็นตาราง 2×2 แทนแถวเลื่อน (บนจอแคบปุ่มขวาถูกตัดจนดูเหมือนไม่มี) */
+  #dash-inventory-panel #dash-fg-filter { display: grid; grid-template-columns: 1fr 1fr; overflow: visible; }
+  #dash-inventory-panel #dash-fg-filter .dash-parts-filter-btn { justify-content: center; text-align: center; }
+  .panel-meta { white-space: nowrap; }
+}
+@media (max-width: 640px) { #dash-inventory-panel #dash-fg-filter { border-radius: 16px; } }

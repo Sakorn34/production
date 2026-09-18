@@ -1301,3 +1301,15 @@ html.fgs-open, html.fgs-open body { overflow: hidden; }
 .notif-overlay { z-index: 80; }
 /* ปุ่ม "← ย้อน" ใน popup ชั้นแรกต้องซ่อน — กฎ display ของ .btn-sm ชนะแอตทริบิวต์ hidden */
 #list-back[hidden] { display: none !important; }
+/* หน้าบันทึกผลิต: ปุ่มเพิ่มเครื่อง + สแกนต่อเนื่อง อยู่บรรทัดเดียวกัน แบ่งครึ่ง */
+.unit-actions { display: flex; gap: 8px; }
+.unit-actions > .btn { flex: 1 1 0; justify-content: center; white-space: nowrap; min-width: 0; }
+@media (min-width: 641px) { .unit-actions > .btn { flex: 0 0 auto; } }
+@media (max-width: 640px) {
+  /* แถวอะไหล่ (ชุดอะไหล่ที่จะเบิก · อะไหล่ในหน้า MA) — ช่องเลือกอะไหล่ได้บรรทัดเต็ม
+     เดิมอยู่แถวเดียวกับช่องจำนวน + ปุ่มลบ เหลือกว้าง ~58px เห็นชื่ออะไหล่นิดเดียว */
+  .bom-row, .ma-parts-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: 6px; }
+  .bom-row > .chip-dd, .ma-parts-row > .chip-dd { grid-column: 1 / -1; }
+  .bom-row { padding-bottom: 8px; border-bottom: 1px dashed var(--border); }
+}
+.unit-actions > [hidden] { display: none !important; }
