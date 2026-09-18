@@ -209,8 +209,15 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fields') {
 // AJAX: ตรวจรหัสซ้ำก่อนยืนยันบันทึก
 // ---------------------------------------------------------------
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'precheck' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    csrf_check();
+    // ต้องตอบ JSON เสมอ — เดิม csrf_check() ตอบเป็นข้อความธรรมดา และคำเตือน PHP บนเซิร์ฟเวอร์ปนหน้า JSON ได้
+    // หน้าเว็บอ่านไม่ออกแล้วขึ้น "ตรวจสอบรหัสไม่สำเร็จ ... การเชื่อมต่อ" ทั้งที่ไม่ใช่เรื่องเน็ต
+    ob_start();
     header('Content-Type: application/json; charset=utf-8');
+    if (!isset($_POST['csrf']) || !hash_equals(csrf(), (string) $_POST['csrf'])) {
+        ob_end_clean();
+        echo json_encode(['ok' => false, 'code' => 'csrf', 'message' => 'หน้านี้เปิดค้างไว้นานจนหมดอายุ — รีเฟรชหน้า (ดึงหน้าลงเพื่อโหลดใหม่) แล้วกรอกใหม่อีกครั้ง'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     $pid = (int)(isset($_POST['product_id']) ? $_POST['product_id'] : 0);
     $pdate = isset($_POST['produced_at']) ? $_POST['produced_at'] : date('Y-m-d');
     $p = $pid ? qr("SELECT code_mode FROM products WHERE id=?", 'i', [$pid])->fetch_assoc() : null;
@@ -228,7 +235,13 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'precheck' && $_SERVER['REQUEST_ME
             if ($s !== '') $serials[] = $s;
         }
     }
-    $chk = precheck_production_save($pid, $pdate, $count, $serials);
+    try {
+        $chk = precheck_production_save($pid, $pdate, $count, $serials);
+    } catch (Throwable $e) {
+        error_log('[asset_new precheck] ' . $e->getMessage());
+        $chk = ['ok' => false, 'message' => 'ระบบตรวจรหัสเครื่องขัดข้อง — ลองใหม่อีกครั้ง ถ้ายังไม่ได้ กดแจ้งปัญหาในเมนู'];
+    }
+    ob_end_clean();
     echo json_encode($chk, JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -882,7 +895,8 @@ function buildConfirm(){
   html += rowHtml('รุ่นสินค้า', '<b>' + esc(prodName) + '</b>');
   html += rowHtml('วันที่ผลิต', esc(val('#produced_at')));
   html += rowHtml('จำนวนเครื่อง', '<b>' + mcount + '</b> เครื่อง' + (machines.length ? '<br><span class="muted">' + machines.map(esc).join(', ') + '</span>' : ''));
-  html += rowHtml('ผู้ผลิต/ประกอบ', esc(val('[name="made_by"]')) || '-');
+  // ช่องซ่อนว่าง = ตอนบันทึกระบบใส่ชื่อคนที่ล็อกอินให้ — หน้ายืนยันต้องแสดงชื่อเดียวกัน ไม่ใช่ "-"
+  html += rowHtml('ผู้ผลิต/ประกอบ', esc(val('[name="made_by"]') || (cfg && cfg.actor_name) || '') || '-');
   if (val('[name="fw_version"]')) html += rowHtml('Firmware', esc(val('[name="fw_version"]')));
   if (val('[name="lot_label"]')) html += rowHtml('Lot', esc(val('[name="lot_label"]')));
   html += '</table></div>';
@@ -930,6 +944,28 @@ document.getElementById('mainform').addEventListener('submit', function(e){
   document.getElementById('confirm-error').textContent = '';
   document.getElementById('confirm-overlay').hidden = false;
 });
+/** ข้อความเมื่อบันทึกไม่ได้ — กรณี S/N ซ้ำบอกแถวที่ · รหัส · เครื่องเดิมเป็นรุ่นอะไร ผลิตเมื่อไหร่ */
+function precheckErrorHtml(d){
+  var html = '<b>' + esc(d.message || 'บันทึกไม่ได้ — ตรวจสอบรหัสเครื่อง') + '</b>';
+  var info = d.dupes_info || [];
+  if (info.length) {
+    var rows = serialInputs().map(function(i){ return i.value.trim().toUpperCase(); });
+    html += '<ul class="dup-list">' + info.map(function(x){
+      var n = rows.indexOf(String(x.code).toUpperCase());
+      return '<li>' + (n >= 0 ? '<span class="dup-n">แถว #' + (n + 1) + '</span> ' : '')
+        + '<b>' + esc(x.code) + '</b><br><span class="muted">มีในระบบแล้ว: ' + esc(x.model)
+        + (x.produced ? ' · ผลิต ' + esc(x.produced) : '') + (x.status ? ' · ' + esc(x.status) : '') + '</span> '
+        + '<a href="' + BASE + '/asset.php?id=' + (x.id | 0) + '" target="_blank" rel="noopener">ดูเครื่องนี้ ›</a></li>';
+    }).join('') + '</ul>';
+  }
+  return html;
+}
+/** แถวที่ S/N ซ้ำเป็นกรอบแดงในฟอร์ม — ปิด popup แล้วเห็นทันทีว่าต้องแก้แถวไหน */
+function markDupRows(dupes){
+  var set = {};
+  (dupes || []).forEach(function(c){ set[String(c).toUpperCase()] = 1; });
+  serialInputs().forEach(function(i){ i.classList.toggle('is-dup', !!set[i.value.trim().toUpperCase()]); });
+}
 function doConfirmSubmit(){
   var errBox = document.getElementById('confirm-error');
   var btn = document.getElementById('confirm-submit-btn');
@@ -938,13 +974,21 @@ function doConfirmSubmit(){
   btn.disabled = true;
   btn.textContent = 'กำลังตรวจสอบ…';
   var fd = new FormData(document.getElementById('mainform'));
+  markDupRows([]);
   fetch(BASE + '/asset_new.php?ajax=precheck', { method: 'POST', body: fd, credentials: 'same-origin' })
-    .then(function(r){ return r.json(); })
+    .then(function(r){
+      // อ่านเป็นข้อความก่อน — เซิร์ฟเวอร์ตอบอย่างอื่นที่ไม่ใช่ JSON จะได้บอกตรง ๆ ไม่โทษเน็ต
+      return r.text().then(function(t){
+        try { return JSON.parse(t); }
+        catch (e) { return { ok: false, message: 'เซิร์ฟเวอร์ตอบกลับผิดปกติ (HTTP ' + r.status + ') — รีเฟรชหน้าแล้วลองใหม่ ถ้ายังไม่ได้ กดแจ้งปัญหาในเมนู' }; }
+      });
+    })
     .then(function(d){
       btn.disabled = false;
       btn.textContent = 'ยืนยันบันทึก';
       if (!d.ok) {
-        errBox.textContent = d.message || 'ไม่สามารถบันทึกได้ — กรุณาตรวจสอบรหัสเครื่อง';
+        errBox.innerHTML = precheckErrorHtml(d);
+        markDupRows(d.dupes || []);
         errBox.hidden = false;
         errBox.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         return;

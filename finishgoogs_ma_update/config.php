@@ -2515,15 +2515,36 @@ function precheck_production_save($productId, $producedDate, $count, array $seri
             $codes[] = build_generated_asset_code($p, $producedDate, $startRun + $i);
         }
     } else {
-        $codes = array_values(array_unique(array_filter(array_map('trim', $serials))));
+        $raw = array_values(array_filter(array_map('trim', $serials), 'strlen'));
+        $codes = array_values(array_unique($raw));
         if (!$codes) return ['ok' => false, 'message' => 'ยังไม่ได้กรอกรหัสเครื่อง'];
+        // รหัสเดียวกันกรอก 2 แถวในชุดนี้เอง
+        $twice = array_values(array_unique(array_diff_assoc($raw, array_unique($raw))));
+        if ($twice) {
+            return ['ok' => false, 'message' => 'กรอกรหัสเดียวกันซ้ำในชุดนี้: ' . implode(', ', $twice) . ' — ลบแถวที่ซ้ำออกก่อน',
+                    'codes' => $codes, 'dupes' => $twice, 'dupes_info' => []];
+        }
     }
 
     $dupes = [];
+    $dupesInfo = [];
     foreach ($codes as $code) {
-        if (qr("SELECT id FROM assets WHERE asset_code=?", 's', [$code])->fetch_assoc()) {
+        $ex = qr("SELECT a.id, a.asset_code, a.produced_at, a.status, p.name AS pname FROM assets a JOIN products p ON p.id = a.product_id WHERE a.asset_code=?", 's', [$code])->fetch_assoc();
+        if ($ex) {
             $dupes[] = $code;
+            // บอกว่าเครื่องเดิมคืออะไร — คนกรอกจะรู้ทันทีว่าสแกนผิดเครื่อง หรือเครื่องนี้ลงทะเบียนไปแล้วจริง
+            $dupesInfo[] = [
+                'code'     => (string) $ex['asset_code'],
+                'id'       => (int) $ex['id'],
+                'model'    => (string) $ex['pname'],
+                'produced' => $ex['produced_at'] ? date('d/m/Y', strtotime((string) $ex['produced_at'])) : '',
+                'status'   => status_th((string) $ex['status']),
+            ];
         }
+    }
+    if ($dupes && $p['code_mode'] !== 'generated') {
+        return ['ok' => false, 'message' => (count($dupes) > 1 ? 'รหัสเครื่อง ' . count($dupes) . ' แถวด้านล่าง' : 'รหัสเครื่องด้านล่าง') . 'ลงทะเบียนในระบบไว้แล้ว — ลบแถวนั้นออก หรือแก้เป็นรหัสที่ถูกต้อง แล้วกดบันทึกใหม่',
+                'codes' => $codes, 'dupes' => $dupes, 'dupes_info' => $dupesInfo];
     }
     if ($dupes) {
         $list = implode(', ', $dupes);
@@ -2532,7 +2553,7 @@ function precheck_production_save($productId, $producedDate, $count, array $seri
             : 'รหัสเครื่องเหล่านี้มีในระบบแล้ว: ' . $list;
         $msg .= "\n\nสาเหตุที่เป็นไปได้: เคยบันทึกหรือนำเข้าแล้ว · เลข running ไม่ตรงกับรหัสที่มีอยู่\n";
         $msg .= 'แนวทางแก้: ตรวจใน「ทะเบียนเครื่อง」หรือให้ admin ปรับเลข running ในระบบหลังบ้าน';
-        return ['ok' => false, 'message' => $msg, 'codes' => $codes, 'dupes' => $dupes];
+        return ['ok' => false, 'message' => $msg, 'codes' => $codes, 'dupes' => $dupes, 'dupes_info' => $dupesInfo];
     }
 
     return ['ok' => true, 'codes' => $codes];

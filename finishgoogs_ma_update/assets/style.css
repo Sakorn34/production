@@ -1345,3 +1345,9 @@ html.fgs-open, html.fgs-open body { overflow: hidden; }
   .unit-row:has(input[name="serials[]"]) > .unit-row-btns { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); }
   .unit-row .unit-del { width: 40px; min-width: 40px; min-height: 40px; height: 40px; border: 0; background: transparent; color: var(--text-muted); }
 }
+/* หน้าบันทึกผลิต: S/N ที่ซ้ำกับในระบบ — กรอบแดงในฟอร์ม + รายการใน popup ยืนยัน */
+.unit-row input.is-dup { border-color: var(--danger, #b91c1c) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger, #b91c1c) 18%, transparent); }
+.dup-list { margin: 8px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.dup-list li { padding: 8px 10px; border-radius: 8px; background: var(--surface, #fff); border: 1px solid color-mix(in srgb, var(--danger, #b91c1c) 30%, transparent); line-height: 1.5; font-weight: 400; }
+.dup-list .dup-n { display: inline-block; padding: 0 8px; border-radius: 999px; background: var(--danger, #b91c1c); color: #fff; font-size: 12px; font-weight: 700; }
+.dup-list a { white-space: nowrap; }
