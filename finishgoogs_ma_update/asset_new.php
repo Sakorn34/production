@@ -208,6 +208,26 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fields') {
 // ---------------------------------------------------------------
 // AJAX: ตรวจรหัสซ้ำก่อนยืนยันบันทึก
 // ---------------------------------------------------------------
+// ตรวจ S/N ทีละตัวตอนสแกน/พิมพ์ — รู้ว่าซ้ำตั้งแต่ตอนสแกน ไม่ต้องรอกดบันทึกทั้งชุด
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'serial_check') {
+    header('Content-Type: application/json; charset=utf-8');
+    $code = trim((string) ($_GET['code'] ?? ''));
+    $ex = $code === '' ? null : qr(
+        "SELECT a.id, a.asset_code, a.produced_at, a.status, p.name AS pname FROM assets a JOIN products p ON p.id = a.product_id WHERE a.asset_code = ? LIMIT 1",
+        's',
+        [$code]
+    )->fetch_assoc();
+    echo json_encode($ex ? [
+        'exists'   => true,
+        'id'       => (int) $ex['id'],
+        'code'     => (string) $ex['asset_code'],
+        'model'    => (string) $ex['pname'],
+        'produced' => $ex['produced_at'] ? date('d/m/Y', strtotime((string) $ex['produced_at'])) : '',
+        'status'   => status_th((string) $ex['status']),
+    ] : ['exists' => false, 'code' => $code], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'precheck' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // ต้องตอบ JSON เสมอ — เดิม csrf_check() ตอบเป็นข้อความธรรมดา และคำเตือน PHP บนเซิร์ฟเวอร์ปนหน้า JSON ได้
     // หน้าเว็บอ่านไม่ออกแล้วขึ้น "ตรวจสอบรหัสไม่สำเร็จ ... การเชื่อมต่อ" ทั้งที่ไม่ใช่เรื่องเน็ต
@@ -1132,40 +1152,98 @@ function refreshPreviews(){
   updateAssetHints();
 }
 
-// ---------- สแกนรหัสเครื่องเข้าช่องกรอก (ตัวสแกนชุดเดียวทั้งระบบ assets/scan-field.js) ----------
-// เปิดกล้องค้างไว้ สแกนทีละเครื่องได้ต่อกัน: ใส่ช่องว่างถัดไปหรือเพิ่มแถวให้เอง · รหัสซ้ำในชุดนี้เตือนแล้วข้าม
 function serialInputs(){
   return Array.prototype.slice.call(document.querySelectorAll('#unit-list input[name="serials[]"]'));
 }
+/** ถามเซิร์ฟเวอร์ว่า S/N นี้ลงทะเบียนไว้แล้วหรือยัง · เช็คไม่ได้ (เน็ตหลุด) = ปล่อยผ่าน ไปจับตอนบันทึกแทน */
+function serialCheck(code){
+  return fetch(BASE + '/asset_new.php?ajax=serial_check&code=' + encodeURIComponent(code), { credentials: 'same-origin' })
+    .then(function(r){ return r.json(); })
+    .catch(function(){ return null; });
+}
+/** ทำเครื่องหมายแถวที่ S/N มีในระบบแล้ว — กรอบแดง + บรรทัดบอกว่าเป็นเครื่องอะไร */
+function markRowExisting(input, info){
+  var row = input.closest('.unit-row');
+  if (!row) return;
+  var note = row.nextElementSibling && row.nextElementSibling.classList.contains('unit-dup-note') ? row.nextElementSibling : null;
+  input.classList.toggle('is-dup', !!info);
+  if (!info) { if (note) note.remove(); return; }
+  if (!note) {
+    note = document.createElement('div');
+    note.className = 'unit-dup-note';
+    row.insertAdjacentElement('afterend', note);
+  }
+  note.innerHTML = 'มีในระบบแล้ว: ' + esc(info.model) + (info.produced ? ' · ผลิต ' + esc(info.produced) : '')
+    + ' — <a href="' + BASE + '/asset.php?id=' + (info.id | 0) + '" target="_blank" rel="noopener">ดูเครื่อง ›</a> · ลบแถวนี้หรือแก้รหัส';
+}
+// พิมพ์/วางรหัสเอง: เช็คตอนออกจากช่อง
+document.getElementById('unit-list').addEventListener('change', function(e){
+  var inp = e.target;
+  if (!inp.matches || !inp.matches('input[name="serials[]"]')) return;
+  var code = inp.value.trim();
+  if (!code) { markRowExisting(inp, null); return; }
+  serialCheck(code).then(function(r){
+    if (inp.value.trim() !== code) return;    // แก้ค่าไปแล้วระหว่างรอ
+    markRowExisting(inp, r && r.exists ? r : null);
+  });
+});
+// ลบแถว = ลบบรรทัดแจ้งเตือนของแถวนั้นด้วย
+document.getElementById('unit-list').addEventListener('click', function(e){
+  if (!e.target.closest('.unit-del')) return;
+  var row = e.target.closest('.unit-row');
+  var note = row && row.nextElementSibling;
+  if (note && note.classList.contains('unit-dup-note')) note.remove();
+}, true);
+
+// ---------- สแกนรหัสเครื่องเข้าช่องกรอก (ตัวสแกนชุดเดียวทั้งระบบ assets/scan-field.js) ----------
+// เปิดกล้องค้างไว้ สแกนทีละเครื่องได้ต่อกัน: ใส่ช่องว่างถัดไปหรือเพิ่มแถวให้เอง
+// รหัสซ้ำในชุดนี้ = เตือนแล้วข้าม · รหัสที่ลงทะเบียนในระบบแล้ว = เตือนสีแดงพร้อมบอกว่าเป็นเครื่องอะไร ไม่ใส่ลงรายการ
 function scanUnits(btn){
   if (!cfg || cfg.mode === 'generated' || !window.FgScan) return;
   var row = btn && btn.closest ? btn.closest('.unit-row') : null;
   var first = row ? row.querySelector('input[name="serials[]"]') : null;
+  var checking = false;
   function countText(){ return serialInputs().filter(function(i){ return i.value.trim() !== ''; }).length + ' เครื่องในชุดนี้'; }
+  function place(code, api){
+    var inputs = serialInputs();
+    // สแกนแรกลงแถวที่กดปุ่ม (ทับค่าเดิมได้) · ถัดไปลงช่องว่างแรก ไม่มีก็เพิ่มแถว
+    var target = first && inputs.indexOf(first) >= 0 ? first : null;
+    first = null;
+    if (!target) target = inputs.filter(function(i){ return i.value.trim() === ''; })[0] || null;
+    if (!target) {
+      addUnit(true);
+      var all = serialInputs();
+      target = all[all.length - 1];
+    }
+    target.value = code;
+    markRowExisting(target, null);
+    target.dispatchEvent(new Event('input', { bubbles: true }));
+    updateProdSnippets();
+    refreshPreviews();
+    api.feedback('ok', code);
+    api.setCount(countText());
+  }
   FgScan.open({
     title: 'สแกนรหัสเครื่อง — ต่อกันได้หลายเครื่อง',
     continuous: true,
     count: countText(),
     onCode: function(code, api){
+      if (checking) return;          // รอผลตัวก่อนหน้า — กล้องอ่านป้ายเดิมได้หลายครั้งต่อวินาที
       var key = code.toUpperCase();
-      var inputs = serialInputs();
-      // สแกนแรกลงแถวที่กดปุ่ม (ทับค่าเดิมได้) · ถัดไปลงช่องว่างแรก ไม่มีก็เพิ่มแถว
-      var target = first && inputs.indexOf(first) >= 0 ? first : null;
-      var dup = inputs.some(function(i){ return i !== target && i.value.trim().toUpperCase() === key; });
-      if (dup) { api.feedback('dup', code + ' — มีในรายการแล้ว'); return; }
-      first = null;
-      if (!target) target = inputs.filter(function(i){ return i.value.trim() === ''; })[0] || null;
-      if (!target) {
-        addUnit(true);
-        var all = serialInputs();
-        target = all[all.length - 1];
+      var target = first && serialInputs().indexOf(first) >= 0 ? first : null;
+      if (serialInputs().some(function(i){ return i !== target && i.value.trim().toUpperCase() === key; })) {
+        api.feedback('dup', code + ' — มีในรายการแล้ว');
+        return;
       }
-      target.value = code;
-      target.dispatchEvent(new Event('input', { bubbles: true }));
-      updateProdSnippets();
-      refreshPreviews();
-      api.feedback('ok', code);
-      api.setCount(countText());
+      checking = true;
+      serialCheck(code).then(function(r){
+        checking = false;
+        if (r && r.exists) {
+          api.feedback('bad', code + ' — มีในระบบแล้ว: ' + r.model + (r.produced ? ' · ผลิต ' + r.produced : ''));
+          return;
+        }
+        place(code, api);
+      });
     },
     onClose: function(){
       var empty = serialInputs().filter(function(i){ return i.value.trim() === ''; });
