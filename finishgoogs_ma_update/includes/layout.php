@@ -264,6 +264,8 @@ a.classList.remove('nav-collapsed');a.classList.add('nav-expanded');}}catch(e){}
         <?= ui_sidebar_cross_group('สต็อกอะไหล่', ui_nav_items_parts(), ui_parts_base_url()) ?>
       </nav>
     </div>
+    <?php require_once dirname(__DIR__, 2) . '/shared/ui_footer.php'; ?>
+    <?= ui_sidebar_help_html(BASE_URL, defined('APP_RELEASE_VERSION') ? (string) APP_RELEASE_VERSION : '', $cur === 'guide.php') ?>
     <div class="sidebar-foot">
       <button type="button" class="userbox-trigger" aria-expanded="false" aria-haspopup="true">
         <div class="ub-avatar"><?= h(mb_substr(trim($showName), 0, 1)) ?></div>
@@ -392,8 +394,8 @@ function page_pager_html($page, $pages, $per, $total, callable $urlFor, $unit = 
 
 function page_footer() {
     require_once dirname(__DIR__, 2) . '/shared/ui_footer.php';
-    // ส่วนท้ายอยู่ท้ายเนื้อหา (ไม่ลอยทับ) · หน้าต่างแจ้งปัญหาอยู่ในนี้ด้วย
-    echo ui_app_footer_html(BASE_URL, defined('APP_RELEASE_VERSION') ? (string) APP_RELEASE_VERSION : '', csrf());
+    // หน้าต่างแจ้งปัญหา — ปุ่มเปิดอยู่ท้ายเมนูข้าง (ui_sidebar_help_html)
+    echo ui_support_modal_html(BASE_URL, csrf());
     ?>
   </main>
 </div>

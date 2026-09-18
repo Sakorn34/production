@@ -1026,23 +1026,9 @@
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   ส่วนท้ายทุกหน้า + หน้าต่างแจ้งปัญหา (shared/ui_footer.php · assets/app-footer.js) — แบบ ข
+   หน้าต่างแจ้งปัญหา (ปุ่มเปิดอยู่ท้ายเมนูข้าง) (shared/ui_footer.php · assets/app-footer.js)
    อยู่ไฟล์นี้เพราะสองแอปโหลดร่วมกัน · กำหนดหน้าต่างเองครบ ไม่พึ่ง .notif-box ของแอปผลิต
    ───────────────────────────────────────────────────────────────────────────── */
-.app-footer { margin: 28px 0 8px; padding-top: 14px; border-top: 1px solid var(--border, #e7e0f5); text-align: center; color: var(--text-muted, #8b83a5); font-size: calc(12px * var(--font-scale, 1)); line-height: 1.6; }
-.app-footer-ver { white-space: nowrap; }
-.app-footer-actions { display: inline-flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; justify-content: center; }
-.app-footer-pill, .app-footer-report {
-  display: inline-flex; align-items: center; min-height: 32px; padding: 4px 14px; border-radius: 999px;
-  font: inherit; font-size: calc(12.5px * var(--font-scale, 1)); text-decoration: none; cursor: pointer;
-  border: 1px solid var(--border-strong, #d6cfe6); background: var(--surface, #fff); color: var(--text-muted, #6b6480);
-}
-.app-footer-report { border-color: color-mix(in srgb, var(--primary, #e11d74) 45%, transparent); color: var(--primary, #e11d74); font-weight: 600; }
-.app-footer-pill:hover, .app-footer-report:hover { background: var(--surface-soft, #f4f1fa); }
-@media (max-width: 640px) {
-  .app-footer { margin-top: 20px; }
-  .app-footer-pill, .app-footer-report { min-height: 40px; padding: 6px 16px; }
-}
 .support-overlay { position: fixed; inset: 0; z-index: 1100; background: rgba(20, 16, 36, .5); display: flex; align-items: center; justify-content: center; padding: 12px; }
 .support-overlay[hidden] { display: none !important; }
 .support-overlay .support-box {
@@ -1071,3 +1057,14 @@
 .support-btn { min-height: 44px; padding: 8px 18px; border-radius: 10px; border: 1px solid var(--border-strong, #d6cfe6); background: var(--surface, #fff); color: var(--text, #2a2440); font: inherit; font-weight: 600; cursor: pointer; }
 .support-btn.is-primary { background: var(--primary, #e11d74); border-color: var(--primary, #e11d74); color: #fff; }
 .support-btn:disabled { opacity: .6; cursor: default; }
+
+/* ท้ายเมนูข้าง: คู่มือการใช้งาน · แจ้งปัญหา · เวอร์ชัน (shared/ui_footer.php → ui_sidebar_help_html) */
+.sidebar-help { flex-shrink: 0; padding: 4px 8px 2px; border-top: 1px solid rgba(255, 255, 255, .1); }
+.sidebar .sidebar-help-link { width: 100%; box-sizing: border-box; border: 0; background: transparent; font: inherit; font-size: calc(13px * var(--font-scale, 1)); text-align: left; cursor: pointer; margin: 1px 0; padding: 7px 10px; min-height: 0; }
+.sidebar .sidebar-help-link.active { background: rgba(255, 255, 255, .14); color: #fff; }
+.sidebar-ver {
+  padding: 2px 10px 6px 40px; color: rgba(255, 255, 255, .42); font-size: calc(10.5px * var(--font-scale, 1)); line-height: 1.45;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-height: 60px; opacity: 1; transition: opacity .18s ease .1s, max-height .26s cubic-bezier(.4, 0, .2, 1);
+}
+.app.nav-collapsed:not(.sidebar-top) .sidebar-ver { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; transition: opacity .1s ease, max-height .26s cubic-bezier(.4, 0, .2, 1); }

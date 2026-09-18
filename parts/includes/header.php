@@ -73,6 +73,8 @@ a.classList.remove('nav-collapsed');a.classList.add('nav-expanded');}}catch(e){}
                 <?php endforeach; ?>
             </ul>
         </div>
+        <?php require_once dirname(__DIR__, 2) . '/shared/ui_footer.php'; ?>
+        <?= ui_sidebar_help_html($fgBase, function_exists('app_release_version') ? (string) app_release_version() : '') ?>
         <div class="sidebar-foot">
             <button type="button" class="userbox-trigger" aria-expanded="false" aria-haspopup="true">
                 <div class="ub-avatar"><?= e(mb_substr(trim($showName), 0, 1)) ?></div>
