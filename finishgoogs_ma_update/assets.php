@@ -187,7 +187,9 @@ try {
 $productList = qr("SELECT DISTINCT p.name FROM products p JOIN assets a ON a.product_id=p.id ORDER BY p.name");
 
 $assetsCta = '<a class="btn" href="' . BASE_URL . '/asset_new.php">'
-    . ui_btn_label('assets', ' ลงทะเบียนเครื่องผลิตใหม่') . '</a>';
+    . ui_btn_label('assets', ' ลงทะเบียนเครื่องผลิตใหม่') . '</a>'
+    . '<a class="btn btn-line" href="' . BASE_URL . '/leasing_move.php" data-same-tab>'
+    . ui_btn_label('upload', ' ย้ายไประบบเช่า') . '</a>';
 page_header('ทะเบียนเครื่องผลิตใหม่', true, number_format($totalRows) . ' เครื่อง', '', $assetsCta);
 ?>
 <div class="filter assets-filter">

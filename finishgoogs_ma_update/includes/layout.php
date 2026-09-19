@@ -117,6 +117,7 @@ function page_back_url_default() {
     switch ($cur) {
         case 'asset.php':
         case 'asset_new.php':
+        case 'leasing_move.php':
             return $b . '/assets.php';
         case 'update_edit.php':
         case 'update_new.php':

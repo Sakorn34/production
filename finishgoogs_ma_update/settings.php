@@ -5,6 +5,8 @@ require_settings_access();
 require __DIR__ . '/includes/layout.php';
 require __DIR__ . '/includes/product_admin.php';
 require_once dirname(__DIR__) . '/shared/finishgood_shortage_registry.php';
+require_once __DIR__ . '/includes/leasing_move.php';
+ensure_leasing_move_schema();
 fg_shortage_ensure_min_schema();
 
 ensure_product_code_schema();
@@ -387,6 +389,31 @@ productCodeToggle('new');
   <label>ชื่อรุ่น</label><input type="text" name="name" value="<?= h($product['name']) ?>" required maxlength="150">
   <label>หมวด</label><input type="text" name="category" value="<?= h($product['category']) ?>" maxlength="50">
   <label>สต็อกขั้นต่ำ</label><input type="number" name="min_stock" min="0" step="1" value="<?= isset($product['min_stock']) && $product['min_stock'] !== null ? (int) $product['min_stock'] : '' ?>" placeholder="เว้นว่าง = ไม่ติดตามยอดขาด">
+  <?php
+  // ย้ายไประบบเช่า — ชื่อรุ่นต้องเลือกจากรายชื่อของระบบเช่าเท่านั้น · ค่าแนะนำมาจากเครื่องรุ่นนี้ที่อยู่ในระบบเช่าแล้ว
+  $lmNames = leasing_model_names();
+  $lmCur = trim((string) ($product['leasing_name'] ?? ''));
+  $lmSug = $lmCur === '' ? leasing_suggest_name((int) $pid) : null;
+  ?>
+  <label>ชื่อรุ่นในระบบเช่า</label>
+  <div>
+    <select name="leasing_name">
+      <option value="">— ไม่ย้ายไประบบเช่า —</option>
+      <?php foreach ($lmNames as $ln => $desc) { ?>
+      <option value="<?= h($ln) ?>"<?= $lmCur === $ln ? ' selected' : '' ?>><?= h($ln) ?><?= $desc !== '' && $desc !== $ln ? ' (' . h($desc) . ')' : '' ?></option>
+      <?php } ?>
+    </select>
+    <?php if ($lmSug && isset($lmNames[$lmSug['name']])) { ?>
+    <div class="muted" style="font-size:12px; margin-top:4px">แนะนำ: <b><?= h($lmSug['name']) ?></b> — เครื่องรุ่นนี้ในระบบเช่าใช้ชื่อนี้ <?= (int) $lmSug['n'] ?> เครื่อง</div>
+    <?php } elseif (!$lmNames) { ?>
+    <div class="muted" style="font-size:12px; margin-top:4px">เชื่อมต่อระบบเช่าไม่ได้ — โหลดรายชื่อรุ่นไม่ได้</div>
+    <?php } ?>
+  </div>
+  <label>ย้ายไประบบเช่าอัตโนมัติ</label>
+  <label style="display:flex; gap:8px; align-items:flex-start; font-weight:400">
+    <input type="checkbox" name="leasing_auto" value="1"<?= !empty($product['leasing_auto']) ? ' checked' : '' ?>>
+    <span>ลงทะเบียนผลิตใหม่แล้ว ถามให้ย้ายเข้าระบบเช่าด้วย <span class="muted">(หน้ายืนยันก่อนบันทึกมีช่องติ๊ก เอาออกได้ถ้าไม่ต้องการย้ายรอบนั้น)</span></span>
+  </label>
   <?php product_admin_code_fields($product, 'edit'); ?>
   <label>รูปสินค้า</label>
   <div>

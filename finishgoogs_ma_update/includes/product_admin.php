@@ -72,6 +72,12 @@ function product_admin_handle_post() {
         if (array_key_exists('min_stock', $_POST) && function_exists('fg_shortage_save_min_stock')) {
             fg_shortage_save_min_stock([$pcode => (string) $_POST['min_stock']]);
         }
+        if (array_key_exists('leasing_name', $_POST) && function_exists('ensure_leasing_move_schema')) {
+            ensure_leasing_move_schema();
+            $ln = trim((string) $_POST['leasing_name']);
+            q('UPDATE products SET leasing_name = ?, leasing_auto = ? WHERE id = ?', 'sii',
+              [$ln !== '' ? mb_substr($ln, 0, 50) : null, ($ln !== '' && !empty($_POST['leasing_auto'])) ? 1 : 0, $pid]);
+        }
         flash_set('บันทึกข้อมูลรุ่นและรูปแบบรหัสแล้ว');
         return BASE_URL . '/settings.php?product=' . $pid;
     }

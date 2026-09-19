@@ -132,6 +132,12 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fields') {
     $out['show_lot'] = $std['decided'] ? ($std['lot'] !== null) : true;
     $out['show_made_by'] = $std['decided'] ? ($std['made_by'] !== null) : true;
     $out['show_product_snippets'] = product_show_snippets($pid);
+    // ย้ายไประบบเช่า — เสนอเฉพาะรุ่นที่เปิดไว้ในหลังบ้าน และชื่อรุ่นในระบบเช่าใช้ได้
+    require_once __DIR__ . '/includes/leasing_move.php';
+    ensure_leasing_move_schema();
+    $lmP = qr('SELECT leasing_name, leasing_auto FROM products WHERE id = ?', 'i', [$pid])->fetch_assoc() ?: [];
+    $out['leasing_auto'] = !empty($lmP['leasing_auto']) && leasing_product_block_reason($lmP) === '';
+    $out['leasing_name'] = (string) ($lmP['leasing_name'] ?? '');
     $out['made_by_input_mode'] = $std['made_by'] ? $std['made_by']['input_mode'] : 'chip_single_free';
     $out['fw_input_mode'] = $std['fw'] ? $std['fw']['input_mode'] : 'chip_single_free';
     $out['lot_input_mode'] = $std['lot'] ? $std['lot']['input_mode'] : 'chip_single_free';
@@ -325,12 +331,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $bomBy = $madeBy;
 
     $codes = []; $err = null;
+    $createdIds = [];
     $notifyAssets = [];
     foreach ($units as $serial) {
         // ไม่ส่ง user id เข้า DB แล้ว — เก็บเฉพาะชื่อจาก profile/ฟอร์มใน made_by
         $r = create_produced_asset($pid, $pdate, $serial, $note ?: null, null);
         if (isset($r['error'])) { $err = $r['error']; break; }
         $codes[] = $r['code'];
+        $createdIds[] = (int) $r['asset_id'];
         q("INSERT INTO production_records (asset_id,recorded_at,made_by,fw_version,problems_found,fix,checklist,lot_label,extra_json)
            VALUES (?,NOW(),?,?,?,?,?,?,?)", 'isssssss',
           [$r['asset_id'], $madeBy !== '' ? $madeBy : null, $fw !== '' ? $fw : null, $problems !== '' ? $problems : null,
@@ -425,12 +433,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
         }
     }
+    // ติ๊ก "ย้ายไประบบเช่าด้วย" ในหน้ายืนยัน — ย้ายเฉพาะชุดที่บันทึกสำเร็จครบ
+    $leaseNote = '';
+    if (!$err && $createdIds && !empty($_POST['move_to_leasing'])) {
+        require_once __DIR__ . '/includes/leasing_move.php';
+        $lm = leasing_move_assets($createdIds, actor_name());
+        $leaseNote = !$lm['ok'] ? ' · ย้ายไประบบเช่าไม่ได้: ' . $lm['error']
+            : ' · ย้ายไประบบเช่าแล้ว ' . count($lm['moved']) . ' เครื่อง' . ($lm['skipped'] ? ' (ข้าม ' . count($lm['skipped']) . ': ' . implode(' · ', array_map(function ($c, $w) { return "$c $w"; }, array_keys($lm['skipped']), $lm['skipped'])) . ')' : '');
+    }
     if ($err) {
         $msg = $err;
         if ($codes) $msg .= ' — บันทึกสำเร็จก่อนหน้านั้น: ' . implode(', ', $codes);
         flash_set($msg, 'err');
     } else {
-        flash_set('บันทึกสำเร็จ ' . count($codes) . ' เครื่อง: ' . implode(', ', $codes));
+        flash_set('บันทึกสำเร็จ ' . count($codes) . ' เครื่อง: ' . implode(', ', $codes) . $leaseNote);
     }
     header('Location: ' . BASE_URL . ($codes ? '/assets.php?product=' . urlencode($p['name']) : '/asset_new.php'));
     exit;
@@ -447,6 +463,7 @@ page_header('บันทึกเครื่องผลิตใหม่');
 ?>
 <form method="post" id="mainform">
   <?= csrf_field() ?>
+  <input type="hidden" name="move_to_leasing" id="move_to_leasing" value="">
   <input type="hidden" name="product_id" id="product_id" value="">
   <input type="hidden" name="checklist" id="checklist_hidden" value="">
 
@@ -548,6 +565,8 @@ page_header('บันทึกเครื่องผลิตใหม่');
       <button type="button" class="btn-sm btn-line" onclick="closeOverlay('confirm-overlay')"><?= ui_btn_label('close', 'ปิด') ?></button>
     </div>
     <div id="confirm-body" style="overflow:auto; max-height:62vh"></div>
+    <?php // รุ่นที่เปิด "ย้ายไประบบเช่าอัตโนมัติ" ในหลังบ้าน — ถามทุกครั้ง เอาติ๊กออกได้ถ้ารอบนี้ไม่ต้องการย้าย ?>
+    <label id="confirm-lease" class="confirm-lease" hidden><input type="checkbox" id="confirm-lease-cb" checked> <span id="confirm-lease-text"></span></label>
     <div id="confirm-error" hidden style="margin-top:10px; padding:12px 14px; background:#fff4f4; border:1px solid #f5c2c2; border-radius:8px; color:#b42318; font-size:14px; line-height:1.5; white-space:pre-wrap"></div>
     <div style="margin-top:14px; display:flex; gap:10px; justify-content:flex-end">
       <button type="button" class="btn btn-line" onclick="closeOverlay('confirm-overlay')">← กลับไปแก้ไข</button>
@@ -953,6 +972,12 @@ function buildConfirm(){
   if (val('[name="note"]')) extra += rowHtml('หมายเหตุ', esc(val('[name="note"]')));
   if (extra) html += '<h3 style="margin:14px 0 6px">ตรวจสอบ / หมายเหตุ</h3><div class="table-wrap"><table class="list">' + extra + '</table></div>';
   document.getElementById('confirm-body').innerHTML = html;
+  var lease = document.getElementById('confirm-lease');
+  lease.hidden = !(cfg && cfg.leasing_auto);
+  if (!lease.hidden) {
+    document.getElementById('confirm-lease-cb').checked = true;
+    document.getElementById('confirm-lease-text').innerHTML = 'ย้าย <b>' + mcount + ' เครื่อง</b>ไปลงทะเบียนในระบบเช่าด้วย (คลังพร้อมเช่า · ชื่อในระบบเช่า "' + esc(cfg.leasing_name) + '")';
+  }
 }
 var confirmedSubmit = false;
 document.getElementById('mainform').addEventListener('submit', function(e){
@@ -1014,6 +1039,7 @@ function doConfirmSubmit(){
         return;
       }
       confirmedSubmit = true;
+      document.getElementById('move_to_leasing').value = (!document.getElementById('confirm-lease').hidden && document.getElementById('confirm-lease-cb').checked) ? '1' : '';
       document.getElementById('confirm-overlay').hidden = true;
       document.getElementById('mainform').submit();
     })
