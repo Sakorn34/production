@@ -134,19 +134,64 @@ function line_bot_quick_items(): array
 }
 
 /**
- * ข้อความวิธีใช้
+ * หัวข้อวิธีใช้ — ใช้ทั้งการ์ด (ปุ่ม "วิธีใช้") และข้อความธรรมดา (ตอนผูกบัญชี/แอดไลน์)
+ *
+ * @return array<int,array{0:string,1:string,2:string}> [ไอคอน, หัวข้อ, คำอธิบาย]
+ */
+function line_bot_help_items(): array
+{
+    return [
+        ['🔎', 'ค้นหาสินค้า', "พิมพ์คำที่ต้องการในแชทได้เลย\nเช่น A4N69 · bitScan · ชื่อลูกค้า · เลขใบเบิก"],
+        ['🕘', 'ประวัติเครื่อง', "พิมพ์ S/N เต็ม เช่น A4N69080374\nได้การ์ดสถานะและประวัติล่าสุดของเครื่อง"],
+        ['📷', 'สแกน S/N', "กดปุ่มแล้วส่องบาร์โค้ดหรือ QR บนเครื่อง\nไม่ต้องพิมพ์ ได้ประวัติเครื่องทันที"],
+        ['📦', 'สต็อกคงเหลือ', "ใหม่ · พร้อมเช่า · ขั้นต่ำ · PO · ขาด/เกิน\nแยกตามรุ่น ตัวเลขเดียวกับ Dashboard"],
+    ];
+}
+
+/**
+ * ข้อความวิธีใช้แบบข้อความธรรมดา
  *
  * @return string
  */
 function line_bot_help_text(): string
 {
-    return "วิธีใช้ไลน์ Production\n\n"
-        . "🔎 ค้นหาสินค้า — พิมพ์คำที่ต้องการ เช่น S/N บางส่วน ชื่อรุ่น ชื่อลูกค้า เลขใบเบิก "
-        . "ค้นได้เหมือนช่องค้นหาในเว็บ\n"
-        . "🕘 ประวัติเครื่อง — พิมพ์ S/N เต็ม หรือกดสแกน จะได้ประวัติเครื่องนั้นทันที\n"
-        . "📷 สแกน S/N — เปิดกล้องส่องบาร์โค้ด/QR บนเครื่อง ไม่ต้องพิมพ์\n"
-        . "📦 สต็อกคงเหลือ — จำนวนเครื่องใหม่และเครื่องสำรองแยกตามรุ่น\n\n"
-        . "คำตอบส่งเข้าแชทนี้ของคุณคนเดียว";
+    $out = "วิธีใช้ไลน์ Production\n";
+    foreach (line_bot_help_items() as [$ic, $title, $desc]) {
+        $out .= "\n" . $ic . ' ' . $title . "\n" . $desc . "\n";
+    }
+    return $out . "\n🔒 คำตอบเห็นเฉพาะคุณในแชทนี้";
+}
+
+/**
+ * การ์ดวิธีใช้ (ปุ่ม "วิธีใช้" ในริชเมนู)
+ *
+ * @return array<string,mixed>
+ */
+function line_bot_help_flex(): array
+{
+    $body = [
+        ['type' => 'text', 'text' => 'วิธีใช้ไลน์ Production', 'weight' => 'bold', 'size' => 'md'],
+        ['type' => 'text', 'text' => 'กดเมนูด้านล่าง หรือพิมพ์ในแชทได้เลย', 'size' => 'xs', 'color' => '#888888'],
+    ];
+    foreach (line_bot_help_items() as [$ic, $title, $desc]) {
+        $body[] = ['type' => 'separator', 'margin' => 'lg'];
+        $body[] = ['type' => 'box', 'layout' => 'horizontal', 'spacing' => 'md', 'margin' => 'lg', 'contents' => [
+            ['type' => 'text', 'text' => $ic, 'size' => 'lg', 'flex' => 0],
+            ['type' => 'box', 'layout' => 'vertical', 'flex' => 1, 'spacing' => 'xs', 'contents' => [
+                ['type' => 'text', 'text' => $title, 'size' => 'sm', 'weight' => 'bold', 'color' => '#4b2682'],
+                ['type' => 'text', 'text' => $desc, 'size' => 'xs', 'color' => '#555555', 'wrap' => true],
+            ]],
+        ]];
+    }
+    $body[] = ['type' => 'box', 'layout' => 'vertical', 'margin' => 'xl', 'paddingAll' => '10px',
+               'backgroundColor' => '#f4f1fb', 'cornerRadius' => '8px', 'contents' => [
+        ['type' => 'text', 'text' => '🔒 คำตอบเห็นเฉพาะคุณในแชทนี้', 'size' => 'xs', 'color' => '#4b2682', 'wrap' => true],
+    ]];
+    return [
+        'type' => 'flex', 'altText' => 'วิธีใช้ไลน์ Production',
+        'contents' => line_bot_bubble($body),
+        'quickReply' => ['items' => line_bot_quick_items()],
+    ];
 }
 
 /**
@@ -504,7 +549,7 @@ function line_bot_handle(array $ev): array
                 return [line_bot_text("ยังไม่ได้ตั้งค่าหน้าสแกนในระบบหลังบ้าน (LIFF ID)\nระหว่างนี้พิมพ์ S/N แทนได้ครับ")];
             case LINE_BOT_PB_HELP:
             default:
-                return [line_bot_text(line_bot_help_text())];
+                return [line_bot_help_flex()];
         }
     }
     if ($type === 'message' && (string) ($ev['message']['type'] ?? '') === 'text') {
