@@ -534,7 +534,7 @@ $partsBase = ui_parts_base_url();
       <td data-pri="2" class="fg-zone-name" title="กดดูการผลิตรายปี"><?= img_tag($m['icon_path'], $m['name'], 'model-thumb') ?></td>
       <td data-pri="1" class="fg-zone-name" title="กดดูการผลิตรายปี">
         <b class="fg-model-name"><?= h($m['name']) ?></b>
-        <?php if ($mCode !== '') { ?><span class="mc-code"><?= h($mCode) ?></span><?php } ?>
+        <?php // รหัสรุ่น (ACC027 ฯลฯ) ไม่แสดง — ผู้ใช้ส่วนใหญ่ไม่ต้องรู้ ยังใช้จับคู่ข้อมูลผ่าน data-code ของแถวเหมือนเดิม ?>
         <?php if ($mCount['due']) { ?>
         <a class="fg-count-due" href="<?= h($B . '/stock_scan.php?pick=' . (int) $m['pid']) ?>" title="ถึงรอบนับสต็อก — กดเพื่อเริ่มนับรุ่นนี้"><?= h($mCount['label']) ?> · นับเลย ›</a>
         <?php } else { ?>
