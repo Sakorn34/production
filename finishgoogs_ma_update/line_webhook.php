@@ -60,6 +60,12 @@ foreach ($events as $ev) {
     if ($userId === '') {
         continue;
     }
+    // ตอบเฉพาะแชทส่วนตัว — bot สำรองอยู่ในกลุ่มด้วย (ห้องทดสอบ) และ reply token ในกลุ่ม
+    // จะตอบเข้ากลุ่ม คนอื่นในกลุ่มเห็นผลค้นหา (มีชื่อลูกค้า/สัญญาเช่า) · ในกลุ่มเงียบไปเลย
+    // ไม่ตอบแม้แต่คำแนะนำ ไม่งั้นทุกข้อความที่คุยกันในกลุ่มจะโดนบอตตอบ
+    if ((string) ($ev['source']['type'] ?? '') !== 'user') {
+        continue;
+    }
 
     $person = line_bot_person($userId, WORK_SUMMARY_LINE_BOT);
     if ($type === 'follow') {

@@ -2,7 +2,7 @@
 /**
  * database/tools/line_richmenu_image.php — สร้างรูปริชเมนูไลน์สำรอง (assets/line/richmenu.png)
  *
- * ลำดับปุ่มต้องตรงกับ line_bot_richmenu_def() ใน includes/line_bot.php (3×2 ซ้าย→ขวา บน→ล่าง)
+ * ตำแหน่งปุ่มต้องตรงกับ line_bot_richmenu_def() ใน includes/line_bot.php (บน 2 ปุ่ม · ล่าง 3 ปุ่ม)
  * แก้ข้อความ/สีที่นี่แล้วรันใหม่ จากนั้นกด "ติดตั้งริชเมนู" ในหน้าตั้งค่า LINE
  *
  *   php database/tools/line_richmenu_image.php
@@ -21,6 +21,7 @@ $out = dirname(__DIR__, 2) . '/assets/line/richmenu.png';
 $extra = [
     'globe' => '<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
     'help'  => '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/>',
+    'keyboard' => '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M10 13h4M7 16h10"/>',
 ];
 $svg = function (string $name) use ($extra) {
     $inner = $extra[$name] ?? null;
@@ -29,13 +30,13 @@ $svg = function (string $name) use ($extra) {
     }
     return '<svg class="ic" width="230" height="230" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' . $inner . '</svg>';
 };
+// [ไอคอน, ชื่อปุ่ม (คำกริยา = สิ่งที่ต้องทำ), คำอธิบายบรรทัดเดียว, ปุ่มหลัก]
 $tiles = [
-    ['search',  'ค้นหาสินค้า',   'S/N · รุ่น · ลูกค้า', true],
-    ['history', 'ประวัติเครื่อง', 'พิมพ์ S/N เต็ม',     true],
-    ['scan',    'สแกน S/N',      'เปิดกล้อง',          true],
-    ['box',     'สต็อกคงเหลือ',  'แยกตามรุ่น',         false],
-    ['globe',   'เปิดเว็บระบบ',  'Production',         false],
-    ['help',    'วิธีใช้',        '',                   false],
+    ['keyboard', 'พิมพ์ค้นหา',    'S/N · รุ่น · ลูกค้า',        true],
+    ['camera',   'สแกนด้วยกล้อง', 'ส่องบาร์โค้ด/QR บนเครื่อง',  true],
+    ['box',      'เช็คสต็อก',     'ใหม่ · เช่า · ขาด',          false],
+    ['globe',    'เปิดเว็บ',       'ระบบ Production',            false],
+    ['help',     'วิธีใช้',         'ดูตัวอย่างการใช้งาน',        false],
 ];
 $cells = '';
 foreach ($tiles as [$ic, $label, $sub, $main]) {
@@ -47,9 +48,9 @@ $html = <<<HTML
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@500;600&display=swap" rel="stylesheet">
 <style>
 html,body{margin:0;width:2500px;height:1686px;overflow:hidden}
-body{display:grid;grid-template-columns:833px 834px 833px;grid-template-rows:843px 843px;gap:0;background:#3d1f6e;font-family:Prompt,'Leelawadee UI',sans-serif}
+body{display:grid;grid-template-columns:repeat(6,1fr);grid-template-rows:843px 843px;gap:0;background:#3d1f6e;font-family:Prompt,'Leelawadee UI',sans-serif}
 .t{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;background:#4b2682;color:#fff;box-shadow:inset 0 0 0 4px #3d1f6e}
-.t.m{background:#fff;color:#4b2682}
+.t{grid-column:span 2}.t.m{grid-column:span 3;background:#fff;color:#4b2682}.t.m b{font-size:124px}.t.m span{font-size:64px}
 .t.m .ic{color:#e0337f}
 .ic{color:#f7b6d2}
 b{font-size:108px;font-weight:600;line-height:1}

@@ -126,9 +126,9 @@ function line_bot_quick_items(): array
     $items = [];
     $liff = line_bot_liff_url();
     if ($liff !== '') {
-        $items[] = ['type' => 'action', 'action' => ['type' => 'uri', 'label' => 'สแกน S/N', 'uri' => $liff]];
+        $items[] = ['type' => 'action', 'action' => ['type' => 'uri', 'label' => 'สแกนด้วยกล้อง', 'uri' => $liff]];
     }
-    $items[] = ['type' => 'action', 'action' => ['type' => 'postback', 'label' => 'สต็อกคงเหลือ', 'data' => LINE_BOT_PB_STOCK, 'displayText' => 'สต็อกคงเหลือ']];
+    $items[] = ['type' => 'action', 'action' => ['type' => 'postback', 'label' => 'เช็คสต็อก', 'data' => LINE_BOT_PB_STOCK, 'displayText' => 'เช็คสต็อก']];
     $items[] = ['type' => 'action', 'action' => ['type' => 'postback', 'label' => 'วิธีใช้', 'data' => LINE_BOT_PB_HELP, 'displayText' => 'วิธีใช้']];
     return $items;
 }
@@ -141,10 +141,9 @@ function line_bot_quick_items(): array
 function line_bot_help_items(): array
 {
     return [
-        ['🔎', 'ค้นหาสินค้า', "พิมพ์คำที่ต้องการในแชทได้เลย\nเช่น A4N69 · bitScan · ชื่อลูกค้า · เลขใบเบิก"],
-        ['🕘', 'ประวัติเครื่อง', "พิมพ์ S/N เต็ม เช่น A4N69080374\nได้การ์ดสถานะและประวัติล่าสุดของเครื่อง"],
-        ['📷', 'สแกน S/N', "กดปุ่มแล้วส่องบาร์โค้ดหรือ QR บนเครื่อง\nไม่ต้องพิมพ์ ได้ประวัติเครื่องทันที"],
-        ['📦', 'สต็อกคงเหลือ', "ใหม่ · พร้อมเช่า · ขั้นต่ำ · PO · ขาด/เกิน\nแยกตามรุ่น ตัวเลขเดียวกับ Dashboard"],
+        ['⌨️', 'พิมพ์ค้นหา', "พิมพ์ S/N ชื่อรุ่น หรือชื่อลูกค้าในแชทได้เลย\nS/N เต็ม = ได้ประวัติเครื่องทันที"],
+        ['📷', 'สแกนด้วยกล้อง', "ส่องบาร์โค้ดหรือ QR บนเครื่อง\nไม่ต้องพิมพ์ ได้ประวัติเครื่องทันที"],
+        ['📦', 'เช็คสต็อก', "ใหม่ · พร้อมเช่า · ขั้นต่ำ · PO · ขาด/เกิน\nแยกตามรุ่น ตัวเลขเดียวกับ Dashboard"],
     ];
 }
 
@@ -540,7 +539,7 @@ function line_bot_handle(array $ev): array
         }
         switch ($data) {
             case LINE_BOT_PB_SEARCH:
-                return [line_bot_text("พิมพ์คำที่ต้องการค้นหาได้เลยครับ\nเช่น S/N บางส่วน ชื่อรุ่น ชื่อลูกค้า เลขใบเบิก")];
+                return [line_bot_text("พิมพ์สิ่งที่อยากค้นหาในช่องแชทได้เลยครับ\nเช่น A4N69080374 · bitScan · ชื่อลูกค้า\n\nพิมพ์ S/N เต็ม = ได้ประวัติเครื่องทันที")];
             case LINE_BOT_PB_HISTORY:
                 return [line_bot_text("พิมพ์ S/N เต็มของเครื่อง หรือกด \"สแกน S/N\" ด้านล่างครับ")];
             case LINE_BOT_PB_STOCK:
@@ -643,7 +642,7 @@ function line_bot_reply(string $replyToken, array $messages, string $bot): bool
 const LINE_BOT_RICHMENU_IMAGE = __DIR__ . '/../assets/line/richmenu.png';
 
 /**
- * โครงริชเมนู 6 ปุ่ม — ลำดับต้องตรงกับรูป assets/line/richmenu.png
+ * โครงริชเมนู 5 ปุ่ม (บน 2 · ล่าง 3) — ตำแหน่งต้องตรงกับรูป assets/line/richmenu.png
  *
  * @return array<string,mixed>
  */
@@ -654,30 +653,24 @@ function line_bot_richmenu_def(): array
     $pb = function (string $data, string $text) {
         return ['type' => 'postback', 'data' => $data, 'displayText' => $text];
     };
-    $actions = [
-        $pb(LINE_BOT_PB_SEARCH, 'ค้นหาสินค้า'),
-        $pb(LINE_BOT_PB_HISTORY, 'ประวัติเครื่อง'),
+    // แถวบน 2 ปุ่มใหญ่ (ครึ่งจอ) · แถวล่าง 3 ปุ่ม — "ค้นหา" กับ "ประวัติ" รวมเป็นปุ่มเดียว
+    // เพราะบอตแยกให้เองอยู่แล้ว (S/N เต็ม = การ์ดประวัติ · ไม่เต็ม = รายการผลค้นหา)
+    $areas = [
+        [0, 0, 1250, $pb(LINE_BOT_PB_SEARCH, 'พิมพ์ค้นหา')],
         // ยังไม่ตั้ง LIFF = ปุ่มตอบว่ายังไม่พร้อม แทนที่จะกดแล้วไม่เกิดอะไร
-        $liff !== '' ? ['type' => 'uri', 'uri' => $liff] : $pb(LINE_BOT_PB_SCAN, 'สแกน S/N'),
-        $pb(LINE_BOT_PB_STOCK, 'สต็อกคงเหลือ'),
-        $web !== '' ? ['type' => 'uri', 'uri' => $web] : $pb(LINE_BOT_PB_HELP, 'วิธีใช้'),
-        $pb(LINE_BOT_PB_HELP, 'วิธีใช้'),
+        [1250, 0, 1250, $liff !== '' ? ['type' => 'uri', 'uri' => $liff] : $pb(LINE_BOT_PB_SCAN, 'สแกนด้วยกล้อง')],
+        [0, 843, 833, $pb(LINE_BOT_PB_STOCK, 'เช็คสต็อก')],
+        [833, 843, 834, $web !== '' ? ['type' => 'uri', 'uri' => $web] : $pb(LINE_BOT_PB_HELP, 'วิธีใช้')],
+        [1667, 843, 833, $pb(LINE_BOT_PB_HELP, 'วิธีใช้')],
     ];
-    $areas = [];
-    $w = [833, 834, 833];
-    foreach ($actions as $i => $act) {
-        $col = $i % 3;
-        $areas[] = [
-            'bounds' => ['x' => $col === 0 ? 0 : ($col === 1 ? 833 : 1667), 'y' => $i < 3 ? 0 : 843, 'width' => $w[$col], 'height' => 843],
-            'action' => $act,
-        ];
-    }
     return [
         'size'        => ['width' => 2500, 'height' => 1686],
         'selected'    => true,
         'name'        => 'production-menu',
         'chatBarText' => 'เมนู Production',
-        'areas'       => $areas,
+        'areas'       => array_map(function ($a) {
+            return ['bounds' => ['x' => $a[0], 'y' => $a[1], 'width' => $a[2], 'height' => 843], 'action' => $a[3]];
+        }, $areas),
     ];
 }
 
