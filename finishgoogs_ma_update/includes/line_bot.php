@@ -1,0 +1,668 @@
+<?php
+/**
+ * includes/line_bot.php — ไลน์สำรองแบบถาม-ตอบ (ริชเมนู · ค้นหา · ประวัติเครื่อง · สต็อก · สแกนผ่าน LIFF)
+ *
+ * เรียกจาก line_webhook.php หลังตรวจลายเซ็นแล้ว ตอบด้วย reply token เสมอ = คำตอบเข้าแชทส่วนตัว
+ * ของคนที่ทักมาเท่านั้น ไม่มีใครอื่นเห็น
+ *
+ * ตอบเฉพาะคนที่ผูกไลน์ไว้ในหน้า "สรุปงานรายคน" แล้ว (work_people.line_user_id) — ผลค้นหามีชื่อลูกค้า
+ * ไซต์งาน และสัญญาเช่า คนนอกที่แอดไลน์มาจึงได้แค่ข้อความบอกวิธีผูกบัญชี
+ *
+ * ค้นหาใช้ smart_search_query() ตัวเดียวกับช่องค้นหาบน sidebar — ผลตรงกับเว็บเสมอ
+ */
+
+require_once __DIR__ . '/smart_search.php';
+
+/** @var string postback data ของปุ่มริชเมนู / ปุ่มในข้อความ */
+const LINE_BOT_PB_SEARCH  = 'm=search';
+const LINE_BOT_PB_HISTORY = 'm=history';
+const LINE_BOT_PB_STOCK   = 'm=stock';
+const LINE_BOT_PB_HELP    = 'm=help';
+const LINE_BOT_PB_SCAN    = 'm=scan';
+/** @var int ผลค้นหาสูงสุดต่อข้อความ — Flex ยาวกว่านี้อ่านยากบนมือถือ */
+const LINE_BOT_MAX_RESULTS = 10;
+/** @var int รายการประวัติเครื่องที่แสดงในการ์ด */
+const LINE_BOT_MAX_HISTORY = 8;
+
+/**
+ * คนทำงานที่ผูก LINE นี้ไว้กับ bot สำรอง
+ *
+ * @param string $lineUserId
+ * @param string $bot
+ * @return array<string,mixed>|null
+ */
+function line_bot_person(string $lineUserId, string $bot): ?array
+{
+    if ($lineUserId === '') {
+        return null;
+    }
+    work_people_ensure_schema();
+    try {
+        $row = qr(
+            'SELECT id, display_name FROM work_people
+             WHERE line_user_id = ? AND is_active = 1 AND COALESCE(line_user_bot, "main") = ? LIMIT 1',
+            'ss',
+            [$lineUserId, $bot]
+        )->fetch_assoc();
+        return $row ?: null;
+    } catch (\Throwable $e) {
+        error_log('[line_bot_person] ' . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * ข้อความนี้เป็นรหัสผูกบัญชีที่ยังใช้ได้หรือไม่ — S/N บางรุ่นยาว 8 ตัวเท่ารหัส จึงต้องเช็คกับฐานจริง
+ * ไม่ใช่ดูแค่รูปแบบ ไม่งั้นคนที่ผูกแล้วพิมพ์ S/N 8 ตัวจะโดนตอบว่า "ไม่พบรหัสนี้"
+ *
+ * @param string $text
+ * @return string รหัส (ตัวใหญ่) หรือ ''
+ */
+function line_bot_link_code_in(string $text): string
+{
+    $t = strtoupper(trim($text));
+    if (!preg_match('/^[A-Z0-9]{8}$/', $t)) {
+        return '';
+    }
+    try {
+        $row = qr('SELECT id FROM work_people WHERE link_code = ? LIMIT 1', 's', [$t])->fetch_assoc();
+        return $row ? $t : '';
+    } catch (\Throwable $e) {
+        return '';
+    }
+}
+
+/**
+ * URL หน้าเว็บ production แบบ https สำหรับปุ่มในข้อความ ('' = ใช้ไม่ได้ ไม่ต้องใส่ปุ่ม)
+ *
+ * @param string $path path ต่อจาก BASE_URL หรือ URL เต็ม
+ * @return string
+ */
+function line_bot_web_url(string $path): string
+{
+    if ($path === '') {
+        return '';
+    }
+    $url = preg_match('#^https?://#i', $path) ? $path : rtrim(line_notify_production_base_url(), '/') . '/' . ltrim($path, '/');
+    return line_notify_sanitize_https_uri($url);
+}
+
+/**
+ * URL เปิดหน้าสแกน (LIFF) — '' ถ้ายังไม่ได้ตั้ง LIFF ID
+ *
+ * @return string
+ */
+function line_bot_liff_url(): string
+{
+    $id = trim((string) (line_notify_config()['liff_scan_id'] ?? ''));
+    return $id !== '' ? 'https://liff.line.me/' . rawurlencode($id) : '';
+}
+
+// ─ ข้อความตอบ ─────────────────────────────────────────────────────────────────
+
+/**
+ * ข้อความธรรมดา + ปุ่มลัด (quick reply) ใต้แชท
+ *
+ * @param string $text
+ * @param bool   $withQuick
+ * @return array<string,mixed>
+ */
+function line_bot_text(string $text, bool $withQuick = true): array
+{
+    $m = ['type' => 'text', 'text' => mb_substr($text, 0, 4900)];
+    if ($withQuick) {
+        $m['quickReply'] = ['items' => line_bot_quick_items()];
+    }
+    return $m;
+}
+
+/**
+ * ปุ่มลัดใต้ช่องพิมพ์ — กดสแกนต่อได้เลยโดยไม่ต้องเปิดริชเมนู
+ *
+ * @return array<int,array<string,mixed>>
+ */
+function line_bot_quick_items(): array
+{
+    $items = [];
+    $liff = line_bot_liff_url();
+    if ($liff !== '') {
+        $items[] = ['type' => 'action', 'action' => ['type' => 'uri', 'label' => 'สแกน S/N', 'uri' => $liff]];
+    }
+    $items[] = ['type' => 'action', 'action' => ['type' => 'postback', 'label' => 'สต็อกคงเหลือ', 'data' => LINE_BOT_PB_STOCK, 'displayText' => 'สต็อกคงเหลือ']];
+    $items[] = ['type' => 'action', 'action' => ['type' => 'postback', 'label' => 'วิธีใช้', 'data' => LINE_BOT_PB_HELP, 'displayText' => 'วิธีใช้']];
+    return $items;
+}
+
+/**
+ * ข้อความวิธีใช้
+ *
+ * @return string
+ */
+function line_bot_help_text(): string
+{
+    return "วิธีใช้ไลน์ Production\n\n"
+        . "🔎 ค้นหาสินค้า — พิมพ์คำที่ต้องการ เช่น S/N บางส่วน ชื่อรุ่น ชื่อลูกค้า เลขใบเบิก "
+        . "ค้นได้เหมือนช่องค้นหาในเว็บ\n"
+        . "🕘 ประวัติเครื่อง — พิมพ์ S/N เต็ม หรือกดสแกน จะได้ประวัติเครื่องนั้นทันที\n"
+        . "📷 สแกน S/N — เปิดกล้องส่องบาร์โค้ด/QR บนเครื่อง ไม่ต้องพิมพ์\n"
+        . "📦 สต็อกคงเหลือ — จำนวนเครื่องใหม่และเครื่องสำรองแยกตามรุ่น\n\n"
+        . "คำตอบส่งเข้าแชทนี้ของคุณคนเดียว";
+}
+
+/**
+ * แบดจ์สถานะเครื่อง (สีจาก ui_status_palette.php เท่านั้น)
+ *
+ * @param string $status
+ * @return array<string,mixed>
+ */
+function line_bot_status_badge(string $status): array
+{
+    $p = status_palette_entry($status);
+    return [
+        'type' => 'box', 'layout' => 'vertical', 'flex' => 0,
+        'backgroundColor' => $p['bg'], 'cornerRadius' => '6px',
+        'paddingStart' => '8px', 'paddingEnd' => '8px', 'paddingTop' => '2px', 'paddingBottom' => '2px',
+        'contents' => [['type' => 'text', 'text' => $p['chip'], 'size' => 'xxs', 'color' => $p['fg'], 'weight' => 'bold']],
+    ];
+}
+
+/**
+ * Flex bubble ห่อมาตรฐาน
+ *
+ * @param array<int,array<string,mixed>> $body
+ * @param array<int,array<string,mixed>> $footer
+ * @return array<string,mixed>
+ */
+function line_bot_bubble(array $body, array $footer = []): array
+{
+    $b = [
+        'type' => 'bubble', 'size' => 'mega',
+        'body' => ['type' => 'box', 'layout' => 'vertical', 'spacing' => 'sm', 'paddingAll' => '16px', 'contents' => $body],
+    ];
+    if ($footer) {
+        $b['footer'] = ['type' => 'box', 'layout' => 'vertical', 'spacing' => 'sm', 'paddingAll' => '12px', 'contents' => $footer];
+    }
+    return $b;
+}
+
+/**
+ * ปุ่มเปิดเว็บ (ใส่เฉพาะเมื่อได้ URL https)
+ *
+ * @param string $label
+ * @param string $path
+ * @return array<int,array<string,mixed>>
+ */
+function line_bot_web_button(string $label, string $path): array
+{
+    $url = line_bot_web_url($path);
+    if ($url === '') {
+        return [];
+    }
+    return [['type' => 'button', 'style' => 'secondary', 'height' => 'sm',
+             'action' => ['type' => 'uri', 'label' => mb_substr($label, 0, 20), 'uri' => $url]]];
+}
+
+// ─ ค้นหา ─────────────────────────────────────────────────────────────────────
+
+/**
+ * เครื่องที่รหัสตรงเป๊ะ (รหัสเครื่องหรือ S/N โรงงาน) — พิมพ์/สแกน S/N เต็มแล้วได้ประวัติเลย
+ *
+ * @param string $q
+ * @return int asset id หรือ 0
+ */
+function line_bot_exact_asset(string $q): int
+{
+    $q = trim($q);
+    if ($q === '' || mb_strlen($q) > 60) {
+        return 0;
+    }
+    $row = qr('SELECT id FROM assets WHERE asset_code = ? OR factory_serial = ? ORDER BY (asset_code = ?) DESC, id DESC LIMIT 1',
+              'sss', [$q, $q, $q])->fetch_assoc();
+    return $row ? (int) $row['id'] : 0;
+}
+
+/**
+ * ตอบคำค้นหา — S/N ตรงเป๊ะ = การ์ดประวัติ · ไม่งั้นรายการผลค้นหาแบบช่องค้นหาในเว็บ
+ *
+ * @param string $q
+ * @return array<int,array<string,mixed>> messages
+ */
+function line_bot_answer_query(string $q): array
+{
+    $q = trim(preg_replace('/\s+/u', ' ', $q) ?? $q);
+    if (mb_strlen($q) < 2) {
+        return [line_bot_text('พิมพ์อย่างน้อย 2 ตัวอักษรครับ')];
+    }
+    $aid = line_bot_exact_asset($q);
+    if ($aid > 0) {
+        return line_bot_history_messages($aid);
+    }
+    try {
+        $items = smart_search_merge_assets(smart_search_link_assets(smart_search_query($q, 5), $q));
+    } catch (\Throwable $e) {
+        error_log('[line_bot_answer_query] ' . $e->getMessage());
+        return [line_bot_text('ค้นหาไม่สำเร็จ ลองใหม่อีกครั้งครับ')];
+    }
+    if (!$items) {
+        return [line_bot_text('ไม่พบ "' . mb_substr($q, 0, 40) . '"' . "\nลองพิมพ์ให้สั้นลง หรือพิมพ์ S/N บางส่วนครับ")];
+    }
+    return [line_bot_search_flex($q, $items)];
+}
+
+/**
+ * การ์ดผลค้นหา
+ *
+ * @param string                           $q
+ * @param array<int,array<string,mixed>>   $items ผลจาก smart_search (รวมเครื่องแล้ว)
+ * @return array<string,mixed>
+ */
+function line_bot_search_flex(string $q, array $items): array
+{
+    $total = count($items);
+    $shown = array_slice($items, 0, LINE_BOT_MAX_RESULTS);
+    $body = [
+        ['type' => 'text', 'text' => 'ค้นหา "' . line_flex_text($q, 30) . '"', 'weight' => 'bold', 'size' => 'md', 'wrap' => true],
+        ['type' => 'text', 'text' => 'พบ ' . $total . ' รายการ' . ($total > count($shown) ? ' · แสดง ' . count($shown) . ' รายการแรก' : '')
+            . ' · แตะเครื่องเพื่อดูประวัติ', 'size' => 'xs', 'color' => '#888888', 'wrap' => true],
+        ['type' => 'separator', 'margin' => 'md'],
+    ];
+    foreach ($shown as $it) {
+        $isAsset = (int) ($it['asset_id'] ?? 0) > 0;
+        $title = line_flex_text((string) ($it['title'] ?? ''), 40);
+        $sub = $isAsset ? (string) ($it['model'] ?? '') : (string) ($it['subtitle'] ?? '');
+        if ($isAsset && !empty($it['sources'])) {
+            $labels = array_filter(array_map(function ($s) { return $s['kind'] === 'asset' ? '' : (string) $s['label']; }, $it['sources']));
+            if ($labels) {
+                $sub .= ' · เจอใน ' . implode(', ', $labels);
+            }
+        }
+        $left = [
+            ['type' => 'text', 'text' => $title !== '' ? $title : '-', 'size' => 'sm', 'weight' => 'bold', 'color' => '#222222', 'wrap' => true],
+        ];
+        if (trim($sub) !== '') {
+            $left[] = ['type' => 'text', 'text' => line_flex_text($sub, 90), 'size' => 'xxs', 'color' => '#777777', 'wrap' => true];
+        }
+        $right = $isAsset && !empty($it['status'])
+            ? line_bot_status_badge((string) $it['status'])
+            : ['type' => 'text', 'text' => line_flex_text((string) ($it['kind_label'] ?? ''), 14) ?: '-', 'size' => 'xxs', 'color' => '#666666', 'flex' => 0];
+        $row = [
+            'type' => 'box', 'layout' => 'horizontal', 'spacing' => 'md', 'paddingTop' => '8px', 'paddingBottom' => '8px',
+            'contents' => [['type' => 'box', 'layout' => 'vertical', 'flex' => 1, 'contents' => $left], $right],
+        ];
+        if ($isAsset) {
+            $row['action'] = ['type' => 'postback', 'label' => 'ประวัติ', 'data' => 'h=' . (int) $it['asset_id'],
+                              'displayText' => 'ประวัติ ' . mb_substr($title, 0, 40)];
+        } else {
+            $url = line_bot_web_url((string) ($it['href'] ?? ''));
+            if ($url !== '') {
+                $row['action'] = ['type' => 'uri', 'label' => 'เปิด', 'uri' => $url];
+            }
+        }
+        $body[] = $row;
+        $body[] = ['type' => 'separator'];
+    }
+    array_pop($body);
+    return [
+        'type' => 'flex', 'altText' => 'ผลค้นหา ' . mb_substr($q, 0, 40) . ' (' . $total . ')',
+        'contents' => line_bot_bubble($body, line_bot_web_button('ดูทั้งหมดในเว็บ', 'assets.php?q=' . rawurlencode($q))),
+        'quickReply' => ['items' => line_bot_quick_items()],
+    ];
+}
+
+// ─ ประวัติเครื่อง ─────────────────────────────────────────────────────────────
+
+/**
+ * การ์ดประวัติเครื่อง
+ *
+ * @param int $assetId
+ * @return array<int,array<string,mixed>> messages
+ */
+function line_bot_history_messages(int $assetId): array
+{
+    $a = qr('SELECT a.id, a.asset_code, a.factory_serial, a.status, a.current_fw_version, a.produced_at, p.name pname
+             FROM assets a JOIN products p ON p.id = a.product_id WHERE a.id = ?', 'i', [$assetId])->fetch_assoc();
+    if (!$a) {
+        return [line_bot_text('ไม่พบเครื่องนี้ในระบบแล้วครับ')];
+    }
+    require_once __DIR__ . '/timeline.php';
+    require_once __DIR__ . '/rent_ma_bridge.php';
+    $tl = [];
+    try {
+        $tl = asset_timeline_items($assetId)['tl'];
+        if (function_exists('asset_leasing_info')) {
+            $lease = asset_leasing_info((string) $a['asset_code'], (string) ($a['factory_serial'] ?? ''));
+            $tl = array_merge($tl, rent_leasing_ma_timeline_items($lease));
+        }
+    } catch (\Throwable $e) {
+        error_log('[line_bot_history] ' . $e->getMessage());
+    }
+    usort($tl, function ($x, $y) {
+        return ($y['d'] !== '' ? strtotime($y['d']) : 0) <=> ($x['d'] !== '' ? strtotime($x['d']) : 0);
+    });
+
+    $body = [
+        ['type' => 'box', 'layout' => 'horizontal', 'spacing' => 'md', 'contents' => [
+            ['type' => 'text', 'text' => line_flex_text((string) $a['asset_code'], 40), 'weight' => 'bold', 'size' => 'lg', 'wrap' => true, 'flex' => 1],
+            line_bot_status_badge((string) $a['status']),
+        ]],
+        ['type' => 'text', 'text' => line_flex_text(implode(' · ', array_filter([
+            (string) $a['pname'],
+            $a['current_fw_version'] ? 'FW ' . $a['current_fw_version'] : '',
+            $a['produced_at'] ? 'ผลิต ' . date('d/m/Y', strtotime((string) $a['produced_at'])) : '',
+        ])), 120), 'size' => 'xs', 'color' => '#777777', 'wrap' => true],
+        ['type' => 'separator', 'margin' => 'md'],
+    ];
+    if (!$tl) {
+        $body[] = ['type' => 'text', 'text' => 'ยังไม่มีประวัติ', 'size' => 'sm', 'color' => '#888888', 'margin' => 'md'];
+    }
+    foreach (array_slice($tl, 0, LINE_BOT_MAX_HISTORY) as $e) {
+        $label = trim(html_entity_decode(strip_tags((string) ($e['type'] ?? '')), ENT_QUOTES, 'UTF-8'));
+        // เนื้อหาใน timeline เป็น HTML (ชิป · รายการ checklist) — ขึ้นบรรทัด/ปิดกล่องเมื่อไหร่ใส่ตัวคั่นแทน
+        // ไม่งั้นข้อความติดกันเป็นพืด
+        // รายการ checklist ทั้งชุด (บางรุ่น 25 ข้อ) ยาวเกินการ์ด — เหลือแค่ "checklist N รายการ"
+        $txt = preg_replace('#<ul class="tl-checklist">.*?</ul>#s', '', (string) ($e['html'] ?? '')) ?? '';
+        $txt = preg_replace('/<br\s*\/?>|<\/(div|li|summary|span|p)>/i', ' · ', $txt) ?? '';
+        $txt = trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($txt), ENT_QUOTES, 'UTF-8')) ?? '');
+        $txt = trim(preg_replace('/(\s*·\s*)+/u', ' · ', $txt) ?? $txt, " ·");
+        $body[] = ['type' => 'box', 'layout' => 'horizontal', 'spacing' => 'md', 'margin' => 'md', 'contents' => [
+            ['type' => 'text', 'text' => $e['d'] !== '' ? date('d/m/y', strtotime($e['d'])) : '-', 'size' => 'xxs', 'color' => '#888888', 'flex' => 0],
+            ['type' => 'box', 'layout' => 'vertical', 'flex' => 1, 'contents' => array_values(array_filter([
+                ['type' => 'text', 'text' => $label !== '' ? line_flex_text($label, 40) : '-', 'size' => 'xs', 'weight' => 'bold', 'color' => '#333333', 'wrap' => true],
+                $txt !== '' ? ['type' => 'text', 'text' => line_flex_text($txt, 140), 'size' => 'xxs', 'color' => '#666666', 'wrap' => true] : null,
+            ]))],
+        ]];
+    }
+    if (count($tl) > LINE_BOT_MAX_HISTORY) {
+        $body[] = ['type' => 'text', 'text' => 'แสดง ' . LINE_BOT_MAX_HISTORY . ' จาก ' . count($tl) . ' รายการล่าสุด', 'size' => 'xxs', 'color' => '#888888', 'margin' => 'md'];
+    }
+    return [[
+        'type' => 'flex', 'altText' => 'ประวัติ ' . (string) $a['asset_code'],
+        'contents' => line_bot_bubble($body, line_bot_web_button('ดูประวัติเต็มในเว็บ', 'asset.php?id=' . $assetId)),
+        'quickReply' => ['items' => line_bot_quick_items()],
+    ]];
+}
+
+// ─ สต็อก ────────────────────────────────────────────────────────────────────
+
+/**
+ * การ์ดสต็อกคงเหลือ — เครื่องใหม่ / สำรอง แยกตามรุ่น
+ *
+ * @return array<int,array<string,mixed>> messages
+ */
+function line_bot_stock_messages(): array
+{
+    $rows = [];
+    $res = qr("SELECT p.name, SUM(a.status = 'new') n_new, SUM(a.status = 'spare') n_spare
+               FROM assets a JOIN products p ON p.id = a.product_id
+               WHERE a.status IN ('new', 'spare')
+               GROUP BY p.id, p.name HAVING n_new + n_spare > 0 ORDER BY n_new DESC, p.name");
+    while ($r = $res->fetch_assoc()) {
+        $rows[] = $r;
+    }
+    if (!$rows) {
+        return [line_bot_text('ตอนนี้ไม่มีเครื่องใหม่หรือเครื่องสำรองในสต็อกครับ')];
+    }
+    $pNew = status_palette_entry('new');
+    $pSpare = status_palette_entry('spare');
+    $head = function (string $t, array $p) {
+        return ['type' => 'text', 'text' => $t, 'size' => 'xxs', 'color' => $p['fg'], 'weight' => 'bold', 'align' => 'end', 'flex' => 2];
+    };
+    $body = [
+        ['type' => 'text', 'text' => 'สต็อกคงเหลือ', 'weight' => 'bold', 'size' => 'md'],
+        ['type' => 'text', 'text' => 'ข้อมูล ณ ' . date('d/m/Y H:i'), 'size' => 'xs', 'color' => '#888888'],
+        ['type' => 'box', 'layout' => 'horizontal', 'margin' => 'md', 'contents' => [
+            ['type' => 'text', 'text' => 'รุ่น', 'size' => 'xxs', 'color' => '#888888', 'flex' => 6],
+            $head($pNew['chip'], $pNew), $head($pSpare['chip'], $pSpare),
+        ]],
+        ['type' => 'separator'],
+    ];
+    $sumNew = 0;
+    $sumSpare = 0;
+    foreach (array_slice($rows, 0, 25) as $r) {
+        $sumNew += (int) $r['n_new'];
+        $sumSpare += (int) $r['n_spare'];
+        $body[] = ['type' => 'box', 'layout' => 'horizontal', 'margin' => 'sm', 'contents' => [
+            ['type' => 'text', 'text' => line_flex_text((string) $r['name'], 40), 'size' => 'xs', 'color' => '#333333', 'wrap' => true, 'flex' => 6],
+            ['type' => 'text', 'text' => number_format((int) $r['n_new']), 'size' => 'xs', 'align' => 'end', 'flex' => 2, 'weight' => 'bold', 'color' => (int) $r['n_new'] ? '#222222' : '#bbbbbb'],
+            ['type' => 'text', 'text' => number_format((int) $r['n_spare']), 'size' => 'xs', 'align' => 'end', 'flex' => 2, 'color' => (int) $r['n_spare'] ? '#222222' : '#bbbbbb'],
+        ]];
+    }
+    if (count($rows) > 25) {
+        $body[] = ['type' => 'text', 'text' => 'และอีก ' . (count($rows) - 25) . ' รุ่น', 'size' => 'xxs', 'color' => '#888888', 'margin' => 'sm'];
+    }
+    $body[] = ['type' => 'separator', 'margin' => 'md'];
+    $body[] = ['type' => 'box', 'layout' => 'horizontal', 'margin' => 'sm', 'contents' => [
+        ['type' => 'text', 'text' => 'รวม', 'size' => 'xs', 'weight' => 'bold', 'flex' => 6],
+        ['type' => 'text', 'text' => number_format($sumNew), 'size' => 'xs', 'weight' => 'bold', 'align' => 'end', 'flex' => 2],
+        ['type' => 'text', 'text' => number_format($sumSpare), 'size' => 'xs', 'weight' => 'bold', 'align' => 'end', 'flex' => 2],
+    ]];
+    return [[
+        'type' => 'flex', 'altText' => 'สต็อกคงเหลือ',
+        'contents' => line_bot_bubble($body, line_bot_web_button('เปิด Dashboard', 'index.php')),
+        'quickReply' => ['items' => line_bot_quick_items()],
+    ]];
+}
+
+// ─ ตัวจัดการ event ────────────────────────────────────────────────────────────
+
+/**
+ * ตอบ event จากคนที่ผูกไลน์แล้ว (ข้อความ / postback)
+ *
+ * @param array<string,mixed> $ev
+ * @return array<int,array<string,mixed>> messages ('' = ไม่ต้องตอบ)
+ */
+function line_bot_handle(array $ev): array
+{
+    $type = (string) ($ev['type'] ?? '');
+    if ($type === 'postback') {
+        $data = (string) ($ev['postback']['data'] ?? '');
+        if (preg_match('/^h=(\d+)$/', $data, $m)) {
+            return line_bot_history_messages((int) $m[1]);
+        }
+        switch ($data) {
+            case LINE_BOT_PB_SEARCH:
+                return [line_bot_text("พิมพ์คำที่ต้องการค้นหาได้เลยครับ\nเช่น S/N บางส่วน ชื่อรุ่น ชื่อลูกค้า เลขใบเบิก")];
+            case LINE_BOT_PB_HISTORY:
+                return [line_bot_text("พิมพ์ S/N เต็มของเครื่อง หรือกด \"สแกน S/N\" ด้านล่างครับ")];
+            case LINE_BOT_PB_STOCK:
+                return line_bot_stock_messages();
+            case LINE_BOT_PB_SCAN:
+                return [line_bot_text("ยังไม่ได้ตั้งค่าหน้าสแกนในระบบหลังบ้าน (LIFF ID)\nระหว่างนี้พิมพ์ S/N แทนได้ครับ")];
+            case LINE_BOT_PB_HELP:
+            default:
+                return [line_bot_text(line_bot_help_text())];
+        }
+    }
+    if ($type === 'message' && (string) ($ev['message']['type'] ?? '') === 'text') {
+        return line_bot_answer_query((string) ($ev['message']['text'] ?? ''));
+    }
+    if ($type === 'message') {
+        return [line_bot_text('ตอนนี้ตอบได้เฉพาะข้อความครับ พิมพ์ S/N หรือคำที่ต้องการค้นหาได้เลย')];
+    }
+    return [];
+}
+
+// ─ LINE API ─────────────────────────────────────────────────────────────────
+
+/**
+ * เรียก LINE Messaging API
+ *
+ * @param string               $method GET|POST|DELETE
+ * @param string               $url
+ * @param string               $token
+ * @param string|null          $body
+ * @param string               $contentType
+ * @return array{code:int, body:string}
+ */
+function line_bot_api(string $method, string $url, string $token, ?string $body = null, string $contentType = 'application/json'): array
+{
+    $ch = curl_init($url);
+    $headers = ['Authorization: Bearer ' . $token];
+    if ($body !== null) {
+        $headers[] = 'Content-Type: ' . $contentType;
+    }
+    curl_setopt_array($ch, [
+        CURLOPT_CUSTOMREQUEST  => $method,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 20,
+        CURLOPT_HTTPHEADER     => $headers,
+    ]);
+    if ($body !== null) {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+    }
+    if (function_exists('line_notify_apply_curl_ssl')) {
+        line_notify_apply_curl_ssl($ch);
+    }
+    $out = curl_exec($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err = curl_error($ch);
+    curl_close($ch);
+    return ['code' => $code, 'body' => is_string($out) ? $out : $err];
+}
+
+/**
+ * ตอบกลับด้วย reply token (ส่งได้สูงสุด 5 ข้อความ · token ใช้ได้ครั้งเดียว)
+ *
+ * @param string                           $replyToken
+ * @param array<int,array<string,mixed>>   $messages
+ * @param string                           $bot
+ * @return bool
+ */
+function line_bot_reply(string $replyToken, array $messages, string $bot): bool
+{
+    $token = line_notify_bot_token($bot);
+    if ($replyToken === '' || $token === '' || !$messages) {
+        return false;
+    }
+    $r = line_bot_api('POST', 'https://api.line.me/v2/bot/message/reply', $token, json_encode([
+        'replyToken' => $replyToken,
+        'messages'   => array_slice(array_values($messages), 0, 5),
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    if ($r['code'] !== 200) {
+        error_log('[line_bot_reply] HTTP ' . $r['code'] . ' ' . mb_substr($r['body'], 0, 500));
+        // Flex ผิดรูปแบบ = LINE ไม่ส่งอะไรเลย — ส่งข้อความธรรมดาแทน คนถามจะได้ไม่เงียบหาย
+        // (reply token ยังไม่ถูกใช้เพราะคำขอแรกถูกปฏิเสธ)
+        if ($r['code'] === 400 && ($messages[0]['type'] ?? '') === 'flex') {
+            line_bot_api('POST', 'https://api.line.me/v2/bot/message/reply', $token, json_encode([
+                'replyToken' => $replyToken,
+                'messages'   => [['type' => 'text', 'text' => 'แสดงผลไม่สำเร็จ ลองเปิดในเว็บแทนครับ']],
+            ], JSON_UNESCAPED_UNICODE));
+        }
+        return false;
+    }
+    return true;
+}
+
+// ─ ริชเมนู ──────────────────────────────────────────────────────────────────
+
+/** @var string path รูปริชเมนู (2500×1686 · 6 ช่อง 3×2) */
+const LINE_BOT_RICHMENU_IMAGE = __DIR__ . '/../assets/line/richmenu.png';
+
+/**
+ * โครงริชเมนู 6 ปุ่ม — ลำดับต้องตรงกับรูป assets/line/richmenu.png
+ *
+ * @return array<string,mixed>
+ */
+function line_bot_richmenu_def(): array
+{
+    $liff = line_bot_liff_url();
+    $web = line_bot_web_url('index.php');
+    $pb = function (string $data, string $text) {
+        return ['type' => 'postback', 'data' => $data, 'displayText' => $text];
+    };
+    $actions = [
+        $pb(LINE_BOT_PB_SEARCH, 'ค้นหาสินค้า'),
+        $pb(LINE_BOT_PB_HISTORY, 'ประวัติเครื่อง'),
+        // ยังไม่ตั้ง LIFF = ปุ่มตอบว่ายังไม่พร้อม แทนที่จะกดแล้วไม่เกิดอะไร
+        $liff !== '' ? ['type' => 'uri', 'uri' => $liff] : $pb(LINE_BOT_PB_SCAN, 'สแกน S/N'),
+        $pb(LINE_BOT_PB_STOCK, 'สต็อกคงเหลือ'),
+        $web !== '' ? ['type' => 'uri', 'uri' => $web] : $pb(LINE_BOT_PB_HELP, 'วิธีใช้'),
+        $pb(LINE_BOT_PB_HELP, 'วิธีใช้'),
+    ];
+    $areas = [];
+    $w = [833, 834, 833];
+    foreach ($actions as $i => $act) {
+        $col = $i % 3;
+        $areas[] = [
+            'bounds' => ['x' => $col === 0 ? 0 : ($col === 1 ? 833 : 1667), 'y' => $i < 3 ? 0 : 843, 'width' => $w[$col], 'height' => 843],
+            'action' => $act,
+        ];
+    }
+    return [
+        'size'        => ['width' => 2500, 'height' => 1686],
+        'selected'    => true,
+        'name'        => 'production-menu',
+        'chatBarText' => 'เมนู Production',
+        'areas'       => $areas,
+    ];
+}
+
+/**
+ * ติดตั้งริชเมนูเป็นค่าเริ่มต้นของ bot — สร้างใหม่ → อัปรูป → ตั้งเป็น default → ลบของเก่าที่เราเคยสร้าง
+ *
+ * @param string $bot
+ * @return array{ok:bool, message:string}
+ */
+function line_bot_install_richmenu(string $bot): array
+{
+    $token = line_notify_bot_token($bot);
+    if ($token === '') {
+        return ['ok' => false, 'message' => 'ยังไม่ได้ใส่ Channel Access Token ของ bot สำรอง'];
+    }
+    if (!is_file(LINE_BOT_RICHMENU_IMAGE)) {
+        return ['ok' => false, 'message' => 'ไม่พบรูปริชเมนู assets/line/richmenu.png'];
+    }
+    $old = [];
+    $r = line_bot_api('GET', 'https://api.line.me/v2/bot/richmenu/list', $token);
+    if ($r['code'] === 200) {
+        foreach ((json_decode($r['body'], true)['richmenus'] ?? []) as $m) {
+            if (($m['name'] ?? '') === 'production-menu') {
+                $old[] = (string) $m['richMenuId'];
+            }
+        }
+    }
+    $r = line_bot_api('POST', 'https://api.line.me/v2/bot/richmenu', $token, json_encode(line_bot_richmenu_def(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    $id = $r['code'] === 200 ? (string) (json_decode($r['body'], true)['richMenuId'] ?? '') : '';
+    if ($id === '') {
+        return ['ok' => false, 'message' => 'สร้างริชเมนูไม่สำเร็จ (HTTP ' . $r['code'] . '): ' . mb_substr($r['body'], 0, 300)];
+    }
+    $r = line_bot_api('POST', 'https://api-data.line.me/v2/bot/richmenu/' . rawurlencode($id) . '/content', $token,
+                      (string) file_get_contents(LINE_BOT_RICHMENU_IMAGE), 'image/png');
+    if ($r['code'] !== 200) {
+        line_bot_api('DELETE', 'https://api.line.me/v2/bot/richmenu/' . rawurlencode($id), $token);
+        return ['ok' => false, 'message' => 'อัปรูปริชเมนูไม่สำเร็จ (HTTP ' . $r['code'] . '): ' . mb_substr($r['body'], 0, 300)];
+    }
+    $r = line_bot_api('POST', 'https://api.line.me/v2/bot/user/all/richmenu/' . rawurlencode($id), $token);
+    if ($r['code'] !== 200) {
+        return ['ok' => false, 'message' => 'ตั้งเป็นเมนูหลักไม่สำเร็จ (HTTP ' . $r['code'] . '): ' . mb_substr($r['body'], 0, 300)];
+    }
+    foreach ($old as $oid) {
+        line_bot_api('DELETE', 'https://api.line.me/v2/bot/richmenu/' . rawurlencode($oid), $token);
+    }
+    return ['ok' => true, 'message' => 'ติดตั้งริชเมนูแล้ว' . (line_bot_liff_url() === '' ? ' (ปุ่มสแกนยังไม่ทำงาน — ใส่ LIFF ID แล้วกดติดตั้งใหม่)' : '')];
+}
+
+/**
+ * สถานะริชเมนูปัจจุบันของ bot
+ *
+ * @param string $bot
+ * @return string ข้อความสั้น
+ */
+function line_bot_richmenu_status(string $bot): string
+{
+    $token = line_notify_bot_token($bot);
+    if ($token === '') {
+        return 'ยังไม่ได้ใส่ Token ของ bot สำรอง';
+    }
+    $r = line_bot_api('GET', 'https://api.line.me/v2/bot/user/all/richmenu', $token);
+    if ($r['code'] === 404) {
+        return 'ยังไม่ได้ติดตั้ง';
+    }
+    if ($r['code'] !== 200) {
+        return 'ตรวจสอบไม่ได้ (HTTP ' . $r['code'] . ')';
+    }
+    $id = (string) (json_decode($r['body'], true)['richMenuId'] ?? '');
+    $m = line_bot_api('GET', 'https://api.line.me/v2/bot/richmenu/' . rawurlencode($id), $token);
+    $name = $m['code'] === 200 ? (string) (json_decode($m['body'], true)['name'] ?? '') : '';
+    return $name === 'production-menu' ? 'ติดตั้งแล้ว' : 'มีริชเมนูอื่นอยู่ (' . ($name !== '' ? $name : $id) . ') — กดติดตั้งเพื่อแทนที่';
+}

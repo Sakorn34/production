@@ -88,6 +88,7 @@ function line_settings_form_defaults(): array
         'test_recipient_id'     => (string)($cfg['test_recipient_id'] ?? ''),
         'has_test_token'        => trim((string)($cfg['test_channel_access_token'] ?? '')) !== '',
         'has_test_secret'       => trim((string)($cfg['test_channel_secret'] ?? '')) !== '',
+        'liff_scan_id'          => (string)($cfg['liff_scan_id'] ?? ''),
     ];
 }
 
@@ -157,6 +158,7 @@ function line_settings_parse_post(array $post): array
         'test_channel_access_token' => $testToken,
         'test_channel_secret'   => $testSecret,
         'test_recipient_id'     => trim((string)($post['test_recipient_id'] ?? '')),
+        'liff_scan_id'          => trim((string)($post['liff_scan_id'] ?? '')),
     ];
 }
 
@@ -215,6 +217,7 @@ function line_settings_build_secrets_php(array $cfg): string
         'test_channel_access_token' => (string)($cfg['test_channel_access_token'] ?? ''),
         'test_channel_secret'   => (string)($cfg['test_channel_secret'] ?? ''),
         'test_recipient_id'     => (string)($cfg['test_recipient_id'] ?? ''),
+        'liff_scan_id'          => (string)($cfg['liff_scan_id'] ?? ''),
     ];
 
     // คีย์อื่นที่มีอยู่เดิมต้องคงไว้ — เดิมฟังก์ชันนี้สร้างไฟล์จากรายการตายตัว

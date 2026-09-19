@@ -53,6 +53,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $sendNowResult = line_notify_send_now($eventKey);
 
+    } elseif ($action === 'install_richmenu') {
+
+        require_once dirname(__DIR__) . '/shared/line_flex_templates.php';
+        require_once __DIR__ . '/includes/work_people.php';
+        require_once __DIR__ . '/includes/line_bot.php';
+        $rm = line_bot_install_richmenu('test');
+        flash_set($rm['message'], $rm['ok'] ? 'ok' : 'err');
+        header('Location: ' . BASE_URL . '/line_notify_settings.php#ln-richmenu');
+        exit;
+
     } elseif ($action === 'test_worker') {
 
         $workerTestResult = line_plesk_test_worker(10);
@@ -124,6 +134,12 @@ $secretsExists = is_file($secretsPath);
 $tokenPh = LINE_SETTINGS_TOKEN_PLACEHOLDER;
 
 $pleskDiag = line_plesk_task_diagnostics();
+
+require_once dirname(__DIR__) . '/shared/line_flex_templates.php';
+require_once __DIR__ . '/includes/work_people.php';
+require_once __DIR__ . '/includes/line_bot.php';
+// เรียก LINE API ทุกครั้งที่เปิดหน้า — bot ยังไม่ตั้ง token ก็ตอบทันทีไม่ต้องรอ
+$richMenuStatus = line_bot_richmenu_status('test');
 
 
 
@@ -478,6 +494,21 @@ page_header('ตั้งค่าแจ้งเตือน LINE');
     <label>Group / User ID ห้องทดสอบ
       <input type="text" name="test_recipient_id" value="<?= h($form['test_recipient_id']) ?>" placeholder="ห้องที่ bot สำรองอยู่">
     </label>
+  </div>
+  <div class="ln-form-grid" id="ln-richmenu">
+    <label>LIFF ID หน้าสแกน S/N
+      <input type="text" name="liff_scan_id" value="<?= h($form['liff_scan_id']) ?>" placeholder="1234567890-AbCdEfGh" autocomplete="off">
+      <span class="muted ln-hint">ปุ่ม "สแกน S/N" ในริชเมนู — Endpoint URL ของ LIFF ต้องเป็น
+        <code><?= h(line_notify_production_base_url()) ?>/line_scan.php</code> · Scope <code>chat_message.write</code>
+        · ใส่แล้วบันทึก แล้วกด "ติดตั้งริชเมนู" ใหม่อีกครั้ง</span>
+    </label>
+    <div>
+      <b>ริชเมนู (ค้นหาสินค้า · ประวัติเครื่อง · สแกน S/N · สต็อกคงเหลือ · เปิดเว็บ · วิธีใช้)</b>
+      <p class="muted ln-hint" style="margin:4px 0 8px">ตอบเฉพาะคนที่ผูกไลน์ในหน้า "สรุปงานรายคน" แล้ว คำตอบเข้าแชทส่วนตัวของคนที่ถามเท่านั้น
+        · สถานะ: <b><?= h($richMenuStatus) ?></b></p>
+      <button type="submit" class="btn btn-line" name="action" value="install_richmenu" formnovalidate
+        onclick="return confirm('ติดตั้งริชเมนูให้ไลน์สำรอง? ทุกคนที่แอดไลน์นี้จะเห็นเมนูใหม่')">ติดตั้งริชเมนู</button>
+    </div>
   </div>
   <label class="ln-toggle">
     <input type="checkbox" name="test_mode" value="1" <?= !empty($form['test_mode']) ? 'checked' : '' ?>>

@@ -75,6 +75,8 @@ function line_notify_config(bool $reload = false): array
         'test_channel_access_token' => '',
         'test_channel_secret'   => '',
         'test_recipient_id'     => '',
+        // LIFF หน้าสแกน S/N ของไลน์สำรอง (finishgoogs_ma_update/line_scan.php)
+        'liff_scan_id'          => '',
         'enabled'               => false,
         'public_production_url' => '',
         'public_parts_url'      => '',
