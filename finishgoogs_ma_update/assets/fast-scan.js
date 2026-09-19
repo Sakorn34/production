@@ -39,19 +39,34 @@
     return caps;
   }
 
-  function controllerFor(track, caps, stopFn, engine) {
+  // ซูมดิจิทัล — กล้องที่ไม่บอกว่าซูมได้ (เช่น เปิดในแอป LINE / WebView) ยังซูมได้ด้วยการขยายภาพ
+  // ตัวอ่านโหมดเร็วจะอ่านเฉพาะส่วนกลางที่ขยายอยู่ (ดู cropFor) จึงช่วยอ่านฉลากเล็ก/ไกลได้จริง
+  // ไม่ใช่แค่ขยายให้ดู
+  var DIGITAL_ZOOM = { min: 1, max: 4, step: 0.1, digital: true };
+
+  function controllerFor(track, caps, stopFn, engine, digital) {
+    var hw = caps.zoom && caps.zoom.max > caps.zoom.min;
     return {
       engine: engine,
       canTorch: !!caps.torch,
-      zoom: caps.zoom ? { min: caps.zoom.min, max: caps.zoom.max, step: caps.zoom.step || 0.1 } : null,
+      zoom: hw ? { min: caps.zoom.min, max: caps.zoom.max, step: caps.zoom.step || 0.1 } : (digital ? DIGITAL_ZOOM : null),
       setTorch: function (on) {
         return track.applyConstraints({ advanced: [{ torch: !!on }] });
       },
       setZoom: function (z) {
+        if (!hw) { digital.set(Number(z)); return Promise.resolve(); }
         return track.applyConstraints({ advanced: [{ zoom: Number(z) }] });
       },
       stop: stopFn
     };
+  }
+
+  // ภาพ video ถูกครอปเป็นสี่เหลี่ยมจัตุรัสกลางจอ (object-fit: cover) แล้วขยาย z เท่า —
+  // คืนส่วนของภาพกล้องที่ผู้ใช้เห็นอยู่จริง
+  function cropFor(video, z) {
+    var vw = video.videoWidth, vh = video.videoHeight;
+    var side = Math.min(vw, vh) / z;
+    return { x: (vw - side) / 2, y: (vh - side) / 2, side: side, full: Math.min(vw, vh, 1280) };
   }
 
   // ── 1) ตัวอ่านของระบบ ──────────────────────────────────────────────────
@@ -79,12 +94,30 @@
           var track = s.getVideoTracks()[0];
           var caps = tuneTrack(track);
 
+          var dz = 1;
+          var canvas = null;
+          var digital = {
+            set: function (z) {
+              dz = Math.max(1, z || 1);
+              video.style.transform = (opts.facing === 'user' ? 'scaleX(-1) ' : '') + 'scale(' + dz + ')';
+            }
+          };
+          // ซูมดิจิทัลอยู่ = อ่านจากส่วนกลางที่ขยายแล้ว (วาดลง canvas ขนาดเต็ม) แทนภาพทั้งเฟรม
+          function source() {
+            if (dz <= 1.01 || !video.videoWidth) { return video; }
+            var c = cropFor(video, dz);
+            if (!canvas) { canvas = document.createElement('canvas'); }
+            if (canvas.width !== c.full) { canvas.width = canvas.height = c.full; }
+            canvas.getContext('2d').drawImage(video, c.x, c.y, c.side, c.side, 0, 0, c.full, c.full);
+            return canvas;
+          }
+
           var busy = false;
           function tick() {
             if (stopped) { return; }
             if (!busy && video.readyState >= 2) {
               busy = true;
-              detector.detect(video).then(function (codes) {
+              detector.detect(source()).then(function (codes) {
                 busy = false;
                 if (codes && codes.length) {
                   // ถ้าเจอหลายอันในภาพ เอาอันที่ใหญ่สุด (น่าจะเป็นอันที่เล็งอยู่)
@@ -104,7 +137,7 @@
             try { s.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
             if (video.parentNode) { video.parentNode.removeChild(video); }
             return Promise.resolve();
-          }, 'native');
+          }, 'native', digital);
           ctl.formats = formats;
           return ctl;
         });
@@ -152,12 +185,19 @@
     }, function () {}).then(function () {
       var caps = {};
       try { caps = scanner.getRunningTrackCapabilities() || {}; } catch (e) {}
+      var hw = caps.zoom && caps.zoom.max > caps.zoom.min;
       return {
         engine: 'fallback',
         canTorch: !!caps.torch,
-        zoom: caps.zoom ? { min: caps.zoom.min, max: caps.zoom.max, step: caps.zoom.step || 0.1 } : null,
+        // ไม่มีซูมจากกล้อง = ขยายภาพให้เล็งง่าย (ตัวอ่านสำรองยังอ่านทั้งเฟรมเหมือนเดิม)
+        zoom: hw ? { min: caps.zoom.min, max: caps.zoom.max, step: caps.zoom.step || 0.1 } : DIGITAL_ZOOM,
         setTorch: function (on) { return scanner.applyVideoConstraints({ advanced: [{ torch: !!on }] }); },
-        setZoom: function (z) { return scanner.applyVideoConstraints({ advanced: [{ zoom: Number(z) }] }); },
+        setZoom: function (z) {
+          if (hw) { return scanner.applyVideoConstraints({ advanced: [{ zoom: Number(z) }] }); }
+          var v = holder.querySelector('video');
+          if (v) { v.style.transform = (opts.facing === 'user' ? 'scaleX(-1) ' : '') + 'scale(' + Math.max(1, Number(z) || 1) + ')'; }
+          return Promise.resolve();
+        },
         stop: function () {
           return scanner.stop().catch(function () {}).then(function () {
             if (holder.parentNode) { holder.parentNode.removeChild(holder); }

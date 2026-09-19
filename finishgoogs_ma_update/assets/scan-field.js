@@ -94,7 +94,7 @@
       + '<button type="button" class="fgs-btn" data-act="torch" hidden>ไฟฉาย</button>'
       + '<button type="button" class="fgs-btn" data-act="sound"></button>'
       + '</div>'
-      + '<div class="fgs-zoom" hidden><span>ซูม</span><input type="range" min="1" max="4" step="0.1" value="1"></div>'
+      + '<div class="fgs-zoom" hidden><span>ซูม</span><input type="range" min="1" max="4" step="0.1" value="1" aria-label="ซูมกล้อง"><b class="fgs-zoom-val">1×</b></div>'
       + '</div>';
     document.body.appendChild(el);
     ui = {
@@ -110,7 +110,8 @@
       torch: el.querySelector('[data-act="torch"]'),
       sound: el.querySelector('[data-act="sound"]'),
       zoomWrap: el.querySelector('.fgs-zoom'),
-      zoom: el.querySelector('.fgs-zoom input')
+      zoom: el.querySelector('.fgs-zoom input'),
+      zoomVal: el.querySelector('.fgs-zoom-val')
     };
     el.querySelector('.fgs-close').addEventListener('click', close);
     el.addEventListener('click', function (e) { if (e.target === el) { close(); } });
@@ -135,6 +136,7 @@
         .catch(function () { ui.torch.hidden = true; });
     });
     ui.zoom.addEventListener('input', function () {
+      ui.zoomVal.textContent = (Math.round(ui.zoom.value * 10) / 10) + '×';
       if (state && state.ctl) { state.ctl.setZoom(ui.zoom.value).catch(function () {}); }
     });
     document.addEventListener('visibilitychange', function () {
@@ -187,6 +189,7 @@
         ui.zoom.max = Math.min(c.zoom.max, 8);
         ui.zoom.step = c.zoom.step;
         ui.zoom.value = c.zoom.min;
+        ui.zoomVal.textContent = (Math.round(c.zoom.min * 10) / 10) + '×';
         ui.zoomWrap.hidden = false;
       }
       renderButtons();

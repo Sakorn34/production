@@ -1281,6 +1281,9 @@ html.fgs-open, html.fgs-open body { overflow: hidden; }
 .fgs-ctl [hidden], .fgs-zoom[hidden] { display: none !important; }
 .fgs-zoom { display: flex; align-items: center; gap: 10px; padding: 0 12px 12px; color: #d6d2e4; font-size: 13px; }
 .fgs-zoom input { flex: 1; }
+.fgs-zoom-val { min-width: 3.2em; text-align: right; font-variant-numeric: tabular-nums; color: #fff; }
+/* ซูมดิจิทัล: ขยายจากกลางภาพ */
+.fgs-stage .fs-video, .fgs-stage .fs-reader video { transform-origin: 50% 50%; }
 /* ปุ่มสแกนอยู่ในช่องกรอกด้านขวา (แบบ ก) — ไม่ต้องกินที่ข้างช่องอีกปุ่ม */
 .scan-field { position: relative; }
 .scan-field > input, .scan-field > .ac-wrap > input { padding-right: 44px; }
