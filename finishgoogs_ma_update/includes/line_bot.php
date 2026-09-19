@@ -500,6 +500,11 @@ function line_bot_api(string $method, string $url, string $token, ?string $body 
     $headers = ['Authorization: Bearer ' . $token];
     if ($body !== null) {
         $headers[] = 'Content-Type: ' . $contentType;
+    } elseif ($method === 'POST') {
+        // POST ไม่มีเนื้อหา (เช่น ตั้งริชเมนูหลัก) — curl ไม่ใส่ Content-Length ให้เอง
+        // หน้าบ้านของ LINE (Akamai) ตอบ 411 Length Required
+        $body = '';
+        $headers[] = 'Content-Length: 0';
     }
     curl_setopt_array($ch, [
         CURLOPT_CUSTOMREQUEST  => $method,
