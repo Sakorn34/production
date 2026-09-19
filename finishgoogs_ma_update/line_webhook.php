@@ -114,7 +114,7 @@ foreach ($replies as $r) {
     if (is_array($r[1])) {
         line_bot_reply($r[0], $r[1], WORK_SUMMARY_LINE_BOT);
     } else {
-        line_bot_reply($r[0], [line_bot_text($r[1], false)], WORK_SUMMARY_LINE_BOT);
+        line_bot_reply($r[0], [line_bot_text($r[1])], WORK_SUMMARY_LINE_BOT);
     }
 }
 

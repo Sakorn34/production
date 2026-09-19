@@ -101,36 +101,14 @@ function line_bot_liff_url(): string
 // ─ ข้อความตอบ ─────────────────────────────────────────────────────────────────
 
 /**
- * ข้อความธรรมดา + ปุ่มลัด (quick reply) ใต้แชท
+ * ข้อความธรรมดา — ไม่ใส่ปุ่มลัด (quick reply) เพราะซ้ำกับริชเมนูที่อยู่ใต้แชทตลอดอยู่แล้ว
  *
  * @param string $text
- * @param bool   $withQuick
  * @return array<string,mixed>
  */
-function line_bot_text(string $text, bool $withQuick = true): array
+function line_bot_text(string $text): array
 {
-    $m = ['type' => 'text', 'text' => mb_substr($text, 0, 4900)];
-    if ($withQuick) {
-        $m['quickReply'] = ['items' => line_bot_quick_items()];
-    }
-    return $m;
-}
-
-/**
- * ปุ่มลัดใต้ช่องพิมพ์ — กดสแกนต่อได้เลยโดยไม่ต้องเปิดริชเมนู
- *
- * @return array<int,array<string,mixed>>
- */
-function line_bot_quick_items(): array
-{
-    $items = [];
-    $liff = line_bot_liff_url();
-    if ($liff !== '') {
-        $items[] = ['type' => 'action', 'action' => ['type' => 'uri', 'label' => 'สแกนด้วยกล้อง', 'uri' => $liff]];
-    }
-    $items[] = ['type' => 'action', 'action' => ['type' => 'postback', 'label' => 'เช็คสต็อก', 'data' => LINE_BOT_PB_STOCK, 'displayText' => 'เช็คสต็อก']];
-    $items[] = ['type' => 'action', 'action' => ['type' => 'postback', 'label' => 'วิธีใช้', 'data' => LINE_BOT_PB_HELP, 'displayText' => 'วิธีใช้']];
-    return $items;
+    return ['type' => 'text', 'text' => mb_substr($text, 0, 4900)];
 }
 
 /**
@@ -189,7 +167,6 @@ function line_bot_help_flex(): array
     return [
         'type' => 'flex', 'altText' => 'วิธีใช้ไลน์ Production',
         'contents' => line_bot_bubble($body),
-        'quickReply' => ['items' => line_bot_quick_items()],
     ];
 }
 
@@ -349,7 +326,6 @@ function line_bot_search_flex(string $q, array $items): array
     return [
         'type' => 'flex', 'altText' => 'ผลค้นหา ' . mb_substr($q, 0, 40) . ' (' . $total . ')',
         'contents' => line_bot_bubble($body, line_bot_web_button('ดูทั้งหมดในเว็บ', 'assets.php?q=' . rawurlencode($q))),
-        'quickReply' => ['items' => line_bot_quick_items()],
     ];
 }
 
@@ -422,7 +398,6 @@ function line_bot_history_messages(int $assetId): array
     return [[
         'type' => 'flex', 'altText' => 'ประวัติ ' . (string) $a['asset_code'],
         'contents' => line_bot_bubble($body, line_bot_web_button('ดูประวัติเต็มในเว็บ', 'asset.php?id=' . $assetId)),
-        'quickReply' => ['items' => line_bot_quick_items()],
     ]];
 }
 
@@ -517,7 +492,6 @@ function line_bot_stock_messages(): array
     return [[
         'type' => 'flex', 'altText' => 'สต็อกคงเหลือ' . ($shortN ? ' · ต้องผลิตเพิ่ม ' . $shortN . ' รุ่น' : ''),
         'contents' => $bubble,
-        'quickReply' => ['items' => line_bot_quick_items()],
     ]];
 }
 
