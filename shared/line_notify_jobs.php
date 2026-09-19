@@ -367,12 +367,9 @@ function line_notify_run_job(string $job, array $opts = []): array
             $dr = line_job_date_range('daily');
             $records = line_job_production_records($dr['from'], $dr['to']);
             if ($records === []) {
-                line_notify_dispatch('production.summary.daily', [
-                    'no_data'   => true,
-                    'timestamp' => date('d/m/Y H:i'),
-                ], array_merge($dispatchOpts, ['dedup_key' => 'production.summary:' . $dr['dedup_suffix'] . ':nodata']));
-                $result['dispatched'] = 1;
-                $result['event_key'] = 'production.summary.daily';
+                // วันที่ไม่มีการผลิตไม่ต้องส่งการ์ด "ไม่มีข้อมูล" — ส่งเข้ากลุ่ม 7 คนนับโควตา LINE 7 ข้อความ
+                // ต่อครั้ง (บัญชีฟรีได้ 300/เดือน) ส่งทุกวันว่างแบบเดิมกินโควตาไปเปล่า ๆ
+                $result['skipped'] = 'ไม่มีการผลิตวันนี้ — ไม่ส่ง';
                 break;
             }
             $grouped = line_job_group_records($records);
@@ -536,10 +533,26 @@ function line_notify_run_job(string $job, array $opts = []): array
                     break;
                 }
                 $fetched = ['items' => $fg['items']];
-                line_notify_dispatch('finishgood.shortage', [
+                // ส่งเฉพาะวันที่ตัวเลขเปลี่ยนจากรอบที่ส่งล่าสุด + ทุกวันจันทร์ส่งเตือนซ้ำ 1 ครั้ง
+                // ยอดขาดไม่ได้เปลี่ยนทุกวัน ส่งซ้ำทุกวันเข้ากลุ่ม 7 คนกินโควตา LINE เดือนละ ~120 ข้อความ
+                // ระหว่างสัปดาห์ดูเองได้ที่ "เช็คสต็อก" ในไลน์สำรอง (ตอบกลับไม่นับโควตา)
+                // กดส่งเองจากหน้าตั้งค่า (skip_dedup) = ส่งเสมอ
+                $fp = line_job_shortage_fingerprint($fg['items']);
+                $last = line_notify_snapshot_get('finishgood.shortage:last_sent');
+                $isMonday = date('N') === '1';
+                if (!$skipDedup && !$isMonday && $last && ($last['fp'] ?? '') === $fp) {
+                    $result['skipped'] = 'ตัวเลขเหมือนรอบที่ส่งล่าสุด (' . (string) ($last['date'] ?? '-') . ') — ไม่ส่งซ้ำ';
+                    $result['items'] = count($fetched['items']);
+                    break;
+                }
+                $oid = line_notify_dispatch('finishgood.shortage', [
                     'items'     => $fetched['items'],
                     'timestamp' => $fg['timestamp_text'] !== '' ? $fg['timestamp_text'] : date('d/m/Y H:i'),
                 ], array_merge($dispatchOpts, ['dedup_key' => 'finishgood.shortage:scan:' . date('Y-m-d')]));
+                // จำตัวเลขชุดนี้เฉพาะเมื่อเข้าคิวส่งจริง — ปิดประเภทนี้อยู่/ชน dedup จะได้ไม่จำชุดที่ไม่เคยส่ง
+                if ($oid) {
+                    line_notify_snapshot_save('finishgood.shortage:last_sent', ['fp' => $fp, 'date' => date('Y-m-d')], 86400 * 60);
+                }
                 $result['dispatched'] = 1;
                 $result['event_key'] = 'finishgood.shortage';
                 $result['items'] = count($fetched['items']);
@@ -552,6 +565,28 @@ function line_notify_run_job(string $job, array $opts = []): array
             $result['skipped'] = 'unknown job';
     }
     return $result;
+}
+
+/**
+ * ลายนิ้วมือของรายการสินค้าที่ต้องผลิตเพิ่ม — เปลี่ยนเมื่อรุ่นที่ขาดหรือตัวเลขในการ์ดเปลี่ยน
+ * (ขาด · มีอยู่ · ต้องมี · ขั้นต่ำ · PO · ใหม่ · พร้อมเช่า) ไม่รวมเวลาดึงข้อมูล
+ *
+ * @param array<int,array<string,mixed>> $items
+ * @return string
+ */
+function line_job_shortage_fingerprint(array $items): string
+{
+    $rows = [];
+    foreach ($items as $it) {
+        $rows[] = implode('|', [
+            strtoupper(trim((string) ($it['product_code'] ?? ''))),
+            (int) ($it['need'] ?? 0), (int) ($it['available'] ?? 0), (int) ($it['required'] ?? 0),
+            (int) ($it['minimum_stock'] ?? 0), (int) ($it['po_qty'] ?? 0),
+            (int) ($it['stock_qty'] ?? 0), (int) ($it['leasing_qty'] ?? 0),
+        ]);
+    }
+    sort($rows);
+    return sha1(implode("\n", $rows));
 }
 
 /**
