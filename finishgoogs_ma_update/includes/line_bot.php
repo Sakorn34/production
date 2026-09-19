@@ -385,60 +385,94 @@ function line_bot_history_messages(int $assetId): array
 // ─ สต็อก ────────────────────────────────────────────────────────────────────
 
 /**
- * การ์ดสต็อกคงเหลือ — เครื่องใหม่ / สำรอง แยกตามรุ่น
+ * การ์ดสต็อกคงเหลือ — ชุดตัวเลขเดียวกับตาราง "จำนวนเครื่องแยกตามรุ่น" บน Dashboard
+ * (fg_model_stock_map: เครื่องใหม่ · คลังพร้อมเช่า · ขั้นต่ำ · PO ค้าง · ขาด/เกิน) ไม่คิดเอง
+ * ตัวเลขในไลน์กับหน้าเว็บจะได้ไม่ขัดกัน
  *
  * @return array<int,array<string,mixed>> messages
  */
 function line_bot_stock_messages(): array
 {
-    $rows = [];
-    $res = qr("SELECT p.name, SUM(a.status = 'new') n_new, SUM(a.status = 'spare') n_spare
-               FROM assets a JOIN products p ON p.id = a.product_id
-               WHERE a.status IN ('new', 'spare')
-               GROUP BY p.id, p.name HAVING n_new + n_spare > 0 ORDER BY n_new DESC, p.name");
+    require_once dirname(__DIR__, 2) . '/shared/finishgood_shortage_dashboard.php';
+    try {
+        $map = fg_model_stock_map();
+    } catch (\Throwable $e) {
+        error_log('[line_bot_stock] ' . $e->getMessage());
+        return [line_bot_text('ดึงยอดสต็อกไม่สำเร็จ ลองใหม่อีกครั้งครับ')];
+    }
+    $names = [];
+    $res = qr("SELECT UPPER(TRIM(product_code)) code, name FROM products WHERE product_code IS NOT NULL AND TRIM(product_code) <> ''");
     while ($r = $res->fetch_assoc()) {
-        $rows[] = $r;
+        $names[(string) $r['code']] = (string) $r['name'];
+    }
+    $rows = [];
+    foreach ($map['codes'] as $code => $c) {
+        $new = (int) ($c['new'] ?? 0);
+        $rent = max(0, (int) ($c['rent'] ?? 0));
+        $min = (int) ($c['min'] ?? 0);
+        $po = (int) ($c['po'] ?? 0);
+        // รุ่นที่ไม่มีของและไม่มีเป้าอะไรเลย ไม่ต้องขึ้นให้รก
+        if ($new + $rent + $min + $po === 0) {
+            continue;
+        }
+        $rows[] = ['name' => $names[$code] ?? (string) $code, 'new' => $new, 'rent' => $rent, 'min' => $min, 'po' => $po,
+                   'state' => (string) ($c['state'] ?? ''), 'gap' => (int) ($c['gap'] ?? 0), 'over' => (int) ($c['over'] ?? 0)];
     }
     if (!$rows) {
-        return [line_bot_text('ตอนนี้ไม่มีเครื่องใหม่หรือเครื่องสำรองในสต็อกครับ')];
+        return [line_bot_text($map['error'] !== '' ? 'ดึงยอดสต็อกไม่สำเร็จ: ' . $map['error'] : 'ยังไม่มีข้อมูลสต็อกครับ')];
     }
+    // ขาดขึ้นก่อน (ขาดมากก่อน) → ปิดแจ้งเตือน → ที่เหลือเรียงตามเครื่องใหม่
+    $rank = ['short' => 0, 'muted' => 1];
+    usort($rows, function ($a, $b) use ($rank) {
+        return [$rank[$a['state']] ?? 2, -$a['gap'], -$a['new'], $a['name']] <=> [$rank[$b['state']] ?? 2, -$b['gap'], -$b['new'], $b['name']];
+    });
+    $shortN = count(array_filter($rows, function ($r) { return $r['state'] === 'short'; }));
+
     $pNew = status_palette_entry('new');
-    $pSpare = status_palette_entry('spare');
-    $head = function (string $t, array $p) {
-        return ['type' => 'text', 'text' => $t, 'size' => 'xxs', 'color' => $p['fg'], 'weight' => 'bold', 'align' => 'end', 'flex' => 2];
+    $pRent = status_palette_entry('rental');
+    $num = function (int $n, array $extra = []) {
+        return ['type' => 'text', 'text' => number_format($n), 'size' => 'xxs', 'align' => 'end', 'flex' => 2,
+                'color' => $n ? '#333333' : '#bbbbbb'] + $extra;
+    };
+    $hd = function (string $t, string $color = '#888888') {
+        return ['type' => 'text', 'text' => $t, 'size' => 'xxs', 'color' => $color, 'weight' => 'bold', 'align' => 'end', 'flex' => 2, 'wrap' => true];
     };
     $body = [
         ['type' => 'text', 'text' => 'สต็อกคงเหลือ', 'weight' => 'bold', 'size' => 'md'],
-        ['type' => 'text', 'text' => 'ข้อมูล ณ ' . date('d/m/Y H:i'), 'size' => 'xs', 'color' => '#888888'],
-        ['type' => 'box', 'layout' => 'horizontal', 'margin' => 'md', 'contents' => [
+        ['type' => 'text', 'text' => ($shortN ? 'ต้องผลิตเพิ่ม ' . $shortN . ' รุ่น · ' : 'ไม่มีรุ่นที่ขาด · ')
+            . 'ข้อมูล ณ ' . ($map['updated'] !== '' ? $map['updated'] : date('d/m/Y H:i')) . ($map['stale'] ? ' (ข้อมูลเก่า)' : ''),
+            'size' => 'xxs', 'color' => '#888888', 'wrap' => true],
+        ['type' => 'box', 'layout' => 'horizontal', 'margin' => 'md', 'spacing' => 'xs', 'contents' => [
             ['type' => 'text', 'text' => 'รุ่น', 'size' => 'xxs', 'color' => '#888888', 'flex' => 6],
-            $head($pNew['chip'], $pNew), $head($pSpare['chip'], $pSpare),
+            $hd('ใหม่', $pNew['fg']), $hd('พร้อมเช่า', $pRent['fg']), $hd('ขั้นต่ำ'), $hd('PO'), $hd('ผล'),
         ]],
         ['type' => 'separator'],
     ];
-    $sumNew = 0;
-    $sumSpare = 0;
-    foreach (array_slice($rows, 0, 25) as $r) {
-        $sumNew += (int) $r['n_new'];
-        $sumSpare += (int) $r['n_spare'];
-        $body[] = ['type' => 'box', 'layout' => 'horizontal', 'margin' => 'sm', 'contents' => [
-            ['type' => 'text', 'text' => line_flex_text((string) $r['name'], 40), 'size' => 'xs', 'color' => '#333333', 'wrap' => true, 'flex' => 6],
-            ['type' => 'text', 'text' => number_format((int) $r['n_new']), 'size' => 'xs', 'align' => 'end', 'flex' => 2, 'weight' => 'bold', 'color' => (int) $r['n_new'] ? '#222222' : '#bbbbbb'],
-            ['type' => 'text', 'text' => number_format((int) $r['n_spare']), 'size' => 'xs', 'align' => 'end', 'flex' => 2, 'color' => (int) $r['n_spare'] ? '#222222' : '#bbbbbb'],
+    $max = 30;
+    foreach (array_slice($rows, 0, $max) as $r) {
+        if ($r['state'] === 'short') {
+            $res = ['text' => 'ขาด ' . number_format($r['gap']), 'color' => '#991b1b', 'weight' => 'bold'];
+        } elseif ($r['state'] === 'muted') {
+            $res = ['text' => 'ขาด ' . number_format($r['gap']), 'color' => '#94a3b8'];
+        } else {
+            $res = $r['over'] > 0 ? ['text' => 'เกิน ' . number_format($r['over']), 'color' => '#166534'] : ['text' => 'พอดี', 'color' => '#475569'];
+        }
+        $body[] = ['type' => 'box', 'layout' => 'horizontal', 'margin' => 'sm', 'spacing' => 'xs', 'contents' => [
+            ['type' => 'text', 'text' => line_flex_text($r['name'], 40), 'size' => 'xxs', 'color' => '#333333', 'wrap' => true, 'flex' => 6],
+            $num($r['new'], ['weight' => 'bold']), $num($r['rent']), $num($r['min']), $num($r['po']),
+            ['type' => 'text', 'size' => 'xxs', 'align' => 'end', 'flex' => 2, 'wrap' => true] + $res,
         ]];
     }
-    if (count($rows) > 25) {
-        $body[] = ['type' => 'text', 'text' => 'และอีก ' . (count($rows) - 25) . ' รุ่น', 'size' => 'xxs', 'color' => '#888888', 'margin' => 'sm'];
+    if (count($rows) > $max) {
+        $body[] = ['type' => 'text', 'text' => 'และอีก ' . (count($rows) - $max) . ' รุ่น — ดูทั้งหมดใน Dashboard', 'size' => 'xxs', 'color' => '#888888', 'margin' => 'sm'];
     }
-    $body[] = ['type' => 'separator', 'margin' => 'md'];
-    $body[] = ['type' => 'box', 'layout' => 'horizontal', 'margin' => 'sm', 'contents' => [
-        ['type' => 'text', 'text' => 'รวม', 'size' => 'xs', 'weight' => 'bold', 'flex' => 6],
-        ['type' => 'text', 'text' => number_format($sumNew), 'size' => 'xs', 'weight' => 'bold', 'align' => 'end', 'flex' => 2],
-        ['type' => 'text', 'text' => number_format($sumSpare), 'size' => 'xs', 'weight' => 'bold', 'align' => 'end', 'flex' => 2],
-    ]];
+    $body[] = ['type' => 'text', 'text' => 'ผล = (ใหม่ + พร้อมเช่า) − (ขั้นต่ำ + PO) · สีจาง = ปิดแจ้งเตือนรุ่นนั้นไว้',
+               'size' => 'xxs', 'color' => '#999999', 'wrap' => true, 'margin' => 'md'];
+    $bubble = line_bot_bubble($body, line_bot_web_button('เปิด Dashboard', 'index.php'));
+    $bubble['size'] = 'giga';   // 6 คอลัมน์ — mega แคบจนตัวเลขตกบรรทัด
     return [[
-        'type' => 'flex', 'altText' => 'สต็อกคงเหลือ',
-        'contents' => line_bot_bubble($body, line_bot_web_button('เปิด Dashboard', 'index.php')),
+        'type' => 'flex', 'altText' => 'สต็อกคงเหลือ' . ($shortN ? ' · ต้องผลิตเพิ่ม ' . $shortN . ' รุ่น' : ''),
+        'contents' => $bubble,
         'quickReply' => ['items' => line_bot_quick_items()],
     ]];
 }
