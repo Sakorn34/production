@@ -1390,3 +1390,15 @@ html.fgs-open, html.fgs-open body { overflow: hidden; }
 .fps-tag.is-check { background: #fef3c7; color: #854d0e; }
 .fps-tag.is-dup { background: #fee2e2; color: #991b1b; }
 .fps-foot { display: flex; justify-content: flex-end; }
+.fps-box { position: relative; }
+.fps-thumb-btn { border: 0; padding: 0; background: none; cursor: zoom-in; flex: 0 0 auto; min-height: 0 !important; line-height: 0; }
+/* ดูรูปป้ายขยาย — ซ้อนเต็มกล่อง มีช่องพิมพ์รหัสใต้รูป */
+.fps-zoom { position: absolute; inset: 0; background: var(--surface, #fff); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; z-index: 2; }
+.fps-zoom[hidden] { display: none !important; }
+.fps-zoom-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: calc(13px * var(--font-scale, 1)); }
+.fps-zoom-pic { flex: 1; min-height: 0; overflow: auto; background: #111; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: zoom-in; }
+.fps-zoom-pic img { width: 100%; height: auto; display: block; }
+.fps-zoom-pic.is-big { display: block; cursor: zoom-out; }
+.fps-zoom-pic.is-big img { width: 250%; max-width: none; }
+.fps-zoom-code { font-family: ui-monospace, monospace; font-size: calc(18px * var(--font-scale, 1)); padding: 10px 12px; letter-spacing: .5px; }
+.fps-zoom-btns { display: flex; gap: 8px; justify-content: flex-end; }

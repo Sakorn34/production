@@ -186,7 +186,8 @@
       onStep('อ่านบาร์โค้ด…');
       return readBarcodes(canvas).then(function (codes) {
         codes.forEach(function (c) {
-          results.push({ code: c.text.trim().toUpperCase(), how: 'barcode', thumb: crop(canvas, c.box, 360).toDataURL('image/jpeg', 0.8), box: c.box });
+          results.push({ code: c.text.trim().toUpperCase(), how: 'barcode', thumb: crop(canvas, c.box, 360).toDataURL('image/jpeg', 0.8),
+                         full: crop(canvas, c.box, 1400).toDataURL('image/jpeg', 0.85), box: c.box });
         });
         var labels = findLabels(canvas).filter(function (b) {
           return !results.some(function (r) { return overlaps(r.box, b); });
@@ -199,14 +200,16 @@
             var rot = b.h > b.w ? 90 : 0;
             var big = crop(canvas, b, 1600, '', rot);
             var thumb = crop(canvas, b, 360, '', rot).toDataURL('image/jpeg', 0.8);
+            // รูปป้ายขนาดใหญ่ — แตะรูปเล็กในรายการเพื่อดูขยายแล้วพิมพ์รหัสเอง
+            var full = crop(canvas, b, 1400, '', rot).toDataURL('image/jpeg', 0.85);
             return readBarcodes(big).then(function (codes) {
               if (codes.length) {
-                results.push({ code: codes[0].text.trim().toUpperCase(), how: 'barcode', thumb: thumb, box: b });
+                results.push({ code: codes[0].text.trim().toUpperCase(), how: 'barcode', thumb: thumb, full: full, box: b });
                 return;
               }
               return ocrLabel(canvas, b, rot, t).then(function (hit) {
                 if (hit && hit.noise) { return; }
-                results.push({ code: hit ? hit.code : '', how: hit ? 'ocr' : 'none', thumb: thumb, box: b, prefill: hit ? '' : (t ? t.prefix : '') });
+                results.push({ code: hit ? hit.code : '', how: hit ? 'ocr' : 'none', thumb: thumb, full: full, box: b, prefill: hit ? '' : (t ? t.prefix : '') });
               });
             });
           });
@@ -263,11 +266,43 @@
       + '<p class="fps-status" aria-live="polite"></p>'
       + '<div class="fps-list"></div>'
       + '<div class="fps-foot"><button type="button" class="btn fps-add" disabled>เพิ่มลงฟอร์ม</button></div>'
+      + '<div class="fps-zoom" hidden><div class="fps-zoom-head"><b>รูปป้ายขยาย</b><span class="muted">แตะรูปเพื่อขยาย/ย่อ · เลื่อนดูได้</span></div>'
+      + '<div class="fps-zoom-pic"><img alt="รูปป้าย S/N"></div>'
+      + '<input type="text" class="fps-zoom-code" autocomplete="off" spellcheck="false" aria-label="รหัสเครื่อง">'
+      + '<div class="fps-zoom-btns"><button type="button" class="btn btn-line fps-zoom-cancel">ยกเลิก</button><button type="button" class="btn fps-zoom-ok">ใช้รหัสนี้</button></div></div>'
       + '</div>';
     document.body.appendChild(el);
-    ui = { root: el, status: el.querySelector('.fps-status'), list: el.querySelector('.fps-list'), add: el.querySelector('.fps-add') };
+    ui = { root: el, status: el.querySelector('.fps-status'), list: el.querySelector('.fps-list'), add: el.querySelector('.fps-add'),
+           zoom: el.querySelector('.fps-zoom'), zoomPic: el.querySelector('.fps-zoom-pic'), zoomImg: el.querySelector('.fps-zoom-pic img'),
+           zoomCode: el.querySelector('.fps-zoom-code') };
+    // แตะรูปเล็ก → ดูรูปป้ายขยาย พร้อมช่องพิมพ์รหัสอยู่ใต้รูป (ไม่ต้องสลับไปมาระหว่างรูปกับช่อง)
+    var zoomRow = null;
+    ui.list.addEventListener('click', function (e) {
+      var btn = e.target.closest('.fps-thumb-btn');
+      if (!btn) { return; }
+      zoomRow = btn.closest('.fps-row');
+      ui.zoomImg.src = zoomRow._full;
+      ui.zoomPic.classList.remove('is-big');
+      ui.zoomCode.value = zoomRow.querySelector('.fps-code').value;
+      ui.zoom.hidden = false;
+      // เคอร์เซอร์ไว้ท้ายข้อความ — ส่วนใหญ่ต้องพิมพ์แค่ตัวท้าย
+      setTimeout(function () { ui.zoomCode.focus(); var n = ui.zoomCode.value.length; ui.zoomCode.setSelectionRange(n, n); }, 50);
+    });
+    ui.zoomPic.addEventListener('click', function () { ui.zoomPic.classList.toggle('is-big'); });
+    function closeZoom(apply) {
+      if (apply && zoomRow) {
+        var inp = zoomRow.querySelector('.fps-code');
+        inp.value = ui.zoomCode.value.trim().toUpperCase();
+        inp.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      ui.zoom.hidden = true;
+      zoomRow = null;
+    }
+    el.querySelector('.fps-zoom-ok').addEventListener('click', function () { closeZoom(true); });
+    el.querySelector('.fps-zoom-cancel').addEventListener('click', function () { closeZoom(false); });
+    ui.zoomCode.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); closeZoom(true); } });
     el.querySelector('.fps-x').addEventListener('click', close);
-    el.addEventListener('click', function (e) { if (e.target === el) { close(); } });
+    el.addEventListener('click', function (e) { if (e.target === el) { if (!ui.zoom.hidden) { ui.zoom.hidden = true; } else { close(); } } });
     [].forEach.call(el.querySelectorAll('input[type=file]'), function (inp) {
       inp.addEventListener('change', function () { var f = [].slice.call(inp.files || []); inp.value = ''; if (f.length) { run(f); } });
     });
@@ -351,9 +386,10 @@
           var row = document.createElement('div');
           row.className = 'fps-row';
           row.setAttribute('data-how', r.how);
+          row._full = r.full || r.thumb;
           // อ่านไม่ออก = ไม่ติ๊กไว้ก่อน (ช่องมีแค่ส่วนต้นที่เติมให้) จนกว่าจะพิมพ์ตัวท้ายเอง
           row.innerHTML = '<input type="checkbox" class="fps-cb"' + (r.code ? ' checked' : '') + ' aria-label="เลือก">'
-            + '<img class="fps-thumb" alt="" src="' + r.thumb + '">'
+            + '<button type="button" class="fps-thumb-btn" aria-label="ดูรูปป้ายขยาย"><img class="fps-thumb" alt="" src="' + r.thumb + '"></button>'
             + '<div class="fps-main"><input type="text" class="fps-code" value="' + esc(r.code || r.prefill || '') + '"'
             + (r.prefill && !r.code ? ' data-prefill="' + esc(r.prefill) + '"' : '') + ' autocomplete="off" spellcheck="false" aria-label="รหัสเครื่อง">'
             + '<div class="fps-tags"></div></div>';
@@ -376,6 +412,7 @@
     state = { opts: opts || {}, template: buildTemplate((opts || {}).samples), existing: ((opts || {}).existing || []).map(function (s) { return String(s).trim().toUpperCase(); }) };
     ui.list.innerHTML = '';
     ui.status.textContent = '';
+    ui.zoom.hidden = true;
     updateAdd();
     ui.root.hidden = false;
     document.documentElement.classList.add('fgs-open');
