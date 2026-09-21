@@ -440,11 +440,22 @@ function line_bot_stock_messages(): array
     if (!$rows) {
         return [line_bot_text($map['error'] !== '' ? 'ดึงยอดสต็อกไม่สำเร็จ: ' . $map['error'] : 'ยังไม่มีข้อมูลสต็อกครับ')];
     }
-    // ขาดขึ้นก่อน (ขาดมากก่อน) → ปิดแจ้งเตือน → ที่เหลือเรียงตามเครื่องใหม่
-    $rank = ['short' => 0, 'muted' => 1];
-    usort($rows, function ($a, $b) use ($rank) {
-        return [$rank[$a['state']] ?? 2, -$a['gap'], -$a['new'], $a['name']] <=> [$rank[$b['state']] ?? 2, -$b['gap'], -$b['new'], $b['name']];
+    // เรียงแบบเดียวกับตารางรุ่นบน Dashboard: 3 กลุ่มตามความเร่งด่วน
+    // (0 ต่ำกว่าขั้นต่ำ → 1 ถึงขั้นต่ำแต่ไม่พอส่ง PO → 2 ครบ) ในกลุ่มเรียงจากที่มีน้อยสุดก่อน
+    foreach ($rows as &$r) {
+        $r['have'] = $r['new'] + $r['rent'];
+        $r['stage'] = $r['state'] === 'over' ? 2 : ($r['have'] < $r['min'] ? 0 : 1);
+    }
+    unset($r);
+    usort($rows, function ($a, $b) {
+        return [$a['stage'], $a['have'], -($b['min'] + $b['po']), $a['name']] <=> [$b['stage'], $b['have'], -($a['min'] + $a['po']), $b['name']];
     });
+    $groupLabel = [
+        0 => ['ต่ำกว่าขั้นต่ำ — ต้องผลิตด่วน', '#991b1b', '#fef2f2'],
+        1 => ['ถึงขั้นต่ำแล้ว แต่ไม่พอส่ง PO', '#92400e', '#fffbeb'],
+        2 => ['ครบแล้ว', '#166534', '#f0fdf4'],
+    ];
+    $groupCount = array_count_values(array_column($rows, 'stage'));
     $shortN = count(array_filter($rows, function ($r) { return $r['state'] === 'short'; }));
 
     $pNew = status_palette_entry('new');
@@ -468,7 +479,16 @@ function line_bot_stock_messages(): array
         ['type' => 'separator'],
     ];
     $max = 30;
+    $lastStage = -1;
     foreach (array_slice($rows, 0, $max) as $r) {
+        if ($r['stage'] !== $lastStage) {
+            $lastStage = $r['stage'];
+            [$gl, $gc, $gb] = $groupLabel[$r['stage']];
+            $body[] = ['type' => 'box', 'layout' => 'vertical', 'margin' => 'md', 'backgroundColor' => $gb, 'cornerRadius' => '6px',
+                       'paddingAll' => '6px', 'contents' => [
+                ['type' => 'text', 'text' => $gl . ' · ' . ($groupCount[$r['stage']] ?? 0) . ' รุ่น', 'size' => 'xxs', 'weight' => 'bold', 'color' => $gc, 'wrap' => true],
+            ]];
+        }
         if ($r['state'] === 'short') {
             $res = ['text' => 'ขาด ' . number_format($r['gap']), 'color' => '#991b1b', 'weight' => 'bold'];
         } elseif ($r['state'] === 'muted') {

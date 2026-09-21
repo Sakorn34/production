@@ -519,6 +519,7 @@ $partsBase = ui_parts_base_url();
         <th data-pri="2" class="fg-bar-col" title="เต็มแถบ = ยอดที่ต้องมี · ส่วนสีจาง = เกินจากที่ต้องมี"><span class="fg-legend"><i class="is-new"></i>เครื่องใหม่</span> <span class="fg-legend"><i class="is-pool"></i>คลังพร้อมเช่า</span> <span class="fg-legend"><b class="fg-legend-mark">▼</b>ขั้นต่ำ</span> <span class="fg-legend"><b class="fg-legend-mark is-po">▼</b>ขั้นต่ำ+PO</span></th>
         <th data-pri="1" class="num-col">เครื่องใหม่</th>
         <th data-pri="2" class="num-col" title="ระบบเช่าเป็น finished goods รอปล่อยเช่า — นับรวมในยอดที่มี">คลังพร้อมเช่า</th>
+        <th data-pri="2" class="num-col" title="(เครื่องใหม่ + คลังพร้อมเช่า) ÷ (ขั้นต่ำ + PO)">มี / ต้องมี</th>
         <th data-pri="1">ผล</th>
       </tr>
     </thead>
@@ -548,6 +549,7 @@ $partsBase = ui_parts_base_url();
       </td>
       <td data-pri="1" class="num-col fg-cell fg-zone-stock" data-fg-cell="ours">—</td>
       <td data-pri="2" class="num-col fg-cell fg-zone-stock" data-fg-cell="pool">—</td>
+      <td data-pri="2" class="num-col fg-cell fg-zone-stock" data-fg-cell="pct">—</td>
       <td data-pri="1" class="fg-cell fg-zone-stock" data-fg-cell="verdict"></td>
     </tr>
     <?php } ?>
@@ -738,6 +740,15 @@ $partsBase = ui_parts_base_url();
           : '<span class="fg-chip fg-chip-over">ครบพอดี</span>';
       }
       row0.setAttribute('data-gap', String(gap));
+      // สำหรับเรียงแบบกลุ่ม: 0 = ต่ำกว่าขั้นต่ำ · 1 = ถึงขั้นต่ำแต่ไม่พอส่ง PO · 2 = ครบ
+      var minNum = Number(row.min) || 0;
+      row0.setAttribute('data-have', String(have + pool));
+      row0.setAttribute('data-req', String(req));
+      row0.setAttribute('data-stage', row.state === 'over' ? '2' : (have + pool < minNum ? '0' : '1'));
+      var pctCell = row0.querySelector('[data-fg-cell="pct"]');
+      if (pctCell) {
+        pctCell.innerHTML = req > 0 ? '<b>' + Math.round((have + pool) / req * 100) + '%</b>' : '<span class="muted">—</span>';
+      }
       row0.setAttribute('data-over', row.state === 'over' ? String(Number(row.over) || 0) : '-1');
 
       var cell = function (key) { return row0.querySelector('[data-fg-cell="' + key + '"]'); };
@@ -806,16 +817,32 @@ $partsBase = ui_parts_base_url();
 
     if (!short && !over) { return; }
     fgCounts = { all: modelCards.length, short: short, over: over, due: dueCount };
-    // ขาดมากสุดขึ้นก่อน → รุ่นที่พอดี → เกินน้อยไปมาก (รุ่นที่ยังไม่มีตัวเลขอยู่ท้ายสุด)
-    var rank = function (el) {
-      var g = Number(el.getAttribute('data-gap') || -1);
-      if (g >= 0) { return 100000 + g; }
-      var o = Number(el.getAttribute('data-over'));
-      return el.hasAttribute('data-over') && o >= 0 ? 50000 - o : -1;
-    };
-    modelCards.slice().sort(function (a, b) {
-      return rank(b) - rank(a) || Number(b.getAttribute('data-count') || 0) - Number(a.getAttribute('data-count') || 0);
-    }).forEach(function (card) { modelsGrid.appendChild(card); });
+    // แบ่ง 3 กลุ่มตามความเร่งด่วน (ต่ำกว่าขั้นต่ำ → ถึงขั้นต่ำแต่ไม่พอส่ง PO → ครบ)
+    // ในกลุ่มเรียงจากที่มีอยู่น้อยสุดก่อน · มีเท่ากัน = รุ่นที่ต้องมีมากกว่าขึ้นก่อน
+    // รุ่นที่ยังไม่มีตัวเลขอยู่ท้ายสุด · การ์ด "เช็คสต็อก" ในไลน์เรียงแบบเดียวกัน (includes/line_bot.php)
+    var num = function (el, k, d) { var v = el.getAttribute(k); return v === null ? d : Number(v); };
+    var sorted = modelCards.slice().sort(function (a, b) {
+      return num(a, 'data-stage', 3) - num(b, 'data-stage', 3)
+        || num(a, 'data-have', 0) - num(b, 'data-have', 0)
+        || num(b, 'data-req', 0) - num(a, 'data-req', 0)
+        || num(b, 'data-count', 0) - num(a, 'data-count', 0);
+    });
+    modelsGrid.querySelectorAll('tr.dash-fg-group').forEach(function (g) { g.remove(); });
+    var lastStage = null;
+    sorted.forEach(function (card) {
+      var st = card.getAttribute('data-stage');
+      if (st !== null && st !== lastStage) {
+        lastStage = st;
+        var n = sorted.filter(function (c) { return c.getAttribute('data-stage') === st; }).length;
+        var gr = document.createElement('tr');
+        gr.className = 'dash-fg-group is-stage-' + st;
+        gr.setAttribute('data-stage', st);
+        gr.innerHTML = '<td data-pri="1" colspan="7">' + fgGroupLabels[st] + ' <span class="dash-fg-group-n">' + fgNum(n) + ' รุ่น</span></td>';
+        modelsGrid.appendChild(gr);
+      }
+      modelsGrid.appendChild(card);
+    });
+    syncFgGroups();
 
     if (fgSummary) {
       document.getElementById('dash-fg-sum-new').textContent = fgNum(newTotal) + ' เครื่อง';
@@ -858,6 +885,20 @@ $partsBase = ui_parts_base_url();
     });
   }
 
+  var fgGroupLabels = {
+    '0': 'ต่ำกว่าขั้นต่ำ — ต้องผลิตด่วน',
+    '1': 'ถึงขั้นต่ำแล้ว แต่ไม่พอส่ง PO',
+    '2': 'ครบแล้ว'
+  };
+  // หัวกลุ่มซ่อนตามแถวในกลุ่ม — กรองแล้วไม่เหลือรุ่นในกลุ่มไหน หัวกลุ่มนั้นก็ไม่ต้องขึ้น
+  function syncFgGroups() {
+    if (!modelsGrid) { return; }
+    modelsGrid.querySelectorAll('tr.dash-fg-group').forEach(function (g) {
+      var st = g.getAttribute('data-stage');
+      g.hidden = !modelCards.some(function (c) { return !c.hidden && c.getAttribute('data-stage') === st; });
+    });
+  }
+
   function setFgLabel(btn, text, n) {
     if (btn) { btn.textContent = text + ' (' + fgNum(n) + ')'; }
   }
@@ -875,6 +916,7 @@ $partsBase = ui_parts_base_url();
         ? card.getAttribute('data-due') !== '1'
         : !(currentFgFilter === 'all' || state === currentFgFilter);
     });
+    syncFgGroups();
     if (metaEl && currentView === 'models') {
       metaEl.textContent = fgNum(fgCounts[currentFgFilter] || 0) + ' รุ่น';
     }

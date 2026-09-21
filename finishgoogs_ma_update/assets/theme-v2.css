@@ -943,6 +943,19 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .fg-chip-short { background: #fee2e2; color: #991b1b; }
 .fg-chip-over { background: #dcfce7; color: #166534; }
 .fg-chip-muted { background: #f1f5f9; color: #475569; }
+/* หัวกลุ่มในตารางรุ่น (ต่ำกว่าขั้นต่ำ / ไม่พอส่ง PO / ครบ) — สีเดียวกับชิปผล */
+.dash-models-table tr.dash-fg-group td { padding: 7px 12px; font-weight: 700; font-size: calc(13px * var(--font-scale, 1)); cursor: default; border-top: 1px solid var(--border, #e5e7eb); }
+.dash-models-table tr.dash-fg-group.is-stage-0 td { background: #fef2f2; color: #991b1b; }
+.dash-models-table tr.dash-fg-group.is-stage-1 td { background: #fffbeb; color: #92400e; }
+.dash-models-table tr.dash-fg-group.is-stage-2 td { background: #f0fdf4; color: #166534; }
+.dash-models-table tr.dash-fg-group[hidden] { display: none !important; }
+.dash-fg-group-n { font-weight: 400; opacity: .8; margin-left: 6px; }
+/* มือถือ (ตารางกลายเป็นการ์ด): หัวกลุ่มเป็นแถบหัวข้อ ไม่ใช่การ์ดอีกใบ */
+@media (max-width: 760px) {
+  .dash-models-table tr.dash-fg-group { border: 0; padding: 0; margin: 14px 0 8px; background: none; }
+  .dash-models-table tr.dash-fg-group:first-child { margin-top: 0; }
+  .dash-models-table tr.dash-fg-group td { border-radius: 8px; border-top: 0; }
+}
 .dash-fg-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0 0 12px; }
 .dash-fg-summary[hidden] { display: none !important; }
 .dash-fg-tile { background: var(--surface-soft, #f6f4fb); border-radius: var(--radius-sm, 10px); padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
