@@ -1362,4 +1362,8 @@ html.fgs-open, html.fgs-open body { overflow: hidden; }
 /* หน้ายืนยันบันทึกผลิต: ใบเบิก inventory ที่จะตัดยอด */
 .confirm-inv { margin-top: 12px; padding: 10px 14px; border-radius: 10px; background: #f0fdf4; border: 1px solid #bbf7d0; color: #14532d; line-height: 1.6; font-size: calc(13.5px * var(--font-scale, 1)); }
 .confirm-inv[hidden] { display: none !important; }
+.confirm-inv.is-warn { background: #fffbeb; border-color: #fde68a; color: #854d0e; }
 .confirm-lease input { width: 20px; height: 20px; margin-top: 2px; flex: 0 0 auto; }
+/* โปรไฟล์เครื่อง: ผลิตจากใบเบิก inventory / ไม่ผ่านใบเบิก */
+.asset-inv-note { margin: 8px 0 12px; font-size: calc(13px * var(--font-scale, 1)); }
+.asset-inv-note.is-warn { background: #fffbeb; color: #854d0e; border: 1px solid #fde68a; border-radius: 8px; padding: 8px 12px; }

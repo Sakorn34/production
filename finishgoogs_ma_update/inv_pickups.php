@@ -18,6 +18,16 @@ $preQ = trim((string) ($_GET['pre'] ?? ''));
 $grpQ = inv_pickup_grp((string) ($_GET['grp'] ?? ''));
 
 // ── รายละเอียดรายการ: ตัดยอดเอง / เอาออก / ปิด-เปิด ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['match_asset'])) {
+    // แท็บ "ไม่ผ่านใบเบิก": จับคู่เครื่องเข้าใบที่เลือก
+    csrf_check();
+    [$mPre, $mGrp] = array_pad(explode('|', (string) ($_POST['match_to'] ?? ''), 2), 2, '');
+    $r = $mPre !== '' ? inv_pickup_manual_alloc($mPre, inv_pickup_grp($mGrp), (string) $_POST['match_asset'], actor_name())
+                      : ['ok' => false, 'message' => 'ยังไม่ได้เลือกใบเบิก'];
+    flash_set($r['message'], $r['ok'] ? 'ok' : 'err');
+    header('Location: ' . $B . '/inv_pickups.php?tab=unmatched');
+    exit;
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
     $pre = trim((string) ($_POST['pre'] ?? ''));
@@ -134,7 +144,8 @@ if ($preQ !== '' && $grpQ !== '') {
 }
 
 // ─────────────────────────── หน้ารวม: การ์ดต่อรุ่น ───────────────────────────
-$tab = in_array($_GET['tab'] ?? '', ['ready', 'waiting', 'done'], true) ? $_GET['tab'] : 'ready';
+$tab = in_array($_GET['tab'] ?? '', ['ready', 'waiting', 'done', 'unmatched'], true) ? $_GET['tab'] : 'ready';
+$unmatched = inv_pickup_unmatched_assets();
 $byModel = ['ready' => [], 'waiting' => [], 'done' => []];
 foreach ($data['items'] as $it) {
     $byModel[$it['state']][$it['grp']][] = $it;
@@ -161,7 +172,47 @@ if (!$data['ok']) { ?>
   <?php foreach (['ready' => 'รอผลิต', 'waiting' => 'รอคลังจ่าย', 'done' => 'ผลิตครบ'] as $k => $label) { ?>
   <a class="ip-tab<?= $tab === $k ? ' is-on' : '' ?>" href="?tab=<?= $k ?>" role="tab" aria-selected="<?= $tab === $k ? 'true' : 'false' ?>"><?= $label ?> (<?= count($byModel[$k]) ?> รุ่น)</a>
   <?php } ?>
+  <a class="ip-tab ip-tab-warn<?= $tab === 'unmatched' ? ' is-on' : '' ?>" href="?tab=unmatched" role="tab" aria-selected="<?= $tab === 'unmatched' ? 'true' : 'false' ?>">ไม่ผ่านใบเบิก (<?= count($unmatched) ?> เครื่อง)</a>
 </div>
+
+<?php if ($tab === 'unmatched') {
+    // ใบที่รับรุ่นนั้นได้และยังเหลือ (รอผลิต) — ให้เลือกจับคู่
+    $openFor = [];
+    foreach ($byModel['ready'] as $list) {
+        foreach ($list as $it) {
+            foreach ($it['products'] as $p) {
+                $openFor[$p][] = $it;
+            }
+        }
+    } ?>
+<div class="panel">
+  <p class="muted" style="margin:0 0 10px;font-size:12.5px">เครื่องรุ่นที่ติดตามกับใบเบิก ที่ลงทะเบียนตั้งแต่ <?= h($fmtD(inv_pickup_since())) ?> แต่ไม่ได้ตัดยอดใบเบิกใด
+    (ลงทะเบียนตอนไม่มีใบเบิกค้าง) — ถ้ามีใบเบิกของเครื่องนั้นแล้ว เลือกใบแล้วกดจับคู่</p>
+  <?php if (!$unmatched) { ?><p class="muted" style="margin:0">ไม่มี — ทุกเครื่องผ่านใบเบิก</p><?php } else { ?>
+  <div class="table-wrap"><table class="list">
+    <tr><th data-pri="1">เครื่อง</th><th data-pri="2">ลงทะเบียน</th><th data-pri="1">จับคู่กับใบเบิก</th></tr>
+    <?php foreach ($unmatched as $u) { $opts = $openFor[(int) $u['product_id']] ?? []; ?>
+    <tr>
+      <td data-pri="1"><a href="<?= $B ?>/asset.php?id=<?= (int) $u['id'] ?>"><b><?= h($u['asset_code']) ?></b></a><div class="muted" style="font-size:12px"><?= h($u['pname']) ?></div></td>
+      <td data-pri="2"><?= h($fmtD($u['created_at'])) ?><?= $u['created_by'] ? ' · ' . h($u['created_by']) : '' ?></td>
+      <td data-pri="1"><?php if ($opts) { ?>
+        <form method="post" class="ip-inline"><?= csrf_field() ?><input type="hidden" name="match_asset" value="<?= h($u['asset_code']) ?>">
+          <select name="match_to" class="ip-match"><?php foreach ($opts as $o) { ?>
+            <option value="<?= h($o['pre_id'] . '|' . $o['grp']) ?>"><?= h($fmtD($o['date']) . ' · ' . ($o['kind'] === 'parts' ? implode(', ', array_unique($o['parts'])) : $o['set']) . ' · เหลือ ' . $o['left']) ?></option>
+          <?php } ?></select>
+          <button type="submit" class="btn btn-sm btn-line">จับคู่</button>
+        </form>
+      <?php } else { ?><span class="muted">ไม่มีใบเบิกค้างของรุ่นนี้</span><?php } ?></td>
+    </tr>
+    <?php } ?>
+  </table></div>
+  <?php } ?>
+</div>
+<?php
+    inv_pickups_css();
+    page_footer();
+    exit;
+} ?>
 
 <?php
 $models = $byModel[$tab];
@@ -235,6 +286,8 @@ function inv_pickups_css(): void
 <style>
 .ip-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 12px; }
 .ip-tab { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--border, #e5e7eb); text-decoration: none; color: inherit; font-size: calc(13.5px * var(--font-scale, 1)); background: var(--surface, #fff); }
+.ip-tab-warn { border-color: #fde68a; }
+.ip-match { max-width: 100%; min-width: 0; }
 .ip-tab.is-on { background: var(--accent-soft, #fdf2f8); border-color: var(--accent, #e0337f); color: var(--accent, #e0337f); font-weight: 700; }
 .ip-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 12px; margin-bottom: 12px; }
 .ip-card { background: var(--surface, #fff); border: 1px solid var(--border, #e5e7eb); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }

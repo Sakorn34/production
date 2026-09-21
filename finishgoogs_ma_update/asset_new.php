@@ -142,6 +142,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fields') {
     // ต่อ inventory ไม่ได้ = รายการว่าง ลงทะเบียนได้ตามปกติ
     require_once __DIR__ . '/includes/inv_pickup.php';
     $out['inv_open'] = [];
+    $out['inv_tracked'] = inv_pickup_is_tracked((int) $pid);
     $invData = inv_pickup_load();
     foreach ($invData['items'] as $it) {
         if ($it['state'] === 'ready' && in_array((int) $pid, $it['products'], true)) {
@@ -1002,7 +1003,13 @@ function buildConfirm(){
   // ตัดยอดใบเบิก: เติมจากใบเก่าสุดก่อน ตามจำนวนเครื่องที่กำลังบันทึก (ฝั่ง server คิดแบบเดียวกัน)
   var invBox = document.getElementById('confirm-inv');
   var open = (cfg && cfg.inv_open) || [];
-  invBox.hidden = !open.length;
+  // รุ่นที่ติดตามกับใบเบิก แต่ไม่มีใบค้างเลย = กำลังบันทึกแบบไม่ผ่านใบเบิก — เตือนให้รู้ตัว (ยังบันทึกได้)
+  var noSlip = !open.length && cfg && cfg.inv_tracked;
+  invBox.hidden = !open.length && !noSlip;
+  invBox.classList.toggle('is-warn', !!noSlip);
+  if (noSlip) {
+    invBox.innerHTML = '<b>รุ่นนี้ไม่มีใบเบิกจาก inventory ค้างอยู่</b><br>จะบันทึกแบบ<b>ไม่ผ่านใบเบิก</b> — ถ้ามีใบเบิกอยู่แล้ว จับคู่ทีหลังได้ที่หน้าใบเบิกรอผลิต แท็บ "ไม่ผ่านใบเบิก"';
+  }
   if (open.length) {
     var need = mcount, rows = [];
     open.forEach(function (o) {

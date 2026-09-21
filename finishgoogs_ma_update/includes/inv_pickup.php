@@ -684,3 +684,89 @@ function inv_pickup_backfill(string $actor): array
     $res['ok'] = true;
     return $res;
 }
+
+// ─ เครื่องที่ไม่ผ่านใบเบิก ────────────────────────────────────────────────────────
+
+/**
+ * รุ่นที่ติดตามกับใบเบิก inventory — ผูกไว้ในชุดแบบ "ทั้งใบ" หรือในอะไหล่ของใบแยกชิ้น
+ *
+ * รุ่นที่ไม่เคยเบิกจากคลัง inventory (ผลิตจากสต็อกช่าง ฯลฯ) ไม่อยู่ในนี้
+ * จึงไม่ถูกนับว่า "ไม่ผ่านใบเบิก" — ไม่งั้นเครื่องทุกเครื่องของรุ่นพวกนั้นขึ้นเตือนหมด
+ *
+ * @return array<int,true> product_id => true
+ */
+function inv_pickup_tracked_products(): array
+{
+    $maps = inv_pickup_maps();
+    $out = [];
+    foreach ($maps['sets'] as $m) {
+        if ($m['mode'] === 'set') {
+            foreach (inv_pickup_grp_ids($m['grp']) as $p) {
+                $out[$p] = true;
+            }
+        }
+    }
+    foreach ($maps['parts'] as $m) {
+        foreach (inv_pickup_grp_ids($m['grp']) as $p) {
+            $out[$p] = true;
+        }
+    }
+    return $out;
+}
+
+/**
+ * รุ่นนี้ติดตามกับใบเบิกไหม
+ *
+ * @param int $productId
+ * @return bool
+ */
+function inv_pickup_is_tracked(int $productId): bool
+{
+    static $tracked = null;
+    if ($tracked === null) {
+        $tracked = inv_pickup_tracked_products();
+    }
+    return isset($tracked[$productId]);
+}
+
+/**
+ * เครื่องที่ลงทะเบียนตั้งแต่วันเริ่มติดตาม แต่ไม่ได้ตัดยอดใบเบิกใด (เฉพาะรุ่นที่ติดตาม)
+ *
+ * @param int $limit
+ * @return array<int,array<string,mixed>>
+ */
+function inv_pickup_unmatched_assets(int $limit = 500): array
+{
+    $tracked = array_keys(inv_pickup_tracked_products());
+    if (!$tracked) {
+        return [];
+    }
+    $out = [];
+    $r = qr('SELECT a.id, a.asset_code, a.product_id, a.created_at, a.created_by, p.name pname
+             FROM assets a JOIN products p ON p.id = a.product_id
+             LEFT JOIN inv_pickup_alloc x ON x.asset_id = a.id
+             WHERE x.id IS NULL AND a.product_id IN (' . implode(',', array_map('intval', $tracked)) . ') AND a.created_at >= ?
+             ORDER BY a.created_at DESC, a.id DESC LIMIT ' . (int) $limit, 's', [inv_pickup_since() . ' 00:00:00']);
+    while ($x = $r->fetch_assoc()) {
+        $out[] = $x;
+    }
+    return $out;
+}
+
+/**
+ * เครื่องนี้ "ไม่ผ่านใบเบิก" ไหม (รุ่นที่ติดตาม · ลงทะเบียนหลังวันเริ่มติดตาม · ไม่มีการตัดยอด)
+ *
+ * @param array<string,mixed> $asset แถว assets (id, product_id, created_at)
+ * @return bool
+ */
+function inv_pickup_asset_unmatched(array $asset): bool
+{
+    ensure_inv_pickup_schema();
+    if (!inv_pickup_is_tracked((int) $asset['product_id'])) {
+        return false;
+    }
+    if ((string) ($asset['created_at'] ?? '') < inv_pickup_since() . ' 00:00:00') {
+        return false;
+    }
+    return inv_pickup_for_asset((int) $asset['id']) === null;
+}
