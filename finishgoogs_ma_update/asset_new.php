@@ -144,7 +144,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fields') {
     $out['inv_open'] = [];
     $invData = inv_pickup_load();
     foreach ($invData['items'] as $it) {
-        if ($it['state'] === 'ready' && (int) $it['product_id'] === $pid) {
+        if ($it['state'] === 'ready' && in_array((int) $pid, $it['products'], true)) {
             $out['inv_open'][] = ['pre_id' => $it['pre_id'], 'date' => date('d/m', strtotime($it['date'])),
                                   'label' => $it['kind'] === 'parts' ? implode(', ', array_unique($it['parts'])) : $it['set'], 'left' => $it['left']];
         }

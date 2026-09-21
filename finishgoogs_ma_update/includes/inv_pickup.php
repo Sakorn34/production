@@ -14,7 +14,12 @@
  *   ชุด   (bitVisitor Plus, bitScan …) — ทั้งใบ = เครื่องรุ่นเดียว · จำนวนเครื่อง = จำนวนที่ซ้ำมากสุดของแถว
  *   แยกชิ้น (bitVisitor Accessories …) — แต่ละอะไหล่คือของสำเร็จรูปคนละรุ่น (Mobile Printer → Portable Printer)
  *         ผูกรายอะไหล่ · จำนวน = จำนวนที่เบิกของอะไหล่นั้น
- * หน่วยที่ติดตาม/ตัดยอด = (ใบ, รุ่นของเรา) — ใบแยกชิ้นใบเดียวอาจมีหลายรุ่น
+ * หน่วยที่ติดตาม/ตัดยอด = (ใบ, กลุ่มรุ่น) — ใบแยกชิ้นใบเดียวอาจมีหลายกลุ่ม
+ *
+ * อะไหล่/ชุดเดียวใช้ได้หลายรุ่น (เช่น หัวอ่านตัวเดียวกันใส่ได้ทั้ง Smart Card Reader และรุ่น S)
+ * → ผูกได้หลายรุ่น เป็น "กลุ่มรุ่น" (grp = product id เรียงกัน คั่นด้วย -) ลงทะเบียนรุ่นไหนในกลุ่มก็ตัดยอดใบนั้น
+ * อะไหล่บางตัวใช้มากกว่า 1 ชิ้นต่อเครื่อง → ตั้ง "ชิ้นต่อเครื่อง" จำนวนเครื่อง = ชิ้นที่เบิก ÷ ชิ้นต่อเครื่อง
+ * (ใบชุดไม่ต้องตั้ง — นับจำนวนชุดจากค่าที่ซ้ำมากสุด อะไหล่ ×2 ในชุดจึงไม่ทำให้นับผิด)
  */
 
 /** @var string ประเภทใบเบิกผลิตในระบบ inventory (สะกดตรงตามที่ระบบนั้นบันทึก) */
@@ -38,14 +43,15 @@ function ensure_inv_pickup_schema(): void
     db()->query("CREATE TABLE IF NOT EXISTS inv_set_map (
         inv_name VARCHAR(191) NOT NULL PRIMARY KEY,
         mode ENUM('set','parts','ignore') NOT NULL DEFAULT 'set',
-        product_id INT NULL,
+        product_ids VARCHAR(255) NOT NULL DEFAULT '',
         updated_by VARCHAR(100) NULL,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-    // อะไหล่ในใบแบบแยกชิ้น → รุ่นของเรา (product_id NULL = ไม่ใช่เครื่อง ไม่ติดตาม เช่น สายคล้อง)
+    // อะไหล่ในใบแบบแยกชิ้น → รุ่นของเรา (product_ids ว่าง = ไม่ใช่เครื่อง ไม่ติดตาม เช่น สายคล้อง)
     db()->query("CREATE TABLE IF NOT EXISTS inv_part_map (
         inv_part_id INT NOT NULL PRIMARY KEY,
-        product_id INT NULL,
+        product_ids VARCHAR(255) NOT NULL DEFAULT '',
+        per_unit DECIMAL(8,2) NOT NULL DEFAULT 1,
         updated_by VARCHAR(100) NULL,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
@@ -53,22 +59,22 @@ function ensure_inv_pickup_schema(): void
     db()->query("CREATE TABLE IF NOT EXISTS inv_pickup_alloc (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
         pre_id VARCHAR(30) NOT NULL,
-        product_id INT NOT NULL,
+        grp VARCHAR(100) NOT NULL,
         asset_id INT NOT NULL,
         source ENUM('auto','manual') NOT NULL DEFAULT 'auto',
         allocated_by VARCHAR(100) NULL,
         allocated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         UNIQUE KEY uq_asset (asset_id),
-        KEY idx_pre (pre_id, product_id)
+        KEY idx_pre (pre_id, grp)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     // ปิดรายการเอง (ผลิตไม่ครบแต่จบแล้ว · ของเสีย · ยกเลิก)
     db()->query("CREATE TABLE IF NOT EXISTS inv_pickup_close (
         pre_id VARCHAR(30) NOT NULL,
-        product_id INT NOT NULL,
+        grp VARCHAR(100) NOT NULL,
         reason VARCHAR(255) NULL,
         closed_by VARCHAR(100) NULL,
         closed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (pre_id, product_id)
+        PRIMARY KEY (pre_id, grp)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 }
 
@@ -103,22 +109,47 @@ function inv_pickup_log_dt(string $v): string
 /**
  * แผนที่การผูกทั้งหมด
  *
- * @return array{sets:array<string,array{mode:string,product_id:?int}>, parts:array<int,?int>}
+ * @return array{sets:array<string,array{mode:string,grp:string}>, parts:array<int,array{grp:string,per_unit:float}>}
  */
 function inv_pickup_maps(): array
 {
     ensure_inv_pickup_schema();
     $sets = [];
-    $r = db()->query('SELECT inv_name, mode, product_id FROM inv_set_map');
+    $r = db()->query('SELECT inv_name, mode, product_ids FROM inv_set_map');
     while ($x = $r->fetch_assoc()) {
-        $sets[(string) $x['inv_name']] = ['mode' => (string) $x['mode'], 'product_id' => $x['product_id'] !== null ? (int) $x['product_id'] : null];
+        $sets[(string) $x['inv_name']] = ['mode' => (string) $x['mode'], 'grp' => inv_pickup_grp((string) $x['product_ids'])];
     }
     $parts = [];
-    $r = db()->query('SELECT inv_part_id, product_id FROM inv_part_map');
+    $r = db()->query('SELECT inv_part_id, product_ids, per_unit FROM inv_part_map');
     while ($x = $r->fetch_assoc()) {
-        $parts[(int) $x['inv_part_id']] = $x['product_id'] !== null ? (int) $x['product_id'] : null;
+        $parts[(int) $x['inv_part_id']] = ['grp' => inv_pickup_grp((string) $x['product_ids']), 'per_unit' => max(0.01, (float) $x['per_unit'])];
     }
     return ['sets' => $sets, 'parts' => $parts];
+}
+
+/**
+ * กลุ่มรุ่น — product id ไม่ซ้ำ เรียงจากน้อยไปมาก คั่นด้วย "-" ('' = ไม่มีรุ่น)
+ *
+ * @param string|array<int,int|string> $ids "3,1" หรือ [3,1]
+ * @return string "1-3"
+ */
+function inv_pickup_grp($ids): string
+{
+    $list = is_array($ids) ? $ids : preg_split('/[^0-9]+/', (string) $ids, -1, PREG_SPLIT_NO_EMPTY);
+    $list = array_values(array_unique(array_filter(array_map('intval', $list))));
+    sort($list);
+    return implode('-', $list);
+}
+
+/**
+ * product id ในกลุ่มรุ่น
+ *
+ * @param string $grp
+ * @return int[]
+ */
+function inv_pickup_grp_ids(string $grp): array
+{
+    return $grp === '' ? [] : array_map('intval', explode('-', $grp));
 }
 
 /**
@@ -257,24 +288,27 @@ function inv_pickup_load(array $opts = []): array
                     $out['unmapped']['part:' . $pid] = ($out['unmapped']['part:' . $pid] ?? 0) + 1;
                     continue;
                 }
-                $prod = $maps['parts'][$pid];
-                if (!$prod) {
+                $pm = $maps['parts'][$pid];
+                if ($pm['grp'] === '') {
                     continue;   // ผูกไว้ว่าไม่ใช่เครื่อง (สายคล้อง ฯลฯ)
                 }
-                $qty = (int) round($d['issued'] ? $ln['got'] : $ln['req']);
-                $key = $id . '|' . $prod;
+                // จำนวนเครื่อง = ชิ้นที่เบิก ÷ ชิ้นต่อเครื่อง (ปัดลง — เศษชิ้นประกอบเป็นเครื่องไม่ได้)
+                $qty = (int) floor((($d['issued'] ? $ln['got'] : $ln['req']) + 0.001) / $pm['per_unit']);
+                $key = $id . '|' . $pm['grp'];
                 if (!isset($items[$key])) {
-                    $items[$key] = ['pre_id' => $id, 'product_id' => $prod, 'qty' => 0, 'kind' => 'parts', 'missing' => [], 'parts' => []];
+                    $items[$key] = ['pre_id' => $id, 'grp' => $pm['grp'], 'qty' => 0, 'kind' => 'parts', 'missing' => [], 'parts' => []];
                 }
-                $items[$key]['qty'] += $qty;
-                $items[$key]['parts'][] = $ln['name'];
+                // อะไหล่หลายตัวในใบเดียวที่ผูกกลุ่มรุ่นเดียวกัน = ชิ้นส่วนของเครื่องชุดเดียวกัน (ตัวเครื่อง + กล่อง ฯลฯ)
+                // ใช้ค่ามากสุด ไม่บวกกัน ไม่งั้นเครื่อง 20 เครื่องจะกลายเป็น 40
+                $items[$key]['qty'] = max($items[$key]['qty'], $qty);
+                $items[$key]['parts'][] = $ln['name'] . ($pm['per_unit'] != 1 ? ' (' . (0 + $pm['per_unit']) . ' ชิ้น/เครื่อง)' : '');
                 if ($d['issued'] && $ln['got'] + 0.001 < $ln['req']) {
                     $items[$key]['missing'][] = $ln['name'];
                 }
             }
             continue;
         }
-        if (!$map || !$map['product_id']) {
+        if (!$map || $map['grp'] === '') {
             $out['unmapped']['set:' . $d['set']] = ($out['unmapped']['set:' . $d['set']] ?? 0) + 1;
             continue;
         }
@@ -295,8 +329,8 @@ function inv_pickup_load(array $opts = []): array
                 }
             }
         }
-        $items[$id . '|' . $map['product_id']] = ['pre_id' => $id, 'product_id' => (int) $map['product_id'], 'qty' => $sets,
-                                                   'kind' => 'set', 'missing' => $missing, 'parts' => []];
+        $items[$id . '|' . $map['grp']] = ['pre_id' => $id, 'grp' => $map['grp'], 'qty' => $sets,
+                                           'kind' => 'set', 'missing' => $missing, 'parts' => []];
     }
     unset($d);
 
@@ -304,13 +338,13 @@ function inv_pickup_load(array $opts = []): array
     $alloc = [];
     $closed = [];
     $in = implode(',', array_map(function ($v) { return "'" . db()->real_escape_string($v) . "'"; }, $ids));
-    $r = db()->query("SELECT pre_id, product_id, COUNT(*) n FROM inv_pickup_alloc WHERE pre_id IN ($in) GROUP BY pre_id, product_id");
+    $r = db()->query("SELECT pre_id, grp, COUNT(*) n FROM inv_pickup_alloc WHERE pre_id IN ($in) GROUP BY pre_id, grp");
     while ($x = $r->fetch_assoc()) {
-        $alloc[$x['pre_id'] . '|' . $x['product_id']] = (int) $x['n'];
+        $alloc[$x['pre_id'] . '|' . $x['grp']] = (int) $x['n'];
     }
-    $r = db()->query("SELECT pre_id, product_id, reason, closed_by, closed_at FROM inv_pickup_close WHERE pre_id IN ($in)");
+    $r = db()->query("SELECT pre_id, grp, reason, closed_by, closed_at FROM inv_pickup_close WHERE pre_id IN ($in)");
     while ($x = $r->fetch_assoc()) {
-        $closed[$x['pre_id'] . '|' . $x['product_id']] = $x;
+        $closed[$x['pre_id'] . '|' . $x['grp']] = $x;
     }
     $prodNames = [];
     $r = db()->query('SELECT id, name FROM products');
@@ -322,7 +356,8 @@ function inv_pickup_load(array $opts = []): array
         $it['done'] = $alloc[$key] ?? 0;
         $it['left'] = max(0, $it['qty'] - $it['done']);
         $it['closed'] = $closed[$key] ?? null;
-        $it['model'] = $prodNames[$it['product_id']] ?? ('#' . $it['product_id']);
+        $it['products'] = inv_pickup_grp_ids($it['grp']);
+        $it['model'] = implode(' / ', array_map(function ($p) use ($prodNames) { return $prodNames[$p] ?? ('#' . $p); }, $it['products']));
         $it['date'] = $d['date'];
         $it['set'] = $d['set'];
         $it['by'] = $d['by'];
@@ -362,25 +397,26 @@ function inv_pickup_allocate(array $assetIds, string $actor): array
         $res['error'] = $data['error'];
         return $res;
     }
+    // รายการที่ยังเหลือ เรียงเก่าสุดก่อน (items เรียงตามวันที่มาแล้ว) — รายการหนึ่งรับได้หลายรุ่น
     $open = [];
     foreach ($data['items'] as $it) {
         if ($it['state'] === 'ready') {
-            $open[$it['product_id']][] = ['pre_id' => $it['pre_id'], 'left' => $it['left']];
+            $open[] = ['pre_id' => $it['pre_id'], 'grp' => $it['grp'], 'products' => $it['products'], 'left' => $it['left']];
         }
     }
     $r = db()->query('SELECT a.id, a.product_id FROM assets a LEFT JOIN inv_pickup_alloc x ON x.asset_id = a.id
                       WHERE x.id IS NULL AND a.id IN (' . implode(',', $ids) . ') ORDER BY a.id');
     while ($a = $r->fetch_assoc()) {
         $pid = (int) $a['product_id'];
-        if (empty($open[$pid])) {
-            continue;
-        }
-        $slot = &$open[$pid][0];
-        q("INSERT IGNORE INTO inv_pickup_alloc (pre_id, product_id, asset_id, source, allocated_by) VALUES (?, ?, ?, 'auto', ?)",
-          'siis', [$slot['pre_id'], $pid, (int) $a['id'], mb_substr($actor, 0, 100)]);
-        $res['allocated'][(int) $a['id']] = $slot['pre_id'];
-        if (--$slot['left'] <= 0) {
-            array_shift($open[$pid]);
+        foreach ($open as &$slot) {
+            if ($slot['left'] <= 0 || !in_array($pid, $slot['products'], true)) {
+                continue;
+            }
+            q("INSERT IGNORE INTO inv_pickup_alloc (pre_id, grp, asset_id, source, allocated_by) VALUES (?, ?, ?, 'auto', ?)",
+              'ssis', [$slot['pre_id'], $slot['grp'], (int) $a['id'], mb_substr($actor, 0, 100)]);
+            $res['allocated'][(int) $a['id']] = $slot['pre_id'];
+            $slot['left']--;
+            break;
         }
         unset($slot);
     }
@@ -394,12 +430,12 @@ function inv_pickup_allocate(array $assetIds, string $actor): array
  * ตัดยอดเครื่องเข้าใบเบิกเอง (หรือย้ายจากใบเดิม) ด้วยรหัสเครื่อง
  *
  * @param string $preId
- * @param int    $productId
+ * @param string $grp   กลุ่มรุ่นของรายการ ("1-3")
  * @param string $code  รหัสเครื่อง / S/N
  * @param string $actor
  * @return array{ok:bool, message:string}
  */
-function inv_pickup_manual_alloc(string $preId, int $productId, string $code, string $actor): array
+function inv_pickup_manual_alloc(string $preId, string $grp, string $code, string $actor): array
 {
     ensure_inv_pickup_schema();
     $code = trim($code);
@@ -408,13 +444,13 @@ function inv_pickup_manual_alloc(string $preId, int $productId, string $code, st
     if (!$a) {
         return ['ok' => false, 'message' => 'ไม่พบเครื่อง ' . $code];
     }
-    if ((int) $a['product_id'] !== $productId) {
+    if (!in_array((int) $a['product_id'], inv_pickup_grp_ids($grp), true)) {
         return ['ok' => false, 'message' => $a['asset_code'] . ' เป็นรุ่น ' . $a['name'] . ' ไม่ตรงกับรายการนี้'];
     }
     $old = qr('SELECT pre_id FROM inv_pickup_alloc WHERE asset_id = ?', 'i', [(int) $a['id']])->fetch_assoc();
     q('DELETE FROM inv_pickup_alloc WHERE asset_id = ?', 'i', [(int) $a['id']]);
-    q("INSERT INTO inv_pickup_alloc (pre_id, product_id, asset_id, source, allocated_by) VALUES (?, ?, ?, 'manual', ?)",
-      'siis', [$preId, $productId, (int) $a['id'], mb_substr($actor, 0, 100)]);
+    q("INSERT INTO inv_pickup_alloc (pre_id, grp, asset_id, source, allocated_by) VALUES (?, ?, ?, 'manual', ?)",
+      'ssis', [$preId, $grp, (int) $a['id'], mb_substr($actor, 0, 100)]);
     return ['ok' => true, 'message' => $a['asset_code'] . ($old && $old['pre_id'] !== $preId ? ' ย้ายมาจากใบ ' . $old['pre_id'] : ' ตัดยอดแล้ว')];
 }
 
@@ -434,20 +470,20 @@ function inv_pickup_unalloc(int $assetId): void
  * ปิด / เปิดรายการ (ใบ × รุ่น) เอง
  *
  * @param string $preId
- * @param int    $productId
+ * @param string $grp
  * @param bool   $close
  * @param string $reason
  * @param string $actor
  * @return void
  */
-function inv_pickup_set_closed(string $preId, int $productId, bool $close, string $reason, string $actor): void
+function inv_pickup_set_closed(string $preId, string $grp, bool $close, string $reason, string $actor): void
 {
     ensure_inv_pickup_schema();
     if ($close) {
-        q('REPLACE INTO inv_pickup_close (pre_id, product_id, reason, closed_by) VALUES (?, ?, ?, ?)',
-          'siss', [$preId, $productId, mb_substr(trim($reason), 0, 255), mb_substr($actor, 0, 100)]);
+        q('REPLACE INTO inv_pickup_close (pre_id, grp, reason, closed_by) VALUES (?, ?, ?, ?)',
+          'ssss', [$preId, $grp, mb_substr(trim($reason), 0, 255), mb_substr($actor, 0, 100)]);
     } else {
-        q('DELETE FROM inv_pickup_close WHERE pre_id = ? AND product_id = ?', 'si', [$preId, $productId]);
+        q('DELETE FROM inv_pickup_close WHERE pre_id = ? AND grp = ?', 'ss', [$preId, $grp]);
     }
 }
 
@@ -455,16 +491,16 @@ function inv_pickup_set_closed(string $preId, int $productId, bool $close, strin
  * เครื่องที่ตัดยอดจากรายการนี้
  *
  * @param string $preId
- * @param int    $productId
+ * @param string $grp
  * @return array<int,array<string,mixed>>
  */
-function inv_pickup_alloc_assets(string $preId, int $productId): array
+function inv_pickup_alloc_assets(string $preId, string $grp): array
 {
     ensure_inv_pickup_schema();
     $out = [];
-    $r = qr('SELECT x.asset_id, x.source, x.allocated_by, x.allocated_at, a.asset_code, a.status
-             FROM inv_pickup_alloc x JOIN assets a ON a.id = x.asset_id
-             WHERE x.pre_id = ? AND x.product_id = ? ORDER BY a.asset_code', 'si', [$preId, $productId]);
+    $r = qr('SELECT x.asset_id, x.source, x.allocated_by, x.allocated_at, a.asset_code, a.status, p.name pname
+             FROM inv_pickup_alloc x JOIN assets a ON a.id = x.asset_id JOIN products p ON p.id = a.product_id
+             WHERE x.pre_id = ? AND x.grp = ? ORDER BY a.asset_code', 'ss', [$preId, $grp]);
     while ($x = $r->fetch_assoc()) {
         $out[] = $x;
     }
@@ -480,7 +516,7 @@ function inv_pickup_alloc_assets(string $preId, int $productId): array
 function inv_pickup_for_asset(int $assetId): ?array
 {
     ensure_inv_pickup_schema();
-    $x = qr('SELECT pre_id, product_id, source, allocated_by, allocated_at FROM inv_pickup_alloc WHERE asset_id = ?', 'i', [$assetId])->fetch_assoc();
+    $x = qr('SELECT pre_id, grp, source, allocated_by, allocated_at FROM inv_pickup_alloc WHERE asset_id = ?', 'i', [$assetId])->fetch_assoc();
     return $x ?: null;
 }
 
@@ -564,7 +600,7 @@ function inv_pickup_mapping_rows(): array
         if (!isset($out['sets'][$set])) {
             $m = $maps['sets'][$set] ?? null;
             $out['sets'][$set] = ['name' => $set, 'docs' => 0, 'last' => '', 'mode' => $m['mode'] ?? '',
-                                  'product_id' => $m['product_id'] ?? null, 'saved' => (bool) $m];
+                                  'grp' => $m['grp'] ?? '', 'saved' => (bool) $m];
         }
         $out['sets'][$set]['last'] = max($out['sets'][$set]['last'], (string) $r['last']);
         $partsBySet[$set][(int) $r['pre_part']] = ['name' => (string) $r['part_name'], 'docs' => (int) $r['docs']];
@@ -592,7 +628,8 @@ function inv_pickup_mapping_rows(): array
         foreach ($partsBySet[$set] ?? [] as $pid => $p) {
             if (!isset($out['parts'][$pid])) {
                 $out['parts'][$pid] = ['part_id' => $pid, 'name' => $p['name'] !== '' ? $p['name'] : '#' . $pid, 'docs' => 0, 'sets' => [],
-                                       'product_id' => $maps['parts'][$pid] ?? null, 'saved' => array_key_exists($pid, $maps['parts'])];
+                                       'grp' => $maps['parts'][$pid]['grp'] ?? '', 'per_unit' => $maps['parts'][$pid]['per_unit'] ?? 1.0,
+                                       'saved' => array_key_exists($pid, $maps['parts'])];
             }
             $out['parts'][$pid]['docs'] += $p['docs'];
             $out['parts'][$pid]['sets'][] = $set;
@@ -630,15 +667,15 @@ function inv_pickup_backfill(string $actor): array
         $doc = $data['docs'][$it['pre_id']];
         $from = $doc['issued_at'] !== '' ? $doc['issued_at'] : $doc['date'] . ' 00:00:00';
         $r = qr('SELECT a.id FROM assets a LEFT JOIN inv_pickup_alloc x ON x.asset_id = a.id
-                 WHERE x.id IS NULL AND a.product_id = ? AND a.created_at >= ?
-                 ORDER BY a.created_at, a.id LIMIT ' . ((int) $it['left'] + count($used)), 'is', [(int) $it['product_id'], $from]);
+                 WHERE x.id IS NULL AND a.product_id IN (' . implode(',', $it['products']) . ') AND a.created_at >= ?
+                 ORDER BY a.created_at, a.id LIMIT ' . ((int) $it['left'] + count($used)), 's', [$from]);
         $left = (int) $it['left'];
         while ($left > 0 && ($a = $r->fetch_assoc())) {
             if (isset($used[(int) $a['id']])) {
                 continue;
             }
-            q("INSERT IGNORE INTO inv_pickup_alloc (pre_id, product_id, asset_id, source, allocated_by) VALUES (?, ?, ?, 'auto', ?)",
-              'siis', [$it['pre_id'], (int) $it['product_id'], (int) $a['id'], mb_substr($actor . ' (ย้อนหลัง)', 0, 100)]);
+            q("INSERT IGNORE INTO inv_pickup_alloc (pre_id, grp, asset_id, source, allocated_by) VALUES (?, ?, ?, 'auto', ?)",
+              'ssis', [$it['pre_id'], $it['grp'], (int) $a['id'], mb_substr($actor . ' (ย้อนหลัง)', 0, 100)]);
             $used[(int) $a['id']] = true;
             $left--;
             $res['allocated']++;

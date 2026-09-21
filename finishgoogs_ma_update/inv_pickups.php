@@ -14,20 +14,21 @@ ensure_inv_pickup_schema();
 
 $B = BASE_URL;
 $preQ = trim((string) ($_GET['pre'] ?? ''));
-$prodQ = (int) ($_GET['product'] ?? 0);
+// รายการ = (ใบ, กลุ่มรุ่น) · กลุ่มรุ่น "1-3" = อะไหล่/ชุดที่ใช้ได้หลายรุ่น
+$grpQ = inv_pickup_grp((string) ($_GET['grp'] ?? ''));
 
 // ── รายละเอียดรายการ: ตัดยอดเอง / เอาออก / ปิด-เปิด ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
     $pre = trim((string) ($_POST['pre'] ?? ''));
-    $prod = (int) ($_POST['product'] ?? 0);
-    $back = $B . '/inv_pickups.php?pre=' . rawurlencode($pre) . '&product=' . $prod;
+    $grp = inv_pickup_grp((string) ($_POST['grp'] ?? ''));
+    $back = $B . '/inv_pickups.php?pre=' . rawurlencode($pre) . '&grp=' . $grp;
     if (isset($_POST['alloc_code'])) {
         $n = 0;
         $msgs = [];
         // สแกน/วางได้หลายรหัส คั่นด้วยบรรทัดใหม่ ช่องว่าง หรือจุลภาค
         foreach (preg_split('/[\s,]+/', (string) $_POST['alloc_code'], -1, PREG_SPLIT_NO_EMPTY) as $code) {
-            $r = inv_pickup_manual_alloc($pre, $prod, $code, actor_name());
+            $r = inv_pickup_manual_alloc($pre, $grp, $code, actor_name());
             $n += $r['ok'] ? 1 : 0;
             $msgs[] = $r['message'];
         }
@@ -36,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         inv_pickup_unalloc((int) $_POST['unalloc']);
         flash_set('เอาเครื่องออกจากใบเบิกแล้ว — ยอดคืนใบ');
     } elseif (isset($_POST['close'])) {
-        inv_pickup_set_closed($pre, $prod, $_POST['close'] === '1', (string) ($_POST['reason'] ?? ''), actor_name());
+        inv_pickup_set_closed($pre, $grp, $_POST['close'] === '1', (string) ($_POST['reason'] ?? ''), actor_name());
         flash_set($_POST['close'] === '1' ? 'ปิดรายการแล้ว' : 'เปิดรายการใหม่แล้ว');
     }
     header('Location: ' . $back);
@@ -49,10 +50,10 @@ $mapLink = $canMap ? '<a class="btn btn-line" href="' . $B . '/inv_pickup_map.ph
 $fmtD = function ($d) { return $d !== '' ? date('d/m/y', strtotime($d)) : '—'; };
 
 // ─────────────────────────── หน้ารายละเอียดรายการ (ใบ × รุ่น) ───────────────────────────
-if ($preQ !== '' && $prodQ > 0) {
+if ($preQ !== '' && $grpQ !== '') {
     $item = null;
     foreach ($data['items'] as $it) {
-        if ($it['pre_id'] === $preQ && (int) $it['product_id'] === $prodQ) {
+        if ($it['pre_id'] === $preQ && $it['grp'] === $grpQ) {
             $item = $it;
         }
     }
@@ -68,7 +69,7 @@ if ($preQ !== '' && $prodQ > 0) {
         page_footer();
         exit;
     }
-    $assets = inv_pickup_alloc_assets($preQ, $prodQ);
+    $assets = inv_pickup_alloc_assets($preQ, $grpQ);
     $stLabel = ['waiting' => 'รอคลังจ่าย', 'ready' => 'รอผลิต', 'done' => 'ผลิตครบ'][$item['state']];
     ?>
 <div class="panel ip-detail">
@@ -83,9 +84,9 @@ if ($preQ !== '' && $prodQ > 0) {
   </div>
   <?php if ($item['missing']) { ?><p class="ip-warn">คลังยังไม่ได้จ่าย: <?= h(implode(' · ', $item['missing'])) ?></p><?php } ?>
   <div class="ip-d-actions">
-    <a class="btn" href="<?= $B ?>/asset_new.php?product=<?= $prodQ ?>"><?= ui_btn_label('assets', ' ลงทะเบียนเครื่องรุ่นนี้') ?></a>
+    <?= inv_pickups_register_links($item, 'btn') ?>
     <form method="post" class="ip-inline">
-      <?= csrf_field() ?><input type="hidden" name="pre" value="<?= h($preQ) ?>"><input type="hidden" name="product" value="<?= $prodQ ?>">
+      <?= csrf_field() ?><input type="hidden" name="pre" value="<?= h($preQ) ?>"><input type="hidden" name="grp" value="<?= h($grpQ) ?>">
       <?php if ($item['closed']) { ?>
         <button type="submit" name="close" value="0" class="btn btn-line">เปิดรายการใหม่</button>
         <span class="muted">ปิดโดย <?= h($item['closed']['closed_by']) ?><?= $item['closed']['reason'] ? ' — ' . h($item['closed']['reason']) : '' ?></span>
@@ -100,7 +101,7 @@ if ($preQ !== '' && $prodQ > 0) {
 <div class="panel">
   <h3 style="margin:0 0 8px">เครื่องที่ตัดยอดแล้ว (<?= count($assets) ?>)</h3>
   <form method="post" class="ip-alloc">
-    <?= csrf_field() ?><input type="hidden" name="pre" value="<?= h($preQ) ?>"><input type="hidden" name="product" value="<?= $prodQ ?>">
+    <?= csrf_field() ?><input type="hidden" name="pre" value="<?= h($preQ) ?>"><input type="hidden" name="grp" value="<?= h($grpQ) ?>">
     <input type="text" name="alloc_code" placeholder="พิมพ์หรือสแกน S/N เพื่อตัดยอดเข้าใบนี้" data-scan="submit" autocomplete="off">
     <button type="submit" class="btn btn-line">ตัดยอด</button>
   </form>
@@ -108,8 +109,8 @@ if ($preQ !== '' && $prodQ > 0) {
   <?php if ($assets) { ?>
   <div class="ip-sns">
     <?php foreach ($assets as $a) { ?>
-    <span class="ip-sn"><a href="<?= $B ?>/asset.php?id=<?= (int) $a['asset_id'] ?>"><?= h($a['asset_code']) ?></a><?= $a['source'] === 'manual' ? ' <small class="muted">ตัดเอง</small>' : '' ?>
-      <form method="post" class="ip-inline"><?= csrf_field() ?><input type="hidden" name="pre" value="<?= h($preQ) ?>"><input type="hidden" name="product" value="<?= $prodQ ?>">
+    <span class="ip-sn"><a href="<?= $B ?>/asset.php?id=<?= (int) $a['asset_id'] ?>"><?= h($a['asset_code']) ?></a><?= count($item['products']) > 1 ? ' <small class="muted">' . h($a['pname']) . '</small>' : '' ?><?= $a['source'] === 'manual' ? ' <small class="muted">ตัดเอง</small>' : '' ?>
+      <form method="post" class="ip-inline"><?= csrf_field() ?><input type="hidden" name="pre" value="<?= h($preQ) ?>"><input type="hidden" name="grp" value="<?= h($grpQ) ?>">
         <button type="submit" name="unalloc" value="<?= (int) $a['asset_id'] ?>" class="ip-x" title="เอาออกจากใบนี้" aria-label="เอา <?= h($a['asset_code']) ?> ออกจากใบนี้" onclick="return confirm('เอา <?= h($a['asset_code']) ?> ออกจากใบเบิกนี้?')">✕</button></form></span>
     <?php } ?>
   </div>
@@ -136,7 +137,7 @@ if ($preQ !== '' && $prodQ > 0) {
 $tab = in_array($_GET['tab'] ?? '', ['ready', 'waiting', 'done'], true) ? $_GET['tab'] : 'ready';
 $byModel = ['ready' => [], 'waiting' => [], 'done' => []];
 foreach ($data['items'] as $it) {
-    $byModel[$it['state']][$it['product_id']][] = $it;
+    $byModel[$it['state']][$it['grp']][] = $it;
 }
 $extraN = count(array_filter($data['docs'], function ($d) { return !empty($d['extra']); }));
 $unmappedN = array_sum($data['unmapped']);
@@ -192,12 +193,12 @@ if (!$models) { ?>
     <div class="muted ip-c-sub">ผลิตแล้ว <?= number_format($done) ?> / <?= number_format($qty) ?> · <?= count($list) ?> ใบ
       <?= $miss ? '<span class="ip-warn-chip">' . h(implode(', ', array_slice(array_keys($miss), 0, 2))) . (count($miss) > 2 ? ' …' : '') . ' ยังไม่ได้จ่าย</span>' : '' ?></div>
     <?php foreach ($list as $it) { ?>
-    <a class="ip-doc" href="?pre=<?= rawurlencode($it['pre_id']) ?>&amp;product=<?= (int) $pid ?>">
+    <a class="ip-doc" href="?pre=<?= rawurlencode($it['pre_id']) ?>&amp;grp=<?= h($it['grp']) ?>">
       <span><?= h($fmtD($it['date'])) ?> · <?= h($it['kind'] === 'parts' ? implode(', ', array_unique($it['parts'])) : $it['set']) ?> · <?= h($it['by']) ?></span>
       <span class="ip-doc-n"><?= $tab === 'ready' ? 'เหลือ ' . (int) $it['left'] . '/' . (int) $it['qty'] : (int) $it['qty'] ?> ›</span>
     </a>
     <?php } ?>
-    <?php if ($tab !== 'done') { ?><a class="btn btn-sm btn-line ip-c-go" href="<?= $B ?>/asset_new.php?product=<?= (int) $pid ?>">ลงทะเบียนเครื่องรุ่นนี้</a><?php } ?>
+    <?php if ($tab !== 'done') { ?><div class="ip-c-go"><?= inv_pickups_register_links($list[0], 'btn btn-sm btn-line') ?></div><?php } ?>
   </div>
 <?php } ?>
 </div>
@@ -205,6 +206,24 @@ if (!$models) { ?>
 <?php
 inv_pickups_css();
 page_footer();
+
+/**
+ * ปุ่มไปหน้าลงทะเบียน — กลุ่มหลายรุ่นได้ปุ่มต่อรุ่น (เลือกรุ่นให้เลย)
+ *
+ * @param array<string,mixed> $item
+ * @param string              $cls
+ * @return string
+ */
+function inv_pickups_register_links(array $item, string $cls): string
+{
+    $names = explode(' / ', (string) $item['model']);
+    $html = '';
+    foreach ($item['products'] as $i => $pid) {
+        $label = count($item['products']) > 1 ? ' ลงทะเบียน ' . ($names[$i] ?? '#' . $pid) : ' ลงทะเบียนเครื่องรุ่นนี้';
+        $html .= '<a class="' . h($cls) . '" href="' . BASE_URL . '/asset_new.php?product=' . (int) $pid . '">' . ui_btn_label('assets', $label) . '</a> ';
+    }
+    return $html;
+}
 
 /**
  * สไตล์ของหน้านี้
@@ -228,7 +247,7 @@ function inv_pickups_css(): void
 .ip-doc { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px dashed var(--border, #e5e7eb); font-size: calc(12.5px * var(--font-scale, 1)); color: inherit; text-decoration: none; }
 .ip-doc > span:first-child { min-width: 0; overflow-wrap: anywhere; }
 .ip-doc-n { white-space: nowrap; color: var(--muted, #6b7280); }
-.ip-c-go { align-self: flex-start; margin-top: 6px; }
+.ip-c-go { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .ip-warn-chip { display: inline-block; font-size: 11.5px; background: #fef3c7; color: #854d0e; border-radius: 6px; padding: 0 6px; }
 .ip-warn { background: #fef3c7; color: #854d0e; border-radius: 8px; padding: 6px 10px; margin: 10px 0 0; }
 .ip-note { background: #fffbeb; }

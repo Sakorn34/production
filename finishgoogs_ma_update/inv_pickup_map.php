@@ -7,6 +7,7 @@
  *   ชุดทั่วไป        → ทั้งใบ = รุ่นเดียว (bitStamp-G → bitStamp Guard)
  *   ชุด Accessories → แยกรายชิ้น แล้วผูกอะไหล่แต่ละตัว (Mobile Printer → Portable Printer · สายคล้อง = ไม่ใช่เครื่อง)
  *   ไม่ติดตาม         → ไม่ขึ้นในคิวผลิต
+ * เลือกได้หลายรุ่น (อะไหล่/ชุดที่ใช้ได้หลายรุ่น) · อะไหล่ตั้ง "ชิ้นต่อเครื่อง" ได้ (บางตัวใช้ 2 ชิ้นต่อเครื่อง)
  * ค่าที่ขึ้นมาให้ตอนยังไม่ได้บันทึกเป็นแค่คำแนะนำจากชื่อที่คล้ายกัน
  */
 require __DIR__ . '/config.php';
@@ -36,17 +37,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_map'])) {
         if ($name === '' || !in_array($mode, ['set', 'parts', 'ignore'], true)) {
             continue;
         }
-        $pid = (int) ($_POST['set_product'][$name] ?? 0);
-        q('REPLACE INTO inv_set_map (inv_name, mode, product_id, updated_by) VALUES (?, ?, ?, ?)',
-          'ssis', [$name, $mode, $mode === 'set' && $pid > 0 ? $pid : null, $who]);
+        $grp = $mode === 'set' ? inv_pickup_grp((array) ($_POST['set_products'][$name] ?? [])) : '';
+        q('REPLACE INTO inv_set_map (inv_name, mode, product_ids, updated_by) VALUES (?, ?, ?, ?)',
+          'ssss', [$name, $mode, $grp, $who]);
     }
-    foreach ((array) ($_POST['part_product'] ?? []) as $partId => $pid) {
+    foreach ((array) ($_POST['part_seen'] ?? []) as $partId => $_) {
         $partId = (int) $partId;
-        if ($partId <= 0 || $pid === '') {
-            continue;   // "— เลือก —" = ยังไม่ตัดสินใจ ไม่บันทึก
+        $picked = (array) ($_POST['part_products'][$partId] ?? []);
+        if ($partId <= 0 || !$picked) {
+            continue;   // ยังไม่ได้เลือกอะไรเลย = ยังไม่ตัดสินใจ ไม่บันทึก
         }
-        q('REPLACE INTO inv_part_map (inv_part_id, product_id, updated_by) VALUES (?, ?, ?)',
-          'iis', [$partId, (int) $pid > 0 ? (int) $pid : null, $who]);
+        // ติ๊ก "ไม่ใช่เครื่อง" (ค่า 0) = ไม่ติดตาม — รุ่นอื่นที่ติ๊กพร้อมกันไม่นับ
+        $grp = in_array('0', $picked, true) ? '' : inv_pickup_grp($picked);
+        $per = (float) str_replace(',', '.', (string) ($_POST['part_per'][$partId] ?? '1'));
+        q('REPLACE INTO inv_part_map (inv_part_id, product_ids, per_unit, updated_by) VALUES (?, ?, ?, ?)',
+          'isds', [$partId, $grp, $per > 0 ? min($per, 999) : 1, $who]);
     }
     flash_set('บันทึกการผูกรุ่นแล้ว');
     header('Location: ' . $B . '/inv_pickup_map.php');
@@ -59,15 +64,25 @@ $r = db()->query('SELECT id, name FROM products WHERE is_active = 1 ORDER BY nam
 while ($x = $r->fetch_row()) {
     $products[(int) $x[0]] = (string) $x[1];
 }
-$productOptions = function (?int $sel, bool $allowNone) use ($products) {
-    $h = '<option value="">— เลือก —</option>';
+/**
+ * ช่องเลือกรุ่น (ติ๊กได้หลายรุ่น) — กางเป็นรายการติ๊กใต้ปุ่ม ไม่ใช้ <select multiple> ที่ใช้ยากบนมือถือ
+ *
+ * @param string $field     ชื่อ input (ต่อท้าย [] เอง)
+ * @param int[]  $sel       รุ่นที่เลือก
+ * @param bool   $allowNone มีตัวเลือก "ไม่ใช่เครื่อง"
+ * @param bool   $noneSel   เลือก "ไม่ใช่เครื่อง" อยู่
+ */
+$modelPicker = function (string $field, array $sel, bool $allowNone, bool $noneSel = false) use ($products) {
+    $names = array_values(array_filter(array_map(function ($id) use ($products) { return $products[$id] ?? null; }, $sel)));
+    $sum = $noneSel ? 'ไม่ใช่เครื่อง' : ($names ? implode(' / ', $names) : '— เลือกรุ่น —');
+    $h = '<details class="im-pick"><summary>' . h($sum) . '</summary><div class="im-pick-list">';
     if ($allowNone) {
-        $h .= '<option value="0"' . ($sel === 0 ? ' selected' : '') . '>ไม่ใช่เครื่อง (ไม่ติดตาม)</option>';
+        $h .= '<label class="im-none"><input type="checkbox" name="' . h($field) . '[]" value="0"' . ($noneSel ? ' checked' : '') . '> ไม่ใช่เครื่อง (ไม่ติดตาม)</label>';
     }
     foreach ($products as $id => $name) {
-        $h .= '<option value="' . $id . '"' . ($sel === $id ? ' selected' : '') . '>' . h($name) . '</option>';
+        $h .= '<label><input type="checkbox" name="' . h($field) . '[]" value="' . $id . '"' . (in_array($id, $sel, true) ? ' checked' : '') . '> ' . h($name) . '</label>';
     }
-    return $h;
+    return $h . '</div></details>';
 };
 
 page_header('ผูกใบเบิก inventory กับรุ่น', true, 'ทำครั้งเดียว — ใช้แยกใบเบิกผลิตเป็นรุ่นในหน้า "ใบเบิกรอผลิต"');
@@ -93,7 +108,8 @@ page_header('ผูกใบเบิก inventory กับรุ่น', true,
       <tr><th>ในระบบ inventory</th><th class="num-col">ใบ (1 ปี)</th><th>วิธีนับ</th><th>รุ่นของเรา</th></tr>
       <?php foreach ($rows['sets'] as $s) {
           $mode = $s['mode'] !== '' ? $s['mode'] : (stripos($s['name'], 'accessor') !== false ? 'parts' : 'set');
-          $sel = $s['product_id'] !== null ? (int) $s['product_id'] : ($s['saved'] ? null : inv_pickup_suggest_product($s['name'], $products));
+          $sug = $s['saved'] ? null : inv_pickup_suggest_product($s['name'], $products);
+          $sel = $s['grp'] !== '' ? inv_pickup_grp_ids($s['grp']) : ($sug ? [$sug] : []);
           $k = h($s['name']); ?>
       <tr class="<?= $s['saved'] ? '' : 'im-new' ?>">
         <td><b><?= $k ?></b><?= $s['saved'] ? '' : ' <span class="im-badge">ยังไม่บันทึก</span>' ?><div class="muted" style="font-size:12px">ล่าสุด <?= h(date('d/m/Y', strtotime($s['last']))) ?></div></td>
@@ -103,7 +119,7 @@ page_header('ผูกใบเบิก inventory กับรุ่น', true,
           <option value="parts"<?= $mode === 'parts' ? ' selected' : '' ?>>แยกรายชิ้น</option>
           <option value="ignore"<?= $mode === 'ignore' ? ' selected' : '' ?>>ไม่ติดตาม</option>
         </select></td>
-        <td><select name="set_product[<?= $k ?>]" class="im-prod"<?= $mode !== 'set' ? ' hidden' : '' ?>><?= $productOptions($sel, false) ?></select>
+        <td><div class="im-prod"<?= $mode !== 'set' ? ' hidden' : '' ?>><?= $modelPicker('set_products[' . $s['name'] . ']', $sel, false) ?></div>
           <span class="muted im-parts-note"<?= $mode === 'parts' ? '' : ' hidden' ?>>ผูกรายอะไหล่ด้านล่าง</span></td>
       </tr>
       <?php } ?>
@@ -113,15 +129,18 @@ page_header('ผูกใบเบิก inventory กับรุ่น', true,
   <?php if ($rows['parts']) { ?>
   <div class="panel">
     <h3 style="margin:0 0 4px">อะไหล่ในใบแบบแยกรายชิ้น</h3>
-    <p class="muted" style="margin:0 0 10px;font-size:12.5px">ของสำเร็จรูปที่เป็นเครื่องของเรา → เลือกรุ่น · ของที่ไม่ใช่เครื่อง (สายคล้อง กล่อง PCB) → "ไม่ใช่เครื่อง"</p>
+    <p class="muted" style="margin:0 0 10px;font-size:12.5px">ของสำเร็จรูปที่เป็นเครื่องของเรา → ติ๊กรุ่น (ใช้ได้หลายรุ่นติ๊กได้หลายอัน) · ของที่ไม่ใช่เครื่อง (สายคล้อง กล่อง PCB) → "ไม่ใช่เครื่อง"<br><b>ชิ้นต่อเครื่อง</b> — ใช้ 2 ชิ้นต่อ 1 เครื่อง ใส่ 2 · จำนวนเครื่อง = ชิ้นที่เบิก ÷ ชิ้นต่อเครื่อง</p>
     <div class="table-wrap"><table class="list im-table">
-      <tr><th>อะไหล่ใน inventory</th><th class="num-col">ใบ</th><th>รุ่นของเรา</th></tr>
+      <tr><th>อะไหล่ใน inventory</th><th class="num-col">ใบ</th><th>รุ่นของเรา</th><th>ชิ้นต่อเครื่อง</th></tr>
       <?php foreach ($rows['parts'] as $p) {
-          $sel = $p['saved'] ? ($p['product_id'] !== null ? (int) $p['product_id'] : 0) : inv_pickup_suggest_product($p['name'], $products); ?>
+          $sug = $p['saved'] ? null : inv_pickup_suggest_product($p['name'], $products);
+          $sel = $p['grp'] !== '' ? inv_pickup_grp_ids($p['grp']) : ($sug ? [$sug] : []);
+          $none = $p['saved'] && $p['grp'] === ''; ?>
       <tr class="<?= $p['saved'] ? '' : 'im-new' ?>">
         <td><?= h($p['name']) ?><?= $p['saved'] ? '' : ' <span class="im-badge">ยังไม่บันทึก</span>' ?><div class="muted" style="font-size:12px"><?= h(implode(', ', array_unique($p['sets']))) ?></div></td>
         <td class="num-col"><?= (int) $p['docs'] ?></td>
-        <td><select name="part_product[<?= (int) $p['part_id'] ?>]"><?= $productOptions($sel, true) ?></select></td>
+        <td><input type="hidden" name="part_seen[<?= (int) $p['part_id'] ?>]" value="1"><?= $modelPicker('part_products[' . (int) $p['part_id'] . ']', $sel, true, $none) ?></td>
+        <td><input type="number" name="part_per[<?= (int) $p['part_id'] ?>]" value="<?= h((string) (0 + $p['per_unit'])) ?>" min="0.01" step="any" class="im-per" aria-label="ชิ้นต่อเครื่อง"></td>
       </tr>
       <?php } ?>
     </table></div>
@@ -146,6 +165,19 @@ document.querySelectorAll('.im-mode').forEach(function (s) {
     tr.querySelector('.im-parts-note').hidden = s.value !== 'parts';
   });
 });
+document.querySelectorAll('.im-pick').forEach(function (d) {
+  d.addEventListener('change', function (e) {
+    var boxes = [].slice.call(d.querySelectorAll('input[type=checkbox]'));
+    if (e.target.value === '0' && e.target.checked) {
+      boxes.forEach(function (b) { if (b.value !== '0') { b.checked = false; } });
+    } else if (e.target.checked) {
+      boxes.forEach(function (b) { if (b.value === '0') { b.checked = false; } });
+    }
+    var on = boxes.filter(function (b) { return b.checked; });
+    d.querySelector('summary').textContent = !on.length ? '— เลือกรุ่น —'
+      : on.map(function (b) { return b.value === '0' ? 'ไม่ใช่เครื่อง' : b.parentNode.textContent.trim(); }).join(' / ');
+  });
+});
 </script>
 <?php } ?>
 <style>
@@ -155,5 +187,13 @@ document.querySelectorAll('.im-mode').forEach(function (s) {
 .im-since { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-weight: 600; }
 .im-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 20px; }
 .im-table [hidden] { display: none !important; }
+.im-pick { position: relative; min-width: 0; }
+.im-pick summary { cursor: pointer; padding: 6px 10px; border: 1px solid var(--border, #d9d4e6); border-radius: 8px; background: var(--surface, #fff); list-style: none; overflow-wrap: anywhere; }
+.im-pick summary::-webkit-details-marker { display: none; }
+.im-pick summary::after { content: ' ▾'; color: var(--muted, #6b7280); }
+.im-pick-list { max-height: 260px; overflow: auto; border: 1px solid var(--border, #d9d4e6); border-radius: 8px; margin-top: 4px; padding: 4px 8px; background: var(--surface, #fff); }
+.im-pick-list label { display: flex; gap: 8px; align-items: center; padding: 4px 0; font-weight: 400; }
+.im-pick-list .im-none { border-bottom: 1px dashed var(--border, #e5e7eb); margin-bottom: 4px; padding-bottom: 6px; }
+.im-per { width: 76px; }
 </style>
 <?php page_footer(); ?>
