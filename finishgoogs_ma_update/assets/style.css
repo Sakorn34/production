@@ -1367,3 +1367,26 @@ html.fgs-open, html.fgs-open body { overflow: hidden; }
 /* โปรไฟล์เครื่อง: ผลิตจากใบเบิก inventory / ไม่ผ่านใบเบิก */
 .asset-inv-note { margin: 8px 0 12px; font-size: calc(13px * var(--font-scale, 1)); }
 .asset-inv-note.is-warn { background: #fffbeb; color: #854d0e; border: 1px solid #fde68a; border-radius: 8px; padding: 8px 12px; }
+
+/* ถ่ายรูปหลายเครื่อง (assets/photo-serials.js) */
+.fps-overlay { position: fixed; inset: 0; z-index: 90; background: rgba(20, 12, 36, .55); display: flex; align-items: center; justify-content: center; padding: 12px; }
+.fps-overlay[hidden] { display: none !important; }
+.fps-box { background: var(--surface, #fff); border-radius: 14px; width: min(560px, 100%); max-height: calc(100vh - 24px); display: flex; flex-direction: column; padding: 14px 16px; gap: 8px; }
+.fps-head { display: flex; justify-content: space-between; align-items: center; font-size: calc(16px * var(--font-scale, 1)); }
+.fps-x { border: 0; background: none; font-size: 18px; cursor: pointer; color: var(--muted, #6b7280); min-height: 0; padding: 4px 8px; }
+.fps-tip { margin: 0; font-size: calc(12.5px * var(--font-scale, 1)); color: var(--muted, #6b7280); }
+.fps-pick { display: flex; gap: 8px; flex-wrap: wrap; }
+.fps-pick label { cursor: pointer; }
+.fps-status { margin: 0; font-size: calc(13px * var(--font-scale, 1)); min-height: 1.4em; }
+.fps-list { overflow: auto; flex: 1; min-height: 0; }
+.fps-row { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--border, #eee); }
+.fps-cb { width: 20px; height: 20px; flex: 0 0 auto; }
+.fps-thumb { width: 120px; max-width: 34vw; border-radius: 6px; border: 1px solid var(--border, #e5e7eb); flex: 0 0 auto; background: #fff; }
+.fps-main { flex: 1; min-width: 0; }
+.fps-code { width: 100%; min-width: 0; font-family: ui-monospace, monospace; font-size: calc(14px * var(--font-scale, 1)); }
+.fps-tags { margin-top: 3px; display: flex; gap: 4px; flex-wrap: wrap; }
+.fps-tag { font-size: 11.5px; border-radius: 6px; padding: 0 6px; }
+.fps-tag.is-ok { background: #dcfce7; color: #166534; }
+.fps-tag.is-check { background: #fef3c7; color: #854d0e; }
+.fps-tag.is-dup { background: #fee2e2; color: #991b1b; }
+.fps-foot { display: flex; justify-content: flex-end; }

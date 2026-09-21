@@ -143,6 +143,13 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fields') {
     require_once __DIR__ . '/includes/inv_pickup.php';
     $out['inv_open'] = [];
     $out['inv_tracked'] = inv_pickup_is_tracked((int) $pid);
+    // ตัวอย่างรหัสล่าสุดของรุ่น — ปุ่ม "ถ่ายรูปหลายเครื่อง" ใช้เดารูปแบบรหัส (ตัวอักษร/ตัวเลขแต่ละตำแหน่ง + ส่วนต้นที่เหมือนกัน)
+    // เพื่อแก้ตัวที่อ่านจากตัวหนังสือพลาดบ่อย (O/0 · D/0 · S/5)
+    $out['serial_samples'] = [];
+    $ss = qr('SELECT asset_code FROM assets WHERE product_id = ? ORDER BY id DESC LIMIT 40', 'i', [$pid]);
+    while ($x = $ss->fetch_row()) {
+        $out['serial_samples'][] = (string) $x[0];
+    }
     $invData = inv_pickup_load();
     foreach ($invData['items'] as $it) {
         if ($it['state'] === 'ready' && in_array((int) $pid, $it['products'], true)) {
@@ -521,6 +528,8 @@ page_header('บันทึกเครื่องผลิตใหม่');
         <div class="unit-actions">
           <button type="button" class="btn btn-line btn-sm" id="add-unit" onclick="addUnit()" disabled><?= ui_btn_label('plus', 'เพิ่มเครื่อง') ?></button>
           <button type="button" class="btn btn-line btn-sm" id="scan-units" onclick="scanUnits(null)" hidden><?= ui_btn_label('scan', 'สแกนต่อเนื่อง') ?></button>
+          <?php // ป้ายที่สแกนสดอ่านยาก (บาร์โค้ดเส้นถี่) — ถ่ายรูปนิ่งทีละหลายเครื่องแล้วอ่านจากรูปแทน ?>
+          <button type="button" class="btn btn-line btn-sm" id="photo-units" onclick="photoUnits()" hidden><?= ui_btn_label('camera', 'ถ่ายรูปหลายเครื่อง') ?></button>
         </div>
         <input type="hidden" name="gen_count" id="gen_count" value="0">
       </div>
@@ -598,6 +607,7 @@ page_header('บันทึกเครื่องผลิตใหม่');
 </div>
 
 <script src="<?= BASE_URL ?>/assets/ma-snippets.js?v=<?= @filemtime(__DIR__ . '/assets/ma-snippets.js') ?: time() ?>"></script>
+<script src="<?= BASE_URL ?>/assets/photo-serials.js?v=<?= @filemtime(__DIR__ . '/assets/photo-serials.js') ?: time() ?>"></script>
 <script>
 var cfg = null, unitCount = 0;
 var BASE = '<?= BASE_URL ?>';
@@ -643,6 +653,7 @@ function loadProduct(pid){
       cfg = d;
       document.getElementById('add-unit').disabled = false;
       document.getElementById('scan-units').hidden = d.mode === 'generated';
+      document.getElementById('photo-units').hidden = d.mode === 'generated';
       document.getElementById('save-btn').disabled = false;
       document.getElementById('unit-hint').textContent = d.mode === 'generated'
         ? '(ระบบออกเลข running อัตโนมัติ — รหัสเครื่องจริงยืนยันตอนกดบันทึก)'
@@ -1273,6 +1284,27 @@ document.getElementById('unit-list').addEventListener('click', function(e){
 // ---------- สแกนรหัสเครื่องเข้าช่องกรอก (ตัวสแกนชุดเดียวทั้งระบบ assets/scan-field.js) ----------
 // เปิดกล้องค้างไว้ สแกนทีละเครื่องได้ต่อกัน: ใส่ช่องว่างถัดไปหรือเพิ่มแถวให้เอง
 // รหัสซ้ำในชุดนี้ = เตือนแล้วข้าม · รหัสที่ลงทะเบียนในระบบแล้ว = เตือนสีแดงพร้อมบอกว่าเป็นเครื่องอะไร ไม่ใส่ลงรายการ
+/** ถ่ายรูปหลายเครื่อง → ตรวจรายการ → เติมลงช่องว่าง (ไม่พอก็เพิ่มแถว) */
+function photoUnits(){
+  if (!cfg || cfg.mode === 'generated' || !window.FgPhotoSerials) return;
+  FgPhotoSerials.open({
+    samples: cfg.serial_samples || [],
+    check: serialCheck,
+    existing: serialInputs().map(function(i){ return i.value.trim(); }).filter(Boolean),
+    onAdd: function(codes){
+      codes.forEach(function(code){
+        var target = serialInputs().filter(function(i){ return i.value.trim() === ''; })[0];
+        if (!target) { addUnit(true); var all = serialInputs(); target = all[all.length - 1]; }
+        target.value = code;
+        markRowExisting(target, null);
+        target.dispatchEvent(new Event('input', { bubbles: true }));
+        target.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      updateProdSnippets();
+      refreshPreviews();
+    }
+  });
+}
 function scanUnits(btn){
   if (!cfg || cfg.mode === 'generated' || !window.FgScan) return;
   var row = btn && btn.closest ? btn.closest('.unit-row') : null;
