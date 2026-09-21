@@ -818,6 +818,79 @@ switch ($type) {
         render_stock_today_table($rows, $partsBase);
         break;
 
+    case 'inv_pickup_model': // Dashboard: popup รายละเอียดใบเบิกของกลุ่มรุ่น (v = "1-3")
+        require_once __DIR__ . '/includes/inv_pickup.php';
+        $grp = inv_pickup_grp((string) $v);
+        $d = inv_pickup_load();
+        if (!$d['ok']) {
+            echo '<p class="muted">ต่อระบบ inventory ไม่ได้: ' . h($d['error']) . '</p>';
+            break;
+        }
+        $list = array_values(array_filter($d['items'], function ($it) use ($grp) { return $it['grp'] === $grp && $it['state'] === 'ready'; }));
+        if (!$list) {
+            echo '<p class="muted">ไม่มีของรอผลิตของรุ่นนี้แล้ว</p>';
+            break;
+        }
+        $pids = $list[0]['products'];
+        $prods = [];
+        $pr = db()->query('SELECT id, name, icon_path FROM products WHERE id IN (' . implode(',', array_map('intval', $pids)) . ')');
+        while ($x = $pr->fetch_assoc()) {
+            $prods[(int) $x['id']] = $x;
+        }
+        $icon = '';
+        foreach ($pids as $p) {
+            if (!empty($prods[$p]['icon_path'])) {
+                $icon = $prods[$p]['icon_path'];
+                break;
+            }
+        }
+        $left = array_sum(array_column($list, 'left'));
+        $B = BASE_URL;
+        echo '<div class="pk-pop">';
+        echo '<div class="pk-pop-head">' . ($icon ? img_tag($icon, $list[0]['model'], 'pk-pop-img') : '<span class="pk-pop-img pk-noimg"></span>')
+            . '<div><b class="pk-pop-name">' . h($list[0]['model']) . '</b><div class="muted">รอผลิต <b>' . number_format($left) . '</b> เครื่อง · ' . count($list) . ' ใบเบิก</div></div></div>';
+        echo '<div class="table-wrap"><table class="list pk-pop-table"><tr><th>ใบเบิก</th><th>ผู้เบิก</th><th class="num-col">เบิก</th><th class="num-col">ผลิตแล้ว</th><th class="num-col">เหลือ</th></tr>';
+        foreach ($list as $it) {
+            $label = $it['kind'] === 'parts' ? implode(', ', array_unique($it['parts'])) : $it['set'];
+            echo '<tr><td><a href="' . h($B . '/inv_pickups.php?pre=' . rawurlencode($it['pre_id']) . '&grp=' . $it['grp']) . '">'
+                . h(date('d/m', strtotime($it['date']))) . ' · ' . h($it['pre_id']) . '</a><div class="muted" style="font-size:12px">' . h($label) . '</div></td>'
+                . '<td>' . h($it['by']) . '</td><td class="num-col">' . (int) $it['qty'] . '</td><td class="num-col">' . (int) $it['done'] . '</td>'
+                . '<td class="num-col"><b>' . (int) $it['left'] . '</b></td></tr>';
+        }
+        echo '</table></div>';
+        // ของที่คลังยังไม่จ่าย + อะไหล่ที่จ่ายแล้ว (รวมทุกใบของรุ่นนี้)
+        $missing = [];
+        $got = [];
+        foreach ($list as $it) {
+            foreach ($it['missing'] as $m) {
+                $missing[$m] = true;
+            }
+            foreach ($d['docs'][$it['pre_id']]['lines'] as $ln) {
+                // ใบแยกชิ้น: นับเฉพาะอะไหล่ของรุ่นนี้ (ใบเดียวกันมีของรุ่นอื่น/สายคล้องปนอยู่)
+                $mine = $it['kind'] !== 'parts' || array_filter($it['parts'], function ($p) use ($ln) { return strpos($p, $ln['name']) === 0; });
+                if ($ln['got'] > 0 && $mine) {
+                    $got[$ln['name']] = ($got[$ln['name']] ?? 0) + $ln['got'];
+                }
+            }
+        }
+        if ($missing) {
+            echo '<p class="pk-pop-warn">คลังยังไม่ได้จ่าย: ' . h(implode(' · ', array_keys($missing))) . '</p>';
+        }
+        if ($got) {
+            $parts = [];
+            foreach ($got as $n => $q) {
+                $parts[] = h($n) . ' ×' . (0 + $q);
+            }
+            echo '<p class="muted pk-pop-parts">อะไหล่ที่คลังจ่ายแล้ว: ' . implode(' · ', $parts) . '</p>';
+        }
+        echo '<div class="pk-pop-btns">';
+        foreach ($pids as $p) {
+            $nm = $prods[$p]['name'] ?? ('#' . $p);
+            echo '<a class="btn btn-sm" href="' . h($B . '/asset_new.php?product=' . $p) . '">' . ui_btn_label('assets', count($pids) > 1 ? ' ลงทะเบียน ' . $nm : ' ลงทะเบียนเครื่องรุ่นนี้') . '</a>';
+        }
+        echo '</div></div>';
+        break;
+
     case 'inv_pickup_summary': // Dashboard: การ์ดใบเบิก inventory + คอลัมน์ "เบิกแล้ว รอผลิต" ในตารางรุ่น (JSON)
         require_once __DIR__ . '/includes/inv_pickup.php';
         header('Content-Type: application/json; charset=utf-8');
@@ -851,6 +924,42 @@ switch ($type) {
             }
         }
         $out['ready_models'] = count($groups);
+        // รายรุ่นสำหรับการ์ด (แบบ ก) — กลุ่มรุ่นที่รอผลิต เรียงเหลือมากสุดก่อน
+        $icons = [];
+        $ir = db()->query('SELECT id, icon_path FROM products');
+        while ($x = $ir->fetch_row()) {
+            $icons[(int) $x[0]] = (string) $x[1];
+        }
+        $models = [];
+        foreach ($d['items'] as $it) {
+            if ($it['state'] !== 'ready') {
+                continue;
+            }
+            $g = $it['grp'];
+            if (!isset($models[$g])) {
+                $icon = '';
+                foreach ($it['products'] as $p) {
+                    if (!empty($icons[$p])) {
+                        $icon = (string) img_url($icons[$p]);
+                        break;
+                    }
+                }
+                $models[$g] = ['grp' => $g, 'name' => $it['model'], 'icon' => $icon, 'left' => 0, 'docs' => 0, 'oldest' => $it['date'], 'missing' => []];
+            }
+            $models[$g]['left'] += $it['left'];
+            $models[$g]['docs']++;
+            $models[$g]['oldest'] = min($models[$g]['oldest'], $it['date']);
+            foreach ($it['missing'] as $m) {
+                $models[$g]['missing'][preg_replace('/\s*\(.*$/u', '', $m)] = true;
+            }
+        }
+        usort($models, function ($a, $b) { return [$b['left'], $a['name']] <=> [$a['left'], $b['name']]; });
+        foreach ($models as &$m) {
+            $m['oldest'] = date('d/m', strtotime($m['oldest']));
+            $m['missing'] = array_keys($m['missing']);
+        }
+        unset($m);
+        $out['models'] = $models;
         $out['oldest'] = $out['oldest'] !== '' ? date('d/m', strtotime($out['oldest'])) : '';
         $out['waiting'] = count($waitingDocs);
         if ($waitingDocs) {

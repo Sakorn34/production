@@ -450,16 +450,16 @@ $partsBase = ui_parts_base_url();
 <?php // ใบเบิกจากระบบ inventory (แบบ ก · 21 ก.ย. 2026) — โหลดทีหลังหน้า (dashboard_data ?type=inv_pickup_summary)
       // ยังไม่ได้ตั้งค่า/ต่อ inventory ไม่ได้ = ไม่ขึ้นเลย ?>
 <div class="panel dash-pickup" id="dash-pickup" hidden>
-  <div class="panel-head-row"><h3>ใบเบิกจาก inventory <span class="muted panel-meta" id="dash-pk-since"></span></h3>
+  <div class="panel-head-row"><h3>ของที่เบิกมาแล้ว รอผลิต <span class="muted panel-meta" id="dash-pk-since"></span></h3>
     <a class="dash-pk-all" href="<?= h($B) ?>/inv_pickups.php">ดูทั้งหมด ›</a></div>
-  <div class="dash-pk-tiles">
-    <a class="dash-pk-tile" href="<?= h($B) ?>/inv_pickups.php?tab=ready"><span class="dash-pk-label">เบิกแล้ว รอผลิต</span>
-      <span class="dash-pk-num"><b id="dash-pk-ready">—</b> เครื่อง</span><span class="dash-pk-sub" id="dash-pk-ready-sub"></span></a>
-    <a class="dash-pk-tile" href="<?= h($B) ?>/inv_pickups.php?tab=waiting"><span class="dash-pk-label">รอคลังจ่าย</span>
-      <span class="dash-pk-num"><b id="dash-pk-waiting">—</b> ใบ</span><span class="dash-pk-sub" id="dash-pk-waiting-sub"></span></a>
-    <a class="dash-pk-tile is-warn" href="<?= h($B) ?>/inv_pickups.php?tab=unmatched"><span class="dash-pk-label">ไม่ผ่านใบเบิก</span>
-      <span class="dash-pk-num"><b id="dash-pk-unmatched">—</b> เครื่อง</span><span class="dash-pk-sub" id="dash-pk-unmatched-sub"></span></a>
+  <div class="dash-pk-stats">
+    <a class="dash-pk-stat" href="<?= h($B) ?>/inv_pickups.php?tab=ready"><b id="dash-pk-ready">—</b> เครื่อง · <span id="dash-pk-models">—</span> รุ่น</a>
+    <a class="dash-pk-stat" href="<?= h($B) ?>/inv_pickups.php?tab=waiting">รอคลังจ่าย <b id="dash-pk-waiting">—</b> ใบ</a>
+    <a class="dash-pk-stat is-warn" id="dash-pk-unmatched-pill" href="<?= h($B) ?>/inv_pickups.php?tab=unmatched"
+       title="เครื่องที่ลงทะเบียนตอนรุ่นนั้นไม่มีใบเบิกจาก inventory ค้างอยู่ — จับคู่กับใบเบิกทีหลังได้">ลงทะเบียนโดยไม่มีใบเบิก <b id="dash-pk-unmatched">—</b></a>
   </div>
+  <div class="dash-pk-list" id="dash-pk-list"></div>
+  <a class="dash-pk-more" id="dash-pk-more" href="<?= h($B) ?>/inv_pickups.php" hidden></a>
 </div>
 
 <div class="panel" id="dash-inventory-panel">
@@ -725,15 +725,33 @@ $partsBase = ui_parts_base_url();
     .then(function (d) {
       if (!d || !d.ok) { return; }
       var set = function (id, v) { var el = document.getElementById(id); if (el) { el.textContent = v; } };
+      var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
       set('dash-pk-ready', fgNum(d.ready));
-      set('dash-pk-ready-sub', d.ready ? fgNum(d.ready_models) + ' รุ่น · ใบเก่าสุด ' + d.oldest : 'ไม่มีของรอผลิต');
+      set('dash-pk-models', fgNum(d.ready_models));
       set('dash-pk-waiting', fgNum(d.waiting));
-      set('dash-pk-waiting-sub', d.waiting ? 'ล่าสุด ' + d.waiting_last + (d.waiting_by ? ' · ' + d.waiting_by : '') : 'คลังจ่ายครบแล้ว');
       set('dash-pk-unmatched', fgNum(d.unmatched));
-      set('dash-pk-unmatched-sub', d.unmatched ? 'ตั้งแต่ ' + d.since + ' · กดเพื่อจับคู่' : 'ทุกเครื่องผ่านใบเบิก');
       set('dash-pk-since', 'ติดตามตั้งแต่ ' + d.since);
+      document.getElementById('dash-pk-unmatched-pill').hidden = !d.unmatched;
+      // รายรุ่น 5 อันดับแรก — กดแถวเปิด popup รายละเอียด (ใบเบิก · ของที่ยังไม่จ่าย · อะไหล่ที่จ่ายแล้ว)
+      var SHOW = 5, list = document.getElementById('dash-pk-list'), models = d.models || [];
+      list.innerHTML = models.length ? models.slice(0, SHOW).map(function (m) {
+        return '<button type="button" class="dash-pk-row" data-grp="' + esc(m.grp) + '" data-name="' + esc(m.name) + '">'
+          + (m.icon ? '<img src="' + esc(m.icon) + '" alt="" class="dash-pk-img" loading="lazy">' : '<span class="dash-pk-img dash-pk-noimg"></span>')
+          + '<span class="dash-pk-nm"><b>' + esc(m.name) + '</b>'
+          + (m.missing.length ? ' <span class="dash-pk-miss">' + esc(m.missing.slice(0, 2).join(', ')) + ' ยังไม่จ่าย</span>' : '')
+          + '<small>' + m.docs + ' ใบ · ' + (m.docs > 1 ? 'เก่าสุด ' : '') + esc(m.oldest) + '</small></span>'
+          + '<span class="dash-pk-q"><b>' + fgNum(m.left) + '</b>เครื่อง</span></button>';
+      }).join('') : '<p class="muted" style="margin:6px 0 0">ไม่มีของที่เบิกมารอผลิต</p>';
+      var more = document.getElementById('dash-pk-more');
+      more.hidden = models.length <= SHOW;
+      more.textContent = '+ อีก ' + (models.length - SHOW) + ' รุ่น ›';
+      list.onclick = function (e) {
+        var b = e.target.closest('.dash-pk-row');
+        if (!b) { return; }
+        showListModal(b.getAttribute('data-name'), fgBase + '?type=inv_pickup_model&v=' + encodeURIComponent(b.getAttribute('data-grp')), '<?= h($B) ?>/inv_pickups.php');
+      };
       var box = document.getElementById('dash-pickup');
-      if (box) { box.hidden = false; box.querySelector('.dash-pk-tile.is-warn').classList.toggle('is-zero', !d.unmatched); }
+      if (box) { box.hidden = false; }
       modelCards.forEach(function (row) {
         var c = row.querySelector('[data-fg-cell="pick"]');
         var v = d.by_pid[row.getAttribute('data-pid')];

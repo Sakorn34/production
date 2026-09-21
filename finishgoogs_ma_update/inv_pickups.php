@@ -172,7 +172,7 @@ if (!$data['ok']) { ?>
   <?php foreach (['ready' => 'รอผลิต', 'waiting' => 'รอคลังจ่าย', 'done' => 'ผลิตครบ'] as $k => $label) { ?>
   <a class="ip-tab<?= $tab === $k ? ' is-on' : '' ?>" href="?tab=<?= $k ?>" role="tab" aria-selected="<?= $tab === $k ? 'true' : 'false' ?>"><?= $label ?> (<?= count($byModel[$k]) ?> รุ่น)</a>
   <?php } ?>
-  <a class="ip-tab ip-tab-warn<?= $tab === 'unmatched' ? ' is-on' : '' ?>" href="?tab=unmatched" role="tab" aria-selected="<?= $tab === 'unmatched' ? 'true' : 'false' ?>">ไม่ผ่านใบเบิก (<?= count($unmatched) ?> เครื่อง)</a>
+  <a class="ip-tab ip-tab-warn<?= $tab === 'unmatched' ? ' is-on' : '' ?>" href="?tab=unmatched" role="tab" aria-selected="<?= $tab === 'unmatched' ? 'true' : 'false' ?>">ลงทะเบียนโดยไม่มีใบเบิก (<?= count($unmatched) ?>)</a>
 </div>
 
 <?php if ($tab === 'unmatched') {

@@ -375,7 +375,7 @@ $invAlloc = inv_pickup_for_asset($id);
 if ($invAlloc) { ?>
 <p class="muted asset-inv-note">ผลิตจากใบเบิก inventory <a href="<?= BASE_URL ?>/inv_pickups.php?pre=<?= rawurlencode($invAlloc['pre_id']) ?>&amp;grp=<?= h($invAlloc['grp']) ?>"><?= h($invAlloc['pre_id']) ?></a> · <?= $invAlloc['source'] === 'manual' ? 'ตัดยอดเอง' : 'ตัดยอดอัตโนมัติ' ?> โดย <?= h((string) $invAlloc['allocated_by']) ?></p>
 <?php } elseif (inv_pickup_asset_unmatched($a + ['id' => $id])) { ?>
-<p class="asset-inv-note is-warn"><b>ไม่ผ่านใบเบิก</b> — ลงทะเบียนตอนที่รุ่นนี้ไม่มีใบเบิกจาก inventory ค้างอยู่
+<p class="asset-inv-note is-warn"><b>ลงทะเบียนโดยไม่มีใบเบิก</b> — ตอนลงทะเบียน รุ่นนี้ไม่มีใบเบิกจาก inventory ค้างอยู่
   · <a href="<?= BASE_URL ?>/inv_pickups.php?tab=unmatched">จับคู่กับใบเบิก ›</a></p>
 <?php } ?>
 <?php if ($partAlertsHtml) { ?>

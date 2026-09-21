@@ -1008,7 +1008,7 @@ function buildConfirm(){
   invBox.hidden = !open.length && !noSlip;
   invBox.classList.toggle('is-warn', !!noSlip);
   if (noSlip) {
-    invBox.innerHTML = '<b>รุ่นนี้ไม่มีใบเบิกจาก inventory ค้างอยู่</b><br>จะบันทึกแบบ<b>ไม่ผ่านใบเบิก</b> — ถ้ามีใบเบิกอยู่แล้ว จับคู่ทีหลังได้ที่หน้าใบเบิกรอผลิต แท็บ "ไม่ผ่านใบเบิก"';
+    invBox.innerHTML = '<b>รุ่นนี้ไม่มีใบเบิกจาก inventory ค้างอยู่</b><br>จะบันทึกเป็น<b>ลงทะเบียนโดยไม่มีใบเบิก</b> — ถ้ามีใบเบิกอยู่แล้ว จับคู่ทีหลังได้ที่หน้าใบเบิกรอผลิต แท็บ "ลงทะเบียนโดยไม่มีใบเบิก"';
   }
   if (open.length) {
     var need = mcount, rows = [];
