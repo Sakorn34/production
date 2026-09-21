@@ -368,6 +368,13 @@ page_header('เครื่อง ' . $a['asset_code'], false);
   <?= asset_stockparts_withdraw_card_html($stockWithdraw) ?>
   <?php } ?>
 </div>
+<?php
+// ใบเบิกผลิตจาก inventory ที่เครื่องนี้ถูกตัดยอด (ตารางมีเมื่อเปิดใช้ฟีเจอร์ใบเบิกแล้ว)
+require_once __DIR__ . '/includes/inv_pickup.php';
+$invAlloc = inv_pickup_for_asset($id);
+if ($invAlloc) { ?>
+<p class="muted asset-inv-note">ผลิตจากใบเบิก inventory <a href="<?= BASE_URL ?>/inv_pickups.php?pre=<?= rawurlencode($invAlloc['pre_id']) ?>&amp;product=<?= (int) $invAlloc['product_id'] ?>"><?= h($invAlloc['pre_id']) ?></a> · <?= $invAlloc['source'] === 'manual' ? 'ตัดยอดเอง' : 'ตัดยอดอัตโนมัติ' ?> โดย <?= h((string) $invAlloc['allocated_by']) ?></p>
+<?php } ?>
 
 <?php if ($partAlertsHtml) { ?>
 <div style="margin-bottom:16px"><?= $partAlertsHtml ?></div>

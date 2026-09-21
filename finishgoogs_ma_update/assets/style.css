@@ -1359,4 +1359,7 @@ html.fgs-open, html.fgs-open body { overflow: hidden; }
 /* หน้ายืนยันบันทึกผลิต: ช่องติ๊กย้ายไประบบเช่า (รุ่นที่เปิดไว้ในหลังบ้าน) */
 .confirm-lease { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; padding: 12px 14px; border-radius: 10px; background: var(--info-soft, #eff6ff); border: 1px solid color-mix(in srgb, var(--info, #1d4ed8) 30%, transparent); line-height: 1.5; cursor: pointer; }
 .confirm-lease[hidden] { display: none !important; }
+/* หน้ายืนยันบันทึกผลิต: ใบเบิก inventory ที่จะตัดยอด */
+.confirm-inv { margin-top: 12px; padding: 10px 14px; border-radius: 10px; background: #f0fdf4; border: 1px solid #bbf7d0; color: #14532d; line-height: 1.6; font-size: calc(13.5px * var(--font-scale, 1)); }
+.confirm-inv[hidden] { display: none !important; }
 .confirm-lease input { width: 20px; height: 20px; margin-top: 2px; flex: 0 0 auto; }

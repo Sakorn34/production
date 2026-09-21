@@ -138,6 +138,17 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fields') {
     $lmP = qr('SELECT leasing_name, leasing_auto FROM products WHERE id = ?', 'i', [$pid])->fetch_assoc() ?: [];
     $out['leasing_auto'] = !empty($lmP['leasing_auto']) && leasing_product_block_reason($lmP) === '';
     $out['leasing_name'] = (string) ($lmP['leasing_name'] ?? '');
+    // ใบเบิกผลิตจาก inventory ที่คลังจ่ายแล้วและยังเหลือ (เก่าสุดก่อน) — หน้ายืนยันบอกว่าจะตัดยอดใบไหน
+    // ต่อ inventory ไม่ได้ = รายการว่าง ลงทะเบียนได้ตามปกติ
+    require_once __DIR__ . '/includes/inv_pickup.php';
+    $out['inv_open'] = [];
+    $invData = inv_pickup_load();
+    foreach ($invData['items'] as $it) {
+        if ($it['state'] === 'ready' && (int) $it['product_id'] === $pid) {
+            $out['inv_open'][] = ['pre_id' => $it['pre_id'], 'date' => date('d/m', strtotime($it['date'])),
+                                  'label' => $it['kind'] === 'parts' ? implode(', ', array_unique($it['parts'])) : $it['set'], 'left' => $it['left']];
+        }
+    }
     $out['made_by_input_mode'] = $std['made_by'] ? $std['made_by']['input_mode'] : 'chip_single_free';
     $out['fw_input_mode'] = $std['fw'] ? $std['fw']['input_mode'] : 'chip_single_free';
     $out['lot_input_mode'] = $std['lot'] ? $std['lot']['input_mode'] : 'chip_single_free';
@@ -433,6 +444,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
         }
     }
+    // ตัดยอดใบเบิกผลิตจาก inventory (รุ่นเดียวกัน · เก่าสุดก่อน) — ไม่มีใบให้ตัด/ต่อไม่ได้ = ข้าม ไม่กระทบการบันทึก
+    $invNote = '';
+    if ($createdIds) {
+        require_once __DIR__ . '/includes/inv_pickup.php';
+        $ia = inv_pickup_allocate($createdIds, actor_name());
+        if ($ia['allocated']) {
+            $invNote = ' · ตัดยอดใบเบิก ' . count($ia['allocated']) . ' เครื่อง';
+        }
+    }
     // ติ๊ก "ย้ายไประบบเช่าด้วย" ในหน้ายืนยัน — ย้ายเฉพาะชุดที่บันทึกสำเร็จครบ
     $leaseNote = '';
     if (!$err && $createdIds && !empty($_POST['move_to_leasing'])) {
@@ -446,7 +466,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($codes) $msg .= ' — บันทึกสำเร็จก่อนหน้านั้น: ' . implode(', ', $codes);
         flash_set($msg, 'err');
     } else {
-        flash_set('บันทึกสำเร็จ ' . count($codes) . ' เครื่อง: ' . implode(', ', $codes) . $leaseNote);
+        flash_set('บันทึกสำเร็จ ' . count($codes) . ' เครื่อง: ' . implode(', ', $codes) . $invNote . $leaseNote);
     }
     header('Location: ' . BASE_URL . ($codes ? '/assets.php?product=' . urlencode($p['name']) : '/asset_new.php'));
     exit;
@@ -566,6 +586,7 @@ page_header('บันทึกเครื่องผลิตใหม่');
     </div>
     <div id="confirm-body" style="overflow:auto; max-height:62vh"></div>
     <?php // รุ่นที่เปิด "ย้ายไประบบเช่าอัตโนมัติ" ในหลังบ้าน — ถามทุกครั้ง เอาติ๊กออกได้ถ้ารอบนี้ไม่ต้องการย้าย ?>
+    <div id="confirm-inv" class="confirm-inv" hidden></div>
     <label id="confirm-lease" class="confirm-lease" hidden><input type="checkbox" id="confirm-lease-cb" checked> <span id="confirm-lease-text"></span></label>
     <div id="confirm-error" hidden style="margin-top:10px; padding:12px 14px; background:#fff4f4; border:1px solid #f5c2c2; border-radius:8px; color:#b42318; font-size:14px; line-height:1.5; white-space:pre-wrap"></div>
     <div style="margin-top:14px; display:flex; gap:10px; justify-content:flex-end">
@@ -599,6 +620,12 @@ function pickProduct(el){
   loadProduct(el.dataset.id);
 }
 document.getElementById('produced_at').addEventListener('change', refreshPreviews);
+// มาจากปุ่ม "ลงทะเบียนเครื่องรุ่นนี้" ในหน้าใบเบิกรอผลิต — เลือกรุ่นให้เลย
+(function () {
+  var want = new URLSearchParams(location.search).get('product');
+  var el = want && document.querySelector('#prod-pick .pp[data-id="' + want.replace(/\D/g, '') + '"]');
+  if (el) { pickProduct(el); el.scrollIntoView({ block: 'nearest' }); }
+})();
 
 function loadProduct(pid){
   cfg = null; unitCount = 0;
@@ -972,6 +999,21 @@ function buildConfirm(){
   if (val('[name="note"]')) extra += rowHtml('หมายเหตุ', esc(val('[name="note"]')));
   if (extra) html += '<h3 style="margin:14px 0 6px">ตรวจสอบ / หมายเหตุ</h3><div class="table-wrap"><table class="list">' + extra + '</table></div>';
   document.getElementById('confirm-body').innerHTML = html;
+  // ตัดยอดใบเบิก: เติมจากใบเก่าสุดก่อน ตามจำนวนเครื่องที่กำลังบันทึก (ฝั่ง server คิดแบบเดียวกัน)
+  var invBox = document.getElementById('confirm-inv');
+  var open = (cfg && cfg.inv_open) || [];
+  invBox.hidden = !open.length;
+  if (open.length) {
+    var need = mcount, rows = [];
+    open.forEach(function (o) {
+      if (need <= 0) { return; }
+      var take = Math.min(need, o.left);
+      need -= take;
+      rows.push('ใบเบิก ' + esc(o.date) + ' ' + esc(o.label) + ': <b>' + take + ' เครื่อง</b> · เหลือ ' + (o.left - take));
+    });
+    invBox.innerHTML = 'ตัดยอดใบเบิกจาก inventory<br>' + rows.join('<br>')
+      + (need > 0 ? '<br><span class="muted">อีก ' + need + ' เครื่องไม่มีใบเบิกให้ตัด — บันทึกได้ตามปกติ</span>' : '');
+  }
   var lease = document.getElementById('confirm-lease');
   lease.hidden = !(cfg && cfg.leasing_auto);
   if (!lease.hidden) {

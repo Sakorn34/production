@@ -186,6 +186,72 @@ function dbLeasingError()
     }
     return (string)($GLOBALS['_dbLeasingError'] ?? 'เชื่อมต่อฐานระบบเช่าไม่ได้');
 }
+
+/**
+ * เชื่อมต่อฐานระบบ inventory (biton_inventory) — **อ่านอย่างเดียว** fail-soft ไม่ die
+ *
+ * ใบเบิกอะไหล่ผลิตเกิดที่ระบบ inventory — production แค่ดึงมาแสดงคิวผลิตและตัดยอดในฐานของเราเอง
+ * ห้ามเขียนอะไรลงฐานนี้ (ตกลงกับผู้ใช้ 2026-09-21) · ตั้งค่าที่ secrets key `inventory`
+ * แนะนำ MySQL user ที่มีสิทธิ์ SELECT อย่างเดียว
+ *
+ * @return mysqli|null
+ */
+function dbInventory()
+{
+    static $db = false;
+    static $error = '';
+    if ($db !== false) {
+        $GLOBALS['_dbInventoryError'] = $error;
+        return $db;
+    }
+    $db = null;
+    $c = db_secrets();
+    if (empty($c['inventory']) || !is_array($c['inventory'])) {
+        $error = 'ยังไม่ได้ตั้งค่า inventory ใน finishgoogs.secrets.php';
+        $GLOBALS['_dbInventoryError'] = $error;
+        return null;
+    }
+    $cfg = $c['inventory'];
+    $host = trim((string)($cfg['host'] ?? ''));
+    $user = trim((string)($cfg['user'] ?? ''));
+    $pass = (string)($cfg['pass'] ?? '');
+    $name = trim((string)($cfg['db'] ?? ''));
+    if ($host === '' || $name === '' || $user === '') {
+        $error = 'ค่าเชื่อมต่อระบบ inventory ไม่ครบ (host / db / user)';
+        $GLOBALS['_dbInventoryError'] = $error;
+        return null;
+    }
+    $mysqli = mysqli_init();
+    if (!$mysqli) {
+        $error = 'สร้างการเชื่อมต่อระบบ inventory ไม่สำเร็จ';
+        $GLOBALS['_dbInventoryError'] = $error;
+        return null;
+    }
+    $mysqli->options(MYSQLI_OPT_CONNECT_TIMEOUT, 3);
+    if (!@$mysqli->real_connect($host, $user, $pass, $name)) {
+        $error = 'เชื่อมต่อฐานระบบ inventory ไม่ได้';
+        $GLOBALS['_dbInventoryError'] = $error;
+        return null;
+    }
+    $mysqli->set_charset('utf8mb4');
+    $db = $mysqli;
+    $error = '';
+    $GLOBALS['_dbInventoryError'] = '';
+    return $db;
+}
+
+/**
+ * ข้อความ error ล่าสุดของ dbInventory() ('' = ต่อได้)
+ *
+ * @return string
+ */
+function dbInventoryError()
+{
+    if (dbInventory() !== null) {
+        return '';
+    }
+    return (string)($GLOBALS['_dbInventoryError'] ?? 'เชื่อมต่อฐานระบบ inventory ไม่ได้');
+}
 /**
  * เชื่อมต่อฐานระบบซ่อม (biton_maintenance) — อ่านอย่างเดียว fail-soft ไม่ die
  *
@@ -1837,6 +1903,11 @@ function asset_delete_full($assetId) {
         q("UPDATE part_movements SET ref_asset_id=NULL WHERE ref_asset_id=?", 'i', [$assetId]);
     }
     q("DELETE FROM spare_loans WHERE spare_asset_id=? OR replaces_asset_id=?", 'ii', [$assetId, $assetId]);
+    // ตัดยอดใบเบิก inventory ไว้ → คืนยอดให้ใบ (ตารางมีเมื่อเคยเปิดใช้ฟีเจอร์ใบเบิกแล้ว)
+    $t = db()->query("SHOW TABLES LIKE 'inv_pickup_alloc'");
+    if ($t && $t->num_rows) {
+        q('DELETE FROM inv_pickup_alloc WHERE asset_id=?', 'i', [$assetId]);
+    }
     q("DELETE FROM assets WHERE id=?", 'i', [$assetId]);
     share_delete_asset($a['asset_code']);
     return true;

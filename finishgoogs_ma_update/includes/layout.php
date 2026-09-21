@@ -118,6 +118,7 @@ function page_back_url_default() {
         case 'asset.php':
         case 'asset_new.php':
         case 'leasing_move.php':
+        case 'inv_pickups.php':
             return $b . '/assets.php';
         case 'update_edit.php':
         case 'update_new.php':
@@ -137,6 +138,7 @@ function page_back_url_default() {
         case 'work_report.php':
         case 'support_reports.php':
         case 'unused_images.php':
+        case 'inv_pickup_map.php':
         case 'stock_scan.php':
         case 'stock_check.php':
         case 'unknown_assets.php':
@@ -230,7 +232,7 @@ $dockClass = ($side === 'top') ? '' : ' nav-collapsed';
 $ubUser = ui_userbox_identity();
 $showName = $ubUser['name'] !== 'ผู้ใช้งาน' ? $ubUser['name'] : ($u ? $u['display_name'] : '-');
 $settingsActive = in_array($cur, ['settings.php', 'appearance.php', 'server_config.php', 'line_notify_settings.php', 'activity_logs.php', 'share_admin.php', 'system_doc.php', 'work_report.php', 'my_work.php',
-    'stock_scan.php', 'stock_check.php', 'unknown_assets.php', 'stock_movements.php', 'installation_history.php', 'production_dedupe.php', 'rent_retire_sync.php', 'share.php', 'support_reports.php', 'unused_images.php'], true);
+    'stock_scan.php', 'stock_check.php', 'unknown_assets.php', 'stock_movements.php', 'installation_history.php', 'production_dedupe.php', 'rent_retire_sync.php', 'share.php', 'support_reports.php', 'unused_images.php', 'inv_pickup_map.php'], true);
 ?>
 <div class="app<?= $sideClass . $dockClass ?>">
 <?php // ตั้ง class ให้ตรงกับที่ผู้ใช้เลือกไว้ ก่อนเบราว์เซอร์วาดเฟรมแรก
