@@ -107,7 +107,14 @@ if ($dashProdYears) {
 $perModel = [];
 $res = qr("SELECT p.id pid, p.name, p.icon_path, p.product_code, COUNT(*) c FROM assets a JOIN products p ON p.id=a.product_id
            GROUP BY p.id ORDER BY c DESC");
-while ($r = $res->fetch_assoc()) $perModel[] = $r;
+// รุ่นที่ตั้ง "ซ่อน" ไว้ในหลังบ้าน (ขั้นต่ำและการแจ้งเตือนรายรุ่น) — แผนกอื่นดูแลสต็อกเอง ไม่ต้องขึ้นในตารางนี้
+require_once dirname(__DIR__) . '/shared/finishgood_shortage_filter.php';
+$hiddenModelCodes = array_flip(fg_shortage_hidden_codes());
+while ($r = $res->fetch_assoc()) {
+    if (!isset($hiddenModelCodes[strtoupper(trim((string) $r['product_code']))])) {
+        $perModel[] = $r;
+    }
+}
 
 // จำนวนแยกตามสถานะ สำหรับแถบ stack ในการ์ด — แยกเป็น query ที่สองแล้ว pivot ใน PHP
 // เร็วกว่าการใส่ SUM(status=..) สี่ตัวในคิวรีเดียว (56ms เทียบ 83ms) เพราะ SUM บังคับให้

@@ -26,14 +26,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_min'])) {
     exit;
 }
 
-// บันทึกรุ่นที่เลือกปิดแจ้งเตือน
+// บันทึกการแสดงรายรุ่น: แสดง / ไม่เตือน (แสดงแต่ไม่ส่งไลน์) / ซ่อน (หายจากรายการสต็อกทั้งระบบ)
+// รุ่นที่ไม่ได้อยู่ในฟอร์มรอบนี้ (เช่น รุ่นจาก Setup ที่ตอนนี้ไม่ขาดแล้ว) คงค่าเดิมไว้ ไม่ล้างทิ้ง
 $savedMsg = '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_skip'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_vis'])) {
     csrf_check();
-    $posted = isset($_POST['skip']) && is_array($_POST['skip']) ? $_POST['skip'] : [];
-    fg_shortage_save_skipped_codes($posted);
+    $posted = isset($_POST['vis']) && is_array($_POST['vis']) ? $_POST['vis'] : [];
+    $skip = array_flip(fg_shortage_skipped_codes());
+    $hide = array_flip(fg_shortage_hidden_codes());
+    foreach ($posted as $code => $mode) {
+        $code = strtoupper(trim((string) $code));
+        unset($skip[$code], $hide[$code]);
+        if ($mode === 'mute') {
+            $skip[$code] = true;
+        } elseif ($mode === 'hide') {
+            $hide[$code] = true;
+        }
+    }
+    fg_shortage_save_skipped_codes(array_keys($skip));
+    fg_shortage_save_hidden_codes(array_keys($hide));
     fg_shortage_dash_cache_clear();
-    header('Location: ' . BASE_URL . '/finishgood_shortage_preview.php?saved=1');
+    header('Location: ' . BASE_URL . '/finishgood_shortage_preview.php?saved=1#fg-vis');
     exit;
 }
 
@@ -42,6 +55,7 @@ $registryAll = fg_shortage_registry_rows(null);
 // รุ่นที่ขาดทั้งหมด (ก่อนตัดรุ่นที่ปิดแจ้งเตือน) ใช้ทำรายการให้ติ๊กปิด
 $allShort = fg_shortage_apply_registry([]);
 $skipCodes = fg_shortage_skipped_codes();
+$hideCodes = fg_shortage_hidden_codes();
 $fgSame = fg_shortage_dashboard_data();
 $fetched = [
     'ok'             => !empty($fgSame['ok']),
@@ -342,33 +356,84 @@ $allJson = $messages !== []
     <?php endif; ?>
 </div>
 
-<?php if ($allShort['error'] === ''): ?>
-<div class="panel" style="margin-bottom:12px">
-    <h2 style="margin:0 0 4px;font-size:16px">เลือกรุ่นที่จะแจ้งเตือน</h2>
+<?php
+// รุ่นทั้งหมดที่ตั้งค่าได้: รุ่นในทะเบียนเรา (มีรหัสสินค้า) + รุ่นจากระบบ Setup ที่ขาดอยู่ตอนนี้
+// (RFiD Card, Sim Net ฯลฯ ที่ไม่มีในทะเบียนเรา) + รุ่นที่เคยตั้งซ่อน/ไม่เตือนไว้แล้ว
+$visRows = [];
+$__res = qr("SELECT UPPER(TRIM(product_code)) code, name FROM products WHERE is_active = 1 AND product_code IS NOT NULL AND TRIM(product_code) <> '' ORDER BY name");
+while ($__r = $__res->fetch_assoc()) {
+    $visRows[$__r['code']] = ['name' => (string) $__r['name'], 'need' => null];
+}
+foreach ($allShort['items'] ?? [] as $it) {
+    $c = strtoupper(trim((string) ($it['product_code'] ?? '')));
+    if ($c === '') { continue; }
+    $visRows[$c] = ['name' => $visRows[$c]['name'] ?? (string) ($it['product_name'] ?? $c), 'need' => (int) ($it['need'] ?? 0)];
+}
+foreach ($registryAll['rows'] ?? [] as $c => $row) {
+    $c = strtoupper(trim((string) $c));
+    if (isset($visRows[$c]) && $visRows[$c]['need'] === null) { $visRows[$c]['need'] = (int) $row['need']; }
+}
+foreach (array_merge($skipCodes, $hideCodes) as $c) {
+    if (!isset($visRows[$c])) { $visRows[$c] = ['name' => $c, 'need' => null]; }
+}
+$visMode = function ($c) use ($skipCodes, $hideCodes) {
+    return in_array($c, $hideCodes, true) ? 'hide' : (in_array($c, $skipCodes, true) ? 'mute' : 'show');
+};
+// ซ่อนอยู่ไปท้ายสุด ที่เหลือเรียงตามชื่อ
+uksort($visRows, function ($x, $y) use ($visRows, $visMode) {
+    return [$visMode($x) === 'hide', $visRows[$x]['name']] <=> [$visMode($y) === 'hide', $visRows[$y]['name']];
+});
+?>
+<style>
+.vis-seg { display: inline-flex; border: 1px solid #d5d0e2; border-radius: 8px; overflow: hidden; }
+.vis-seg label { padding: 4px 10px; font-size: 12.5px; cursor: pointer; color: #555; border-left: 1px solid #d5d0e2; white-space: nowrap; }
+.vis-seg label:first-child { border-left: 0; }
+.vis-seg input { position: absolute; opacity: 0; pointer-events: none; }
+.vis-seg label:has(input:checked) { background: #ede9f8; color: #3d1f6e; font-weight: 700; }
+.vis-seg label.is-hide:has(input:checked) { background: #fee2e2; color: #991b1b; }
+.vis-seg label:has(input:focus-visible) { outline: 2px solid #7c5cc4; outline-offset: -2px; }
+.reg-table tr.vis-hidden td:first-child { opacity: .55; }
+/* ชื่อรุ่นตัดบรรทัดได้ — จอมือถือจะได้เห็นปุ่มเลือกครบโดยไม่ต้องเลื่อนตารางไปข้าง */
+#fg-vis .reg-table td:first-child { white-space: normal; min-width: 110px; }
+@media (max-width: 600px) { #fg-vis .reg-table th, #fg-vis .reg-table td { padding: 6px 4px; } .vis-seg label { padding: 4px 7px; } }
+</style>
+<div class="panel" style="margin-bottom:12px" id="fg-vis">
+    <h2 style="margin:0 0 4px;font-size:16px">การแสดงรายรุ่น</h2>
     <p style="margin:0 0 10px;font-size:13px;color:#666">
-        ติ๊กรุ่นที่ <b>ไม่ต้องการ</b> ให้แจ้งเตือน · รุ่นใหม่ที่เพิ่มมาทีหลังจะถูกแจ้งเตือนเองโดยไม่ต้องมาตั้งค่า
+        <b>แสดง</b> = ขึ้นในรายการสต็อกและแจ้งเตือนไลน์ ·
+        <b>ไม่เตือน</b> = ขึ้นในรายการสต็อก แต่ไม่ส่งแจ้งเตือนไลน์ ·
+        <b>ซ่อน</b> = ไม่ขึ้นเลย (ตาราง Dashboard · ยอดขาดรวม · เช็คสต็อกในไลน์ · แจ้งเตือน · หน้านับสต็อก)
+        ใช้กับของสำเร็จรูปที่แผนกอื่นดูแลสต็อกเอง — ทะเบียนเครื่องและประวัติไม่ถูกลบ
     </p>
     <?php if (($_GET['saved'] ?? '') === '1'): ?><div class="ok" style="margin-bottom:10px">บันทึกแล้ว</div><?php endif; ?>
     <form method="post">
         <?= csrf_field() ?>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:6px 16px;margin-bottom:12px">
-        <?php foreach ($allShort['items'] as $it):
-            $code = (string)($it['product_code'] ?? '');
-            $off  = in_array(strtoupper(trim($code)), $skipCodes, true); ?>
-            <label style="display:flex;gap:7px;align-items:baseline;font-size:13.5px;<?= $off ? 'opacity:.55' : '' ?>">
-                <input type="checkbox" name="skip[]" value="<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>" <?= $off ? 'checked' : '' ?>>
-                <span><?= htmlspecialchars((string)$it['product_name'], ENT_QUOTES, 'UTF-8') ?>
-                    <span style="color:#999">(<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>)</span>
-                    <b style="color:#c0392b"><?= (int)($it['need'] ?? 0) ?></b></span>
-            </label>
-        <?php endforeach; ?>
+        <div class="reg-wrap">
+        <table class="reg-table">
+            <thead><tr><th>รุ่น</th><th class="n">ขาด / เกิน</th><th>การแสดง</th></tr></thead>
+            <tbody>
+            <?php foreach ($visRows as $code => $v):
+                $mode = $visMode($code);
+                $esc = htmlspecialchars($code, ENT_QUOTES, 'UTF-8'); ?>
+                <tr class="<?= $mode === 'hide' ? 'vis-hidden' : '' ?>">
+                    <td><?= htmlspecialchars($v['name'], ENT_QUOTES, 'UTF-8') ?> <span style="color:#999">(<?= $esc ?>)</span></td>
+                    <td class="n"><?php if ($v['need'] !== null): ?><b style="color:<?= $v['need'] < 0 ? '#c0392b' : '#1e6b33' ?>"><?= (int) $v['need'] ?></b><?php else: ?><span style="color:#999">—</span><?php endif; ?></td>
+                    <td>
+                        <span class="vis-seg" role="radiogroup" aria-label="การแสดง <?= htmlspecialchars($v['name'], ENT_QUOTES, 'UTF-8') ?>">
+                            <label><input type="radio" name="vis[<?= $esc ?>]" value="show" <?= $mode === 'show' ? 'checked' : '' ?>>แสดง</label>
+                            <label><input type="radio" name="vis[<?= $esc ?>]" value="mute" <?= $mode === 'mute' ? 'checked' : '' ?>>ไม่เตือน</label>
+                            <label class="is-hide"><input type="radio" name="vis[<?= $esc ?>]" value="hide" <?= $mode === 'hide' ? 'checked' : '' ?>>ซ่อน</label>
+                        </span>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
         </div>
-        <button type="submit" name="save_skip" value="1">บันทึกการเลือก</button>
-        <span style="margin-left:10px;font-size:13px;color:#666">ปิดอยู่ <?= count($skipCodes) ?> รุ่น · จะส่ง <?= count($fetched['items']) ?> รุ่น</span>
+        <button type="submit" name="save_vis" value="1" style="margin-top:10px">บันทึกการแสดง</button>
+        <span style="margin-left:10px;font-size:13px;color:#666">ไม่เตือน <?= count($skipCodes) ?> รุ่น · ซ่อน <?= count($hideCodes) ?> รุ่น · แจ้งเตือนรอบนี้ <?= count($fetched['items']) ?> รุ่น</span>
     </form>
 </div>
-<?php endif; ?>
-
 <?php foreach ($messages as $index => $message): ?>
     <?php $bytes = strlen(json_encode($message, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)); ?>
     <div class="panel" style="margin-bottom:8px;">

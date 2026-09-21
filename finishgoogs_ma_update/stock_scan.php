@@ -111,10 +111,17 @@ page_header('นับสต็อกด้วยการสแกน', true, $
 
 <?php if ($view === 'start') {
     $products = [];
-    $res = qr("SELECT p.id, p.name, COUNT(a.id) total, SUM(a.status = 'new') in_stock
+    $res = qr("SELECT p.id, p.name, p.product_code, COUNT(a.id) total, SUM(a.status = 'new') in_stock
                FROM products p JOIN assets a ON a.product_id = p.id
                WHERE p.is_active = 1 GROUP BY p.id ORDER BY in_stock DESC, p.name");
-    while ($r = $res->fetch_assoc()) { $r['count'] = stock_count_status((int) $r['id']); $products[] = $r; }
+    // รุ่นที่ซ่อนจากรายการสต็อก (แผนกอื่นนับเอง) ไม่ขึ้นให้เลือก และไม่นับเป็น "ถึงรอบนับ"
+    require_once dirname(__DIR__) . '/shared/finishgood_shortage_filter.php';
+    $hiddenCodes = array_flip(fg_shortage_hidden_codes());
+    while ($r = $res->fetch_assoc()) {
+        if (isset($hiddenCodes[strtoupper(trim((string) $r['product_code']))])) { continue; }
+        $r['count'] = stock_count_status((int) $r['id']);
+        $products[] = $r;
+    }
     // รุ่นที่ถึงรอบนับขึ้นก่อน (ยังไม่เคยนับ / นานสุด) ที่เหลือเรียงตามจำนวนในคลังเหมือนเดิม
     usort($products, function ($a, $b) {
         if ($a['count']['due'] !== $b['count']['due']) { return $a['count']['due'] ? -1 : 1; }

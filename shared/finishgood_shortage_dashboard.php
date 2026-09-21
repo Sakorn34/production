@@ -188,10 +188,11 @@ function fg_model_stock_map(): array
     }
 
     $all = fg_shortage_registry_rows(null);
+    $hidden = array_flip(fg_shortage_hidden_codes());
     if (!empty($all['ok'])) {
         foreach ($all['rows'] as $code => $row) {
             $code = strtoupper(trim((string) $code));
-            if ($code === '' || isset($out['codes'][$code])) {
+            if ($code === '' || isset($out['codes'][$code]) || isset($hidden[$code])) {
                 continue;
             }
             $need = (int) $row['need'];
