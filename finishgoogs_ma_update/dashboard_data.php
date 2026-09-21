@@ -818,6 +818,49 @@ switch ($type) {
         render_stock_today_table($rows, $partsBase);
         break;
 
+    case 'inv_pickup_summary': // Dashboard: การ์ดใบเบิก inventory + คอลัมน์ "เบิกแล้ว รอผลิต" ในตารางรุ่น (JSON)
+        require_once __DIR__ . '/includes/inv_pickup.php';
+        header('Content-Type: application/json; charset=utf-8');
+        $d = inv_pickup_load();
+        // ยังไม่ได้ตั้งค่า/ต่อ inventory ไม่ได้/ยังไม่ผูกรุ่นเลย = ไม่ต้องโชว์การ์ด
+        if (!$d['ok'] || !inv_pickup_tracked_products()) {
+            echo json_encode(['ok' => false, 'error' => (string) $d['error']], JSON_UNESCAPED_UNICODE);
+            break;
+        }
+        $out = ['ok' => true, 'ready' => 0, 'ready_models' => 0, 'oldest' => '', 'waiting' => 0, 'waiting_last' => '',
+                'waiting_by' => '', 'unmatched' => count(inv_pickup_unmatched_assets()), 'since' => date('d/m', strtotime(inv_pickup_since())),
+                'by_pid' => []];
+        $groups = [];
+        $waitingDocs = [];
+        foreach ($d['items'] as $it) {
+            if ($it['state'] === 'ready') {
+                $out['ready'] += $it['left'];
+                $groups[$it['grp']] = true;
+                if ($out['oldest'] === '' || $it['date'] < $out['oldest']) {
+                    $out['oldest'] = $it['date'];
+                }
+                // รายรุ่นในตาราง: กลุ่มหลายรุ่นนับให้ทุกรุ่นในกลุ่ม แล้วบอกว่าเป็นยอดใช้ร่วม
+                foreach ($it['products'] as $p) {
+                    $row = $out['by_pid'][$p] ?? ['left' => 0, 'shared' => false];
+                    $row['left'] += $it['left'];
+                    $row['shared'] = $row['shared'] || count($it['products']) > 1;
+                    $out['by_pid'][$p] = $row;
+                }
+            } elseif ($it['state'] === 'waiting') {
+                $waitingDocs[$it['pre_id']] = $it;
+            }
+        }
+        $out['ready_models'] = count($groups);
+        $out['oldest'] = $out['oldest'] !== '' ? date('d/m', strtotime($out['oldest'])) : '';
+        $out['waiting'] = count($waitingDocs);
+        if ($waitingDocs) {
+            $last = end($waitingDocs);
+            $out['waiting_last'] = date('d/m', strtotime($last['date']));
+            $out['waiting_by'] = (string) $last['by'];
+        }
+        echo json_encode($out, JSON_UNESCAPED_UNICODE);
+        break;
+
     case 'fg_model_stock': // การ์ดรุ่นบน Dashboard — ยอดคลัง/ขาด/เกิน รายรหัสรุ่น (JSON)
         require_once dirname(__DIR__) . '/shared/finishgood_shortage_dashboard.php';
         header('Content-Type: application/json; charset=utf-8');

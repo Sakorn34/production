@@ -943,7 +943,29 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .fg-chip-short { background: #fee2e2; color: #991b1b; }
 .fg-chip-over { background: #dcfce7; color: #166534; }
 .fg-chip-muted { background: #f1f5f9; color: #475569; }
-/* หัวกลุ่มในตารางรุ่น (ต่ำกว่าขั้นต่ำ / ไม่พอส่ง PO / ครบ) — สีเดียวกับชิปผล */
+/* Dashboard: การ์ดใบเบิกจาก inventory (3 ช่อง) */
+.dash-pickup[hidden] { display: none !important; }
+.dash-pickup .panel-head-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.dash-pk-all { font-size: calc(13px * var(--font-scale, 1)); white-space: nowrap; }
+.dash-pk-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: 10px; margin-top: 8px; }
+.dash-pk-tile { display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; border-radius: 10px; background: var(--surface-2, #f6f4fb); color: inherit; text-decoration: none; border: 1px solid transparent; }
+.dash-pk-tile:hover { border-color: var(--border, #e5e7eb); }
+.dash-pk-label { font-size: calc(12.5px * var(--font-scale, 1)); color: var(--muted, #6b7280); }
+.dash-pk-num b { font-size: calc(24px * var(--font-scale, 1)); }
+.dash-pk-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--muted, #6b7280); }
+.dash-pk-tile.is-warn { background: #fffbeb; }
+.dash-pk-tile.is-warn .dash-pk-label, .dash-pk-tile.is-warn b { color: #854d0e; }
+.dash-pk-tile.is-warn.is-zero { background: var(--surface-2, #f6f4fb); }
+.dash-pk-tile.is-warn.is-zero .dash-pk-label, .dash-pk-tile.is-warn.is-zero b { color: inherit; }
+.dash-models-table td[data-fg-cell="pick"] b { color: var(--st-rental-fg, #1e40af); }
+/* มือถือ: 3 ช่องเรียงแถวเดียว ไม่ซ้อนลงมากินจอ */
+@media (max-width: 600px) {
+  .dash-pk-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .dash-pk-tile { padding: 8px; }
+  .dash-pk-num b { font-size: calc(20px * var(--font-scale, 1)); }
+  .dash-pk-num { font-size: calc(11.5px * var(--font-scale, 1)); }
+  .dash-pk-sub { display: none; }
+}/* หัวกลุ่มในตารางรุ่น (ต่ำกว่าขั้นต่ำ / ไม่พอส่ง PO / ครบ) — สีเดียวกับชิปผล */
 .dash-models-table tr.dash-fg-group td { padding: 7px 12px; font-weight: 700; font-size: calc(13px * var(--font-scale, 1)); cursor: default; border-top: 1px solid var(--border, #e5e7eb); }
 .dash-models-table tr.dash-fg-group.is-stage-0 td { background: #fef2f2; color: #991b1b; }
 .dash-models-table tr.dash-fg-group.is-stage-1 td { background: #fffbeb; color: #92400e; }
@@ -1903,7 +1925,8 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
   [data-dash-tab="prod"] #dash-inventory-panel,
   [data-dash-tab="prod"] .dash-side-kpis,
   [data-dash-tab="parts"] .kpi-status-overview,
-  [data-dash-tab="parts"] #dash-prod-chart { display: none !important; }
+  [data-dash-tab="parts"] #dash-prod-chart,
+  [data-dash-tab="parts"] #dash-pickup { display: none !important; }
   [data-dash-tab="parts"] .dash-top-row, [data-dash-tab="prod"] .dash-top-row { display: block; }
   [data-dash-tab="parts"] .dash-side-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
   /* แท็บเลือกมุมมองแทนแล้ว — ปุ่มสลับในหัวกล่องซ้ำกัน */

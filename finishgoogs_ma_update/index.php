@@ -447,6 +447,21 @@ $partsBase = ui_parts_base_url();
   <?php } ?>
 </div>
 
+<?php // ใบเบิกจากระบบ inventory (แบบ ก · 21 ก.ย. 2026) — โหลดทีหลังหน้า (dashboard_data ?type=inv_pickup_summary)
+      // ยังไม่ได้ตั้งค่า/ต่อ inventory ไม่ได้ = ไม่ขึ้นเลย ?>
+<div class="panel dash-pickup" id="dash-pickup" hidden>
+  <div class="panel-head-row"><h3>ใบเบิกจาก inventory <span class="muted panel-meta" id="dash-pk-since"></span></h3>
+    <a class="dash-pk-all" href="<?= h($B) ?>/inv_pickups.php">ดูทั้งหมด ›</a></div>
+  <div class="dash-pk-tiles">
+    <a class="dash-pk-tile" href="<?= h($B) ?>/inv_pickups.php?tab=ready"><span class="dash-pk-label">เบิกแล้ว รอผลิต</span>
+      <span class="dash-pk-num"><b id="dash-pk-ready">—</b> เครื่อง</span><span class="dash-pk-sub" id="dash-pk-ready-sub"></span></a>
+    <a class="dash-pk-tile" href="<?= h($B) ?>/inv_pickups.php?tab=waiting"><span class="dash-pk-label">รอคลังจ่าย</span>
+      <span class="dash-pk-num"><b id="dash-pk-waiting">—</b> ใบ</span><span class="dash-pk-sub" id="dash-pk-waiting-sub"></span></a>
+    <a class="dash-pk-tile is-warn" href="<?= h($B) ?>/inv_pickups.php?tab=unmatched"><span class="dash-pk-label">ไม่ผ่านใบเบิก</span>
+      <span class="dash-pk-num"><b id="dash-pk-unmatched">—</b> เครื่อง</span><span class="dash-pk-sub" id="dash-pk-unmatched-sub"></span></a>
+  </div>
+</div>
+
 <div class="panel" id="dash-inventory-panel">
   <div class="panel-head-row">
     <h3 id="dash-inventory-title">
@@ -526,7 +541,7 @@ $partsBase = ui_parts_base_url();
         <th data-pri="2" class="fg-bar-col" title="เต็มแถบ = ยอดที่ต้องมี · ส่วนสีจาง = เกินจากที่ต้องมี"><span class="fg-legend"><i class="is-new"></i>เครื่องใหม่</span> <span class="fg-legend"><i class="is-pool"></i>คลังพร้อมเช่า</span> <span class="fg-legend"><b class="fg-legend-mark">▼</b>ขั้นต่ำ</span> <span class="fg-legend"><b class="fg-legend-mark is-po">▼</b>ขั้นต่ำ+PO</span></th>
         <th data-pri="1" class="num-col">เครื่องใหม่</th>
         <th data-pri="2" class="num-col" title="ระบบเช่าเป็น finished goods รอปล่อยเช่า — นับรวมในยอดที่มี">คลังพร้อมเช่า</th>
-        <th data-pri="2" class="num-col" title="(เครื่องใหม่ + คลังพร้อมเช่า) ÷ (ขั้นต่ำ + PO)">มี / ต้องมี</th>
+        <th data-pri="2" class="num-col" title="ของที่ระบบ inventory จ่ายลงมาแล้ว ยังไม่ได้ลงทะเบียนเครื่อง — กำลังจะผลิตเพิ่ม">เบิกแล้ว รอผลิต</th>
         <th data-pri="1">ผล</th>
       </tr>
     </thead>
@@ -535,7 +550,7 @@ $partsBase = ui_parts_base_url();
     <?php $mCode = strtoupper(trim((string) $m['product_code'])); $mCount = stock_count_status((int) $m['pid']); ?>
     <?php // แบ่งแถวเป็น 2 โซนกด: รูป+ชื่อรุ่น = การผลิตรายปี · แถบสีถึงคอลัมน์สุดท้าย = หมายเลขสินค้าในสต็อก
           // (จัดการคลิกรวมที่ tbody ด้านล่าง) ?>
-    <tr class="dash-model-row" data-code="<?= h($mCode) ?>" data-count="<?= (int) $m['c'] ?>" data-fg="none" data-due="<?= $mCount['due'] ? '1' : '0' ?>"
+    <tr class="dash-model-row" data-pid="<?= (int) $m['pid'] ?>" data-code="<?= h($mCode) ?>" data-count="<?= (int) $m['c'] ?>" data-fg="none" data-due="<?= $mCount['due'] ? '1' : '0' ?>"
         data-name="<?= h($m['name']) ?>"
         data-years-url="<?= h("$B/dashboard_data.php?type=product_years&v=" . (int) $m['pid']) ?>"
         data-list-url="<?= h("$B/assets.php?product=" . urlencode($m['name'])) ?>">
@@ -556,7 +571,7 @@ $partsBase = ui_parts_base_url();
       </td>
       <td data-pri="1" class="num-col fg-cell fg-zone-stock" data-fg-cell="ours">—</td>
       <td data-pri="2" class="num-col fg-cell fg-zone-stock" data-fg-cell="pool">—</td>
-      <td data-pri="2" class="num-col fg-cell fg-zone-stock" data-fg-cell="pct">—</td>
+      <td data-pri="2" class="num-col fg-cell" data-fg-cell="pick"><span class="muted">—</span></td>
       <td data-pri="1" class="fg-cell fg-zone-stock" data-fg-cell="verdict"></td>
     </tr>
     <?php } ?>
@@ -704,6 +719,32 @@ $partsBase = ui_parts_base_url();
   function fgNum(n) { return Number(n).toLocaleString('en-US'); }
 
   // ตัวเลขคลังของแต่ละรุ่น — โหลดหลังหน้าขึ้น ไม่ให้ Dashboard รอ API ของระบบ Setup (เซิร์ฟเวอร์ cache 10 นาที)
+  // ใบเบิก inventory: การ์ดสรุป + คอลัมน์ "เบิกแล้ว รอผลิต" รายรุ่น
+  fetch(fgBase + '?type=inv_pickup_summary', { credentials: 'same-origin' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d || !d.ok) { return; }
+      var set = function (id, v) { var el = document.getElementById(id); if (el) { el.textContent = v; } };
+      set('dash-pk-ready', fgNum(d.ready));
+      set('dash-pk-ready-sub', d.ready ? fgNum(d.ready_models) + ' รุ่น · ใบเก่าสุด ' + d.oldest : 'ไม่มีของรอผลิต');
+      set('dash-pk-waiting', fgNum(d.waiting));
+      set('dash-pk-waiting-sub', d.waiting ? 'ล่าสุด ' + d.waiting_last + (d.waiting_by ? ' · ' + d.waiting_by : '') : 'คลังจ่ายครบแล้ว');
+      set('dash-pk-unmatched', fgNum(d.unmatched));
+      set('dash-pk-unmatched-sub', d.unmatched ? 'ตั้งแต่ ' + d.since + ' · กดเพื่อจับคู่' : 'ทุกเครื่องผ่านใบเบิก');
+      set('dash-pk-since', 'ติดตามตั้งแต่ ' + d.since);
+      var box = document.getElementById('dash-pickup');
+      if (box) { box.hidden = false; box.querySelector('.dash-pk-tile.is-warn').classList.toggle('is-zero', !d.unmatched); }
+      modelCards.forEach(function (row) {
+        var c = row.querySelector('[data-fg-cell="pick"]');
+        var v = d.by_pid[row.getAttribute('data-pid')];
+        if (!c) { return; }
+        c.innerHTML = v && v.left > 0
+          ? '<b>' + fgNum(v.left) + '</b>' + (v.shared ? '<div class="cell-sub muted" title="ใบเบิกนี้ใช้ได้หลายรุ่น — ยอดเดียวกันขึ้นทุกรุ่นในกลุ่ม">ใช้ร่วมหลายรุ่น</div>' : '')
+          : '<span class="muted">—</span>';
+      });
+    })
+    .catch(function () {});
+
   fetch(fgBase + '?type=fg_model_stock', { credentials: 'same-origin' })
     .then(function (r) { return r.json(); })
     .then(function (d) {
@@ -752,10 +793,7 @@ $partsBase = ui_parts_base_url();
       row0.setAttribute('data-have', String(have + pool));
       row0.setAttribute('data-req', String(req));
       row0.setAttribute('data-stage', row.state === 'over' ? '2' : (have + pool < minNum ? '0' : '1'));
-      var pctCell = row0.querySelector('[data-fg-cell="pct"]');
-      if (pctCell) {
-        pctCell.innerHTML = req > 0 ? '<b>' + Math.round((have + pool) / req * 100) + '%</b>' : '<span class="muted">—</span>';
-      }
+
       row0.setAttribute('data-over', row.state === 'over' ? String(Number(row.over) || 0) : '-1');
 
       var cell = function (key) { return row0.querySelector('[data-fg-cell="' + key + '"]'); };
