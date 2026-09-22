@@ -1546,6 +1546,7 @@ function asset_leasing_info($assetCode, $factorySerial = '')
         'ma_history' => [],
         'ma_retire_reason' => '',
         'status_label' => '',
+        'rent_history' => [],
     ];
 
     $candidates = [];
@@ -1644,11 +1645,123 @@ function asset_leasing_info($assetCode, $factorySerial = '')
         }
     }
 
+    $out['rent_history'] = rent_leasing_rent_history($rentRows);
     $out['fault_notes'] = rent_leasing_fault_notes($rentRows);
     $out['ma_history'] = rent_leasing_ma_history($out['serial']);
     $out['ma_retire_reason'] = rent_leasing_ma_retire_reason($out['ma_history']);
     $out['status_label'] = rent_leasing_status_label($out['pro_status'], $out['p_status']);
     return $out;
+}
+
+/**
+ * ประวัติการเช่าของเครื่อง — ทุกบรรทัดสัญญา (tbl_rent_product) ที่ S/N นี้เคยไปอยู่ ใหม่สุดก่อน
+ * ใช้แถวที่ asset_leasing_info() ดึงมาแล้ว ไม่ query ตารางใหญ่ซ้ำ · ชื่อลูกค้าดึงรอบเดียวทั้งชุด
+ *
+ * @param array<int,array<string,mixed>> $rows
+ * @return array<int,array<string,string>>
+ */
+function rent_leasing_rent_history(array $rows): array
+{
+    if (!$rows) {
+        return [];
+    }
+    $names = [];
+    $ids = array_values(array_unique(array_filter(array_map(function ($r) { return trim((string) ($r['p_cus_id'] ?? '')); }, $rows))));
+    if ($ids && dbLeasing()) {
+        $in = implode(',', array_map(function ($v) { return "'" . dbLeasing()->real_escape_string($v) . "'"; }, $ids));
+        $res = @dbLeasing()->query("SELECT cus_id, cus_name FROM tbl_customer WHERE cus_id IN ($in)");
+        while ($res && ($x = $res->fetch_row())) {
+            $names[(string) $x[0]] = trim((string) $x[1]);
+        }
+    }
+    $d = function ($v) {
+        $v = trim((string) $v);
+        return ($v === '' || strpos($v, '0000-00-00') === 0) ? '' : substr($v, 0, 10);
+    };
+    $out = [];
+    $seen = [];
+    foreach ($rows as $r) {
+        // บรรทัดสัญญาซ้ำเป๊ะ (สัญญา/วันที่/ไซต์/สถานะเดียวกัน) มีอยู่จริงในระบบเช่า — แสดงครั้งเดียว
+        $key = implode('|', [$r['r_code'] ?? '', $r['r_startdate'] ?? '', $r['r_enddate'] ?? '', $r['p_sitename'] ?? '', $r['p_status'] ?? '']);
+        if (isset($seen[$key])) {
+            continue;
+        }
+        $seen[$key] = true;
+        $out[] = [
+            'code'     => trim((string) ($r['r_code'] ?? '')) !== '' ? trim((string) $r['r_code']) : trim((string) ($r['r_po'] ?? '')),
+            'start'    => $d($r['r_startdate'] ?? ''),
+            'end'      => $d($r['r_enddate'] ?? ''),
+            'returned' => $d($r['p_date_received'] ?? ''),
+            'status'   => trim((string) ($r['p_status'] ?? '')),
+            'customer' => $names[trim((string) ($r['p_cus_id'] ?? ''))] ?? '',
+            'site'     => trim((string) ($r['p_sitename'] ?? '')),
+        ];
+    }
+    // เช่าอยู่ตอนนี้ขึ้นก่อน แล้วเรียงตามวันเริ่มสัญญาใหม่สุด
+    usort($out, function ($a, $b) {
+        return [$a['status'] === 'active' ? 0 : 1, $b['start']] <=> [$b['status'] === 'active' ? 0 : 1, $a['start']];
+    });
+    return $out;
+}
+
+/**
+ * ตารางประวัติการเช่าบนโปรไฟล์เครื่อง (หน้าตาเดียวกับ "เคยถูกยืมเป็นเครื่องสำรอง") — ไม่มีประวัติ = ''
+ *
+ * @param array<string,mixed> $info ผลจาก asset_leasing_info()
+ * @return string
+ */
+function asset_leasing_rent_history_html(array $info): string
+{
+    $rows = $info['rent_history'] ?? [];
+    if (empty($info['found']) || !$rows) {
+        return '';
+    }
+    $labels = [
+        'active' => ['กำลังเช่า', 'ma-pill-out'], 'received' => ['รับคืนแล้ว', 'ma-pill-done'], 'claim' => ['เคลม', 'ma-pill-open'],
+        'Awaiting Return' => ['รอรับคืน', 'ma-pill-open'], 'MA' => ['ส่ง MA', 'ma-pill-open'], 'Lost' => ['สูญหาย', 'ma-pill-urgent'],
+        'Asset Retirement' => ['ปลดระวาง', 'ma-pill-urgent'],
+    ];
+    $be = function ($iso) {
+        return $iso !== '' && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $iso, $m) ? $m[3] . '/' . $m[2] . '/' . ((int) $m[1] + 543) : '';
+    };
+    $now = $rows[0]['status'] === 'active' ? $rows[0] : null;
+    $total = count($rows);
+    $customers = count(array_unique(array_filter(array_column($rows, 'customer'))));
+
+    $out = '<section class="ma-repair-section">';
+    $out .= '<h2 class="h-with-icon">' . ui_icon_html('history', 18) . 'ประวัติการเช่า (ระบบเช่า)'
+        . ($now ? ' <span class="ma-pill ma-pill-out">ตอนนี้เช่าอยู่</span>' : '') . '</h2>';
+    $out .= '<p class="ma-hint">' . number_format($total) . ' สัญญา' . ($customers ? ' · ' . number_format($customers) . ' ลูกค้า' : '');
+    if ($now) {
+        $out .= ' · ตอนนี้อยู่ที่ ' . h($now['site'] !== '' ? $now['site'] : $now['customer'])
+            . ($now['end'] !== '' ? ' ถึง ' . h($be($now['end'])) : '');
+    }
+    $out .= '</p>';
+
+    $render = function (array $slice) use ($labels, $be) {
+        $s = '';
+        foreach ($slice as $r) {
+            $lb = $labels[$r['status']] ?? [$r['status'] !== '' ? $r['status'] : '—', 'ma-pill-open'];
+            $s .= '<tr>'
+                . '<td class="ma-mono">' . h($r['code'] !== '' ? $r['code'] : '—') . '</td>'
+                . '<td class="ma-mono">' . h($be($r['start']) ?: '—') . '</td>'
+                . '<td class="ma-mono">' . h($be($r['end']) ?: '—') . '</td>'
+                . '<td>' . ($r['returned'] !== '' ? '<span class="ma-mono">' . h($be($r['returned'])) . '</span>' : ($r['status'] === 'active' ? '<span class="ma-muted">—</span>' : '<span class="ma-muted">—</span>')) . '</td>'
+                . '<td>' . h($r['customer'] !== '' ? $r['customer'] : '—') . ($r['site'] !== '' ? '<div class="ma-muted">' . h($r['site']) . '</div>' : '') . '</td>'
+                . '<td><span class="ma-pill ' . $lb[1] . '">' . h($lb[0]) . '</span></td>'
+                . '</tr>';
+        }
+        return $s;
+    };
+    $head = '<table class="ma-table"><thead><tr><th>สัญญา</th><th>เริ่ม</th><th>สิ้นสุด</th><th>รับคืน</th><th>ลูกค้า / ไซต์งาน</th><th>สถานะ</th></tr></thead><tbody>';
+    $show = 5;
+    $out .= '<div class="ma-card ma-card-flat"><div class="ma-tblscroll">' . $head . $render(array_slice($rows, 0, $show)) . '</tbody></table></div>';
+    if ($total > $show) {
+        $rest = array_slice($rows, $show);
+        $out .= '<details class="ma-more"><summary>ดูอีก ' . number_format(count($rest)) . ' สัญญา</summary>'
+            . '<div class="ma-tblscroll">' . $head . $render($rest) . '</tbody></table></div></details>';
+    }
+    return $out . '</div></section>';
 }
 
 /**

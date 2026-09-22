@@ -514,6 +514,9 @@ if ($invAlloc) { ?>
 <?php } ?>
 <?php } ?>
 
+<?php // ประวัติการเช่า — ทุกสัญญาที่เครื่องนี้เคยไปอยู่ (ข้อมูลชุดเดียวกับการ์ดระบบเช่าด้านบน ไม่ query ซ้ำ) ?>
+<?= asset_leasing_rent_history_html($leaseInfo) ?>
+
 <?= asset_maintenance_section_html($maRepairInfo) ?>
 
 <h2>ประวัติทั้งหมด (<?= count($tl) ?> รายการ) — เรียงตามเวลาบันทึก</h2>
