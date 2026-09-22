@@ -226,7 +226,10 @@ function line_flex_fg_row(array $item): array
                         'type' => 'box', 'layout' => 'horizontal',
                         'contents' => [
                             ['type' => 'text', 'text' => line_flex_fg_text((string)$item['product_code'], 30), 'size' => 'xxs', 'color' => '#999999', 'flex' => 7],
-                            ['type' => 'text', 'text' => 'ต้องผลิต', 'size' => 'xxs', 'color' => '#999999', 'flex' => 3, 'align' => 'end'],
+                            // กลุ่มเดียวกับตารางรุ่นบน Dashboard: ต่ำกว่าขั้นต่ำ (ด่วน) / ถึงขั้นต่ำแล้วแต่ไม่พอส่ง PO
+                            line_flex_fg_is_below_min($item)
+                                ? ['type' => 'text', 'text' => 'ต่ำกว่าขั้นต่ำ', 'size' => 'xxs', 'color' => '#b02a1e', 'weight' => 'bold', 'flex' => 3, 'align' => 'end']
+                                : ['type' => 'text', 'text' => 'ไม่พอส่ง PO', 'size' => 'xxs', 'color' => '#b45309', 'weight' => 'bold', 'flex' => 3, 'align' => 'end'],
                         ],
                     ],
 
@@ -512,11 +515,40 @@ function line_flex_fg_even_groups(array $items, int $messages, int $totalItems, 
  * @param string|null $timestamp เวลาที่แสดง (null = เวลาปัจจุบัน)
  * @return array<int,array<string,mixed>> รายการ message object (ว่าง = ไม่มีรุ่นติดลบ)
  */
+/**
+ * รุ่นนี้ต่ำกว่าขั้นต่ำไหม (มีอยู่ = เครื่องใหม่ + คลังพร้อมเช่า น้อยกว่าขั้นต่ำ)
+ *
+ * @param array<string,mixed> $item
+ * @return bool
+ */
+function line_flex_fg_is_below_min(array $item): bool
+{
+    return (int) $item['available'] < (int) $item['minimum_stock'];
+}
+
+/**
+ * เรียงแบบเดียวกับตาราง "จำนวนเครื่องแยกตามรุ่น" บน Dashboard (index.php) และการ์ดเช็คสต็อกในไลน์
+ * ต่ำกว่าขั้นต่ำก่อน → ถึงขั้นต่ำแต่ไม่พอส่ง PO · ในกลุ่มเรียงจากที่มีอยู่น้อยสุดก่อน ·
+ * มีเท่ากันให้รุ่นที่ต้องมีมากกว่าขึ้นก่อน
+ *
+ * @param array<int,array<string,mixed>> $items
+ * @return array<int,array<string,mixed>>
+ */
+function line_flex_fg_sort_like_dashboard(array $items): array
+{
+    usort($items, static function ($a, $b) {
+        return [line_flex_fg_is_below_min($a) ? 0 : 1, (int) $a['available'], -(int) $a['required'], (string) $a['product_name']]
+           <=> [line_flex_fg_is_below_min($b) ? 0 : 1, (int) $b['available'], -(int) $b['required'], (string) $b['product_name']];
+    });
+    return array_values($items);
+}
+
 function line_flex_finishgood_shortage_messages(array $items, ?string $timestamp = null): array
 {
     if ($items === []) {
         return [];
     }
+    $items = line_flex_fg_sort_like_dashboard($items);
 
     if ($timestamp === null) {
         $timestamp = date('d/m/Y H:i') . ' น.';
