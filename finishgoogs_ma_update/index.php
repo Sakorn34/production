@@ -551,7 +551,7 @@ $partsBase = ui_parts_base_url();
       <tr>
         <th data-pri="2" style="width:44px"></th>
         <th data-pri="1">รุ่น</th>
-        <th data-pri="2" class="fg-bar-col" title="เต็มแถบ = ยอดที่ต้องมี · ส่วนสีจาง = เกินจากที่ต้องมี"><span class="fg-legend"><i class="is-new"></i>เครื่องใหม่</span> <span class="fg-legend"><i class="is-pool"></i>คลังพร้อมเช่า</span> <span class="fg-legend"><b class="fg-legend-mark">▼</b>ขั้นต่ำ</span> <span class="fg-legend"><b class="fg-legend-mark is-po">▼</b>ขั้นต่ำ+PO</span></th>
+        <th data-pri="2" class="fg-bar-col" title="ทุกรุ่นใช้สเกลเดียวกัน — แถบยาวเท่ากันคือจำนวนเครื่องเท่ากัน · หมุด ▼ = ยอดที่ต้องมีของรุ่นนั้น · ส่วนสีจาง = เกินจากที่ต้องมี"><span class="fg-legend"><i class="is-new"></i>เครื่องใหม่</span> <span class="fg-legend"><i class="is-pool"></i>คลังพร้อมเช่า</span> <span class="fg-legend"><b class="fg-legend-mark">▼</b>ขั้นต่ำ</span> <span class="fg-legend"><b class="fg-legend-mark is-po">▼</b>ขั้นต่ำ+PO</span></th>
         <th data-pri="1" class="num-col">เครื่องใหม่</th>
         <th data-pri="2" class="num-col" title="ระบบเช่าเป็น finished goods รอปล่อยเช่า — นับรวมในยอดที่มี">คลังพร้อมเช่า</th>
         <th data-pri="2" class="num-col" title="ของที่ระบบ inventory จ่ายลงมาแล้ว ยังไม่ได้ลงทะเบียนเครื่อง — กำลังจะผลิตเพิ่ม">เบิกแล้ว รอผลิต</th>
@@ -799,6 +799,14 @@ $partsBase = ui_parts_base_url();
 
   function applyFgData(d) {
     var short = 0, over = 0, gapTotal = 0, newTotal = 0, poolTotal = 0;
+    // สเกลแถบร่วมกันทุกแถว — รุ่นไหนมี 1 เครื่องเท่ากัน แถบก็ต้องยาวเท่ากัน
+    // (เดิมแต่ละแถวใช้สเกลของตัวเอง 1 เครื่องของรุ่นที่ต้องมี 3 เลยยาวกว่ารุ่นที่ต้องมี 52)
+    var fgScale = 1;
+    modelCards.forEach(function (row0) {
+      var row = d.codes[row0.getAttribute('data-code') || ''];
+      if (!row) { return; }
+      fgScale = Math.max(fgScale, Number(row.req) || 0, (Number(row.new) || 0) + Math.max(0, Number(row.rent) || 0));
+    });
     modelCards.forEach(function (row0) {
       var row = d.codes[row0.getAttribute('data-code') || ''];
       if (!row) { return; }
@@ -860,15 +868,15 @@ $partsBase = ui_parts_base_url();
       // มีเกินกว่าที่ต้องมี → ขยายสเกล แล้วส่วนที่เกินเป็นสีจาง
       var bar = cell('bar');
       if (bar) {
-        var scale = Math.max(req, have + pool, 1);
-        var pc = function (n) { return Math.round(n / scale * 1000) / 10; };
+        var pc = function (n) { return Math.round(n / fgScale * 1000) / 10; };
         var newIn = Math.min(have, req);
         var poolIn = Math.min(pool, Math.max(0, req - newIn));
         var seg = function (cls, n) { return n > 0 ? '<i class="' + cls + '" style="width:' + pc(n) + '%"></i>' : ''; };
         bar.innerHTML = seg('is-new', newIn) + seg('is-pool', poolIn)
           + seg('is-new is-extra', have - newIn) + seg('is-pool is-extra', pool - poolIn);
         bar.title = 'เครื่องใหม่ ' + fgNum(have) + (pool > 0 ? ' · คลังพร้อมเช่า ' + fgNum(pool) : '')
-          + ' · ต้องมี ' + fgNum(req) + (pool > 0 ? ' (ยอดขาดนับเฉพาะเครื่องใหม่)' : '');
+          + ' · ต้องมี ' + fgNum(req) + (pool > 0 ? ' (ยอดขาดนับเฉพาะเครื่องใหม่)' : '')
+          + ' · ทุกรุ่นใช้สเกลเดียวกัน (สุดแถบ = ' + fgNum(fgScale) + ' เครื่อง)';
 
         // หมุด ▼ เหนือแถบ: ดำ = ขั้นต่ำ · ส้ม = ขั้นต่ำ + PO (= ต้องมี) — PO เป็น 0 จะทับกัน เหลือหมุดเดียว
         var minQ = Number(row.min) || 0;
