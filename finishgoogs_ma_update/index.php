@@ -801,12 +801,18 @@ $partsBase = ui_parts_base_url();
     var short = 0, over = 0, gapTotal = 0, newTotal = 0, poolTotal = 0;
     // สเกลแถบร่วมกันทุกแถว — รุ่นไหนมี 1 เครื่องเท่ากัน แถบก็ต้องยาวเท่ากัน
     // (เดิมแต่ละแถวใช้สเกลของตัวเอง 1 เครื่องของรุ่นที่ต้องมี 3 เลยยาวกว่ารุ่นที่ต้องมี 52)
-    var fgScale = 1;
+    // ตัดสเกลที่ ~2 เท่าของค่ากลาง ไม่ให้รุ่นใหญ่รุ่นเดียว (ต้องมี 52) บีบแถบรุ่นอื่นจนมองไม่เห็น
+    // รุ่นที่เกินสเกลแถบชนขอบ แล้วมีป้าย › บอกไว้ — ตัวเลขจริงอยู่ในบรรทัดใต้แถบเหมือนเดิม
+    var fgVals = [];
     modelCards.forEach(function (row0) {
       var row = d.codes[row0.getAttribute('data-code') || ''];
       if (!row) { return; }
-      fgScale = Math.max(fgScale, Number(row.req) || 0, (Number(row.new) || 0) + Math.max(0, Number(row.rent) || 0));
+      fgVals.push(Math.max(Number(row.req) || 0, (Number(row.new) || 0) + Math.max(0, Number(row.rent) || 0)));
     });
+    fgVals.sort(function (a, b) { return a - b; });
+    var fgMax = fgVals.length ? fgVals[fgVals.length - 1] : 1;
+    var fgMed = fgVals.length ? fgVals[Math.floor(fgVals.length / 2)] : 1;
+    var fgScale = Math.max(1, Math.min(fgMax, Math.max(10, Math.round(fgMed * 2))));
     modelCards.forEach(function (row0) {
       var row = d.codes[row0.getAttribute('data-code') || ''];
       if (!row) { return; }
@@ -868,7 +874,7 @@ $partsBase = ui_parts_base_url();
       // มีเกินกว่าที่ต้องมี → ขยายสเกล แล้วส่วนที่เกินเป็นสีจาง
       var bar = cell('bar');
       if (bar) {
-        var pc = function (n) { return Math.round(n / fgScale * 1000) / 10; };
+        var pc = function (n) { return Math.min(100, Math.round(n / fgScale * 1000) / 10); };
         var newIn = Math.min(have, req);
         var poolIn = Math.min(pool, Math.max(0, req - newIn));
         var seg = function (cls, n) { return n > 0 ? '<i class="' + cls + '" style="width:' + pc(n) + '%"></i>' : ''; };
@@ -876,7 +882,8 @@ $partsBase = ui_parts_base_url();
           + seg('is-new is-extra', have - newIn) + seg('is-pool is-extra', pool - poolIn);
         bar.title = 'เครื่องใหม่ ' + fgNum(have) + (pool > 0 ? ' · คลังพร้อมเช่า ' + fgNum(pool) : '')
           + ' · ต้องมี ' + fgNum(req) + (pool > 0 ? ' (ยอดขาดนับเฉพาะเครื่องใหม่)' : '')
-          + ' · ทุกรุ่นใช้สเกลเดียวกัน (สุดแถบ = ' + fgNum(fgScale) + ' เครื่อง)';
+          + ' · ทุกรุ่นใช้สเกลเดียวกัน (สุดแถบ = ' + fgNum(fgScale) + ' เครื่อง'
+          + (Math.max(req, have + pool) > fgScale ? ' — รุ่นนี้เกินสเกล' : '') + ')';
 
         // หมุด ▼ เหนือแถบ: ดำ = ขั้นต่ำ · ส้ม = ขั้นต่ำ + PO (= ต้องมี) — PO เป็น 0 จะทับกัน เหลือหมุดเดียว
         var minQ = Number(row.min) || 0;
@@ -894,8 +901,16 @@ $partsBase = ui_parts_base_url();
             el.title = tip;
             marks.appendChild(el);
           };
-          if (minQ > 0) { mark('', minQ, 'ขั้นต่ำ ' + fgNum(minQ)); }
-          if (poQ > 0 || minQ === 0) { mark(' is-po', req, 'ขั้นต่ำ ' + fgNum(minQ) + ' + PO ' + fgNum(poQ) + ' = ต้องมี ' + fgNum(req)); }
+          if (minQ > 0 && minQ <= fgScale) { mark('', minQ, 'ขั้นต่ำ ' + fgNum(minQ)); }
+          if ((poQ > 0 || minQ === 0) && req <= fgScale) { mark(' is-po', req, 'ขั้นต่ำ ' + fgNum(minQ) + ' + PO ' + fgNum(poQ) + ' = ต้องมี ' + fgNum(req)); }
+          // เกินสเกล — บอกด้วย › ท้ายแถบ แทนหมุดที่จะไปกองอยู่ริมขวาแบบผิด ๆ
+          if (Math.max(req, have + pool) > fgScale) {
+            var ov = document.createElement('span');
+            ov.className = 'fg-mark is-clip';
+            ov.textContent = '›';
+            ov.title = 'เกินสเกลแถบ (สุดแถบ = ' + fgNum(fgScale) + ' เครื่อง) · มี ' + fgNum(have + pool) + ' · ต้องมี ' + fgNum(req);
+            marks.appendChild(ov);
+          }
         }
         var note = cell('note');
         if (note) {

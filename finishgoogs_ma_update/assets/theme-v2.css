@@ -1031,6 +1031,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .fg-bar-wrap { position: relative; padding-top: 11px; }
 .fg-mark { position: absolute; top: 0; transform: translateX(-50%); font-size: 10px; line-height: 1; color: var(--text, #2a2440); pointer-events: auto; }
 .fg-mark.is-po, .fg-legend-mark.is-po { color: #b45309; }
+.fg-mark.is-clip { top: 11px; right: -2px; left: auto; transform: none; font-size: 13px; line-height: 12px; color: var(--text-muted, #6b6480); }
 .fg-legend-mark { font-size: 10px; color: var(--text, #2a2440); }
 .fg-bar-note { margin-top: 4px; font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); white-space: nowrap; }
 .fg-legend { display: inline-flex; align-items: center; gap: 4px; font-weight: 500; white-space: nowrap; margin-right: 6px; }
