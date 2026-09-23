@@ -844,44 +844,59 @@ switch ($type) {
                 break;
             }
         }
+        $qtyAll = array_sum(array_column($list, 'qty'));
+        $doneAll = array_sum(array_column($list, 'done'));
         $left = array_sum(array_column($list, 'left'));
+        $pct = $qtyAll > 0 ? min(100, (int) round($doneAll * 100 / $qtyAll)) : 0;
+        $barCol = status_bar_color('new');   // ผลิตแล้ว = เครื่องใหม่ (สีจาก ui_status_palette)
+        $snByDoc = inv_pickup_alloc_assets_by_doc($grp, array_column($list, 'pre_id'));
         $B = BASE_URL;
         echo '<div class="pk-pop">';
         echo '<div class="pk-pop-head">' . ($icon ? img_tag($icon, $list[0]['model'], 'pk-pop-img') : '<span class="pk-pop-img pk-noimg"></span>')
-            . '<div><b class="pk-pop-name">' . h($list[0]['model']) . '</b><div class="muted">รอผลิต <b>' . number_format($left) . '</b> เครื่อง · ' . count($list) . ' ใบเบิก</div></div></div>';
-        echo '<div class="table-wrap"><table class="list pk-pop-table"><tr><th>ใบเบิก</th><th>ผู้เบิก</th><th class="num-col">เบิก</th><th class="num-col">ผลิตแล้ว</th><th class="num-col">เหลือ</th></tr>';
+            . '<div class="pk-pop-sum"><b class="pk-pop-name">' . h($list[0]['model']) . '</b>'
+            . '<div class="muted">เบิกมา ' . number_format($qtyAll) . ' · ผลิตแล้ว ' . number_format($doneAll)
+            . ' · เหลือ ' . number_format($left) . ' เครื่อง · ' . count($list) . ' ใบเบิก</div></div>'
+            . '<span class="pk-pct">' . $pct . '%</span></div>';
+        echo '<div class="pk-bar"><span style="width:' . $pct . '%;background:' . h($barCol) . '"></span></div>';
+        // การ์ดต่อใบเบิก: ความคืบหน้าของใบนั้น · S/N ที่ผลิตจากใบนั้น · อะไหล่ที่คลังจ่าย
         foreach ($list as $it) {
-            $label = $it['kind'] === 'parts' ? implode(', ', array_unique($it['parts'])) : $it['set'];
-            echo '<tr><td><a href="' . h($B . '/inv_pickups.php?pre=' . rawurlencode($it['pre_id']) . '&grp=' . $it['grp']) . '">'
-                . h(date('d/m', strtotime($it['date']))) . ' · ' . h($it['pre_id']) . '</a><div class="muted" style="font-size:12px">' . h($label) . '</div></td>'
-                . '<td>' . h($it['by']) . '</td><td class="num-col">' . (int) $it['qty'] . '</td><td class="num-col">' . (int) $it['done'] . '</td>'
-                . '<td class="num-col"><b>' . (int) $it['left'] . '</b></td></tr>';
-        }
-        echo '</table></div>';
-        // ของที่คลังยังไม่จ่าย + อะไหล่ที่จ่ายแล้ว (รวมทุกใบของรุ่นนี้)
-        $missing = [];
-        $got = [];
-        foreach ($list as $it) {
-            foreach ($it['missing'] as $m) {
-                $missing[$m] = true;
+            $p1 = $it['qty'] > 0 ? min(100, (int) round($it['done'] * 100 / $it['qty'])) : 0;
+            echo '<div class="pk-doc' . ($it['missing'] ? ' is-short' : '') . '">';
+            echo '<div class="pk-doc-head"><span class="pk-doc-id"><a href="'
+                . h($B . '/inv_pickups.php?pre=' . rawurlencode($it['pre_id']) . '&grp=' . $it['grp']) . '"><b>'
+                . h(date('d/m', strtotime($it['date']))) . ' · ' . h($it['pre_id']) . '</b></a>'
+                . ($it['by'] !== '' ? ' <span class="muted">· ' . h($it['by']) . '</span>' : '') . '</span>'
+                . '<span class="pk-doc-n"><b>' . (int) $it['done'] . '</b>/' . (int) $it['qty'] . ' · เหลือ ' . (int) $it['left'] . '</span></div>';
+            echo '<div class="pk-bar pk-bar-sm"><span style="width:' . $p1 . '%;background:' . h($barCol) . '"></span></div>';
+            $sns = $snByDoc[$it['pre_id']] ?? [];
+            if ($sns) {
+                echo '<div class="pk-doc-sns">';
+                foreach (array_slice($sns, 0, 12) as $s) {
+                    echo '<a class="pk-sn" href="' . h($B . '/asset.php?id=' . (int) $s['asset_id']) . '">' . h($s['asset_code']) . '</a>';
+                }
+                if (count($sns) > 12) {
+                    echo '<a class="pk-sn pk-sn-more" href="' . h($B . '/inv_pickups.php?pre=' . rawurlencode($it['pre_id']) . '&grp=' . $it['grp']) . '">+'
+                        . (count($sns) - 12) . '</a>';
+                }
+                echo '</div>';
+            } else {
+                echo '<div class="muted pk-doc-none">ยังไม่ได้ลงทะเบียนเครื่องจากใบนี้</div>';
             }
+            $parts = [];
             foreach ($d['docs'][$it['pre_id']]['lines'] as $ln) {
                 // ใบแยกชิ้น: นับเฉพาะอะไหล่ของรุ่นนี้ (ใบเดียวกันมีของรุ่นอื่น/สายคล้องปนอยู่)
                 $mine = $it['kind'] !== 'parts' || array_filter($it['parts'], function ($p) use ($ln) { return strpos($p, $ln['name']) === 0; });
                 if ($ln['got'] > 0 && $mine) {
-                    $got[$ln['name']] = ($got[$ln['name']] ?? 0) + $ln['got'];
+                    $parts[] = h($ln['name']) . ' ×' . (0 + $ln['got']);
                 }
             }
-        }
-        if ($missing) {
-            echo '<p class="pk-pop-warn">คลังยังไม่ได้จ่าย: ' . h(implode(' · ', array_keys($missing))) . '</p>';
-        }
-        if ($got) {
-            $parts = [];
-            foreach ($got as $n => $q) {
-                $parts[] = h($n) . ' ×' . (0 + $q);
+            if ($parts) {
+                echo '<div class="pk-doc-parts">อะไหล่ที่คลังจ่าย: ' . implode(' · ', $parts) . '</div>';
             }
-            echo '<p class="muted pk-pop-parts">อะไหล่ที่คลังจ่ายแล้ว: ' . implode(' · ', $parts) . '</p>';
+            if ($it['missing']) {
+                echo '<div class="pk-doc-warn">คลังยังไม่ได้จ่าย: ' . h(implode(' · ', $it['missing'])) . '</div>';
+            }
+            echo '</div>';
         }
         echo '<div class="pk-pop-btns">';
         foreach ($pids as $p) {

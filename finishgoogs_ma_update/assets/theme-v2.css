@@ -965,7 +965,25 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .pk-pop-name { font-size: calc(16px * var(--font-scale, 1)); }
 .pk-pop-warn { background: #fef3c7; color: #854d0e; border-radius: 8px; padding: 6px 10px; margin: 10px 0 0; }
 .pk-pop-parts { font-size: calc(12.5px * var(--font-scale, 1)); margin: 8px 0 0; line-height: 1.6; }
-.pk-pop-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }.dash-models-table td[data-fg-cell="pick"] b { color: var(--st-rental-fg, #1e40af); }
+.pk-pop-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.pk-pop-sum { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.pk-pct { font-size: calc(22px * var(--font-scale, 1)); font-weight: 700; white-space: nowrap; }
+/* แถบผลิตแล้ว / เบิกมา (สีแถบส่งมาจาก PHP ตาม ui_status_palette) */
+.pk-bar { height: 10px; border-radius: 999px; background: var(--surface-2, #f6f4fb); overflow: hidden; margin: 2px 0 12px; }
+.pk-bar > span { display: block; height: 100%; border-radius: 999px; }
+.pk-bar-sm { height: 6px; margin: 6px 0 8px; }
+.pk-doc { border: 1px solid var(--border, #e5e7eb); border-radius: 10px; padding: 9px 11px; margin-bottom: 8px; }
+.pk-doc.is-short { border-color: #fde68a; }
+.pk-doc-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: calc(13px * var(--font-scale, 1)); }
+.pk-doc-id { overflow-wrap: anywhere; }
+.pk-doc-n { white-space: nowrap; color: var(--muted, #6b7280); }
+.pk-doc-sns { display: flex; flex-wrap: wrap; gap: 6px; }
+.pk-sn { font-size: calc(12px * var(--font-scale, 1)); background: var(--surface-2, #f6f4fb); border-radius: 999px; padding: 2px 9px; text-decoration: none; color: inherit; }
+.pk-sn:hover { background: var(--border, #e5e7eb); }
+.pk-doc-none, .pk-doc-parts { font-size: calc(12px * var(--font-scale, 1)); line-height: 1.55; }
+.pk-doc-parts { color: var(--muted, #6b7280); margin-top: 8px; }
+.pk-doc-warn { font-size: calc(12px * var(--font-scale, 1)); background: #fef3c7; color: #854d0e; border-radius: 8px; padding: 4px 8px; margin-top: 6px; }
+.dash-models-table td[data-fg-cell="pick"] b { color: var(--st-rental-fg, #1e40af); }
 /* หัวกลุ่มในตารางรุ่น (ต่ำกว่าขั้นต่ำ / ไม่พอส่ง PO / ครบ) — สีเดียวกับชิปผล */
 .dash-models-table tr.dash-fg-group td { padding: 7px 12px; font-weight: 700; font-size: calc(13px * var(--font-scale, 1)); cursor: default; border-top: 1px solid var(--border, #e5e7eb); }
 .dash-models-table tr.dash-fg-group.is-stage-0 td { background: #fef2f2; color: #991b1b; }

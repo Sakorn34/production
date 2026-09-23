@@ -105,6 +105,9 @@ if ($preQ !== '' && $grpQ !== '') {
     </div>
     <div class="ip-d-nums"><b><?= (int) $item['done'] ?></b> / <?= (int) $item['qty'] ?> เครื่อง<div class="muted">เหลือ <?= (int) $item['left'] ?></div></div>
   </div>
+  <?php // แถบผลิตแล้ว/เบิกมา — สีเดียวกับ "เครื่องใหม่" จาก ui_status_palette
+  $pct = $item['qty'] > 0 ? min(100, (int) round($item['done'] * 100 / $item['qty'])) : 0; ?>
+  <div class="pk-bar"><span style="width:<?= $pct ?>%;background:<?= h(status_bar_color('new')) ?>"></span></div>
   <?php if ($item['missing']) { ?><p class="ip-warn">คลังยังไม่ได้จ่าย: <?= h(implode(' · ', $item['missing'])) ?></p><?php } ?>
   <div class="ip-d-actions">
     <?= inv_pickups_register_links($item, 'btn') ?>

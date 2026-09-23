@@ -516,6 +516,31 @@ function inv_pickup_alloc_assets(string $preId, string $grp): array
 }
 
 /**
+ * S/N ที่ตัดยอดแล้วของหลายใบในกลุ่มรุ่นเดียวกัน — query เดียว (ใช้ที่ popup บน Dashboard)
+ *
+ * @param string   $grp
+ * @param string[] $preIds
+ * @return array<string,array<int,array<string,mixed>>> pre_id => รายการเครื่อง
+ */
+function inv_pickup_alloc_assets_by_doc(string $grp, array $preIds): array
+{
+    ensure_inv_pickup_schema();
+    $out = [];
+    $ids = array_values(array_unique(array_filter($preIds)));
+    if (!$ids) {
+        return $out;
+    }
+    $in = implode(',', array_map(function ($v) { return "'" . db()->real_escape_string($v) . "'"; }, $ids));
+    $r = qr('SELECT x.pre_id, x.asset_id, a.asset_code, p.name pname
+             FROM inv_pickup_alloc x JOIN assets a ON a.id = x.asset_id JOIN products p ON p.id = a.product_id
+             WHERE x.grp = ? AND x.pre_id IN (' . $in . ') ORDER BY a.asset_code', 's', [$grp]);
+    while ($x = $r->fetch_assoc()) {
+        $out[$x['pre_id']][] = $x;
+    }
+    return $out;
+}
+
+/**
  * ใบเบิกที่เครื่องนี้ถูกตัดยอด (แสดงบนโปรไฟล์เครื่อง)
  *
  * @param int $assetId
