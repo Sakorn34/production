@@ -887,11 +887,12 @@ switch ($type) {
                 // ใบแยกชิ้น: นับเฉพาะอะไหล่ของรุ่นนี้ (ใบเดียวกันมีของรุ่นอื่น/สายคล้องปนอยู่)
                 $mine = $it['kind'] !== 'parts' || array_filter($it['parts'], function ($p) use ($ln) { return strpos($p, $ln['name']) === 0; });
                 if ($ln['got'] > 0 && $mine) {
-                    $parts[] = h($ln['name']) . ' ×' . (0 + $ln['got']);
+                    $parts[] = '<li><span>' . h($ln['name']) . '</span><b>' . (0 + $ln['got']) . '</b></li>';
                 }
             }
             if ($parts) {
-                echo '<div class="pk-doc-parts">อะไหล่ที่คลังจ่าย: ' . implode(' · ', $parts) . '</div>';
+                echo '<div class="pk-doc-parts"><div class="pk-parts-h">อะไหล่ที่คลังจ่าย <span class="muted">' . count($parts) . ' รายการ</span></div>'
+                    . '<ul class="pk-parts">' . implode('', $parts) . '</ul></div>';
             }
             if ($it['missing']) {
                 echo '<div class="pk-doc-warn">คลังยังไม่ได้จ่าย: ' . h(implode(' · ', $it['missing'])) . '</div>';

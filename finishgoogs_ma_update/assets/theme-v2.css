@@ -986,7 +986,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .pk-sn { font-size: calc(12px * var(--font-scale, 1)); background: var(--surface-2, #f6f4fb); border-radius: 999px; padding: 2px 9px; text-decoration: none; color: inherit; }
 .pk-sn:hover { background: var(--border, #e5e7eb); }
 .pk-doc-none, .pk-doc-parts { font-size: calc(12px * var(--font-scale, 1)); line-height: 1.55; }
-.pk-doc-parts { color: var(--muted, #6b7280); margin-top: 8px; }
+.pk-doc-parts { margin-top: 8px; }
+.pk-parts-h { color: var(--muted, #6b7280); margin-bottom: 4px; }
+.pk-parts { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); }
+.pk-parts li { display: flex; justify-content: space-between; gap: 8px; background: var(--surface-2, #f6f4fb); border-radius: 8px; padding: 3px 10px; }
+.pk-parts li span { min-width: 0; overflow-wrap: anywhere; }
+.pk-parts li b { white-space: nowrap; }
 .pk-doc-warn { font-size: calc(12px * var(--font-scale, 1)); background: #fef3c7; color: #854d0e; border-radius: 8px; padding: 4px 8px; margin-top: 6px; }
 .dash-models-table td[data-fg-cell="pick"] b { color: var(--st-rental-fg, #1e40af); }
 /* หัวกลุ่มในตารางรุ่น (ต่ำกว่าขั้นต่ำ / ไม่พอส่ง PO / ครบ) — สีเดียวกับชิปผล */
