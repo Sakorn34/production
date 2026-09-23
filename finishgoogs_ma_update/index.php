@@ -822,6 +822,8 @@ $partsBase = ui_parts_base_url();
       // สำหรับเรียงแบบกลุ่ม: 0 = ต่ำกว่าขั้นต่ำ · 1 = ถึงขั้นต่ำแต่ไม่พอส่ง PO · 2 = ครบ
       var minNum = Number(row.min) || 0;
       row0.setAttribute('data-have', String(have + pool));
+      row0.setAttribute('data-new', String(have));
+      row0.setAttribute('data-pool', String(pool));
       row0.setAttribute('data-req', String(req));
       row0.setAttribute('data-stage', row.state === 'over' ? '2' : (have + pool < minNum ? '0' : '1'));
 
@@ -894,12 +896,14 @@ $partsBase = ui_parts_base_url();
     if (!short && !over) { return; }
     fgCounts = { all: modelCards.length, short: short, over: over, due: dueCount };
     // แบ่ง 3 กลุ่มตามความเร่งด่วน (ต่ำกว่าขั้นต่ำ → ถึงขั้นต่ำแต่ไม่พอส่ง PO → ครบ)
-    // ในกลุ่มเรียงจากที่มีอยู่น้อยสุดก่อน · มีเท่ากัน = รุ่นที่ต้องมีมากกว่าขึ้นก่อน
-    // รุ่นที่ยังไม่มีตัวเลขอยู่ท้ายสุด · การ์ด "เช็คสต็อก" ในไลน์เรียงแบบเดียวกัน (includes/line_bot.php)
+    // ในกลุ่มดู "เครื่องใหม่" เป็นหลัก (น้อยสุดก่อน) มีเท่ากันค่อยดูคลังพร้อมเช่า แล้วรุ่นที่ต้องมีมากกว่าขึ้นก่อน
+    // รุ่นที่ยังไม่มีตัวเลขอยู่ท้ายสุด · การ์ด "เช็คสต็อก" ในไลน์และข้อความเตือนเรียงแบบเดียวกัน
+    // (includes/line_bot.php · shared/line_flex_finishgood_shortage.php)
     var num = function (el, k, d) { var v = el.getAttribute(k); return v === null ? d : Number(v); };
     var sorted = modelCards.slice().sort(function (a, b) {
       return num(a, 'data-stage', 3) - num(b, 'data-stage', 3)
-        || num(a, 'data-have', 0) - num(b, 'data-have', 0)
+        || num(a, 'data-new', 0) - num(b, 'data-new', 0)
+        || num(a, 'data-pool', 0) - num(b, 'data-pool', 0)
         || num(b, 'data-req', 0) - num(a, 'data-req', 0)
         || num(b, 'data-count', 0) - num(a, 'data-count', 0);
     });

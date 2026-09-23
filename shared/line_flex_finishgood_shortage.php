@@ -528,8 +528,8 @@ function line_flex_fg_is_below_min(array $item): bool
 
 /**
  * เรียงแบบเดียวกับตาราง "จำนวนเครื่องแยกตามรุ่น" บน Dashboard (index.php) และการ์ดเช็คสต็อกในไลน์
- * ต่ำกว่าขั้นต่ำก่อน → ถึงขั้นต่ำแต่ไม่พอส่ง PO · ในกลุ่มเรียงจากที่มีอยู่น้อยสุดก่อน ·
- * มีเท่ากันให้รุ่นที่ต้องมีมากกว่าขึ้นก่อน
+ * ต่ำกว่าขั้นต่ำก่อน → ถึงขั้นต่ำแต่ไม่พอส่ง PO · ในกลุ่มดูเครื่องใหม่เป็นหลัก (น้อยสุดก่อน)
+ * มีเท่ากันค่อยดูคลังพร้อมเช่า แล้วให้รุ่นที่ต้องมีมากกว่าขึ้นก่อน
  *
  * @param array<int,array<string,mixed>> $items
  * @return array<int,array<string,mixed>>
@@ -537,8 +537,10 @@ function line_flex_fg_is_below_min(array $item): bool
 function line_flex_fg_sort_like_dashboard(array $items): array
 {
     usort($items, static function ($a, $b) {
-        return [line_flex_fg_is_below_min($a) ? 0 : 1, (int) $a['available'], -(int) $a['required'], (string) $a['product_name']]
-           <=> [line_flex_fg_is_below_min($b) ? 0 : 1, (int) $b['available'], -(int) $b['required'], (string) $b['product_name']];
+        return [line_flex_fg_is_below_min($a) ? 0 : 1, (int) ($a['stock_qty'] ?? $a['available']), (int) ($a['leasing_qty'] ?? 0),
+                -(int) $a['required'], (string) $a['product_name']]
+           <=> [line_flex_fg_is_below_min($b) ? 0 : 1, (int) ($b['stock_qty'] ?? $b['available']), (int) ($b['leasing_qty'] ?? 0),
+                -(int) $b['required'], (string) $b['product_name']];
     });
     return array_values($items);
 }

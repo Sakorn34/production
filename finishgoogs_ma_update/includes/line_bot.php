@@ -448,7 +448,9 @@ function line_bot_stock_messages(): array
     }
     unset($r);
     usort($rows, function ($a, $b) {
-        return [$a['stage'], $a['have'], -($b['min'] + $b['po']), $a['name']] <=> [$b['stage'], $b['have'], -($a['min'] + $a['po']), $b['name']];
+        // เครื่องใหม่เป็นหลัก แล้วค่อยคลังพร้อมเช่า (เรียงเหมือนตารางรุ่นบน Dashboard)
+        return [$a['stage'], $a['new'], $a['rent'], -($a['min'] + $a['po']), $a['name']]
+           <=> [$b['stage'], $b['new'], $b['rent'], -($b['min'] + $b['po']), $b['name']];
     });
     $groupLabel = [
         0 => ['ต่ำกว่าขั้นต่ำ — ต้องผลิตด่วน', '#991b1b', '#fef2f2'],
