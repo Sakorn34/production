@@ -972,6 +972,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .pk-bar { height: 10px; border-radius: 999px; background: var(--surface-2, #f6f4fb); overflow: hidden; margin: 2px 0 12px; }
 .pk-bar > span { display: block; height: 100%; border-radius: 999px; }
 .pk-bar-sm { height: 6px; margin: 6px 0 8px; }
+.pk-bar-row { display: block; height: 5px; margin: 5px 0 0; }
+.dash-pk-prog { margin: 2px 0 6px; }
+.dash-pk-prog-lb { display: flex; justify-content: space-between; gap: 8px; font-size: calc(12.5px * var(--font-scale, 1)); color: var(--muted, #6b7280); }
+.dash-pk-prog-lb b { color: var(--text, #2a2440); }
+.dash-pk-prog .pk-bar { margin: 4px 0 0; }
 .pk-doc { border: 1px solid var(--border, #e5e7eb); border-radius: 10px; padding: 9px 11px; margin-bottom: 8px; }
 .pk-doc.is-short { border-color: #fde68a; }
 .pk-doc-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: calc(13px * var(--font-scale, 1)); }

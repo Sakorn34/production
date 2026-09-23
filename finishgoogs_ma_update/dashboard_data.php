@@ -917,12 +917,14 @@ switch ($type) {
         }
         $out = ['ok' => true, 'ready' => 0, 'ready_models' => 0, 'oldest' => '', 'waiting' => 0, 'waiting_last' => '',
                 'waiting_by' => '', 'unmatched' => count(inv_pickup_unmatched_assets()), 'since' => date('d/m', strtotime(inv_pickup_since())),
-                'by_pid' => []];
+                'qty' => 0, 'done' => 0, 'bar' => status_bar_color('new'), 'by_pid' => []];
         $groups = [];
         $waitingDocs = [];
         foreach ($d['items'] as $it) {
             if ($it['state'] === 'ready') {
                 $out['ready'] += $it['left'];
+                $out['qty'] += $it['qty'];
+                $out['done'] += $it['done'];
                 $groups[$it['grp']] = true;
                 if ($out['oldest'] === '' || $it['date'] < $out['oldest']) {
                     $out['oldest'] = $it['date'];
@@ -959,9 +961,12 @@ switch ($type) {
                         break;
                     }
                 }
-                $models[$g] = ['grp' => $g, 'name' => $it['model'], 'icon' => $icon, 'left' => 0, 'docs' => 0, 'oldest' => $it['date'], 'missing' => []];
+                $models[$g] = ['grp' => $g, 'name' => $it['model'], 'icon' => $icon, 'left' => 0, 'qty' => 0, 'done' => 0,
+                               'docs' => 0, 'oldest' => $it['date'], 'missing' => []];
             }
             $models[$g]['left'] += $it['left'];
+            $models[$g]['qty'] += $it['qty'];
+            $models[$g]['done'] += $it['done'];
             $models[$g]['docs']++;
             $models[$g]['oldest'] = min($models[$g]['oldest'], $it['date']);
             foreach ($it['missing'] as $m) {

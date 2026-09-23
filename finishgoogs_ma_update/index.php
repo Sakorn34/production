@@ -458,6 +458,10 @@ $partsBase = ui_parts_base_url();
     <a class="dash-pk-stat is-warn" id="dash-pk-unmatched-pill" href="<?= h($B) ?>/inv_pickups.php?tab=unmatched"
        title="เครื่องที่ลงทะเบียนตอนรุ่นนั้นไม่มีใบเบิกจาก inventory ค้างอยู่ — จับคู่กับใบเบิกทีหลังได้">ลงทะเบียนโดยไม่มีใบเบิก <b id="dash-pk-unmatched">—</b></a>
   </div>
+  <div class="dash-pk-prog" id="dash-pk-prog" hidden>
+    <div class="dash-pk-prog-lb"><span>ผลิตแล้ว <b id="dash-pk-done">0</b> / <span id="dash-pk-qty">0</span> เครื่องที่เบิกมา</span><b id="dash-pk-pct">0%</b></div>
+    <div class="pk-bar"><span id="dash-pk-bar"></span></div>
+  </div>
   <div class="dash-pk-list" id="dash-pk-list"></div>
   <a class="dash-pk-more" id="dash-pk-more" href="<?= h($B) ?>/inv_pickups.php" hidden></a>
 </div>
@@ -732,6 +736,13 @@ $partsBase = ui_parts_base_url();
       set('dash-pk-unmatched', fgNum(d.unmatched));
       set('dash-pk-since', 'ติดตามตั้งแต่ ' + d.since);
       document.getElementById('dash-pk-unmatched-pill').hidden = !d.unmatched;
+      // แถบรวม: ผลิตแล้ว / เบิกมา (เฉพาะใบที่ยังรอผลิต) — สีแถบมาจาก ui_status_palette ฝั่ง PHP
+      var pctOf = function (done, qty) { return qty > 0 ? Math.min(100, Math.round(done * 100 / qty)) : 0; };
+      set('dash-pk-done', fgNum(d.done));
+      set('dash-pk-qty', fgNum(d.qty));
+      set('dash-pk-pct', pctOf(d.done, d.qty) + '%');
+      document.getElementById('dash-pk-bar').style.cssText = 'width:' + pctOf(d.done, d.qty) + '%;background:' + d.bar;
+      document.getElementById('dash-pk-prog').hidden = !d.qty;
       // รายรุ่น 5 อันดับแรก — กดแถวเปิด popup รายละเอียด (ใบเบิก · ของที่ยังไม่จ่าย · อะไหล่ที่จ่ายแล้ว)
       var SHOW = 5, list = document.getElementById('dash-pk-list'), models = d.models || [];
       list.innerHTML = models.length ? models.slice(0, SHOW).map(function (m) {
@@ -739,7 +750,9 @@ $partsBase = ui_parts_base_url();
           + (m.icon ? '<img src="' + esc(m.icon) + '" alt="" class="dash-pk-img" loading="lazy">' : '<span class="dash-pk-img dash-pk-noimg"></span>')
           + '<span class="dash-pk-nm"><b>' + esc(m.name) + '</b>'
           + (m.missing.length ? ' <span class="dash-pk-miss">' + esc(m.missing.slice(0, 2).join(', ')) + ' ยังไม่จ่าย</span>' : '')
-          + '<small>' + m.docs + ' ใบ · ' + (m.docs > 1 ? 'เก่าสุด ' : '') + esc(m.oldest) + '</small></span>'
+          + '<small>' + m.docs + ' ใบ · ' + (m.docs > 1 ? 'เก่าสุด ' : '') + esc(m.oldest)
+          + ' · ผลิตแล้ว ' + fgNum(m.done) + '/' + fgNum(m.qty) + '</small>'
+          + '<span class="pk-bar pk-bar-row"><span style="width:' + pctOf(m.done, m.qty) + '%;background:' + d.bar + '"></span></span></span>'
           + '<span class="dash-pk-q"><b>' + fgNum(m.left) + '</b>เครื่อง</span></button>';
       }).join('') : '<p class="muted" style="margin:6px 0 0">ไม่มีของที่เบิกมารอผลิต</p>';
       var more = document.getElementById('dash-pk-more');
