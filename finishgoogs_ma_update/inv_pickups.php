@@ -18,6 +18,19 @@ $preQ = trim((string) ($_GET['pre'] ?? ''));
 $grpQ = inv_pickup_grp((string) ($_GET['grp'] ?? ''));
 
 // ── รายละเอียดรายการ: ตัดยอดเอง / เอาออก / ปิด-เปิด ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['skip_ids']) || isset($_POST['unskip']))) {
+    // เคลียร์เครื่องออกจากรายการ (ไม่นับเข้าใบเบิก) หรือเอากลับมานับ
+    csrf_check();
+    if (isset($_POST['unskip'])) {
+        inv_pickup_unskip((int) $_POST['unskip']);
+        flash_set('เอากลับมานับในรายการแล้ว');
+    } else {
+        $n = inv_pickup_skip_assets((array) $_POST['skip_ids'], (string) ($_POST['skip_reason'] ?? ''), actor_name());
+        flash_set($n ? 'เคลียร์ออกจากรายการแล้ว ' . $n . ' เครื่อง — ไม่นับเข้าใบเบิก' : 'ยังไม่ได้เลือกเครื่อง', $n ? 'ok' : 'err');
+    }
+    header('Location: ' . $B . '/inv_pickups.php?tab=unmatched' . (!empty($_POST['show_skipped']) ? '&skipped=1' : ''));
+    exit;
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['match_asset'])) {
     // แท็บ "ไม่ผ่านใบเบิก": จับคู่เครื่องเข้าใบที่เลือก
     csrf_check();
@@ -187,26 +200,85 @@ if (!$data['ok']) { ?>
     } ?>
 <div class="panel">
   <p class="muted" style="margin:0 0 10px;font-size:12.5px">เครื่องรุ่นที่ติดตามกับใบเบิก ที่ลงทะเบียนตั้งแต่ <?= h($fmtD(inv_pickup_since())) ?> แต่ไม่ได้ตัดยอดใบเบิกใด
-    (ลงทะเบียนตอนไม่มีใบเบิกค้าง) — ถ้ามีใบเบิกของเครื่องนั้นแล้ว เลือกใบแล้วกดจับคู่</p>
+    (ลงทะเบียนตอนไม่มีใบเบิกค้าง) — ถ้ามีใบเบิกของเครื่องนั้นแล้ว เลือกใบแล้วกดจับคู่ ·
+    เครื่องที่แค่นับเข้าคลังใหม่ หรือเป็นของค้างจากใบเบิกเก่า ให้ติ๊กแล้วกด "ไม่ต้องนับ" (เอากลับมานับทีหลังได้)</p>
   <?php if (!$unmatched) { ?><p class="muted" style="margin:0">ไม่มี — ทุกเครื่องผ่านใบเบิก</p><?php } else { ?>
+  <form method="post" id="ip-skip-form">
+  <?= csrf_field() ?>
   <div class="table-wrap"><table class="list">
-    <tr><th data-pri="1">เครื่อง</th><th data-pri="2">ลงทะเบียน</th><th data-pri="1">จับคู่กับใบเบิก</th></tr>
+    <tr><th data-pri="1" class="ip-cbcol"><input type="checkbox" id="ip-skip-all" aria-label="เลือกทั้งหมด"></th>
+      <th data-pri="1">เครื่อง</th><th data-pri="2">ลงทะเบียน</th><th data-pri="1">จับคู่กับใบเบิก</th></tr>
     <?php foreach ($unmatched as $u) { $opts = $openFor[(int) $u['product_id']] ?? []; ?>
     <tr>
+      <td data-pri="1" class="ip-cbcol"><input type="checkbox" class="ip-skip-cb" name="skip_ids[]" value="<?= (int) $u['id'] ?>" aria-label="เลือก <?= h($u['asset_code']) ?>"></td>
       <td data-pri="1"><a href="<?= $B ?>/asset.php?id=<?= (int) $u['id'] ?>"><b><?= h($u['asset_code']) ?></b></a><div class="muted" style="font-size:12px"><?= h($u['pname']) ?></div></td>
       <td data-pri="2"><?= h($fmtD($u['created_at'])) ?><?= $u['created_by'] ? ' · ' . h($u['created_by']) : '' ?></td>
       <td data-pri="1"><?php if ($opts) { ?>
-        <form method="post" class="ip-inline"><?= csrf_field() ?><input type="hidden" name="match_asset" value="<?= h($u['asset_code']) ?>">
-          <select name="match_to" class="ip-match"><?php foreach ($opts as $o) { ?>
+        <span class="ip-inline"><select name="match_to_<?= (int) $u['id'] ?>" class="ip-match" data-match-for="<?= h($u['asset_code']) ?>"><?php foreach ($opts as $o) { ?>
             <option value="<?= h($o['pre_id'] . '|' . $o['grp']) ?>"><?= h($fmtD($o['date']) . ' · ' . ($o['kind'] === 'parts' ? implode(', ', array_unique($o['parts'])) : $o['set']) . ' · เหลือ ' . $o['left']) ?></option>
           <?php } ?></select>
-          <button type="submit" class="btn btn-sm btn-line">จับคู่</button>
-        </form>
+          <button type="button" class="btn btn-sm btn-line ip-match-btn">จับคู่</button></span>
       <?php } else { ?><span class="muted">ไม่มีใบเบิกค้างของรุ่นนี้</span><?php } ?></td>
     </tr>
     <?php } ?>
   </table></div>
+  <div class="ip-skip-bar">
+    <input type="text" name="skip_reason" class="ip-reason" placeholder="เหตุผล (เช่น นับเข้าคลังใหม่ · ของค้างใบเบิกเก่า)">
+    <button type="submit" class="btn btn-line" id="ip-skip-btn" disabled>ไม่ต้องนับที่เลือก</button>
+  </div>
+  </form>
   <?php } ?>
+  <?php $skipped = inv_pickup_skipped_assets(); if ($skipped) { ?>
+  <details class="ip-skipped"<?= !empty($_GET['skipped']) ? ' open' : '' ?>>
+    <summary>เครื่องที่เคลียร์ไว้ ไม่นับเข้าใบเบิก (<?= count($skipped) ?>)</summary>
+    <div class="table-wrap"><table class="list">
+      <tr><th data-pri="1">เครื่อง</th><th data-pri="2">เคลียร์เมื่อ</th><th data-pri="2">เหตุผล</th><th data-pri="1"></th></tr>
+      <?php foreach ($skipped as $s) { ?>
+      <tr>
+        <td data-pri="1"><a href="<?= $B ?>/asset.php?id=<?= (int) $s['id'] ?>"><?= h($s['asset_code']) ?></a><div class="muted" style="font-size:12px"><?= h($s['pname']) ?></div></td>
+        <td data-pri="2"><?= h($fmtD($s['skipped_at'])) ?><?= $s['skipped_by'] ? ' · ' . h($s['skipped_by']) : '' ?></td>
+        <td data-pri="2"><?= h((string) $s['reason']) ?></td>
+        <td data-pri="1"><form method="post" class="ip-inline"><?= csrf_field() ?><input type="hidden" name="show_skipped" value="1">
+          <button type="submit" name="unskip" value="<?= (int) $s['id'] ?>" class="btn btn-sm btn-line">เอากลับมานับ</button></form></td>
+      </tr>
+      <?php } ?>
+    </table></div>
+  </details>
+  <?php } ?>
+  <script>
+  (function () {
+    var form = document.getElementById('ip-skip-form');
+    if (!form) { return; }
+    var btn = document.getElementById('ip-skip-btn');
+    var all = document.getElementById('ip-skip-all');
+    var boxes = [].slice.call(form.querySelectorAll('.ip-skip-cb'));
+    function sync() {
+      var n = boxes.filter(function (b) { return b.checked; }).length;
+      btn.disabled = !n;
+      btn.textContent = n ? 'ไม่ต้องนับที่เลือก (' + n + ')' : 'ไม่ต้องนับที่เลือก';
+      all.checked = n === boxes.length && n > 0;
+    }
+    all.addEventListener('change', function () { boxes.forEach(function (b) { b.checked = all.checked; }); sync(); });
+    boxes.forEach(function (b) { b.addEventListener('change', sync); });
+    form.addEventListener('submit', function (e) {
+      if (!confirm('เอาเครื่องที่เลือกออกจากรายการนี้? (ไม่นับเข้าใบเบิก · เอากลับมานับทีหลังได้)')) { e.preventDefault(); }
+    });
+    // ปุ่มจับคู่อยู่ในฟอร์มเดียวกับการเคลียร์ — ส่งแยกเป็นฟอร์มของตัวเอง ไม่ให้ชนกัน
+    form.addEventListener('click', function (e) {
+      var b = e.target.closest('.ip-match-btn');
+      if (!b) { return; }
+      var sel = b.parentNode.querySelector('.ip-match');
+      var f = document.createElement('form');
+      f.method = 'post';
+      f.innerHTML = form.querySelector('input[name="csrf"]').outerHTML
+        + '<input type="hidden" name="match_asset" value="' + sel.getAttribute('data-match-for') + '">'
+        + '<input type="hidden" name="match_to" value="' + sel.value + '">';
+      document.body.appendChild(f);
+      f.submit();
+    });
+    sync();
+  })();
+  </script>
 </div>
 <?php
     inv_pickups_css();
@@ -287,6 +359,11 @@ function inv_pickups_css(): void
 .ip-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 12px; }
 .ip-tab { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--border, #e5e7eb); text-decoration: none; color: inherit; font-size: calc(13.5px * var(--font-scale, 1)); background: var(--surface, #fff); }
 .ip-tab-warn { border-color: #fde68a; }
+.ip-cbcol { width: 36px; }
+.ip-skip-cb, #ip-skip-all { width: 20px; height: 20px; }
+.ip-skip-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+.ip-skipped { margin-top: 14px; }
+.ip-skipped summary { cursor: pointer; font-size: calc(13.5px * var(--font-scale, 1)); }
 .ip-match { max-width: 100%; min-width: 0; }
 .ip-tab.is-on { background: var(--accent-soft, #fdf2f8); border-color: var(--accent, #e0337f); color: var(--accent, #e0337f); font-weight: 700; }
 .ip-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 12px; margin-bottom: 12px; }

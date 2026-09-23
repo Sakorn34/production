@@ -76,6 +76,14 @@ function ensure_inv_pickup_schema(): void
         closed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (pre_id, grp)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    // เครื่องที่ไม่ต้องนับเข้าใบเบิก — นับเข้าคลังใหม่เฉย ๆ หรือเป็นของค้างจากใบเบิกเก่าก่อนเริ่มติดตาม
+    // เก็บแยกจากการตัดยอด เพื่อให้เอากลับมานับได้ทีหลังและรู้ว่าใครเคลียร์เมื่อไหร่
+    db()->query("CREATE TABLE IF NOT EXISTS inv_pickup_skip (
+        asset_id INT NOT NULL PRIMARY KEY,
+        reason VARCHAR(255) NULL,
+        skipped_by VARCHAR(100) NULL,
+        skipped_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 }
 
 /**
@@ -745,7 +753,8 @@ function inv_pickup_unmatched_assets(int $limit = 500): array
     $r = qr('SELECT a.id, a.asset_code, a.product_id, a.created_at, a.created_by, p.name pname
              FROM assets a JOIN products p ON p.id = a.product_id
              LEFT JOIN inv_pickup_alloc x ON x.asset_id = a.id
-             WHERE x.id IS NULL AND a.product_id IN (' . implode(',', array_map('intval', $tracked)) . ') AND a.created_at >= ?
+             LEFT JOIN inv_pickup_skip s ON s.asset_id = a.id
+             WHERE x.id IS NULL AND s.asset_id IS NULL AND a.product_id IN (' . implode(',', array_map('intval', $tracked)) . ') AND a.created_at >= ?
              ORDER BY a.created_at DESC, a.id DESC LIMIT ' . (int) $limit, 's', [inv_pickup_since() . ' 00:00:00']);
     while ($x = $r->fetch_assoc()) {
         $out[] = $x;
@@ -754,7 +763,59 @@ function inv_pickup_unmatched_assets(int $limit = 500): array
 }
 
 /**
- * เครื่องนี้ "ไม่ผ่านใบเบิก" ไหม (รุ่นที่ติดตาม · ลงทะเบียนหลังวันเริ่มติดตาม · ไม่มีการตัดยอด)
+ * เคลียร์เครื่องออกจากรายการ "ลงทะเบียนโดยไม่มีใบเบิก" — ไม่นับเข้าชุดใบเบิกใด
+ * (นับเข้าคลังใหม่เฉย ๆ · ของค้างจากใบเบิกเก่า) · ทะเบียนเครื่องไม่ถูกแตะ เอากลับมานับได้ทุกเมื่อ
+ *
+ * @param int[]  $assetIds
+ * @param string $reason
+ * @param string $actor
+ * @return int จำนวนที่เคลียร์
+ */
+function inv_pickup_skip_assets(array $assetIds, string $reason, string $actor): int
+{
+    ensure_inv_pickup_schema();
+    $n = 0;
+    foreach (array_unique(array_filter(array_map('intval', $assetIds))) as $id) {
+        q('REPLACE INTO inv_pickup_skip (asset_id, reason, skipped_by) VALUES (?, ?, ?)',
+          'iss', [$id, mb_substr(trim($reason), 0, 255), mb_substr($actor, 0, 100)]);
+        $n++;
+    }
+    return $n;
+}
+
+/**
+ * เอาเครื่องกลับมานับในรายการอีกครั้ง
+ *
+ * @param int $assetId
+ * @return void
+ */
+function inv_pickup_unskip(int $assetId): void
+{
+    ensure_inv_pickup_schema();
+    q('DELETE FROM inv_pickup_skip WHERE asset_id = ?', 'i', [$assetId]);
+}
+
+/**
+ * เครื่องที่เคลียร์ไว้ (ไม่นับเข้าใบเบิก)
+ *
+ * @param int $limit
+ * @return array<int,array<string,mixed>>
+ */
+function inv_pickup_skipped_assets(int $limit = 300): array
+{
+    ensure_inv_pickup_schema();
+    $out = [];
+    $r = qr('SELECT a.id, a.asset_code, a.created_at, p.name pname, s.reason, s.skipped_by, s.skipped_at
+             FROM inv_pickup_skip s JOIN assets a ON a.id = s.asset_id JOIN products p ON p.id = a.product_id
+             ORDER BY s.skipped_at DESC LIMIT ' . (int) $limit);
+    while ($x = $r->fetch_assoc()) {
+        $out[] = $x;
+    }
+    return $out;
+}
+
+/**
+ * เครื่องนี้ "ไม่ผ่านใบเบิก" ไหม (รุ่นที่ติดตาม · ลงทะเบียนหลังวันเริ่มติดตาม · ไม่มีการตัดยอด · ยังไม่ถูกเคลียร์)
  *
  * @param array<string,mixed> $asset แถว assets (id, product_id, created_at)
  * @return bool
@@ -767,6 +828,9 @@ function inv_pickup_asset_unmatched(array $asset): bool
     }
     if ((string) ($asset['created_at'] ?? '') < inv_pickup_since() . ' 00:00:00') {
         return false;
+    }
+    if (qr('SELECT asset_id FROM inv_pickup_skip WHERE asset_id = ?', 'i', [(int) $asset['id']])->fetch_assoc()) {
+        return false;   // เคลียร์ไว้แล้ว ไม่ต้องเตือนบนโปรไฟล์เครื่อง
     }
     return inv_pickup_for_asset((int) $asset['id']) === null;
 }
