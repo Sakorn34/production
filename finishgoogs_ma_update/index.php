@@ -528,6 +528,15 @@ $partsBase = ui_parts_base_url();
       <?php // รุ่นที่เกินรอบนับ — นับไว้ฝั่ง PHP เพราะไม่ต้องรอตัวเลขสต็อก ?>
       <button type="button" class="dash-parts-filter-btn" data-fg-filter="due" role="tab" aria-selected="false" title="รุ่นที่ไม่ได้นับสต็อกเกิน <?= (int) stock_count_interval_days() ?> วัน หรือยังไม่เคยนับ">ถึงรอบนับ</button>
     </div>
+    <label class="dash-fg-sort" for="dash-fg-sort"><span>เรียงตาม</span>
+      <select id="dash-fg-sort">
+        <option value="urgent">ความเร่งด่วน</option>
+        <option value="gap">ขาดมากสุด</option>
+        <option value="new">เครื่องใหม่น้อยสุด</option>
+        <option value="req">ต้องมีมากสุด</option>
+        <option value="name">ชื่อรุ่น</option>
+      </select>
+    </label>
     <span class="muted dash-fg-hint" id="dash-fg-hint"></span>
   </div>
   <?php // ตาราง ไม่ใช่การ์ด — 35 รุ่นเป็นการ์ดเรียงลงมาแล้วเลื่อนยาวมาก ตารางอ่านเทียบกันได้ในจอเดียว
@@ -707,6 +716,10 @@ $partsBase = ui_parts_base_url();
   var modelsGrid = document.getElementById('dash-models-grid');
   var fgFilters = document.getElementById('dash-fg-filters');
   var fgHint = document.getElementById('dash-fg-hint');
+  var fgSortSel = document.getElementById('dash-fg-sort');
+  var fgNumbersReady = false;
+  var currentFgSort = 'urgent';
+  try { currentFgSort = localStorage.getItem('dash_fg_sort') || 'urgent'; } catch (e) {}
   var fgSummary = document.getElementById('dash-fg-summary');
   var fgFoot = document.getElementById('dash-fg-foot');
   var fgBtns = fgFilters ? fgFilters.querySelectorAll('.dash-parts-filter-btn') : [];
@@ -895,34 +908,8 @@ $partsBase = ui_parts_base_url();
 
     if (!short && !over) { return; }
     fgCounts = { all: modelCards.length, short: short, over: over, due: dueCount };
-    // แบ่ง 3 กลุ่มตามความเร่งด่วน (ต่ำกว่าขั้นต่ำ → ถึงขั้นต่ำแต่ไม่พอส่ง PO → ครบ)
-    // ในกลุ่มดู "เครื่องใหม่" เป็นหลัก (น้อยสุดก่อน) มีเท่ากันค่อยดูคลังพร้อมเช่า แล้วรุ่นที่ต้องมีมากกว่าขึ้นก่อน
-    // รุ่นที่ยังไม่มีตัวเลขอยู่ท้ายสุด · การ์ด "เช็คสต็อก" ในไลน์และข้อความเตือนเรียงแบบเดียวกัน
-    // (includes/line_bot.php · shared/line_flex_finishgood_shortage.php)
-    var num = function (el, k, d) { var v = el.getAttribute(k); return v === null ? d : Number(v); };
-    var sorted = modelCards.slice().sort(function (a, b) {
-      return num(a, 'data-stage', 3) - num(b, 'data-stage', 3)
-        || num(a, 'data-new', 0) - num(b, 'data-new', 0)
-        || num(a, 'data-pool', 0) - num(b, 'data-pool', 0)
-        || num(b, 'data-req', 0) - num(a, 'data-req', 0)
-        || num(b, 'data-count', 0) - num(a, 'data-count', 0);
-    });
-    modelsGrid.querySelectorAll('tr.dash-fg-group').forEach(function (g) { g.remove(); });
-    var lastStage = null;
-    sorted.forEach(function (card) {
-      var st = card.getAttribute('data-stage');
-      if (st !== null && st !== lastStage) {
-        lastStage = st;
-        var n = sorted.filter(function (c) { return c.getAttribute('data-stage') === st; }).length;
-        var gr = document.createElement('tr');
-        gr.className = 'dash-fg-group is-stage-' + st;
-        gr.setAttribute('data-stage', st);
-        gr.innerHTML = '<td data-pri="1" colspan="7">' + fgGroupLabels[st] + ' <span class="dash-fg-group-n">' + fgNum(n) + ' รุ่น</span></td>';
-        modelsGrid.appendChild(gr);
-      }
-      modelsGrid.appendChild(card);
-    });
-    syncFgGroups();
+    fgNumbersReady = true;
+    applyFgSort(currentFgSort);
 
     if (fgSummary) {
       document.getElementById('dash-fg-sum-new').textContent = fgNum(newTotal) + ' เครื่อง';
@@ -970,6 +957,54 @@ $partsBase = ui_parts_base_url();
     '1': 'ถึงขั้นต่ำแล้ว แต่ไม่พอส่ง PO',
     '2': 'ครบแล้ว'
   };
+  // วิธีเรียงตารางรุ่น — ผู้ใช้เลือกเองได้ จำไว้ในเครื่องนี้ (ค่าเริ่มต้น = ความเร่งด่วน)
+  // "ความเร่งด่วน" เท่านั้นที่แบ่งหัวกลุ่ม 3 กลุ่ม และตรงกับลำดับการ์ดเช็คสต็อก/ข้อความเตือนในไลน์
+  // (includes/line_bot.php · shared/line_flex_finishgood_shortage.php)
+  var fgNum2 = function (el, k, d) { var v = el.getAttribute(k); return v === null ? d : Number(v); };
+  var fgSorters = {
+    urgent: function (a, b) {
+      return fgNum2(a, 'data-stage', 3) - fgNum2(b, 'data-stage', 3)
+        || fgSorters['new'](a, b)
+        || fgNum2(b, 'data-count', 0) - fgNum2(a, 'data-count', 0);
+    },
+    // ขาด = -1 สำหรับรุ่นที่ครบแล้ว จึงไปอยู่ท้ายสุดเอง
+    gap: function (a, b) { return fgNum2(b, 'data-gap', -1) - fgNum2(a, 'data-gap', -1) || fgSorters['new'](a, b); },
+    'new': function (a, b) {
+      return fgNum2(a, 'data-new', 0) - fgNum2(b, 'data-new', 0)
+        || fgNum2(a, 'data-pool', 0) - fgNum2(b, 'data-pool', 0)
+        || fgNum2(b, 'data-req', 0) - fgNum2(a, 'data-req', 0);
+    },
+    req: function (a, b) { return fgNum2(b, 'data-req', 0) - fgNum2(a, 'data-req', 0) || fgSorters['new'](a, b); },
+    name: function (a, b) { return (a.getAttribute('data-name') || '').localeCompare(b.getAttribute('data-name') || '', 'th'); }
+  };
+  function applyFgSort(mode) {
+    currentFgSort = fgSorters[mode] ? mode : 'urgent';
+    try { localStorage.setItem('dash_fg_sort', currentFgSort); } catch (e) {}
+    if (fgSortSel && fgSortSel.value !== currentFgSort) { fgSortSel.value = currentFgSort; }
+    if (!modelsGrid || !fgNumbersReady) { return; }
+    var sorted = modelCards.slice().sort(fgSorters[currentFgSort]);
+    modelsGrid.querySelectorAll('tr.dash-fg-group').forEach(function (g) { g.remove(); });
+    var lastStage = null;
+    sorted.forEach(function (card) {
+      var st = card.getAttribute('data-stage');
+      if (currentFgSort === 'urgent' && st !== null && st !== lastStage) {
+        lastStage = st;
+        var n = sorted.filter(function (c) { return c.getAttribute('data-stage') === st; }).length;
+        var gr = document.createElement('tr');
+        gr.className = 'dash-fg-group is-stage-' + st;
+        gr.setAttribute('data-stage', st);
+        gr.innerHTML = '<td data-pri="1" colspan="7">' + fgGroupLabels[st] + ' <span class="dash-fg-group-n">' + fgNum(n) + ' รุ่น</span></td>';
+        modelsGrid.appendChild(gr);
+      }
+      modelsGrid.appendChild(card);
+    });
+    syncFgGroups();
+  }
+  if (fgSortSel) {
+    fgSortSel.value = currentFgSort;
+    fgSortSel.addEventListener('change', function () { applyFgSort(fgSortSel.value); });
+  }
+
   // หัวกลุ่มซ่อนตามแถวในกลุ่ม — กรองแล้วไม่เหลือรุ่นในกลุ่มไหน หัวกลุ่มนั้นก็ไม่ต้องขึ้น
   function syncFgGroups() {
     if (!modelsGrid) { return; }
