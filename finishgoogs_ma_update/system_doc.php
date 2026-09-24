@@ -244,18 +244,19 @@ $B = BASE_URL;
 <div class="panel doc-section" id="databases">
   <h2><span class="doc-n">3</span>ฐานข้อมูล</h2>
   <p class="section-note">
-    ระบบต่อ <b>6 database</b> แบ่งเป็น 2 กลุ่ม<br>
+    ระบบต่อ <b>7 database</b> แบ่งเป็น 2 กลุ่ม<br>
     <b>เขียนได้ (ของเรา):</b> <span class="inline-code">biton_production</span> ฐานหลัก ·
     <span class="inline-code">biton_stockparts</span> ทะเบียน S/N ของทีม stock ·
     <span class="inline-code">biton_tech_parts</span> สต็อกอะไหล่ช่าง (single source of truth ของจำนวนคงเหลือ)<br>
     <b>อ่านอย่างเดียว (ของทีมอื่น — ห้ามแก้ schema หรือเขียนลงไป):</b>
     <span class="inline-code">biton_maintenance</span> งานซ่อม ·
     <span class="inline-code">biton_setup</span> ประวัติขาย/เคลม/ใบส่งมอบ ·
-    <span class="inline-code">biton_leasing</span> งานเช่า
+    <span class="inline-code">biton_leasing</span> งานเช่า ·
+    <span class="inline-code">biton_inventory</span> ใบเบิกอะไหล่มาผลิต
   </p>
   <div class="section-note" style="background:#fff7ed; border-color:#f59e0b; color:#92400e">
-    <b>3 ฐานอ่านอย่างเดียวต่อไม่ติดได้ — และต้องไม่ทำให้หน้าเว็บล้ม</b><br>
-    <span class="inline-code">dbMaintenance()</span> / <span class="inline-code">dbSetup()</span> / <span class="inline-code">dbLeasing()</span>
+    <b>4 ฐานอ่านอย่างเดียวต่อไม่ติดได้ — และต้องไม่ทำให้หน้าเว็บล้ม</b><br>
+    <span class="inline-code">dbMaintenance()</span> / <span class="inline-code">dbSetup()</span> / <span class="inline-code">dbLeasing()</span> / <span class="inline-code">dbInventory()</span>
     ตั้ง connect timeout <b>3 วินาที</b> และ<b>คืน <span class="inline-code">null</span></b> ถ้าต่อไม่ได้ (ไม่ throw)
     ทุกจุดที่เรียกจึงต้องเช็ค null แล้วซ่อนเฉพาะส่วนนั้น
     · เหตุผลที่อ่านค่าความผิดพลาดได้: <span class="inline-code">dbLeasingError()</span> ฯลฯ
@@ -276,6 +277,10 @@ $B = BASE_URL;
         <div class="tbl-item"><span class="tbl-name">parts</span><div><div class="tbl-desc">ทะเบียนอะไหล่ใน Production: รหัส, ชื่อ, stock_code (map → tech_parts), icon — จำนวนคงเหลืออ่านจาก biton_tech_parts</div></div></div>
         <div class="tbl-item"><span class="tbl-name">part_movements</span><div><div class="tbl-desc">ประวัติเบิก/คืนอะไหล่ต่อเครื่อง: ref_asset_id, ma_record_id, qty, mode</div></div></div>
         <div class="tbl-item"><span class="tbl-name">bom_items</span><div><div class="tbl-desc">Bill of Materials: อะไหล่ต่อรุ่น (product → parts) จำนวน/เครื่อง</div></div></div>
+        <div class="tbl-item"><span class="tbl-name">inv_set_map / inv_part_map</span><div><div class="tbl-desc">ผูกใบเบิกของ inventory กับรุ่นเรา: ชุด (<span class="inline-code">inv_name</span> → mode set/parts/ignore) และอะไหล่รายชิ้น (<span class="inline-code">inv_part_id</span> → product_ids + <b>per_unit</b> ชิ้นต่อเครื่อง) · 1 รายการผูกได้หลายรุ่น (กลุ่มรุ่น "33-34")</div><div class="tbl-rows">ตั้งค่าที่ inv_pickup_map.php — สร้างตารางเองด้วย ensure_inv_pickup_schema()</div></div></div>
+        <div class="tbl-item"><span class="tbl-name">inv_pickup_alloc</span><div><div class="tbl-desc">ตัดยอด: เครื่องที่ลงทะเบียนแล้ว (asset_id UNIQUE) ไปตัดใบเบิกไหน (pre_id + grp), source auto/manual</div></div></div>
+        <div class="tbl-item"><span class="tbl-name">inv_pickup_close</span><div><div class="tbl-desc">ปิดรายการเอง ทั้งที่ยังผลิตไม่ครบ (ของเสีย/ยกเลิก) — เก็บเหตุผลและผู้ปิด</div></div></div>
+        <div class="tbl-item"><span class="tbl-name">inv_pickup_skip</span><div><div class="tbl-desc">เครื่องที่ "ไม่ต้องนับเข้าใบเบิก" (นับเข้าคลังใหม่ / ของค้างใบเบิกเก่า) — ตัดออกจากแท็บลงทะเบียนโดยไม่มีใบเบิก เอากลับมานับได้</div></div></div>
         <div class="tbl-item"><span class="tbl-name">stock_movements</span><div><div class="tbl-desc">ประวัติเปลี่ยนสถานะเครื่อง in/out (เก็บไว้เพื่อ audit)</div></div></div>
         <div class="tbl-item"><span class="tbl-name">spare_loans</span><div><div class="tbl-desc">บันทึกยืม-คืนเครื่องสำรอง (เชื่อมกับ repairs ถ้ายืมแทนเครื่องเสีย)</div></div></div>
         <div class="tbl-item"><span class="tbl-name">product_field_config</span><div><div class="tbl-desc">config ฟิลด์ต่อรุ่น: production/ma/update + checklist + watch_alert (SD Card/RTC) + fw/lot/made_by</div></div></div>
@@ -330,6 +335,14 @@ $B = BASE_URL;
           <div class="tbl-item"><span class="tbl-name">tbl_customer</span><div><div class="tbl-desc">ชื่อลูกค้าฝั่งเช่า (<span class="inline-code">cus_name</span>, <span class="inline-code">cus_sname</span>, <span class="inline-code">ecus_name</span>) — เชื่อมผ่าน includes/rent_ma_bridge.php, rent_product_name_map.php</div></div></div>
         </div>
       </div>
+      <div class="db-box" style="margin-bottom:12px">
+        <div class="db-box-head secondary" style="background:#7c3aed">🧰 biton_inventory &nbsp;<span style="font-weight:400; font-size:11px; opacity:.85">(ใบเบิกอะไหล่มาผลิต — อ่านอย่างเดียว)</span></div>
+        <div class="db-box-body">
+          <div class="tbl-item"><span class="tbl-name">pre_stock</span><div><div class="tbl-desc">คำขอเบิก 1 แถว = 1 อะไหล่: <span class="inline-code">pre_id</span> (เลขใบ ymd-His), <span class="inline-code">pre_product</span> (ชื่อชุด text), <span class="inline-code">pre_part</span> (part_id), <span class="inline-code">pre_amount</span>, <span class="inline-code">pre_by</span>, <span class="inline-code">pre_status</span> (pre/pickup/cancel) — เราสนเฉพาะ <span class="inline-code">pre_type='เบิกผลิต'</span></div></div></div>
+          <div class="tbl-item"><span class="tbl-name">log_stock</span><div><div class="tbl-desc">ของที่คลังจ่ายจริง (<span class="inline-code">log_part</span> เก็บเป็น<b>ชื่อ</b>อะไหล่ ไม่ใช่ id) — ใช้ตัวนี้ตัดสินว่าใบไหนพร้อมผลิต ไม่ใช้สถานะใบ เพราะมีใบที่จ่ายไม่ตรงที่ขอ</div></div></div>
+          <div class="tbl-item"><span class="tbl-name">part / product / production_formula</span><div><div class="tbl-desc">ชื่ออะไหล่ · รายการชุด · สูตรชุด (ไม่มีจำนวนต่อชุด) — จำนวนชุดอนุมานจากค่าที่ซ้ำมากสุดของแถวในใบ</div><div class="tbl-rows">⚠️ SELECT เท่านั้น — ห้ามเขียน/แก้ schema · เชื่อมผ่าน includes/inv_pickup.php ที่เดียว</div></div></div>
+        </div>
+      </div>
       <div class="section-note">
         <b>กติกาการเชื่อม Cross-Database</b><br>
         — JOIN ข้าม DB ผ่าน PHP mysqli <b>ไม่ work</b> เสมอไป → แก้ด้วยการ query แยก 2 ครั้งแล้วรวมผลใน PHP<br>
@@ -372,7 +385,17 @@ $B = BASE_URL;
     <div class="page-card" style="border-top:3px solid #10b981">
       <div class="pfile">asset_new.php</div>
       <div class="pdesc">บันทึกผลิตใหม่: เลือกรุ่น, BOM picker, checklist/watch alerts ตาม settings, รองรับหลายเครื่อง (generated-code)</div>
-      <div class="pread">อ่าน: products, parts, product_field_config / เขียน: assets, production_records, asset_components, part_movements + tech_parts เบิก BOM</div>
+      <div class="pread">อ่าน: products, parts, product_field_config / เขียน: assets, production_records, asset_components, part_movements + tech_parts เบิก BOM · หลังบันทึกเรียก <span class="inline-code">inv_pickup_allocate()</span> ตัดยอดใบเบิก inventory (เก่าสุดก่อน) แล้วย้ายเข้าระบบเช่าถ้ารุ่นนั้นตั้งไว้</div>
+    </div>
+    <div class="page-card" style="border-top:3px solid #10b981">
+      <div class="pfile">inv_pickups.php</div>
+      <div class="pdesc">ใบเบิกรอผลิต: คิวรายรุ่น (รอผลิต / รอคลังจ่าย / ผลิตครบ) + แท็บลงทะเบียนโดยไม่มีใบเบิก (จับคู่ทีหลัง · เคลียร์ไม่ต้องนับ) · หน้ารายละเอียดใบ = อะไหล่ขอ/จ่าย, S/N ที่ตัดยอด, ตัด/ย้าย/ปิดใบ</div>
+      <div class="pread">อ่าน: biton_inventory (pre_stock, log_stock, part, production_formula) + inv_set_map/inv_part_map / เขียน: inv_pickup_alloc, inv_pickup_close, inv_pickup_skip</div>
+    </div>
+    <div class="page-card" style="border-top:3px solid #6b7280">
+      <div class="pfile">inv_pickup_map.php</div>
+      <div class="pdesc">หลังบ้าน: ผูกชุด/อะไหล่ของ inventory กับรุ่นเรา (หลายรุ่นต่อรายการ · ชิ้นต่อเครื่อง) + วันเริ่มติดตาม + จับคู่ย้อนหลัง</div>
+      <div class="pread">เขียน: inv_set_map, inv_part_map, site_settings (inv_pickup_since)</div>
     </div>
     <div class="page-card" style="border-top:3px solid #8b5cf6">
       <div class="pfile">ma.php</div>
@@ -565,6 +588,10 @@ $B = BASE_URL;
     <div class="flow-step"><div class="flow-num">4</div><div class="flow-body"><b>บันทึก production_records</b> — ผู้ประกอบ, FW ณ เวลาผลิต, checklist, ฟิลด์พิเศษ (JSON)<div class="flow-writes"><span class="flow-write">เขียน: production_records (extra_json)</span></div></div></div>
     <div class="flow-step"><div class="flow-num">5</div><div class="flow-body"><b>บันทึกชิ้นส่วน</b> — ฟิลด์ชนิด 'component' (Display, HUB ฯลฯ) → upsert ทีละชิ้น<div class="flow-writes"><span class="flow-write">เขียน: asset_components (ON DUPLICATE KEY UPDATE)</span></div></div></div>
     <div class="flow-step"><div class="flow-num">6</div><div class="flow-body"><b>เบิกอะไหล่ตาม BOM</b> — <span class="inline-code">tech_parts_stock_out_by_part_id()</span> ลด quantity ใน biton_tech_parts + INSERT part_movements (mode='ผลิต', ref_asset_id)<div class="flow-writes"><span class="flow-write">เขียน: part_movements</span><span class="flow-write">sync: biton_tech_parts.quantity−</span></div></div></div>
+    <div class="flow-step"><div class="flow-num">7</div><div class="flow-body"><b>ตัดยอดใบเบิก inventory</b> — <span class="inline-code">inv_pickup_allocate()</span> จับเครื่องที่เพิ่งบันทึกเข้าใบเบิกของรุ่นนั้นที่คลังจ่ายแล้วและยังเหลือ <b>ใบเก่าสุดก่อน</b> · ไม่มีใบให้ตัด = ข้าม (ขึ้นแท็บ "ลงทะเบียนโดยไม่มีใบเบิก") · ต่อ inventory ไม่ได้ = ไม่ตัด แต่บันทึกเครื่องสำเร็จเหมือนเดิม<div class="flow-writes"><span class="flow-write">อ่าน: biton_inventory (pre_stock, log_stock)</span><span class="flow-write">เขียน: inv_pickup_alloc</span></div></div></div>
+  </div>
+  <div class="section-note" style="margin-top:10px">
+    <b>ลบเครื่องแล้วยอดใบเบิกคืน</b> — <span class="inline-code">asset_delete_full()</span> ลบแถวใน <span class="inline-code">inv_pickup_alloc</span> ของเครื่องนั้นด้วย ใบเบิกจึงกลับมาเหลือเท่าเดิม
   </div>
 
   <h3>✏️ การแก้ไขเครื่อง (asset.php)</h3>
