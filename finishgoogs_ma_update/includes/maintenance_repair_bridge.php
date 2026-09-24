@@ -615,7 +615,7 @@ function ma_legacy_table_html(array $rows): string
 }
 
 /**
- * งานซ่อมที่บันทึกไว้ในระบบ production เอง (โมดูลซ่อมเดิมที่เลิกใช้แล้ว ข้อมูลยังอยู่)
+ * งานซ่อมที่บันทึกไว้ในระบบ production เอง — งานซ่อมเปลี่ยนจอ 2 ชั้น (โมดูลเดิมที่เลิกใช้แล้ว ข้อมูลยังอยู่)
  *
  * แถวพวกนี้ไม่มีในฐานของทีมซ่อม จึงไม่ขึ้นในตารางใบงาน/ประวัติเก่าด้านบน
  * เดิมไปโผล่ที่ timeline ของหน้าเครื่องอย่างเดียว ทำให้ดูเหมือนสองที่ขัดกัน
@@ -655,7 +655,7 @@ function ma_own_repairs_table_html(array $rows): string
         $v = trim((string) $v);
         return ($v === '' || strpos($v, '0000-00-00') === 0) ? '—' : date('d/m/Y', strtotime(substr($v, 0, 10)));
     };
-    $out = '<h3 class="ma-subhead">บันทึกในระบบ production (โมดูลซ่อมเดิม)</h3>'
+    $out = '<h3 class="ma-subhead">บันทึกในระบบ production (ซ่อมเปลี่ยนจอ 2 ชั้น)</h3>'
         . '<p class="ma-hint">' . number_format(count($rows)) . ' รายการ · บันทึกไว้ก่อนย้ายไปใช้ระบบซ่อมกลาง</p>'
         . '<div class="ma-card ma-card-flat"><div class="ma-tblscroll">'
         . '<table class="ma-table"><thead><tr>'
