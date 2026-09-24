@@ -187,6 +187,9 @@ $shots = [
     'scan'      => [2 => ['scan-found', 'สแกนเจอเครื่อง — กรอบเขียวบอกรหัสและรุ่น'],
                     5 => ['asset-actions', 'หน้าเครื่อง: ปุ่มบันทึก MA และเมนูอื่นๆ', '', 'หน้าเครื่องบนคอม: ปุ่มคำสั่งทั้งหมดเรียงแถวเดียว']],
     'produce'   => [3 => ['produce-units', 'กดสแกนต่อเนื่อง แล้วสแกนทีละเครื่อง'], 8 => ['produce-save', 'ท้ายฟอร์ม: Checklist แล้วปุ่มบันทึกทั้งชุด', '', 'ชุดอะไหล่ที่จะเบิก และปุ่มบันทึกทั้งชุด']],
+    'pickup'    => [0 => ['pickup-card', 'การ์ด "ของที่เบิกมาแล้ว รอผลิต" บน Dashboard'],
+                    2 => ['pickup-pop', 'กดที่ชื่อรุ่น — เห็นใบเบิก S/N ที่ผลิตแล้ว และอะไหล่ที่คลังจ่าย'],
+                    3 => ['pickup-queue', 'หน้าใบเบิกรอผลิต — แท็บรอผลิต / รอคลังจ่าย / ผลิตครบ']],
     'ma'        => [2 => ['ma-form', 'เลือกสถานะเครื่องหลังตรวจ']],
     'update'    => [3 => ['update-form', 'ใส่ค่าใหม่ของเฟิร์มแวร์/ชิ้นส่วน']],
     'parts'     => [1 => ['parts-list', 'ปุ่มรับเข้า · เบิกรายชิ้น · เบิก Set']],
@@ -299,6 +302,8 @@ if (!$topic) { ?>
   background: var(--surface, #fff); border: 1px solid var(--border); border-radius: var(--radius, 12px);
   color: inherit; text-decoration: none; transition: border-color .15s, transform .12s;
 }
+/* ทั้งกล่องเป็นลิงก์ — กันเส้นใต้ของ a:hover ไม่ให้ขึ้นใต้ข้อความในกล่อง */
+.guide-tile:hover, .guide-tile:focus, .guide-tile:focus-visible { text-decoration: none; }
 .guide-tile:hover { border-color: var(--primary); transform: translateY(-1px); }
 .guide-tile-ic { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 12px; display: inline-grid; place-items: center; background: var(--primary-soft, #fce7f3); color: var(--primary); }
 .guide-tile-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }

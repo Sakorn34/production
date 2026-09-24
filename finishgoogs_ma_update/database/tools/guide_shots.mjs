@@ -8,6 +8,9 @@ const BASE = 'http://localhost/production/finishgoogs_ma_update';
 const PARTS = 'http://localhost/production/parts/pages';
 const PORT = 9333;
 let VIEW_W = 390;   // ความกว้างจอที่กำลังถ่าย (มือถือ 390 · คอม 1280)
+// ถ่ายเฉพาะบางภาพ: node guide_shots.mjs pickup   (ไม่ใส่อะไร = ถ่ายใหม่ทั้งชุด)
+const ONLY = process.argv.slice(2);
+const want = (name) => ONLY.length === 0 || ONLY.some((o) => name.startsWith(o));
 mkdirSync(OUT, { recursive: true });
 
 const edge = spawn(EDGE, ['--headless=new', `--remote-debugging-port=${PORT}`, '--user-data-dir=' + process.env.TEMP + '/guide-shots-profile',
@@ -71,6 +74,7 @@ function hl(selector, text) {
   `);
 }
 async function shot(name, clipH = 0) {
+  if (!want(name)) { return; }
   const params = { format: 'jpeg', quality: 78 };
   if (clipH) params.clip = { x: 0, y: 0, width: VIEW_W, height: clipH, scale: 1 };
   const r = await send('Page.captureScreenshot', params);
@@ -89,6 +93,21 @@ try {
   await send('Emulation.setLocaleOverride', { locale: 'th-TH' }).catch(() => {});
   await send('Emulation.setTimezoneOverride', { timezoneId: 'Asia/Bangkok' }).catch(() => {});
   await send('Emulation.setUserAgentOverride', { userAgent: 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Mobile Safari/537.36' });
+
+  // 0 ใบเบิกรอผลิต — การ์ดบน Dashboard · popup รายรุ่น · หน้าคิวใบเบิก
+  await go(BASE + '/index.php', 4500);
+  await scrollTo('#dash-pickup', 80);
+  await hl('#dash-pickup');
+  await shot('pickup-card');
+  await js(`document.querySelector('#dash-pickup')?.classList.remove('guide-hl');
+    const rows=[...document.querySelectorAll('#dash-pk-list .dash-pk-row')];
+    // เอารุ่นที่ผลิตไปแล้วบ้าง จะได้เห็น S/N ในภาพ
+    (rows.find(r => r.innerText.indexOf("ผลิตแล้ว 0/") < 0) || rows[0]).click();`);
+  await sleep(1800);
+  await shot('pickup-pop');
+  await go(BASE + '/inv_pickups.php', 2500);
+  await hl('.ip-tabs');
+  await shot('pickup-queue');
 
   // 1 เริ่มต้น — แถบล่าง
   await go(BASE + '/index.php', 3500);
@@ -171,6 +190,27 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 760, deviceScaleFactor: 1, mobile: false });
   await send('Emulation.setUserAgentOverride', { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36 Edg/128.0' });
   const expandNav = `const a=document.querySelector('.app'); if(a){ a.classList.remove('nav-collapsed'); a.classList.add('nav-expanded'); }`;
+
+  // 0 ใบเบิกรอผลิต (จอคอม)
+  await go(BASE + '/index.php', 5000);
+  await js(expandNav);
+  await sleep(900);
+  // การ์ดนี้อยู่ล่างของหน้า และกราฟโหลดทีหลังทำให้ตำแหน่งขยับ — ซ่อนส่วนบนแล้วถ่ายจากหัวหน้าแทนการเลื่อน
+  await js(`['.dash-top-row', '#dash-prod-chart', '.dash-m-tabs'].forEach(s => { const e = document.querySelector(s); if (e) e.style.display = 'none'; }); window.scrollTo(0, 0);`);
+  await sleep(500);
+  await hl('#dash-pickup');
+  await shot('pickup-card-pc', 620);
+  await js(`document.querySelector('#dash-pickup')?.classList.remove('guide-hl');
+    const rows=[...document.querySelectorAll('#dash-pk-list .dash-pk-row')];
+    // เอารุ่นที่ผลิตไปแล้วบ้าง จะได้เห็น S/N ในภาพ
+    (rows.find(r => r.innerText.indexOf("ผลิตแล้ว 0/") < 0) || rows[0]).click();
+    window.scrollTo(0, 0);`);
+  await sleep(1800);
+  await shot('pickup-pop-pc', 700);
+  await go(BASE + '/inv_pickups.php', 2500);
+  await js(expandNav);
+  await hl('.ip-tabs');
+  await shot('pickup-queue-pc', 700);
 
   // 1 เริ่มต้น — เมนูซ้าย (กางไว้)
   await go(BASE + '/index.php', 4000);
