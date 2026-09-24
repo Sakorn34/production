@@ -115,28 +115,67 @@ function ma_items_cell(array $rec, $col, $jsonKey, $max = 6) {
 /** แสดงรายการเป็นบรรทัดพร้อมหัวข้อ */
 function ma_items_html($rec) {
     $out = [];
+    // เปลี่ยน/ซ่อมมาก่อน "ปกติ" เพราะเป็นสิ่งที่คนเปิดดูมองหา · แต่ละรายการแยกบรรทัดมีไอคอนนำหน้า
+    // (ของเดิมต่อกันเป็นพรืดด้วย · ทำให้ไล่สายตาไม่ออกว่ารายการไหนจบตรงไหน)
     $groups = [
-        ['ok_items', 'OK', 'status-ok', 'ปกติ', 'var(--success)'],
-        ['replace_items', 'Replace', 'status-replace', 'เปลี่ยนอะไหล่', 'var(--warning)'],
-        ['repair_items', 'Repair', 'status-repair', 'ซ่อม', 'var(--danger)'],
+        ['replace_items', 'Replace', 'status-replace', 'เปลี่ยนอะไหล่', 'is-rep'],
+        ['repair_items', 'Repair', 'status-repair', 'ซ่อม', 'is-fix'],
+        ['ok_items', 'OK', 'status-ok', 'ตรวจแล้วปกติ', 'is-ok'],
     ];
     foreach ($groups as $g) {
         $items = ma_record_items($rec, $g[0], $g[1]);
-        if ($items) $out[] = '<div style="margin:2px 0"><b class="ma-item-head" style="color:' . $g[4] . '">'
-                           . ui_icon_html($g[2], 13, 'ma-item-svg') . ' ' . h($g[3]) . ' (' . count($items) . '):</b> '
-                           . h(implode(' · ', $items)) . '</div>';
+        if (!$items) {
+            continue;
+        }
+        $li = '';
+        foreach ($items as $it) {
+            $li .= '<div class="ma-li">' . ui_icon_html($g[2], 14, 'ma-li-ic') . '<span>' . h($it) . '</span></div>';
+        }
+        $out[] = '<div class="ma-grp ' . $g[4] . '"><div class="ma-grp-t">' . h($g[3]) . ' (' . count($items) . ')</div>'
+               . '<div class="ma-cols">' . $li . '</div></div>';
     }
     // ข้อมูลอื่นจาก JSON เดิม (Pin IO, เวอร์ชันบอร์ด ฯลฯ)
     if (!empty($rec['versions_json'])) {
-        $others = [];
+        $others = '';
+        $n = 0;
         foreach (json_decode($rec['versions_json'], true) ?: [] as $k => $v) {
             if (in_array($k, ['OK', 'Replace', 'Repair'], true)) continue;
-            $others[] = "$k: $v";
+            $others .= '<div class="ma-li ma-li-kv"><span>' . h($k) . '</span><b>' . h((string) $v) . '</b></div>';
+            $n++;
         }
-        if ($others) $out[] = '<div class="muted" style="font-size:12.5px">' . h(implode(' | ', $others)) . '</div>';
+        if ($n) {
+            $out[] = '<div class="ma-grp"><div class="ma-grp-t">ข้อมูลอื่น (' . $n . ')</div><div class="ma-cols">' . $others . '</div></div>';
+        }
     }
-    if (!empty($rec['remark'])) $out[] = '<div style="font-size:13px">' . ui_icon_html('edit', 12, 'ma-item-svg') . ' ' . h($rec['remark']) . '</div>';
+    $remark = trim((string) ($rec['remark'] ?? ''));
+    if ($remark !== '' && $remark !== '-') {
+        $out[] = '<div class="ma-note"><b>หมายเหตุ</b><div>' . nl2br(h($remark)) . '</div></div>';
+    }
     return $out ? implode('', $out) : '<span class="muted">-</span>';
+}
+
+/**
+ * อะไหล่ที่เบิกในรอบ MA นี้ — ชื่อซ้าย จำนวนขวา เรียง 2 คอลัมน์แบบเดียวกับรายการตรวจ
+ *
+ * @param int $maRecordId
+ * @return string
+ */
+function ma_detail_parts_html($maRecordId) {
+    if (!function_exists('ma_parts_withdrawn_items')) {
+        return '';
+    }
+    $items = ma_parts_withdrawn_items($maRecordId);
+    if (!$items) {
+        return '';
+    }
+    $li = '';
+    foreach ($items as $r) {
+        $q = rtrim(rtrim(number_format((float) $r['qty'], 2), '0'), '.');
+        $li .= '<div class="ma-li ma-li-part"><span>' . h($r['name']) . '</span>'
+             . '<b>×' . h($q) . ($r['unit'] !== '' ? ' ' . h($r['unit']) : '') . '</b></div>';
+    }
+    return '<div class="ma-grp"><div class="ma-grp-t">อะไหล่ที่เบิก (' . count($items) . ')</div>'
+         . '<div class="ma-cols">' . $li . '</div></div>';
 }
 
 /**
@@ -453,7 +492,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ma_detail') {
     echo '<div class="ma-pop-head"><b>' . h(ma_when_label($m['visited_at'])) . '</b>'
        . '<span class="muted"> · ' . h($m['asset_code']) . ' · ' . h($m['pname']) . '</span>'
        . ($sub ? '<div class="muted">' . h(implode(' · ', $sub)) . '</div>' : '') . '</div>';
-    echo '<div class="ma-pop-body">' . ma_items_html($m) . ma_parts_withdrawn_html((int) $m['id']) . '</div>';
+    echo '<div class="ma-pop-body">' . ma_items_html($m) . ma_detail_parts_html((int) $m['id']) . '</div>';
     if (can('ma')) {
         echo '<div class="ma-pop-acts"><a class="btn btn-sm btn-line" href="' . BASE_URL . '/ma.php?edit=' . (int) $m['id'] . '">แก้ไขรายการนี้</a>'
            . '<form method="post" onsubmit="return confirm(\'ลบรายการ MA นี้?\')">' . csrf_field()
