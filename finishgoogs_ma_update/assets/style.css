@@ -1327,6 +1327,20 @@ html.fgs-open, html.fgs-open body { overflow: hidden; }
   .bom-row { padding-bottom: 8px; border-bottom: 1px dashed var(--border); }
 }
 .unit-actions > [hidden] { display: none !important; }
+/* ประวัติ MA ในหน้าบันทึก MA — 1 บรรทัดต่อครั้ง กดแถวดูรายละเอียดใน popup */
+.ma-hist tr.ma-hist-row { cursor: pointer; }
+.ma-hist tr.ma-hist-row:hover td, .ma-hist tr.ma-hist-row:focus-visible td { background: var(--surface-soft, #f6f4fb); }
+.ma-hist-sub { font-size: calc(12px * var(--font-scale, 1)); }
+.ma-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.ma-chip { font-size: calc(11.5px * var(--font-scale, 1)); border-radius: 999px; padding: 1px 9px; white-space: nowrap; }
+.ma-chip.is-ok { background: #ecfdf5; color: #065f46; }
+.ma-chip.is-rep { background: #fffbeb; color: #92400e; }
+.ma-chip.is-fix { background: #fef2f2; color: #991b1b; }
+.ma-chip.is-fw { background: var(--surface-soft, #f6f4fb); color: var(--text-muted, #6b6480); font-family: ui-monospace, monospace; }
+.ma-hist-gist { font-size: calc(12.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); margin-top: 4px; line-height: 1.5; }
+.ma-pop-head { margin-bottom: 8px; line-height: 1.6; }
+.ma-pop-body { line-height: 1.7; }
+.ma-pop-acts { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
 @media (max-width: 640px) {
   /* ปุ่มบันทึกท้ายฟอร์มไม่ลอยบนมือถือ (หน้าแจ้งเตือน LINE · ตั้งค่ารุ่นหลายรุ่น) — วางท้ายฟอร์มตามปกติ */
   .ln-form-actions, .bulk-save-bar { position: static !important; box-shadow: none !important; }

@@ -140,6 +140,67 @@ function ma_items_html($rec) {
 }
 
 /**
+ * วันเวลาที่อ่านง่าย — ข้อมูลเก่าหลายรายการไม่มีเวลา (00:00) ตัดทิ้งไม่ต้องโชว์
+ *
+ * @param string $visitedAt
+ * @return string
+ */
+function ma_when_label($visitedAt) {
+    $when = dthai_full($visitedAt);
+    [$d, $t] = array_pad(explode(' ', $when, 2), 2, '');
+    return $t === '' || $t === '00:00' ? $d : $when;
+}
+
+/**
+ * ชิปสรุปผลการตรวจของ MA 1 ครั้ง — เปลี่ยนอะไหล่/ซ่อมมาก่อน เพราะเป็นสิ่งที่คนอ่านมองหา
+ *
+ * @param array<string,mixed> $rec
+ * @param bool                $showFw
+ * @return string
+ */
+function ma_hist_chips_html($rec, $showFw) {
+    $out = '';
+    $groups = [
+        ['replace_items', 'Replace', 'เปลี่ยน', 'is-rep'],
+        ['repair_items', 'Repair', 'ซ่อม', 'is-fix'],
+        ['ok_items', 'OK', 'ปกติ', 'is-ok'],
+    ];
+    foreach ($groups as $g) {
+        $n = count(ma_record_items($rec, $g[0], $g[1]));
+        if ($n > 0) {
+            $out .= '<span class="ma-chip ' . $g[3] . '">' . h($g[2]) . ' ' . $n . '</span>';
+        }
+    }
+    if ($showFw && trim((string) $rec['fw_version']) !== '') {
+        $out .= '<span class="ma-chip is-fw">' . h($rec['fw_version']) . '</span>';
+    }
+    return $out !== '' ? '<div class="ma-chips">' . $out . '</div>' : '';
+}
+
+/**
+ * สรุปย่อบรรทัดเดียว: ของที่เปลี่ยน/ซ่อมก่อน แล้วต่อด้วยหมายเหตุ — รายละเอียดเต็มอยู่ใน popup
+ *
+ * @param array<string,mixed> $rec
+ * @return string
+ */
+function ma_hist_gist_html($rec) {
+    $parts = array_merge(
+        ma_record_items($rec, 'replace_items', 'Replace'),
+        ma_record_items($rec, 'repair_items', 'Repair')
+    );
+    $text = implode(' · ', $parts);
+    $remark = trim((string) $rec['remark']);
+    if ($remark !== '' && $remark !== '-') {
+        $text = ($text !== '' ? $text . ' — ' : '') . $remark;
+    }
+    if ($text === '') {
+        $n = count(ma_record_items($rec, 'ok_items', 'OK'));
+        $text = $n > 0 ? 'ตรวจตามรอบ ไม่มีการเปลี่ยนอะไหล่' : '-';
+    }
+    return '<div class="ma-hist-gist">' . h(mb_strimwidth($text, 0, 120, '…')) . '</div>';
+}
+
+/**
  * ตรวจและทำความสะอาดรายการ MA — ห้ามซ้ำทั้งในช่องเดียวกันและข้ามช่อง ✅/🔄/🔧
  *
  * @return array{ok: string, replace: string, repair: string}|null null = มีรายการซ้ำข้ามช่อง
@@ -330,16 +391,20 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'history') {
     $res = qr("SELECT * FROM ma_records WHERE asset_id=? ORDER BY visited_at DESC, id DESC LIMIT 15", 'i', [$a['id']]);
     echo '<b>📅 ประวัติ MA (' . $res->num_rows . ' ครั้งล่าสุด)</b>';
     if ($res->num_rows) {
+        // 1 บรรทัดต่อครั้ง: ชิปสรุปผล + สรุปย่อ — รายละเอียดเต็มอยู่ใน popup (ajax=ma_detail)
         echo '<div class="table-wrap">';
-        echo '<table class="list" style="margin:6px 0 12px"><tr><th>วันเวลา</th>'
-           . ($histShowFw ? '<th>FW</th>' : '')
-           . '<th>รายละเอียด</th><th>โดย</th>' . ($canMa ? '<th></th>' : '') . '</tr>';
+        echo '<table class="list ma-hist" style="margin:6px 0 12px"><tr><th data-pri="1">วันเวลา</th><th data-pri="1">ผลการตรวจ</th>'
+           . ($canMa ? '<th data-pri="1"></th>' : '') . '</tr>';
         while ($m = $res->fetch_assoc()) {
-            echo '<tr><td style="white-space:nowrap">' . dthai_full($m['visited_at']) . '</td>'
-               . ($histShowFw ? '<td>' . h($m['fw_version'] ?: '-') . '</td>' : '')
-               . '<td style="max-width:420px">' . ma_items_html($m) . ma_parts_withdrawn_html((int)$m['id']) . '</td>'
-               . '<td>' . h($m['done_by'] ?: '-') . '</td>'
-               . ($canMa ? '<td class="row-actions"><a class="btn btn-sm btn-line" href="' . BASE_URL . '/ma.php?edit=' . $m['id'] . '">แก้ไข</a>'
+            $when = dthai_full($m['visited_at']);
+            [$wDate, $wTime] = array_pad(explode(' ', $when, 2), 2, '');
+            // ข้อมูลเก่าหลายรายการไม่มีเวลา (00:00) และไม่รู้ผู้ตรวจ — ไม่ต้องโชว์ให้รก
+            $sub = array_filter([$wTime !== '' && $wTime !== '00:00' ? $wTime : '', trim((string) $m['done_by'])]);
+            echo '<tr class="ma-hist-row" data-ma="' . (int) $m['id'] . '" data-when="' . h(ma_when_label($m['visited_at'])) . '" tabindex="0">'
+               . '<td data-pri="1" data-nowrap><b>' . h($wDate) . '</b>'
+               . ($sub ? '<div class="muted ma-hist-sub">' . h(implode(' · ', $sub)) . '</div>' : '') . '</td>'
+               . '<td data-pri="1">' . ma_hist_chips_html($m, $histShowFw) . ma_hist_gist_html($m) . '</td>'
+               . ($canMa ? '<td data-pri="1" class="row-actions"><a class="btn btn-sm btn-line" href="' . BASE_URL . '/ma.php?edit=' . $m['id'] . '">แก้ไข</a>'
                     . '<form method="post" onsubmit="return confirm(\'ลบรายการ MA นี้?\')">' . csrf_field()
                     . '<input type="hidden" name="del_ma" value="1"><input type="hidden" name="ma_id" value="' . $m['id'] . '">'
                     . '<button class="btn-sm btn-danger" type="submit">ลบ</button></form></td>' : '')
@@ -368,6 +433,34 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'history') {
         echo '</table>';
         echo '</div>';
     }
+    exit;
+}
+
+// ---------------------------------------------------------------
+// AJAX: รายละเอียด MA 1 ครั้ง — เนื้อหาใน popup ของตารางประวัติ
+// ---------------------------------------------------------------
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'ma_detail') {
+    header('Content-Type: text/html; charset=utf-8');
+    $m = qr("SELECT m.*, a.asset_code, a.product_id, p.name pname FROM ma_records m
+             JOIN assets a ON a.id = m.asset_id JOIN products p ON p.id = a.product_id
+             WHERE m.id = ?", 'i', [(int) ($_GET['id'] ?? 0)])->fetch_assoc();
+    if (!$m) { echo '<p class="muted">ไม่พบรายการ MA นี้</p>'; exit; }
+    echo '<div class="ma-pop">';
+    $sub = array_filter([
+        trim((string) $m['done_by']) !== '' ? 'ผู้ตรวจ ' . $m['done_by'] : '',
+        product_show_fw((int) $m['product_id']) && trim((string) $m['fw_version']) !== '' ? 'FW ' . $m['fw_version'] : '',
+    ]);
+    echo '<div class="ma-pop-head"><b>' . h(ma_when_label($m['visited_at'])) . '</b>'
+       . '<span class="muted"> · ' . h($m['asset_code']) . ' · ' . h($m['pname']) . '</span>'
+       . ($sub ? '<div class="muted">' . h(implode(' · ', $sub)) . '</div>' : '') . '</div>';
+    echo '<div class="ma-pop-body">' . ma_items_html($m) . ma_parts_withdrawn_html((int) $m['id']) . '</div>';
+    if (can('ma')) {
+        echo '<div class="ma-pop-acts"><a class="btn btn-sm btn-line" href="' . BASE_URL . '/ma.php?edit=' . (int) $m['id'] . '">แก้ไขรายการนี้</a>'
+           . '<form method="post" onsubmit="return confirm(\'ลบรายการ MA นี้?\')">' . csrf_field()
+           . '<input type="hidden" name="del_ma" value="1"><input type="hidden" name="ma_id" value="' . (int) $m['id'] . '">'
+           . '<button class="btn-sm btn-danger" type="submit">ลบรายการนี้</button></form></div>';
+    }
+    echo '</div>';
     exit;
 }
 
@@ -1583,6 +1676,20 @@ document.getElementById('ma_remark').addEventListener('input', updateMaSnippets)
         }
       }).catch(function(){});
   }
+  // กดแถวประวัติ = เปิด popup รายละเอียดครั้งนั้น (กดปุ่มแก้ไข/ลบ ไม่นับ)
+  box.addEventListener('click', function(e){
+    if (e.target.closest('.row-actions')) return;
+    var tr = e.target.closest('.ma-hist-row');
+    if (!tr) return;
+    showListModal('MA ' + tr.getAttribute('data-when'), BASE + '/ma.php?ajax=ma_detail&id=' + tr.getAttribute('data-ma'));
+  });
+  box.addEventListener('keydown', function(e){
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    var tr = e.target.closest ? e.target.closest('.ma-hist-row') : null;
+    if (!tr) return;
+    e.preventDefault();
+    showListModal('MA ' + tr.getAttribute('data-when'), BASE + '/ma.php?ajax=ma_detail&id=' + tr.getAttribute('data-ma'));
+  });
   input.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(loadAll, 600); });
   input.addEventListener('change', loadAll);
   if (input.value.trim() !== '') loadAll();
