@@ -615,6 +615,69 @@ function ma_legacy_table_html(array $rows): string
 }
 
 /**
+ * งานซ่อมที่บันทึกไว้ในระบบ production เอง (โมดูลซ่อมเดิมที่เลิกใช้แล้ว ข้อมูลยังอยู่)
+ *
+ * แถวพวกนี้ไม่มีในฐานของทีมซ่อม จึงไม่ขึ้นในตารางใบงาน/ประวัติเก่าด้านบน
+ * เดิมไปโผล่ที่ timeline ของหน้าเครื่องอย่างเดียว ทำให้ดูเหมือนสองที่ขัดกัน
+ *
+ * @param int $assetId
+ * @return array<int,array<string,mixed>>
+ */
+function asset_own_repairs(int $assetId): array
+{
+    if ($assetId <= 0) {
+        return [];
+    }
+    $out = [];
+    try {
+        $res = qr('SELECT r.opened_at, r.closed_at, r.status, r.reported_issue, r.assessment, r.action_taken, c.name AS cust
+                   FROM repairs r LEFT JOIN customers c ON c.id = r.customer_id
+                   WHERE r.asset_id = ? ORDER BY r.opened_at DESC, r.id DESC', 'i', [$assetId]);
+        while ($r = $res->fetch_assoc()) {
+            $out[] = $r;
+        }
+    } catch (\Throwable $e) {
+        error_log('[asset_own_repairs] ' . $e->getMessage());
+    }
+    return $out;
+}
+
+/**
+ * ตารางงานซ่อมเก่าของระบบ production
+ *
+ * @param  array<int,array<string,mixed>> $rows
+ * @return string
+ */
+function ma_own_repairs_table_html(array $rows): string
+{
+    $labels = ['received' => 'รับเครื่องแล้ว', 'in_progress' => 'กำลังซ่อม', 'done' => 'ซ่อมเสร็จ', 'returned' => 'ส่งคืนแล้ว'];
+    $d = function ($v) {
+        $v = trim((string) $v);
+        return ($v === '' || strpos($v, '0000-00-00') === 0) ? '—' : date('d/m/Y', strtotime(substr($v, 0, 10)));
+    };
+    $out = '<h3 class="ma-subhead">บันทึกในระบบ production (โมดูลซ่อมเดิม)</h3>'
+        . '<p class="ma-hint">' . number_format(count($rows)) . ' รายการ · บันทึกไว้ก่อนย้ายไปใช้ระบบซ่อมกลาง</p>'
+        . '<div class="ma-card ma-card-flat"><div class="ma-tblscroll">'
+        . '<table class="ma-table"><thead><tr>'
+        . '<th>วันที่รับ</th><th>ลูกค้า</th><th>อาการแจ้ง</th><th>การประเมิน / การแก้ไข</th><th>สถานะ</th>'
+        . '</tr></thead><tbody>';
+    foreach ($rows as $r) {
+        $fix = array_filter([trim((string) ($r['assessment'] ?? '')), trim((string) ($r['action_taken'] ?? ''))]);
+        $st = $labels[(string) ($r['status'] ?? '')] ?? (string) ($r['status'] ?? '');
+        $done = in_array((string) ($r['status'] ?? ''), ['done', 'returned'], true);
+        $out .= '<tr>'
+            . '<td class="ma-mono">' . h($d($r['opened_at'] ?? '')) . '</td>'
+            . '<td>' . h(trim((string) ($r['cust'] ?? '')) !== '' ? (string) $r['cust'] : '—') . '</td>'
+            . '<td>' . h(trim((string) ($r['reported_issue'] ?? '')) !== '' ? (string) $r['reported_issue'] : '—') . '</td>'
+            . '<td>' . h($fix ? implode(' · ', $fix) : '—') . '</td>'
+            . '<td><span class="ma-pill ' . ($done ? 'ma-pill-done' : 'ma-pill-open') . '">' . h($st !== '' ? $st : 'ไม่ระบุ') . '</span>'
+            . (trim((string) ($r['closed_at'] ?? '')) !== '' ? '<div class="ma-muted">ปิดงาน ' . h($d($r['closed_at'])) . '</div>' : '')
+            . '</td></tr>';
+    }
+    return $out . '</tbody></table></div></div>';
+}
+
+/**
  * ตารางการถูกยืมเป็นเครื่องสำรอง
  *
  * @param  array<int,array<string,mixed>> $rows
@@ -676,15 +739,18 @@ function ma_spare_table_html(array $rows): string
  * @param  array<string,mixed> $info
  * @return string
  */
-function asset_maintenance_section_html(array $info): string
+function asset_maintenance_section_html(array $info, int $assetId = 0): string
 {
+    // งานซ่อมเก่าที่บันทึกในระบบเราเอง — ต้องขึ้นแม้ระบบซ่อมจะไม่มีข้อมูลหรือต่อไม่ได้
+    $own = asset_own_repairs($assetId);
+
     // ยังไม่ได้ตั้งค่าฐานระบบซ่อม → เงียบสนิท ยังไม่เปิดใช้ก็ไม่ต้องมีอะไรบนหน้า
-    if (isset($info['configured']) && $info['configured'] === false) {
+    if (isset($info['configured']) && $info['configured'] === false && !$own) {
         return '';
     }
 
     // ตั้งค่าแล้วแต่ต่อไม่ได้ → เรื่องนี้ควรรู้ บอกสั้น ๆ แบบจาง ๆ ไม่ใช่หน้า error
-    if (empty($info['ok'])) {
+    if (empty($info['ok']) && !$own) {
         $err = trim((string) ($info['error'] ?? ''));
         if ($err === '') {
             return '';
@@ -693,15 +759,21 @@ function asset_maintenance_section_html(array $info): string
             . h($err) . ') — ข้อมูลส่วนอื่นของหน้านี้ยังใช้ได้ตามปกติ</p>';
     }
 
-    if (empty($info['has_any'])) {
+    if (empty($info['has_any']) && !$own) {
         return '';
+    }
+    if (empty($info['ok'])) {
+        // ต่อระบบซ่อมไม่ได้ แต่ยังมีของเราเอง — โชว์เฉพาะส่วนที่มี
+        return '<section class="ma-repair-section"><h2 class="h-with-icon">' . ui_icon_html('repairs', 18) . 'ประวัติงานซ่อม</h2>'
+            . '<p class="ma-hint muted">ดึงประวัติจากระบบซ่อมไม่ได้ตอนนี้ — แสดงเฉพาะบันทึกในระบบ production</p>'
+            . ma_own_repairs_table_html($own) . '</section>';
     }
 
     $c = $info['counts'];
     $jobs = $info['jobs'];
 
     $out = '<section class="ma-repair-section">';
-    $out .= '<h2 class="h-with-icon">' . ui_icon_html('repairs', 18) . 'ประวัติงานซ่อม (ระบบ MA)</h2>';
+    $out .= '<h2 class="h-with-icon">' . ui_icon_html('repairs', 18) . 'ประวัติงานซ่อม</h2>';
 
     // บรรทัดสรุป — ต้องครอบทุกกรณี ไม่ใช่แค่เครื่องที่เคยซ่อม
     // เครื่องสำรองบางตัวไม่เคยเข้าซ่อมเลย มีแต่ประวัติการถูกยืม
@@ -719,6 +791,9 @@ function asset_maintenance_section_html(array $info): string
     if ($c['spare'] > 0) {
         $bits[] = 'ถูกยืมเป็นเครื่องสำรอง ' . number_format($c['spare']) . ' ครั้ง';
     }
+    if ($own) {
+        $bits[] = 'บันทึกในระบบ production ' . number_format(count($own)) . ' รายการ';
+    }
     $out .= '<p class="ma-hint">' . h(implode(' · ', $bits));
     if (!empty($info['open'])) {
         $st = ma_val($jobs[0]['trp_status_job'] ?? null);
@@ -730,8 +805,8 @@ function asset_maintenance_section_html(array $info): string
             . h(number_format($info['urgent'])) . '</span>';
     }
     $out .= ($bits ? ' &nbsp;·&nbsp; ' : '')
-        . '<span class="ma-faint">อ่านจากระบบซ่อม ไม่ใช่ตาราง'
-        . ' &ldquo;ประวัติซ่อม&rdquo; ของ production</span></p>';
+        . '<span class="ma-faint">ใบงานและประวัติเก่าอ่านจากระบบซ่อมกลาง'
+        . ($own ? ' · ตารางท้ายสุดคือบันทึกเดิมของระบบ production' : '') . '</span></p>';
 
     if ($jobs) {
         $out .= ma_jobs_table_html($jobs);
@@ -741,6 +816,9 @@ function asset_maintenance_section_html(array $info): string
     }
     if (!empty($info['spare'])) {
         $out .= ma_spare_table_html($info['spare']);
+    }
+    if ($own) {
+        $out .= ma_own_repairs_table_html($own);
     }
 
     return $out . '</section>';

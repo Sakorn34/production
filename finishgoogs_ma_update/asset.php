@@ -517,7 +517,7 @@ if ($invAlloc) { ?>
 <?php // ประวัติการเช่า — ทุกสัญญาที่เครื่องนี้เคยไปอยู่ (ข้อมูลชุดเดียวกับการ์ดระบบเช่าด้านบน ไม่ query ซ้ำ) ?>
 <?= asset_leasing_rent_history_html($leaseInfo) ?>
 
-<?= asset_maintenance_section_html($maRepairInfo) ?>
+<?= asset_maintenance_section_html($maRepairInfo, (int) $a['id']) ?>
 
 <h2>ประวัติทั้งหมด (<?= count($tl) ?> รายการ) — เรียงตามเวลาบันทึก</h2>
 <?php $moveCount = (int) qr('SELECT COUNT(*) FROM stock_movements WHERE asset_id = ?', 'i', [$id])->fetch_row()[0]; ?>

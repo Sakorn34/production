@@ -202,18 +202,8 @@ function asset_timeline_items($id) {
             ],
         ];
     }
-    $res = qr("SELECT r.opened_at d, r.reported_issue, r.assessment, r.action_taken, r.status, r.closed_at, c.name cust
-               FROM repairs r LEFT JOIN customers c ON c.id=r.customer_id WHERE r.asset_id=?", 'i', [$id]);
-    while ($r = $res->fetch_assoc()) {
-        $body = [];
-        if ($r['cust']) $body[] = 'ลูกค้า: ' . h($r['cust']);
-        if ($r['reported_issue'] && $r['reported_issue'] !== '-') $body[] = 'อาการแจ้ง: ' . h($r['reported_issue']);
-        if ($r['assessment']) $body[] = 'การประเมิน: ' . h($r['assessment']);
-        if ($r['action_taken']) $body[] = 'การแก้ไข: ' . h($r['action_taken']);
-        $stmap = ['received' => 'รับเครื่องแล้ว', 'in_progress' => 'กำลังซ่อม', 'done' => 'ซ่อมเสร็จ', 'returned' => 'ส่งคืนแล้ว'];
-        $body[] = 'สถานะงาน: ' . $stmap[$r['status']] . ($r['closed_at'] ? ' (ปิดงาน ' . dthai($r['closed_at']) . ')' : '');
-        $tl[] = ['d' => timeline_dt($r['d']), 'type_key' => 'repair', 'type' => ui_timeline_type_html('repair'), 'html' => implode('<br>', $body)];
-    }
+    // งานซ่อมเก่าของตาราง repairs ย้ายไปอยู่ในส่วน "ประวัติงานซ่อม" ที่เดียวแล้ว (24 ก.ย. 2026)
+    // เดิมโผล่ที่ timeline อย่างเดียว ทำให้ดูเหมือนสองส่วนบนหน้าเดียวกันขัดกันเอง
     // ประวัติเข้า-ออกคลัง (stock_movements) ไม่แสดงใน timeline แล้ว — ส่วนใหญ่เป็นงานที่ระบบทำเอง
     // (ซิงก์ · เคลียร์เครื่องค้าง · นับสต็อก) ปนกับงานจริงจนอ่านไม่ออก ย้ายไปดูที่ stock_movements.php (หลังบ้าน)
     $res = qr("SELECT s.out_at d, s.expected_return_at, s.returned_at, s.status, a2.asset_code replaces, c.name cust
