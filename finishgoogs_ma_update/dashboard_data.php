@@ -942,12 +942,35 @@ switch ($type) {
             }
         }
         $out['ready_models'] = count($groups);
-        // รายรุ่นสำหรับการ์ด (แบบ ก) — กลุ่มรุ่นที่รอผลิต เรียงเหลือมากสุดก่อน
+        // รายรุ่นสำหรับการ์ด — กลุ่มรุ่นที่รอผลิต พร้อมความเร่งด่วน (ขาดสต็อก + ค้างมากี่วัน)
         $icons = [];
-        $ir = db()->query('SELECT id, icon_path FROM products');
+        $pcodes = [];
+        $ir = db()->query('SELECT id, icon_path, product_code FROM products');
         while ($x = $ir->fetch_row()) {
             $icons[(int) $x[0]] = (string) $x[1];
+            $pcodes[(int) $x[0]] = strtoupper(trim((string) $x[2]));
         }
+        // ยอดขาดรายรุ่น — ชุดเดียวกับตาราง "จำนวนเครื่องแยกตามรุ่น" (มี cache ของตัวเอง)
+        require_once dirname(__DIR__) . '/shared/finishgood_shortage_dashboard.php';
+        $fgMap = fg_model_stock_map();
+        $fgCodes = !empty($fgMap['ok']) ? $fgMap['codes'] : [];
+        // 0 = ต่ำกว่าขั้นต่ำ (ด่วน) · 1 = ถึงขั้นต่ำแต่ไม่พอส่ง PO · 2 = สต็อกครบ
+        $fgStage = function (array $pids) use ($pcodes, $fgCodes) {
+            $stage = 2;
+            $gap = 0;
+            foreach ($pids as $p) {
+                $row = $fgCodes[$pcodes[$p] ?? ''] ?? null;
+                if (!$row) {
+                    continue;
+                }
+                $g = (int) ($row['gap'] ?? 0);
+                $gap = max($gap, $g);
+                if ($g > 0) {
+                    $stage = min($stage, (int) $row['have'] < (int) $row['min'] ? 0 : 1);
+                }
+            }
+            return [$stage, $gap];
+        };
         $models = [];
         foreach ($d['items'] as $it) {
             if ($it['state'] !== 'ready') {
@@ -962,8 +985,9 @@ switch ($type) {
                         break;
                     }
                 }
+                [$stage, $gap] = $fgStage($it['products']);
                 $models[$g] = ['grp' => $g, 'name' => $it['model'], 'icon' => $icon, 'left' => 0, 'qty' => 0, 'done' => 0,
-                               'docs' => 0, 'oldest' => $it['date'], 'missing' => []];
+                               'docs' => 0, 'oldest' => $it['date'], 'stage' => $stage, 'gap' => $gap, 'days' => 0, 'missing' => []];
             }
             $models[$g]['left'] += $it['left'];
             $models[$g]['qty'] += $it['qty'];
@@ -974,8 +998,13 @@ switch ($type) {
                 $models[$g]['missing'][preg_replace('/\s*\(.*$/u', '', $m)] = true;
             }
         }
-        usort($models, function ($a, $b) { return [$b['left'], $a['name']] <=> [$a['left'], $b['name']]; });
+        // ด่วนสุดก่อน: ต่ำกว่าขั้นต่ำ → ไม่พอส่ง PO → ครบ · ในกลุ่มเรียงขาดมากสุด แล้วค้างนานสุด
+        usort($models, function ($a, $b) {
+            return [$a['stage'], -$a['gap'], $a['oldest'], -$a['left']] <=> [$b['stage'], -$b['gap'], $b['oldest'], -$b['left']];
+        });
+        $today = strtotime(date('Y-m-d'));
         foreach ($models as &$m) {
+            $m['days'] = max(0, (int) round(($today - strtotime(substr($m['oldest'], 0, 10))) / 86400));
             $m['oldest'] = date('d/m', strtotime($m['oldest']));
             $m['missing'] = array_keys($m['missing']);
         }

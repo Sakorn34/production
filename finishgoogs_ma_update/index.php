@@ -457,6 +457,13 @@ $partsBase = ui_parts_base_url();
     <a class="dash-pk-stat" href="<?= h($B) ?>/inv_pickups.php?tab=waiting">รอคลังจ่าย <b id="dash-pk-waiting">—</b> ใบ</a>
     <a class="dash-pk-stat is-warn" id="dash-pk-unmatched-pill" href="<?= h($B) ?>/inv_pickups.php?tab=unmatched"
        title="เครื่องที่ลงทะเบียนตอนรุ่นนั้นไม่มีใบเบิกจาก inventory ค้างอยู่ — จับคู่กับใบเบิกทีหลังได้">ลงทะเบียนโดยไม่มีใบเบิก <b id="dash-pk-unmatched">—</b></a>
+    <label class="dash-pk-sort" for="dash-pk-sort"><span>เรียงตาม</span>
+      <select id="dash-pk-sort">
+        <option value="urgent">ด่วนสุดก่อน</option>
+        <option value="oldest">เบิกเก่าสุดก่อน</option>
+        <option value="left">เหลือมากสุดก่อน</option>
+      </select>
+    </label>
   </div>
   <div class="dash-pk-prog" id="dash-pk-prog" hidden>
     <div class="dash-pk-prog-lb"><span>ผลิตแล้ว <b id="dash-pk-done">0</b> / <span id="dash-pk-qty">0</span> เครื่องที่เบิกมา</span><b id="dash-pk-pct">0%</b></div>
@@ -757,20 +764,55 @@ $partsBase = ui_parts_base_url();
       document.getElementById('dash-pk-bar').style.cssText = 'width:' + pctOf(d.done, d.qty) + '%;background:' + d.bar;
       document.getElementById('dash-pk-prog').hidden = !d.qty;
       // รายรุ่น 5 อันดับแรก — กดแถวเปิด popup รายละเอียด (ใบเบิก · ของที่ยังไม่จ่าย · อะไหล่ที่จ่ายแล้ว)
+      // ป้าย = ความขาดสต็อกของรุ่นนั้น (เกณฑ์เดียวกับตารางรุ่นด้านล่าง) · บรรทัดรองบอกว่าของค้างมากี่วัน
       var SHOW = 5, list = document.getElementById('dash-pk-list'), models = d.models || [];
-      list.innerHTML = models.length ? models.slice(0, SHOW).map(function (m) {
-        return '<button type="button" class="dash-pk-row" data-grp="' + esc(m.grp) + '" data-name="' + esc(m.name) + '">'
-          + (m.icon ? '<img src="' + esc(m.icon) + '" alt="" class="dash-pk-img" loading="lazy">' : '<span class="dash-pk-img dash-pk-noimg"></span>')
-          + '<span class="dash-pk-nm"><b>' + esc(m.name) + '</b>'
-          + (m.missing.length ? ' <span class="dash-pk-miss">' + esc(m.missing.slice(0, 2).join(', ')) + ' ยังไม่จ่าย</span>' : '')
-          + '<small>' + m.docs + ' ใบ · ' + (m.docs > 1 ? 'เก่าสุด ' : '') + esc(m.oldest)
-          + ' · ผลิตแล้ว ' + fgNum(m.done) + '/' + fgNum(m.qty) + '</small>'
-          + '<span class="pk-bar pk-bar-row"><span style="width:' + pctOf(m.done, m.qty) + '%;background:' + d.bar + '"></span></span></span>'
-          + '<span class="dash-pk-q"><b>' + fgNum(m.left) + '</b>เครื่อง</span></button>';
-      }).join('') : '<p class="muted" style="margin:6px 0 0">ไม่มีของที่เบิกมารอผลิต</p>';
+      var stageLabel = ['ต่ำกว่าขั้นต่ำ', 'ไม่พอส่ง PO', ''];
+      var pkSorters = {
+        urgent: function (a, b) { return a.stage - b.stage || b.gap - a.gap || b.days - a.days || b.left - a.left; },
+        oldest: function (a, b) { return b.days - a.days || a.stage - b.stage || b.left - a.left; },
+        left: function (a, b) { return b.left - a.left || a.stage - b.stage || b.days - a.days; }
+      };
+      var pkSortSel = document.getElementById('dash-pk-sort');
+      var pkSort = 'urgent';
+      try { pkSort = localStorage.getItem('dash_pk_sort') || 'urgent'; } catch (e) {}
+      if (!pkSorters[pkSort]) { pkSort = 'urgent'; }
       var more = document.getElementById('dash-pk-more');
-      more.hidden = models.length <= SHOW;
-      more.textContent = '+ อีก ' + (models.length - SHOW) + ' รุ่น ›';
+      function drawPk() {
+        if (!models.length) {
+          list.innerHTML = '<p class="muted" style="margin:6px 0 0">ไม่มีของที่เบิกมารอผลิต</p>';
+          more.hidden = true;
+          return;
+        }
+        var rows = models.slice().sort(pkSorters[pkSort]);
+        list.innerHTML = rows.slice(0, SHOW).map(function (m) {
+          var tag = m.gap > 0
+            ? '<span class="dash-pk-tag is-st' + m.stage + '">ขาด ' + fgNum(m.gap) + '</span>'
+            : '<span class="dash-pk-tag is-st2">สต็อกครบ</span>';
+          var sub = [];
+          if (stageLabel[m.stage]) { sub.push(stageLabel[m.stage]); }
+          sub.push('ค้าง ' + fgNum(m.days) + ' วัน');
+          if (m.docs > 1) { sub.push(m.docs + ' ใบ'); }
+          sub.push(m.done > 0 ? 'ผลิตแล้ว ' + fgNum(m.done) + '/' + fgNum(m.qty) : 'ยังไม่ได้ผลิต');
+          return '<button type="button" class="dash-pk-row" data-grp="' + esc(m.grp) + '" data-name="' + esc(m.name) + '">'
+            + (m.icon ? '<img src="' + esc(m.icon) + '" alt="" class="dash-pk-img" loading="lazy">' : '<span class="dash-pk-img dash-pk-noimg"></span>')
+            + '<span class="dash-pk-nm"><b>' + esc(m.name) + '</b>' + tag
+            + (m.missing.length ? ' <span class="dash-pk-miss">' + esc(m.missing.slice(0, 2).join(', ')) + ' ยังไม่จ่าย</span>' : '')
+            + '<small>' + esc(sub.join(' · ')) + '</small>'
+            + '<span class="pk-bar pk-bar-row"><span style="width:' + pctOf(m.done, m.qty) + '%;background:' + d.bar + '"></span></span></span>'
+            + '<span class="dash-pk-q"><b>' + fgNum(m.left) + '</b>เครื่อง</span></button>';
+        }).join('');
+        more.hidden = models.length <= SHOW;
+        more.textContent = '+ อีก ' + (models.length - SHOW) + ' รุ่น ›';
+      }
+      if (pkSortSel) {
+        pkSortSel.value = pkSort;
+        pkSortSel.addEventListener('change', function () {
+          pkSort = pkSorters[pkSortSel.value] ? pkSortSel.value : 'urgent';
+          try { localStorage.setItem('dash_pk_sort', pkSort); } catch (e) {}
+          drawPk();
+        });
+      }
+      drawPk();
       list.onclick = function (e) {
         var b = e.target.closest('.dash-pk-row');
         if (!b) { return; }
