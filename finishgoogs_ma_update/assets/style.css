@@ -1305,9 +1305,10 @@ html.fgs-open, html.fgs-open body { overflow: hidden; }
 .notif-overlay { z-index: 80; }
 /* ปุ่ม "← ย้อน" ใน popup ชั้นแรกต้องซ่อน — กฎ display ของ .btn-sm ชนะแอตทริบิวต์ hidden */
 #list-back[hidden] { display: none !important; }
-/* หน้าบันทึกผลิต: ปุ่มเพิ่มเครื่อง + สแกนต่อเนื่อง อยู่บรรทัดเดียวกัน แบ่งครึ่ง */
-.unit-actions { display: flex; gap: 8px; }
-.unit-actions > .btn { flex: 1 1 0; justify-content: center; white-space: nowrap; min-width: 0; }
+/* หน้าบันทึกผลิต: ปุ่มเพิ่มเครื่อง + สแกนต่อเนื่อง + ถ่ายรูปหลายเครื่อง อยู่บรรทัดเดียวกันถ้าพอ
+   จอแคบ: ปุ่มที่ไม่พอตกไปบรรทัดใหม่ (ห้ามหดต่ำกว่าข้อความ ไม่งั้นตัวหนังสือทับกัน) */
+.unit-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.unit-actions > .btn { flex: 1 0 auto; justify-content: center; white-space: nowrap; min-width: 0; }
 @media (min-width: 641px) { .unit-actions > .btn { flex: 0 0 auto; } }
 @media (max-width: 640px) {
   /* แถวอะไหล่ (ชุดอะไหล่ที่จะเบิก · อะไหล่ในหน้า MA) — ช่องเลือกอะไหล่ได้บรรทัดเต็ม
