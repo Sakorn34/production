@@ -221,7 +221,69 @@ function asset_status_scanned_ids(): array
     return $cache;
 }
 
-function asset_status_sync_row(array $row, array $saleMap, array $leaseMap, bool $write = true, array $installMap = []): array
+/**
+ * เครื่องที่ระบบ setup บันทึกว่าขาย/ส่งมอบไปแล้ว (อ่านทีเดียวทั้งชุด)
+ *
+ * บางเครื่องคลังจ่ายออกผ่านใบสั่งงานของระบบ setup โดยไม่ได้ทำใบเบิกขายใน stock
+ * ทะเบียน stock จึงยังขึ้นว่าอยู่ในคลัง และสถานะฝั่งเราค้างเป็น "เครื่องใหม่"
+ * ทั้งที่ของส่งถึงลูกค้าแล้ว — หลักฐานชุดนี้จึงใช้ปิดช่องว่างนั้น
+ *
+ * @param string[] $codes
+ * @return array<string,array{ref:string,date:string,customer:string,src:string}> รหัสเครื่อง (ตัวใหญ่) => ข้อมูล
+ */
+function asset_status_setup_sold_map(array $codes): array
+{
+    $out = [];
+    $codes = array_values(array_unique(array_filter(array_map('trim', $codes))));
+    if (!$codes || !function_exists('dbSetup')) {
+        return $out;
+    }
+    $db = dbSetup();
+    if (!$db) {
+        return $out;
+    }
+    $in = implode(',', array_map(function ($v) use ($db) { return "'" . $db->real_escape_string($v) . "'"; }, $codes));
+    try {
+        // ใบส่งมอบ Order — แหล่งหลัก มีทั้งเลขใบและชื่อหน่วยงาน
+        $res = $db->query(
+            "SELECT ps.serial_number, ps.issue_ref, ps.issue_date, so.company_name, so.customer_name
+             FROM po_order_part_serials ps LEFT JOIN setup_orders so ON so.id = ps.order_id
+             WHERE ps.serial_number IN ($in) ORDER BY ps.issue_date ASC, ps.id ASC"
+        );
+        while ($res && ($r = $res->fetch_assoc())) {
+            $out[strtoupper(trim((string) $r['serial_number']))] = [
+                'ref'      => trim((string) ($r['issue_ref'] ?? '')),
+                'date'     => trim((string) ($r['issue_date'] ?? '')),
+                'customer' => trim((string) ($r['company_name'] ?? '')) !== ''
+                    ? trim((string) $r['company_name']) : trim((string) ($r['customer_name'] ?? '')),
+                'src'      => 'order',
+            ];
+        }
+        // ประวัติขาย/เคลม — เอาเฉพาะแถวที่เครื่องนี้เป็น "ตัวที่ส่งออกไป" (new_serial_number)
+        $res = $db->query(
+            "SELECT new_serial_number, claim_number, claim_date, customer_name, issue_type
+             FROM equipment_claim_history
+             WHERE new_serial_number IN ($in) ORDER BY claim_date ASC, id ASC"
+        );
+        while ($res && ($r = $res->fetch_assoc())) {
+            $sn = strtoupper(trim((string) $r['new_serial_number']));
+            if (isset($out[$sn])) {
+                continue;   // ใบส่งมอบละเอียดกว่า ใช้ตัวนั้นก่อน
+            }
+            $out[$sn] = [
+                'ref'      => trim((string) ($r['claim_number'] ?? '')),
+                'date'     => trim((string) ($r['claim_date'] ?? '')),
+                'customer' => trim((string) ($r['customer_name'] ?? '')),
+                'src'      => trim((string) ($r['issue_type'] ?? '')) === 'claim' ? 'claim' : 'sale',
+            ];
+        }
+    } catch (\Throwable $e) {
+        error_log('[asset_status_setup_sold_map] ' . $e->getMessage());
+    }
+    return $out;
+}
+
+function asset_status_sync_row(array $row, array $saleMap, array $leaseMap, bool $write = true, array $installMap = [], array $setupMap = []): array
 {
     $id = (int) ($row['id'] ?? 0);
     $code = trim((string) ($row['asset_code'] ?? ''));
@@ -238,6 +300,18 @@ function asset_status_sync_row(array $row, array $saleMap, array $leaseMap, bool
     );
     $target = $resolved['target'];
     $reason = (string) ($resolved['reason'] ?? '');
+
+    // ขาย/ส่งมอบตามระบบ setup — คลังจ่ายออกผ่านใบสั่งงานโดยไม่ได้ทำใบเบิกขายใน stock
+    // แตะเฉพาะเครื่องที่ยังเป็น "ใหม่" และไม่มีชื่อในระบบเช่า (สัญญาเช่าชนะเสมอ)
+    if ($target === null && $current === 'new' && $code !== '') {
+        $lease = $leaseMap[strtoupper($code)] ?? ($leaseMap[$code] ?? null);
+        $hit = $setupMap[strtoupper($code)] ?? null;
+        if ($hit && empty($lease['found'])) {
+            $label = ['order' => 'ส่งมอบตามใบสั่งงาน', 'claim' => 'ส่งออกไปเคลม', 'sale' => 'ขายตามระบบ setup'][$hit['src']] ?? 'ส่งมอบแล้ว';
+            $target = 'sold';
+            $reason = 'ระบบ Setup: ' . $label . ($hit['ref'] !== '' ? ' ' . $hit['ref'] : '');
+        }
+    }
 
     // ประวัติติดตั้งระบบเดิม (installation) — หลักฐานอ่อนสุด ใช้กับเครื่องที่ยังเป็น "ใหม่" เท่านั้น
     // เมื่อไม่มีหลักฐานอื่นเลย (ไม่อยู่ในระบบเช่า ไม่มีใบเบิก) เงื่อนไขละเอียดดู installation_history_status_hint
@@ -292,9 +366,11 @@ function asset_status_sync_batch(array $assetRows, bool $write = true): array
     // โหลดประวัติติดตั้งเฉพาะเครื่องที่ยังเป็น "ใหม่" — กฎนี้ไม่แตะสถานะอื่น
     $newRows = array_values(array_filter($assetRows, function ($r) { return trim((string) ($r['status'] ?? '')) === 'new'; }));
     $installMap = $newRows ? installation_history_map($newRows) : [];
+    // หลักฐานฝั่ง setup ใช้กับเครื่องที่ยังเป็น "ใหม่" เหมือนกัน จึงถามเฉพาะชุดนั้น
+    $setupMap = $newRows ? asset_status_setup_sold_map(array_column($newRows, 'asset_code')) : [];
 
     foreach ($assetRows as $row) {
-        $item = asset_status_sync_row($row, $saleMap, $leaseMap, $write, $installMap);
+        $item = asset_status_sync_row($row, $saleMap, $leaseMap, $write, $installMap, $setupMap);
         if (!empty($item['changed'])) {
             $stats['changed']++;
             $stats['items'][] = $item;
@@ -324,8 +400,10 @@ function asset_status_sync_by_id(int $assetId, bool $write = true): array
     $code = trim((string) ($row['asset_code'] ?? ''));
     $saleMap = $code !== '' ? asset_stockparts_sale_status_by_sn([$code]) : [];
     $leaseMap = asset_leasing_status_by_assets([$row]);
-    $installMap = trim((string) $row['status']) === 'new' ? installation_history_map([$row]) : [];
-    $item = asset_status_sync_row($row, $saleMap, $leaseMap, $write, $installMap);
+    $isNew = trim((string) $row['status']) === 'new';
+    $installMap = $isNew ? installation_history_map([$row]) : [];
+    $setupMap = ($isNew && $code !== '') ? asset_status_setup_sold_map([$code]) : [];
+    $item = asset_status_sync_row($row, $saleMap, $leaseMap, $write, $installMap, $setupMap);
     return [
         'changed' => !empty($item['changed']),
         'from' => (string) ($item['from'] ?? ''),
