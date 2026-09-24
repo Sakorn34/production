@@ -120,6 +120,8 @@ function page_back_url_default() {
         case 'leasing_move.php':
         case 'inv_pickups.php':
             return $b . '/assets.php';
+        case 'search.php':
+            return $b . '/index.php';
         case 'update_edit.php':
         case 'update_new.php':
             return $productId > 0 ? $b . '/updates.php?product=' . $productId : $b . '/updates.php';

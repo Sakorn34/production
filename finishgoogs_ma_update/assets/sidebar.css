@@ -176,6 +176,7 @@
 .sidebar-search-input::placeholder {
   color: rgba(255, 255, 255, .45);
 }
+.sidebar-smart-all { justify-content: center; font-size: calc(12.5px * var(--font-scale, 1)); color: var(--primary, #db2777); font-weight: 600; }
 .sidebar-smart-suggest {
   position: absolute;
   left: 10px;

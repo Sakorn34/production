@@ -233,7 +233,8 @@ function smart_search_query(string $q, int $limitPerKind = 5): array
         return [];
     }
 
-    $limitPerKind = max(1, min(8, $limitPerKind));
+    // ดรอปดาวน์บนเมนูขอมาแค่ 3 · หน้าผลการค้นหาเต็มหน้า (search.php) ขอได้ถึง 100 ต่อแหล่ง
+    $limitPerKind = max(1, min(100, $limitPerKind));
     $like = '%' . $q . '%';
     $prefix = $q . '%';
     $out = [];
@@ -355,7 +356,7 @@ function smart_search_query(string $q, int $limitPerKind = 5): array
                 (string) ($r['contact_name'] ?? ''),
                 $n > 0 ? 'ติดตั้งอยู่ ' . number_format($n) . ' เครื่อง' : '',
             ]))),
-            'href'       => 'repairs.php?customer=' . (int) $r['id'],
+            'href'       => 'search.php?q=' . rawurlencode((string) $r['name']),
         ];
     }
 

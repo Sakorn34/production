@@ -235,6 +235,12 @@
                     + '<span class="sidebar-smart-meta">' + escHtml(it.subtitle || '') + '</span>'
                     + '</button>';
             }).join('');
+            // ดรอปดาวน์โชว์อย่างละไม่กี่รายการ — ชื่อลูกค้าที่มีเครื่องหลายสิบเครื่องจึงเห็นไม่ครบ
+            var allQ = searchInput ? searchInput.value.trim() : '';
+            if (allQ) {
+                suggestBox.innerHTML += '<button type="button" class="sidebar-smart-item sidebar-smart-all" data-href="search.php?q='
+                    + encodeURIComponent(allQ) + '">ดูผลทั้งหมดของ "' + escHtml(allQ) + '" →</button>';
+            }
             suggestBox.hidden = false;
         }
 
