@@ -595,18 +595,22 @@ function ma_jobs_table_html(array $jobs): string
 function ma_legacy_table_html(array $rows): string
 {
     $out = '<h3 class="ma-subhead">ประวัติเก่า (ก่อนย้ายระบบ)</h3>'
-        . '<p class="ma-hint">บันทึกจากระบบเดิมช่วงปี 2561–2563 · มีเฉพาะข้อมูลพื้นฐาน</p>'
+        . '<p class="ma-hint">บันทึกจากระบบเดิมช่วงปี 2561–2563 · บางรายการไม่ได้กรอกอาการหรือสิ่งที่ทำไว้</p>'
         . '<div class="ma-card ma-card-flat"><div class="ma-tblscroll">'
         . '<table class="ma-table"><thead><tr>'
-        . '<th>เลขงาน</th><th>วันที่</th><th>หน่วยงาน</th><th>สถานที่</th><th>รุ่น</th>'
+        . '<th>เลขงาน</th><th>วันที่</th><th>หน่วยงาน</th><th>สถานที่</th><th>อาการที่แจ้ง</th><th>สิ่งที่ทำ</th><th>รุ่น</th>'
         . '</tr></thead><tbody>';
 
     foreach ($rows as $r) {
+        // ตารางเก่ามีข้อความอยู่สองช่อง (อาการที่แจ้ง 1,644 แถว · สิ่งที่ทำ 47 แถว)
+        // เดิมไม่ได้เอามาแสดงเลย เหลือแต่หัวเรื่องกับหน่วยงาน อ่านแล้วไม่รู้ว่าเกิดอะไรขึ้น
         $out .= '<tr>'
             . '<td class="ma-mono">' . h(ma_val($r['rh_mtn_number'] ?? null) ?? '—') . '</td>'
             . '<td class="ma-mono">' . h(ma_date_be($r['rh_date'] ?? null) ?? '—') . '</td>'
             . '<td>' . h(ma_val($r['rh_com_security'] ?? null) ?? '—') . '</td>'
             . '<td>' . h(ma_val($r['rh_com_enduser'] ?? null) ?? '—') . '</td>'
+            . '<td>' . h(ma_val($r['rh_inform_repair'] ?? null) ?? '—') . '</td>'
+            . '<td>' . h(ma_val($r['rh_repair'] ?? null) ?? '—') . '</td>'
             . '<td class="ma-muted">' . h(ma_val($r['rh_product'] ?? null) ?? '—') . '</td>'
             . '</tr>';
     }
