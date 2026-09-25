@@ -170,6 +170,18 @@ usort($items, function ($a, $b) {
     return [$rank[$a['state']], -$a['bom'], $a['name']] <=> [$rank[$b['state']], -$b['bom'], $b['name']];
 });
 $show = $showAll ? $items : array_values(array_filter($items, function ($x) { return $x['state'] !== 'ok'; }));
+// รายการในคลังช่างทั้งหมด — ใช้เป็นตัวเลือกตอนผูกเอง (พิมพ์ชื่อหรือรหัสก็ค้นได้)
+$stockList = [];
+try {
+    $pdoAll = function_exists('dbParts') ? dbParts() : null;
+    if ($pdoAll) {
+        foreach ($pdoAll->query('SELECT code, name, quantity FROM products ORDER BY name') as $sRow) {
+            $stockList[] = $sRow;
+        }
+    }
+} catch (Throwable $e) {
+    $stockList = [];
+}
 // ตัวที่จับคู่ไม่ได้ — ลองเดาว่าในคลังช่างมันคือแถวไหน (เดาเฉพาะที่แสดงอยู่ ไม่ต้องยิงทั้งตาราง)
 $delLog = plc_deleted_log();
 foreach ($show as &$x) {
@@ -226,8 +238,17 @@ page_header('ตรวจการจับคู่อะไหล่กับ�
           <button type="submit" class="btn btn-sm btn-line" onclick="return confirm('เปลี่ยนรหัส Stock ของ <?= h((string) $x['name']) ?> เป็น <?= h((string) $g['row']['code']) ?>?')">ใช้รหัสนี้</button>
         </form>
         <?php } elseif ($x['state'] === 'missing') { ?>
-        <span class="muted">ไม่พบตัวที่ใกล้เคียง — ให้ทีมอะไหล่เพิ่มรายการกลับ</span>
-        <?php } else { ?><span class="muted">—</span><?php } ?>
+        <span class="muted">ไม่พบตัวที่ใกล้เคียง — เพิ่มรายการในคลังช่างก่อน แล้วค่อยผูกด้านล่าง</span>
+        <?php } ?>
+        <?php // ผูกเอง — เลือกรายการในคลังช่างเองได้ทุกกรณี (เช่นเพิ่งสร้างใหม่ด้วยรหัสใหม่) ?>
+        <?php if ($x['state'] !== 'ok' && $stockList) { ?>
+        <form method="post" class="plc-bind">
+          <?= csrf_field() ?><input type="hidden" name="fix_part" value="<?= (int) $x['id'] ?>">
+          <?php if ($showAll) { ?><input type="hidden" name="all" value="1"><?php } ?>
+          <input type="text" name="new_code" list="plc-stock-codes" placeholder="พิมพ์รหัสหรือชื่อในคลังช่าง" autocomplete="off" required>
+          <button type="submit" class="btn btn-sm">ผูกเข้าคลัง</button>
+        </form>
+        <?php } elseif ($x['state'] === 'ok') { ?><span class="muted">—</span><?php } ?>
       </td>
       <td data-pri="3"><?= $x['bom'] > 0 ? number_format($x['bom']) . ' รุ่น' : '<span class="muted">—</span>' ?><?= $x['used'] > 0 ? '<div class="muted" style="font-size:12px">เคยเบิก ' . number_format($x['used']) . ' ครั้ง</div>' : '' ?></td>
     </tr>
@@ -236,7 +257,15 @@ page_header('ตรวจการจับคู่อะไหล่กับ�
   <?php } ?>
 </div>
 
-<p class="muted plc-foot">วิธีแก้: ให้ทีมอะไหล่เพิ่มรายการนี้กลับเข้าคลังช่างด้วยรหัสเดิม หรือแก้ <b>รหัส Stock</b> ของอะไหล่ในระบบเราให้ตรงกับรหัสใหม่ (แอปอะไหล่ → รายละเอียดอะไหล่)</p>
+<datalist id="plc-stock-codes">
+  <?php foreach ($stockList as $s) { ?>
+  <option value="<?= h((string) $s['code']) ?>"><?= h((string) $s['name']) ?> · เหลือ <?= number_format((int) $s['quantity']) ?></option>
+  <?php } ?>
+</datalist>
+
+<p class="muted plc-foot">วิธีแก้: สร้างรายการในคลังช่างก่อน (แอปอะไหล่ → เพิ่มอะไหล่) แล้วกลับมาที่หน้านี้
+  กด <b>ใช้รหัสนี้</b> ถ้าระบบเดาให้ถูก หรือพิมพ์รหัส/ชื่อในช่อง <b>ผูกเข้าคลัง</b> แล้วกดผูกเอง —
+  ระบบจะอัปเดตรหัส Stock ของอะไหล่ในระบบเราให้ตรงกัน แล้วเบิกผลิตได้ทันที</p>
 
 <style>
 .plc-note { background: #fff7ed; border-color: #f59e0b; color: #92400e; line-height: 1.7; }
@@ -246,5 +275,7 @@ page_header('ตรวจการจับคู่อะไหล่กับ�
 .plc-badge.is-warn { background: #fef3c7; color: #92400e; }
 .plc-badge.is-bad { background: #fee2e2; color: #991b1b; }
 .plc-foot { margin-top: 12px; font-size: calc(12.5px * var(--font-scale, 1)); line-height: 1.6; }
+.plc-bind { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.plc-bind input { flex: 1 1 190px; min-width: 0; padding: 5px 10px; min-height: 0; font-size: calc(12.5px * var(--font-scale, 1)); }
 </style>
 <?php page_footer(); ?>
