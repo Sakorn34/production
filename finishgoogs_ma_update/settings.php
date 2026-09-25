@@ -261,6 +261,7 @@ $adminGroups = [
         ['appearance.php', 'palette', 'ปรับแต่งหน้าตาระบบ', 'ข้อความ · โลโก้ · สีธีม · เมนู'],
         ['server_config.php', 'settings', 'Server / Deploy', 'Path secrets · ฐานข้อมูล · SSO · ทดสอบการเชื่อมต่อ'],
         ['system_doc.php', 'book', 'หลักการทำงานของระบบ', 'DB · ตาราง · Data flow · ฟังก์ชัน · สิทธิ์ผู้ใช้'],
+        ['release_notes.php', 'updates', 'ประวัติการอัปเดตระบบ', 'ระบบพัฒนาอะไรไปบ้างในแต่ละรอบ · ของใหม่ · ปรับปรุง · แก้ไข'],
     ]],
 ];
 if (!$product) { ?>
