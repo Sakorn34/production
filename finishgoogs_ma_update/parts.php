@@ -317,22 +317,22 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'edit_part_form') {
       <?= csrf_field() ?>
       <input type="hidden" name="edit_part" value="1">
       <input type="hidden" name="part_id"   value="<?= (int)$r['id'] ?>">
+      <p class="muted" style="margin:0 0 10px;font-size:12.5px">
+        ชื่อ · หน่วย · หมวด · รูป แก้ที่<b>แอปอะไหล่ (คลังช่าง)</b> ที่เดียว แล้วระบบซิงก์เข้ามาให้เอง —
+        ที่นี่แก้ได้เฉพาะรหัสที่ใช้ผูกกับคลังช่าง
+      </p>
       <div class="formgrid form-narrow">
-        <label>ชื่ออะไหล่</label><input type="text" name="name"      value="<?= h($r['name']) ?>" required>
+        <label>ชื่ออะไหล่</label><div><b><?= h($r['name']) ?></b><input type="hidden" name="name" value="<?= h($r['name']) ?>"></div>
         <label>รหัสชิ้นส่วน</label><input type="text" name="part_code" value="<?= h($r['part_code'] ?? '') ?>">
         <label>รหัสสต็อก (P00001)</label><input type="text" name="stock_code" value="<?= h($r['stock_code'] ?? '') ?>" placeholder="ตรงกับรหัสอะไหล่ในระบบสต็อกกลาง">
-        <label>หมวด</label>      <input type="text" name="category"  value="<?= h($r['category'] ?? '') ?>">
-        <label>หน่วย</label>     <input type="text" name="unit"      value="<?= h($r['unit'] ?? '') ?>" placeholder="ชิ้น, เมตร, ม้วน">
-        <label>ร้านค้า</label>   <input type="text" name="dealer"    value="<?= h($r['dealer'] ?? '') ?>">
-        <label>ลิงก์</label>    <input type="url"  name="link"      value="<?= h($r['link'] ?? '') ?>" placeholder="https://...">
-        <label>รูป</label>
-        <div>
-          <?php if ($r['icon_path']) { echo img_tag($r['icon_path'], $r['name']); } ?>
-          <input type="file" name="icon" accept="image/*" style="margin-top:6px;display:block">
-          <span class="muted" style="font-size:11px">ไม่ต้องเลือกถ้าไม่ต้องการเปลี่ยนรูป</span>
-        </div>
+        <label>หมวด</label><div><?= h($r['category'] ?: '—') ?><input type="hidden" name="category" value="<?= h($r['category'] ?? '') ?>"></div>
+        <label>หน่วย</label><div><?= h($r['unit'] ?: '—') ?><input type="hidden" name="unit" value="<?= h($r['unit'] ?? '') ?>"></div>
+        <label>ร้านค้า</label><div><?= h($r['dealer'] ?: '—') ?><input type="hidden" name="dealer" value="<?= h($r['dealer'] ?? '') ?>"></div>
+        <label>ลิงก์</label><div><?= $r['link'] ? '<a href="' . h($r['link']) . '" target="_blank" rel="noopener">เปิดลิงก์</a>' : '—' ?><input type="hidden" name="link" value="<?= h($r['link'] ?? '') ?>"></div>
+        <label>รูป</label><div><?php if ($r['icon_path']) { echo img_tag($r['icon_path'], $r['name']); } else { echo '<span class="muted">—</span>'; } ?></div>
         <div class="full" style="margin-top:10px">
-          <button type="submit" class="btn">บันทึกการแก้ไข</button>
+          <button type="submit" class="btn">บันทึกรหัส</button>
+          <a class="btn btn-line btn-sm" href="<?= h(ui_parts_base_url()) ?>/pages/products.php" target="_blank" rel="noopener" style="margin-left:6px">แก้ข้อมูลที่แอปอะไหล่ ↗</a>
         </div>
       </div>
     </form>
@@ -431,6 +431,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_movement'])) {
 /* ─── POST: เพิ่มอะไหล่ใหม่ ────────────────────────────────────── */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_part'])) {
     csrf_check(); require_can('parts');
+    // ทะเบียนอะไหล่มีที่เดียวคือแอปอะไหล่ (คลังช่าง) — ที่นี่รับมาจาก sync อย่างเดียว
+    flash_set('เพิ่มอะไหล่ใหม่ที่แอปอะไหล่ (คลังช่าง) — ระบบจะซิงก์เข้ามาที่ทะเบียนนี้ให้เอง', 'err');
+    header('Location: ' . BASE_URL . '/parts.php');
+    exit;
     $icon     = save_upload('icon', 'parts');
     q("INSERT INTO parts (part_code,stock_code,name,category,unit,stock_qty,stock_min,dealer,link,icon_path)
        VALUES (?,?,?,?,?,0,?,?,?,?)", 'sssssdsss',
@@ -612,14 +616,14 @@ require __DIR__ . '/includes/list_search.php';
   <button class="btn btn-line" onclick="showListModal('เพิ่มรายการเบิกอะไหล่','<?= h(BASE_URL) ?>/parts.php?ajax=add_move_form','')">
     ➕ เพิ่มรายการเบิก
   </button>
-  <button class="btn btn-line" onclick="var p=document.getElementById('panel-add-part');p.style.display=p.style.display==='none'?'block':'none'">
-    ➕ เพิ่มอะไหล่ใหม่
-  </button>
+  <a class="btn btn-line" href="<?= h(ui_parts_base_url()) ?>/pages/products.php" target="_blank" rel="noopener">
+    ➕ เพิ่มอะไหล่ใหม่ (ที่แอปอะไหล่)
+  </a>
   <?php } ?>
 </div>
 
-<!-- ─── แผงเพิ่มอะไหล่ใหม่ (ซ่อนโดยค่าเริ่มต้น) ─────────────── -->
-<?php if (can('parts')) { ?>
+<!-- ─── แผงเพิ่มอะไหล่ใหม่ — ปิดใช้แล้ว ทะเบียนอะไหล่อยู่ที่แอปอะไหล่ที่เดียว (25 ก.ย. 2026) ─── -->
+<?php if (false) { ?>
 <div id="panel-add-part" class="panel compact-panel" style="display:none; margin-bottom:20px">
   <b style="display:block;margin-bottom:12px;font-size:14px">เพิ่มอะไหล่ใหม่</b>
   <form method="post" class="formgrid form-narrow" enctype="multipart/form-data">

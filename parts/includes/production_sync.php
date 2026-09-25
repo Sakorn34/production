@@ -135,6 +135,13 @@ function production_sync_create_part_from_product(array $product): ?int
     if ($existing) {
         return $existing;
     }
+    // ยังไม่มีแถวที่ผูกรหัสนี้ — ก่อนสร้างใหม่ ลองหาแถวเดิมที่เป็นอะไหล่ตัวเดียวกันแต่รหัสหลุด
+    // (ลบแล้วสร้างใหม่ในคลังช่างจะได้รหัสใหม่ ถ้าสร้างแถวใหม่เลยจะกลายเป็นอะไหล่ซ้ำในทะเบียนผลิต
+    //  แล้วชุดเบิกของรุ่นกับประวัติเดิมก็ยังค้างอยู่กับแถวเก่าที่เบิกไม่ได้)
+    $adopt = production_sync_adopt_orphan_part($code, $name);
+    if ($adopt) {
+        return $adopt;
+    }
     $active = !isset($product['is_active']) || (int) $product['is_active'] === 1;
     $prod = production_db();
     $stmt = $prod->prepare(
@@ -152,6 +159,54 @@ function production_sync_create_part_from_product(array $product): ?int
         $active ? 1 : 0,
     ]);
     return (int) $prod->lastInsertId();
+}
+
+/**
+ * หาแถว parts เดิมที่เป็นอะไหล่ตัวเดียวกัน แล้วผูกรหัสใหม่ให้ (แทนการสร้างแถวซ้ำ)
+ *
+ * เงื่อนไข: ชื่อตรงกัน และรหัสเดิมของแถวนั้น "ใช้ไม่ได้แล้ว" คือว่างเปล่า
+ * หรือชี้ไปยังรหัสที่ไม่มีในคลังช่างแล้ว — ถ้ารหัสเดิมยังใช้ได้อยู่ถือว่าเป็นคนละตัว ไม่แตะ
+ *
+ * @param string $code รหัสใหม่ใน products.code
+ * @param string $name ชื่ออะไหล่
+ * @return int|null part id ที่ผูกให้แล้ว
+ */
+function production_sync_adopt_orphan_part(string $code, string $name): ?int
+{
+    $name = trim($name);
+    if ($name === '') {
+        return null;
+    }
+    $prod = production_db();
+    $st = $prod->prepare('SELECT id, stock_code FROM parts WHERE TRIM(name) = ? ORDER BY id LIMIT 5');
+    $st->execute([$name]);
+    $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+    if (!$rows) {
+        return null;
+    }
+    $live = [];
+    $stock = tech_parts_sync_db();
+    foreach ($rows as $r) {
+        $sc = trim((string) ($r['stock_code'] ?? ''));
+        if ($sc === '') {
+            continue;
+        }
+        $chk = $stock->prepare('SELECT 1 FROM products WHERE code = ? LIMIT 1');
+        $chk->execute([$sc]);
+        if ($chk->fetchColumn()) {
+            $live[(int) $r['id']] = true;
+        }
+    }
+    foreach ($rows as $r) {
+        $id = (int) $r['id'];
+        if (isset($live[$id])) {
+            continue;   // แถวนี้ยังผูกกับของที่มีอยู่จริง = คนละตัวกัน
+        }
+        $up = $prod->prepare('UPDATE parts SET stock_code = ?, is_active = 1 WHERE id = ?');
+        $up->execute([$code, $id]);
+        return $id;
+    }
+    return null;
 }
 
 /**
