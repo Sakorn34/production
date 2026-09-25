@@ -1327,6 +1327,12 @@ html.fgs-open, html.fgs-open body { overflow: hidden; }
   .bom-row { padding-bottom: 8px; border-bottom: 1px dashed var(--border); }
 }
 .unit-actions > [hidden] { display: none !important; }
+/* ป้ายสถานะคลังช่างบนชิปอะไหล่ที่เลือกแล้ว — เห็นตั้งแต่ก่อนกดบันทึกว่าเบิกได้จริงไหม */
+.ma-part-chip-stock { margin-left: 6px; font-size: calc(11px * var(--font-scale, 1)); border-radius: 999px; padding: 0 7px; background: var(--surface-soft, #f6f4fb); color: var(--text-muted, #6b6480); }
+.ma-part-chip-stock.is-na, .ma-part-chip-stock.is-out { background: #fee2e2; color: #991b1b; }
+.confirm-part-warn { margin-top: 12px; border: 1px solid #fde68a; background: #fffbeb; color: #92400e; border-radius: 10px; padding: 9px 12px; font-size: calc(13px * var(--font-scale, 1)); line-height: 1.6; }
+.confirm-part-warn.is-block { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
+.confirm-part-warn ul { margin: 4px 0 0; padding-left: 18px; }
 /* ประวัติ MA ในหน้าบันทึก MA — 1 บรรทัดต่อครั้ง กดแถวดูรายละเอียดใน popup */
 .ma-hist tr.ma-hist-row { cursor: pointer; }
 .ma-hist tr.ma-hist-row:hover td, .ma-hist tr.ma-hist-row:focus-visible td { background: var(--surface-soft, #f6f4fb); }

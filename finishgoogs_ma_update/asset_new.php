@@ -835,12 +835,20 @@ function bomPartStockHtml(p){
   var unit = p.unit ? ' ' + esc(p.unit) : '';
   return '<span class="' + cls + '">คงเหลือ ' + p.stock_qty + unit + '</span>';
 }
+/** ป้ายเล็กบนชิปที่เลือกแล้ว — อะไหล่ที่ไม่มีในคลังช่างจะเบิกไม่ได้ตอนบันทึก ต้องเห็นตั้งแต่ตอนนี้ */
+function bomPartChipStockHtml(p){
+  if (!p) return '';
+  if (p.stock_qty == null) return '<span class="ma-part-chip-stock is-na">ไม่มีในคลังช่าง</span>';
+  if (p.stock_qty <= 0) return '<span class="ma-part-chip-stock is-out">ของหมด</span>';
+  return '<span class="ma-part-chip-stock">เหลือ ' + p.stock_qty + '</span>';
+}
 function bomPartSelectedChipHtml(partId){
   var label = bomPartLabel(partId);
   if (!label) return '';
   return '<span class="chip chip-pick ma-part-chip-sel">'
     + bomThumbHtml(partId)
-    + '<span class="ma-part-chip-label">' + esc(label) + '</span></span>';
+    + '<span class="ma-part-chip-label">' + esc(label) + '</span>'
+    + bomPartChipStockHtml(bomPartById(partId)) + '</span>';
 }
 function bomPartOptsHtml(selId, filter){
   filter = (filter || '').toLowerCase();
@@ -988,7 +996,7 @@ function buildConfirm(){
   });
   if (dynRows) html += '<h3 style="margin:14px 0 6px">ข้อมูลประจำรุ่น</h3><div class="table-wrap"><table class="list">' + dynRows + '</table></div>';
   // ชุดอะไหล่ที่จะเบิก (× จำนวนเครื่อง)
-  var bomRows = '';
+  var bomRows = '', bomBlock = [], bomShort = [];
   document.querySelectorAll('#bom-list .bom-row').forEach(function(r){
     var hid = r.querySelector('input[name="bom_part_id[]"]');
     var qtyInp = r.querySelector('.qty-stepper input') || r.querySelector('input[name="bom_qty[]"]');
@@ -997,10 +1005,27 @@ function buildConfirm(){
       var pid = parseInt(hid.value, 10);
       var p = bomPartById(pid);
       var nm = p ? p.name + (p.unit ? ' (' + p.unit + ')' : '') : '-';
-      bomRows += rowHtml(esc(nm), qty + ' × ' + mcount + ' = <b>' + (Math.round(qty * mcount * 100) / 100) + '</b>');
+      var needTotal = Math.round(qty * mcount * 100) / 100;
+      bomRows += rowHtml(esc(nm), qty + ' × ' + mcount + ' = <b>' + needTotal + '</b>');
+      if (p && p.stock_qty == null) { bomBlock.push(p.name + ' — ไม่มีรายการนี้ในคลังช่าง (รหัส ' + (p.stock_code || p.part_code || '-') + ')'); }
+      else if (p && p.stock_qty <= 0) { bomBlock.push(p.name + ' — ของหมดในคลังช่าง'); }
+      else if (p && p.stock_qty < needTotal) { bomShort.push(p.name + ' — ต้องใช้ ' + needTotal + ' แต่เหลือ ' + p.stock_qty); }
     }
   });
   if (bomRows) html += '<h3 style="margin:14px 0 6px">อะไหล่ที่จะเบิก (รวมทั้งชุด)</h3><div class="table-wrap"><table class="list">' + bomRows + '</table></div>';
+  // อะไหล่ที่เบิกไม่ได้ = บันทึกแล้วระบบจะคืนทั้งชุดและขึ้น error — บอกตั้งแต่หน้ายืนยัน
+  if (bomBlock.length || bomShort.length) {
+    html += '<div class="confirm-part-warn' + (bomBlock.length ? ' is-block' : '') + '">';
+    if (bomBlock.length) {
+      html += '<b>อะไหล่ที่เบิกไม่ได้ — บันทึกไม่ผ่าน</b><ul>' + bomBlock.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>'
+        + '<span class="muted">เอาอะไหล่นี้ออกจากชุด หรือให้ทีมอะไหล่เพิ่ม/เปิดใช้งานรายการนี้ในคลังช่างก่อน</span>';
+    }
+    if (bomShort.length) {
+      html += (bomBlock.length ? '<div style="margin-top:8px"></div>' : '')
+        + '<b>อะไหล่ในคลังช่างไม่พอ</b><ul>' + bomShort.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>';
+    }
+    html += '</div>';
+  }
   // checklist / ปัญหา / แก้ไข / หมายเหตุ
   var chk = [];
   document.querySelectorAll('#chk-list input[type=checkbox]:checked').forEach(function(c){ chk.push(c.dataset.item); });
@@ -1031,6 +1056,12 @@ function buildConfirm(){
     });
     invBox.innerHTML = 'ตัดยอดใบเบิกจาก inventory<br>' + rows.join('<br>')
       + (need > 0 ? '<br><span class="muted">อีก ' + need + ' เครื่องไม่มีใบเบิกให้ตัด — บันทึกได้ตามปกติ</span>' : '');
+  }
+  // มีอะไหล่ที่เบิกไม่ได้ = กดบันทึกไปก็ไม่ผ่าน ปิดปุ่มไว้ก่อน
+  var okBtn = document.getElementById('confirm-submit-btn');
+  if (okBtn) {
+    okBtn.disabled = bomBlock.length > 0;
+    okBtn.title = bomBlock.length ? 'มีอะไหล่ที่เบิกไม่ได้ในชุด' : '';
   }
   var lease = document.getElementById('confirm-lease');
   lease.hidden = !(cfg && cfg.leasing_auto);

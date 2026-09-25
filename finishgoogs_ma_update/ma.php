@@ -1383,9 +1383,13 @@ function maPartSelectedChipHtml(partId){
   var p = maPartById(partId);
   if (!p) return '';
   var label = p.name + (p.unit ? ' (' + p.unit + ')' : '');
+  // ป้ายสถานะคลังช่าง — อะไหล่ที่ไม่มีในคลังช่างจะเบิกไม่ได้ตอนบันทึก
+  var st = p.stock_qty == null ? '<span class="ma-part-chip-stock is-na">ไม่มีในคลังช่าง</span>'
+         : (p.stock_qty <= 0 ? '<span class="ma-part-chip-stock is-out">ของหมด</span>'
+                             : '<span class="ma-part-chip-stock">เหลือ ' + p.stock_qty + '</span>');
   return '<span class="chip chip-pick ma-part-chip-sel">'
     + maPartThumbHtml(partId)
-    + '<span class="ma-part-chip-label">' + esc(label) + '</span></span>';
+    + '<span class="ma-part-chip-label">' + esc(label) + '</span>' + st + '</span>';
 }
 function maPartOptsHtml(selId, filter){
   filter = (filter || '').toLowerCase();
