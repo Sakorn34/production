@@ -793,9 +793,14 @@ $partsBase = ui_parts_base_url();
           sub.push('ค้าง ' + fgNum(m.days) + ' วัน');
           if (m.docs > 1) { sub.push(m.docs + ' ใบ'); }
           sub.push(m.done > 0 ? 'ผลิตแล้ว ' + fgNum(m.done) + '/' + fgNum(m.qty) : 'ยังไม่ได้ผลิต');
+          // ใบเบิกชุดเดียวประกอบได้หลายรุ่น — โชว์ชื่อรุ่นที่ควรผลิตก่อน แล้วบอกว่ามีอีกกี่รุ่น
+          if ((m.models_n || 1) > 1) {
+            tag = '<span class="dash-pk-tag is-more">+' + ((m.models_n || 1) - 1) + ' รุ่น</span>' + tag;
+            sub.unshift('ควรผลิตรุ่นนี้ก่อน');
+          }
           return '<button type="button" class="dash-pk-row" data-grp="' + esc(m.grp) + '" data-name="' + esc(m.name) + '">'
             + (m.icon ? '<img src="' + esc(m.icon) + '" alt="" class="dash-pk-img" loading="lazy">' : '<span class="dash-pk-img dash-pk-noimg"></span>')
-            + '<span class="dash-pk-nm"><b>' + esc(m.name) + '</b>' + tag
+            + '<span class="dash-pk-nm"><b>' + esc(m.lead || m.name) + '</b>' + tag
             + (m.missing.length ? ' <span class="dash-pk-miss">' + esc(m.missing.slice(0, 2).join(', ')) + ' ยังไม่จ่าย</span>' : '')
             + '<small>' + esc(sub.join(' · ')) + '</small>'
             + '<span class="pk-bar pk-bar-row"><span style="width:' + pctOf(m.done, m.qty) + '%;background:' + d.bar + '"></span></span></span>'

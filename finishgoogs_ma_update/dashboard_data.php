@@ -833,7 +833,7 @@ switch ($type) {
         }
         $pids = $list[0]['products'];
         $prods = [];
-        $pr = db()->query('SELECT id, name, icon_path FROM products WHERE id IN (' . implode(',', array_map('intval', $pids)) . ')');
+        $pr = db()->query('SELECT id, name, icon_path, product_code FROM products WHERE id IN (' . implode(',', array_map('intval', $pids)) . ')');
         while ($x = $pr->fetch_assoc()) {
             $prods[(int) $x['id']] = $x;
         }
@@ -899,6 +899,25 @@ switch ($type) {
             }
             echo '</div>';
         }
+        // ใบเบิกชุดเดียวประกอบได้หลายรุ่น — บอกว่ารุ่นไหนขาดเท่าไร จะได้เลือกผลิตคละได้ถูก
+        if (count($pids) > 1) {
+            require_once dirname(__DIR__) . '/shared/finishgood_shortage_dashboard.php';
+            $fgMap = fg_model_stock_map();
+            $fgCodes = !empty($fgMap['ok']) ? $fgMap['codes'] : [];
+            $short = [];
+            foreach ($pids as $p) {
+                $pc = strtoupper(trim((string) ($prods[$p]['product_code'] ?? '')));
+                $row = $pc !== '' ? ($fgCodes[$pc] ?? null) : null;
+                $short[] = ['name' => (string) ($prods[$p]['name'] ?? ('#' . $p)), 'gap' => $row ? (int) ($row['gap'] ?? 0) : 0];
+            }
+            usort($short, function ($a, $b) { return [-$a['gap'], $a['name']] <=> [-$b['gap'], $b['name']]; });
+            $li = '';
+            foreach ($short as $s) {
+                $li .= '<li><span>' . h($s['name']) . '</span><b>' . ($s['gap'] > 0 ? 'ขาด ' . number_format($s['gap']) : 'ครบ') . '</b></li>';
+            }
+            echo '<div class="pk-doc-parts"><div class="pk-parts-h">ยอดขาดรายรุ่น <span class="muted">— ใบเบิกนี้ประกอบได้ '
+                . count($pids) . ' รุ่น เลือกผลิตคละกันได้</span></div><ul class="pk-parts">' . $li . '</ul></div>';
+        }
         echo '<div class="pk-pop-btns">';
         foreach ($pids as $p) {
             $nm = $prods[$p]['name'] ?? ('#' . $p);
@@ -945,31 +964,33 @@ switch ($type) {
         // รายรุ่นสำหรับการ์ด — กลุ่มรุ่นที่รอผลิต พร้อมความเร่งด่วน (ขาดสต็อก + ค้างมากี่วัน)
         $icons = [];
         $pcodes = [];
-        $ir = db()->query('SELECT id, icon_path, product_code FROM products');
+        $pnames = [];
+        $ir = db()->query('SELECT id, icon_path, product_code, name FROM products');
         while ($x = $ir->fetch_row()) {
             $icons[(int) $x[0]] = (string) $x[1];
             $pcodes[(int) $x[0]] = strtoupper(trim((string) $x[2]));
+            $pnames[(int) $x[0]] = (string) $x[3];
         }
         // ยอดขาดรายรุ่น — ชุดเดียวกับตาราง "จำนวนเครื่องแยกตามรุ่น" (มี cache ของตัวเอง)
         require_once dirname(__DIR__) . '/shared/finishgood_shortage_dashboard.php';
         $fgMap = fg_model_stock_map();
         $fgCodes = !empty($fgMap['ok']) ? $fgMap['codes'] : [];
         // 0 = ต่ำกว่าขั้นต่ำ (ด่วน) · 1 = ถึงขั้นต่ำแต่ไม่พอส่ง PO · 2 = สต็อกครบ
-        $fgStage = function (array $pids) use ($pcodes, $fgCodes) {
-            $stage = 2;
-            $gap = 0;
+        // ใบเบิกชุดเดียวประกอบได้หลายรุ่น (เช่นชุด bitSupply 1206 ใช้ได้ 4 รุ่น) ยอดขาดจึงต้อง
+        // ดูรายรุ่น แล้วชูรุ่นที่ "ควรผลิตก่อน" ขึ้นมา — ขาดหนักสุดและเร่งด่วนสุดในกลุ่ม
+        $fgStage = function (array $pids) use ($pcodes, $pnames, $fgCodes) {
+            $rows = [];
             foreach ($pids as $p) {
                 $row = $fgCodes[$pcodes[$p] ?? ''] ?? null;
-                if (!$row) {
-                    continue;
-                }
-                $g = (int) ($row['gap'] ?? 0);
-                $gap = max($gap, $g);
-                if ($g > 0) {
-                    $stage = min($stage, (int) $row['have'] < (int) $row['min'] ? 0 : 1);
-                }
+                $g = $row ? (int) ($row['gap'] ?? 0) : 0;
+                $st = ($row && $g > 0) ? ((int) $row['have'] < (int) $row['min'] ? 0 : 1) : 2;
+                $rows[] = ['name' => $pnames[$p] ?? ('#' . $p), 'gap' => $g, 'stage' => $st];
             }
-            return [$stage, $gap];
+            usort($rows, function ($a, $b) {
+                return [$a['stage'], -$a['gap'], $a['name']] <=> [$b['stage'], -$b['gap'], $b['name']];
+            });
+            $lead = $rows[0] ?? ['name' => '', 'gap' => 0, 'stage' => 2];
+            return [$lead['stage'], $lead['gap'], $lead['name'], $rows];
         };
         $models = [];
         foreach ($d['items'] as $it) {
@@ -985,9 +1006,12 @@ switch ($type) {
                         break;
                     }
                 }
-                [$stage, $gap] = $fgStage($it['products']);
+                [$stage, $gap, $lead, $perModel] = $fgStage($it['products']);
                 $models[$g] = ['grp' => $g, 'name' => $it['model'], 'icon' => $icon, 'left' => 0, 'qty' => 0, 'done' => 0,
-                               'docs' => 0, 'oldest' => $it['date'], 'stage' => $stage, 'gap' => $gap, 'days' => 0, 'missing' => []];
+                               'docs' => 0, 'oldest' => $it['date'], 'stage' => $stage, 'gap' => $gap, 'days' => 0,
+                               // ชื่อที่โชว์บนการ์ด = รุ่นที่ควรผลิตก่อน · models_n > 1 = ใบเบิกนี้ใช้ได้หลายรุ่น
+                               'lead' => $lead !== '' ? $lead : $it['model'], 'models_n' => count($it['products']),
+                               'by_model' => $perModel, 'missing' => []];
             }
             $models[$g]['left'] += $it['left'];
             $models[$g]['qty'] += $it['qty'];

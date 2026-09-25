@@ -964,6 +964,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .dash-pk-tag.is-st0 { background: #fef2f2; color: #991b1b; }
 .dash-pk-tag.is-st1 { background: #fffbeb; color: #92400e; }
 .dash-pk-tag.is-st2 { background: var(--surface-2, #f6f4fb); color: var(--muted, #6b7280); }
+.dash-pk-tag.is-more { background: #ede9fe; color: #5b21b6; }
 .dash-pk-sort { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: calc(12px * var(--font-scale, 1)); color: var(--muted, #6b7280); white-space: nowrap; }
 .dash-pk-sort select { width: auto; min-width: 0; padding: 3px 24px 3px 9px; min-height: 0; font-size: calc(12px * var(--font-scale, 1)); }
 @media (max-width: 480px) { .dash-pk-sort { margin-left: 0; width: 100%; } .dash-pk-sort select { flex: 1; } }
