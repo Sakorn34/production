@@ -40,6 +40,10 @@ require __DIR__ . '/includes/layout.php';
 $search  = trim(isset($_GET['q']) ? $_GET['q'] : '');
 $status  = isset($_GET['status']) ? $_GET['status'] : '';
 $product = isset($_GET['product']) ? $_GET['product'] : '';
+// ตัวกรองการเบิกอะไหล่ — ปกติไม่แสดงในตาราง (ดูรายละเอียดที่หน้าโปรไฟล์เครื่อง)
+// ไว้เรียกดูเฉพาะตอนอยากตรวจว่ามีเครื่องไหนตกหล่น
+$pw      = isset($_GET['pw']) ? (string) $_GET['pw'] : '';
+if (!in_array($pw, ['none', 'partial'], true)) { $pw = ''; }
 $page    = max(1, (int)(isset($_GET['page']) ? $_GET['page'] : 1));
 $per     = 50;
 // ค่าเริ่มต้น: เวลาบันทึกล่าสุด → รหัสเครื่องมากสุด
@@ -54,7 +58,7 @@ $sortSql = [
 ];
 if (!isset($sortSql[$sort])) $sort = 'time_code';
 
-$hasActiveFilter = ($search !== '' || $product !== '' || $status !== '' || $sort !== 'time_code');
+$hasActiveFilter = ($search !== '' || $product !== '' || $status !== '' || $pw !== '' || $sort !== 'time_code');
 
 /**
  * สร้าง WHERE สำหรับ filter หน้า assets.php
@@ -62,9 +66,10 @@ $hasActiveFilter = ($search !== '' || $product !== '' || $status !== '' || $sort
  * @param string $search
  * @param string $status
  * @param string $product
+ * @param string $pw      '' ทั้งหมด · none ยังไม่เบิกเลย · partial เบิกไม่ครบชุด
  * @return array{w:string,types:string,params:array<int|string>}
  */
-function assets_page_build_where(string $search, string $status, string $product): array
+function assets_page_build_where(string $search, string $status, string $product, string $pw = ''): array
 {
     $where = [];
     $types = '';
@@ -86,11 +91,22 @@ function assets_page_build_where(string $search, string $status, string $product
         $types .= 's';
         $params[] = $product;
     }
+    // เทียบจำนวนอะไหล่ที่เบิกจริง (นับชนิด ไม่ใช่จำนวนชิ้น) กับชุดเบิกของรุ่น
+    // เครื่องของรุ่นที่ยังไม่ได้ตั้งชุดเบิกไม่นับว่าตกหล่น
+    if ($pw === 'none') {
+        $where[] = "EXISTS (SELECT 1 FROM bom_items b WHERE b.product_id = a.product_id)
+                AND NOT EXISTS (SELECT 1 FROM part_movements pm WHERE pm.ref_asset_id = a.id AND pm.direction = 'out')";
+    } elseif ($pw === 'partial') {
+        $where[] = "EXISTS (SELECT 1 FROM part_movements pm WHERE pm.ref_asset_id = a.id AND pm.direction = 'out')
+                AND (SELECT COUNT(DISTINCT pm.part_id) FROM part_movements pm
+                     WHERE pm.ref_asset_id = a.id AND pm.direction = 'out')
+                    < (SELECT COUNT(*) FROM bom_items b WHERE b.product_id = a.product_id)";
+    }
     $w = $where ? 'WHERE ' . implode(' AND ', $where) : '';
     return ['w' => $w, 'types' => $types, 'params' => $params];
 }
 
-$filter = assets_page_build_where($search, $status, $product);
+$filter = assets_page_build_where($search, $status, $product, $pw);
 $w = $filter['w'];
 $types = $filter['types'];
 $params = $filter['params'];
@@ -101,11 +117,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sync_withdraw_list_bu
         $search = trim((string) ($_POST['filter_q'] ?? ''));
         $status = trim((string) ($_POST['filter_status'] ?? ''));
         $product = trim((string) ($_POST['filter_product'] ?? ''));
+        $pw = trim((string) ($_POST['filter_pw'] ?? ''));
+        if (!in_array($pw, ['none', 'partial'], true)) { $pw = ''; }
         $sort = trim((string) ($_POST['filter_sort'] ?? 'time_code'));
         if (!isset($sortSql[$sort])) {
             $sort = 'time_code';
         }
-        $filter = assets_page_build_where($search, $status, $product);
+        $filter = assets_page_build_where($search, $status, $product, $pw);
         $w = $filter['w'];
         $types = $filter['types'];
         $params = $filter['params'];
@@ -130,6 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sync_withdraw_list_bu
         'q'       => $search,
         'product' => $product,
         'status'  => $status,
+        'pw'      => $pw,
         'sort'    => $sort,
     ], static function ($v) {
         return $v !== '';
@@ -148,13 +167,7 @@ $rows = qr("SELECT a.id, a.asset_code, a.factory_serial, a.status, a.produced_at
                    p.name pname, p.icon_path, p.id product_id,
                    (SELECT pr.made_by FROM production_records pr
                     WHERE pr.asset_id=a.id AND pr.made_by IS NOT NULL AND pr.made_by<>''
-                    ORDER BY pr.recorded_at ASC, pr.id ASC LIMIT 1) recorder,
-                   (SELECT COUNT(*) FROM part_movements pm
-                    WHERE pm.ref_asset_id=a.id AND pm.direction='out') parts_out_cnt,
-                   (SELECT COUNT(*) FROM part_movements pm
-                    WHERE pm.ref_asset_id=a.id AND pm.direction='out'
-                      AND pm.tech_stock_out_id IS NOT NULL AND pm.tech_stock_out_id > 0) parts_linked_cnt,
-                   (SELECT COUNT(*) FROM bom_items b WHERE b.product_id=a.product_id) bom_cnt
+                    ORDER BY pr.recorded_at ASC, pr.id ASC LIMIT 1) recorder
             FROM assets a JOIN products p ON p.id=a.product_id
             $w ORDER BY {$sortSql[$sort]} LIMIT $per OFFSET $off", $types, $params);
 
@@ -162,8 +175,6 @@ $assetRows = [];
 while ($r = $rows->fetch_assoc()) {
     $assetRows[] = $r;
 }
-$partsSnCounts = parts_stock_out_counts_by_sn(array_column($assetRows, 'asset_code'));
-
 // สถานะการเบิกขาย — อ่านจากระบบ stock ที่เดียวกับการ์ดในหน้าโปรไฟล์เครื่อง
 // เดิมคอลัมน์นี้อ่าน stock_movements ซึ่งนับ "เบิกผลิต" เป็นเบิกออกด้วย จึงไม่ใช่การขาย
 require_once __DIR__ . '/includes/stockparts_withdraw.php';
@@ -212,6 +223,11 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
       <option value="<?= $s ?>" <?= $status === $s ? 'selected' : '' ?>><?= h(status_th($s)) ?></option>
     <?php } ?>
   </select>
+  <select name="pw" onchange="this.form.submit()" title="ตรวจหาเครื่องที่เบิกอะไหล่ตกหล่น">
+    <option value="">เบิกอะไหล่: ทั้งหมด</option>
+    <option value="none" <?= $pw === 'none' ? 'selected' : '' ?>>ยังไม่เบิกเลย</option>
+    <option value="partial" <?= $pw === 'partial' ? 'selected' : '' ?>>เบิกไม่ครบชุด</option>
+  </select>
   <select name="sort" onchange="this.form.submit()">
     <option value="time_code" <?= $sort === 'time_code' ? 'selected' : '' ?>>บันทึกล่าสุด</option>
     <option value="date_desc" <?= $sort === 'date_desc' ? 'selected' : '' ?>>ผลิต ใหม่ → เก่า</option>
@@ -231,6 +247,7 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
     <input type="hidden" name="filter_q" value="<?= h($search) ?>">
     <input type="hidden" name="filter_product" value="<?= h($product) ?>">
     <input type="hidden" name="filter_status" value="<?= h($status) ?>">
+    <input type="hidden" name="filter_pw" value="<?= h($pw) ?>">
     <input type="hidden" name="filter_sort" value="<?= h($sort) ?>">
     <button type="submit" class="btn btn-sm btn-line btn-with-icon"><?= ui_btn_label('refresh', 'Sync รายการเบิก (' . number_format($withdrawSyncPendingCount) . ')') ?></button>
   </form>
@@ -307,30 +324,15 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
   <thead>
   <tr>
     <th data-pri="2">ผลิตเมื่อ</th><th data-pri="2"></th><th data-pri="1">รหัสเครื่อง</th>
-    <th data-pri="2">รุ่น</th><th data-pri="1">สถานะ</th><th data-pri="2">เบิกอะไหล่</th>
+    <th data-pri="2">รุ่น</th><th data-pri="1">สถานะ</th>
     <th data-pri="3">ผู้บันทึกรายการ</th><th data-pri="3">FW</th><th data-pri="3">การเบิกใช้งาน</th>
   </tr>
   </thead>
   <tbody>
   <?php if (!$assetRows) { ?>
-  <tr><td colspan="9" class="muted" style="text-align:center;padding:20px">ไม่พบเครื่องที่ตรงกับเงื่อนไข</td></tr>
+  <tr><td colspan="8" class="muted" style="text-align:center;padding:20px">ไม่พบเครื่องที่ตรงกับเงื่อนไข</td></tr>
   <?php } ?>
-  <?php foreach ($assetRows as $r) {
-      $sn = trim((string)$r['asset_code']);
-      $stockOutCnt = $sn !== '' ? (int)($partsSnCounts[$sn] ?? 0) : 0;
-      $outCnt = (int)$r['parts_out_cnt'];
-      $linkedCnt = (int)$r['parts_linked_cnt'];
-      $bomCnt = (int)$r['bom_cnt'];
-      $pRow = asset_parts_withdraw_row_status($outCnt, $stockOutCnt, $bomCnt, 0);
-      if ($outCnt > 0) {
-          $wst = asset_withdraw_list_sync_status_from_counts($outCnt, $stockOutCnt, $linkedCnt);
-          $pRow['label'] = $wst['label'];
-          $pRow['status'] = $wst['match'] === 'ok' ? 'done' : 'partial';
-      }
-      $pStatus = $pRow['status'];
-      $pLabel = $pRow['label'];
-      $partsProdUrl = asset_parts_production_url($sn);
-  ?>
+  <?php foreach ($assetRows as $r) { ?>
   <tr>
     <td data-pri="2" data-nowrap><?= dthai($r['produced_at']) ?></td>
     <td data-pri="2" style="width:56px"><?= img_tag($r['icon_path'], $r['pname']) ?></td>
@@ -341,16 +343,6 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
     </td>
     <td data-pri="2"><?= h($r['pname']) ?></td>
     <td data-pri="1"><?= status_badge($r['status']) ?></td>
-    <td data-pri="2">
-      <?php if ($pStatus === 'none') { ?>
-        <span class="muted">—</span>
-      <?php } else { ?>
-        <a href="<?= BASE_URL ?>/asset.php?id=<?= (int)$r['id'] ?>#parts-withdraw" class="parts-status parts-status-<?= h($pStatus) ?>" title="ดูรายละเอียดการเบิก"><?= h($pLabel) ?></a>
-        <?php if ($outCnt > 0) { ?>
-        <br><a href="<?= h($partsProdUrl) ?>" class="muted" style="font-size:11px" title="ประวัติเบิก production/MA">Production</a>
-        <?php } ?>
-      <?php } ?>
-    </td>
     <td data-pri="3"><?= h($r['recorder'] ?: '-') ?></td>
     <td data-pri="3"><?= h($r['current_fw_version'] ?: '-') ?></td>
     <?php
@@ -376,8 +368,8 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
       <?php } ?>
     </td>
   </tr>
-  </tbody>
   <?php } ?>
+  </tbody>
 </table>
 </div>
 
