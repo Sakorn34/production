@@ -96,6 +96,37 @@ function plc_deleted_log(): array
     return $map;
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['merge_keep'])) {
+    csrf_check();
+    $keep = (int) $_POST['merge_keep'];
+    $drop = array_values(array_filter(array_map('intval', (array) ($_POST['merge_drop'] ?? [])), function ($v) use ($keep) {
+        return $v > 0 && $v !== $keep;
+    }));
+    $keepRow = qr('SELECT id, name FROM parts WHERE id = ?', 'i', [$keep])->fetch_assoc();
+    if (!$keepRow || !$drop) {
+        flash_set('รวมรายการไม่ได้ — เลือกตัวที่จะเก็บไม่ถูกต้อง', 'err');
+    } else {
+        $in = implode(',', $drop);
+        // ชุดเบิกของรุ่นห้ามมีอะไหล่ซ้ำในรุ่นเดียวกัน (unique product_id+part_id)
+        // แถวที่ย้ายไม่ได้แปลว่ารุ่นนั้นมีตัวที่เก็บอยู่แล้ว — ทิ้งแถวซ้ำได้เลย
+        db()->query('UPDATE IGNORE bom_items SET part_id = ' . $keep . ' WHERE part_id IN (' . $in . ')');
+        db()->query('DELETE FROM bom_items WHERE part_id IN (' . $in . ')');
+        db()->query('UPDATE part_movements SET part_id = ' . $keep . ' WHERE part_id IN (' . $in . ')');
+        db()->query('DELETE FROM parts WHERE id IN (' . $in . ')');
+        if (function_exists('activity_log_write')) {
+            activity_log_write([
+                'system_key' => 'production', 'actor_name' => actor_name(), 'action_key' => 'part_merge_duplicates',
+                'summary' => 'รวมอะไหล่ซ้ำ ' . count($drop) . ' รายการเข้ากับ "' . $keepRow['name'] . '"',
+                'detail' => json_encode(['keep' => $keep, 'drop' => $drop], JSON_UNESCAPED_UNICODE),
+                'entity_type' => 'part', 'entity_id' => (string) $keep,
+            ]);
+        }
+        flash_set('รวมอะไหล่ซ้ำ ' . count($drop) . ' รายการเข้ากับ "' . $keepRow['name'] . '" แล้ว — ชุดเบิกและประวัติย้ายมาให้ครบ');
+    }
+    header('Location: ' . $B . '/parts_link_check.php' . (!empty($_POST['all']) ? '?all=1' : ''));
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['fix_part'])) {
     csrf_check();
     $pid = (int) $_POST['fix_part'];
@@ -192,6 +223,35 @@ foreach ($show as &$x) {
 }
 unset($x);
 
+// ── อะไหล่ซ้ำ: ชื่อเดียวกัน หรือผูกรหัส Stock เดียวกัน ──
+$dupGroups = [];
+$byId = [];
+foreach ($items as $x) {
+    $byId[(int) $x['id']] = $x;
+}
+$seenKey = [];
+foreach (['name', 'code'] as $field) {
+    $bucket = [];
+    foreach ($items as $x) {
+        $k = mb_strtolower(trim((string) $x[$field]));
+        if ($k !== '') {
+            $bucket[$k][] = (int) $x['id'];
+        }
+    }
+    foreach ($bucket as $k => $ids) {
+        if (count($ids) < 2) {
+            continue;
+        }
+        sort($ids);
+        $sig = implode('-', $ids);
+        if (isset($seenKey[$sig])) {
+            continue;
+        }
+        $seenKey[$sig] = true;
+        $dupGroups[] = ['by' => $field === 'name' ? 'ชื่อซ้ำกัน' : 'ผูกรหัส Stock เดียวกัน', 'label' => (string) $k, 'ids' => $ids];
+    }
+}
+
 page_header('ตรวจการจับคู่อะไหล่กับคลังช่าง', true,
     'อะไหล่ในระบบผลิต ' . number_format(count($items)) . ' รายการ · ไม่มีในคลังช่าง ' . number_format($bad) . ' · ของหมด ' . number_format($out),
     $B . '/settings.php');
@@ -257,6 +317,40 @@ page_header('ตรวจการจับคู่อะไหล่กับ�
   <?php } ?>
 </div>
 
+<?php if ($dupGroups) { ?>
+<div class="panel">
+  <h3 style="margin:0 0 4px">อะไหล่ซ้ำ (<?= count($dupGroups) ?> กลุ่ม)</h3>
+  <p class="muted" style="margin:0 0 10px;font-size:12.5px">เลือกตัวที่จะเก็บไว้ แล้วกดรวม — ชุดเบิกของรุ่นและประวัติการเบิกของตัวที่ซ้ำจะย้ายมาที่ตัวที่เก็บ แล้วลบตัวซ้ำทิ้ง<br>
+    ถ้าเป็น<b>คนละอะไหล่จริง ๆ</b> แต่บังเอิญผูกรหัส Stock เดียวกัน อย่ารวม — ให้แก้รหัสตัวใดตัวหนึ่งในช่อง "ผูกเข้าคลัง" ด้านบนแทน</p>
+  <?php foreach ($dupGroups as $g) { ?>
+  <div class="plc-dupe">
+    <div class="plc-dupe-h"><?= h($g['by']) ?>: <b><?= h($g['label']) ?></b></div>
+    <div class="table-wrap"><table class="list">
+      <tr><th data-pri="1">อะไหล่</th><th data-pri="2">รหัส</th><th data-pri="1">คลังช่าง</th><th data-pri="2">ใช้งาน</th><th data-pri="1"></th></tr>
+      <?php foreach ($g['ids'] as $id) { $x = $byId[$id] ?? null; if (!$x) { continue; } ?>
+      <tr>
+        <td data-pri="1"><b><?= h((string) $x['name']) ?></b><div class="cell-sub muted"><?= h((string) ($x['part_code'] ?: '—')) ?></div></td>
+        <td data-pri="2" class="plc-code"><?= h((string) ($x['part_code'] !== '' ? $x['part_code'] : '—')) ?> / <?= h((string) ($x['code'] !== '' ? $x['code'] : '—')) ?></td>
+        <td data-pri="1"><?php if ($x['state'] === 'missing') { ?><span class="plc-badge is-bad">ไม่มี</span>
+          <?php } elseif ($x['state'] === 'empty') { ?><span class="plc-badge is-warn">ของหมด</span>
+          <?php } else { ?><span class="plc-badge is-ok">เหลือ <?= number_format((int) $x['qty']) ?></span><?php } ?></td>
+        <td data-pri="2"><?= $x['bom'] > 0 ? number_format($x['bom']) . ' รุ่น' : '<span class="muted">ไม่อยู่ในชุดเบิก</span>' ?><?= $x['used'] > 0 ? ' · เบิก ' . number_format($x['used']) . ' ครั้ง' : '' ?></td>
+        <td data-pri="1">
+          <form method="post">
+            <?= csrf_field() ?><input type="hidden" name="merge_keep" value="<?= (int) $id ?>">
+            <?php foreach ($g['ids'] as $other) { if ($other !== $id) { ?><input type="hidden" name="merge_drop[]" value="<?= (int) $other ?>"><?php } } ?>
+            <?php if ($showAll) { ?><input type="hidden" name="all" value="1"><?php } ?>
+            <button type="submit" class="btn btn-sm btn-line" onclick="return confirm('เก็บ &quot;<?= h((string) $x['name']) ?>&quot; ไว้ตัวเดียว แล้วลบตัวซ้ำอีก <?= count($g['ids']) - 1 ?> รายการ?\nชุดเบิกและประวัติจะย้ายมาที่ตัวนี้')">เก็บตัวนี้ · รวมตัวอื่น</button>
+          </form>
+        </td>
+      </tr>
+      <?php } ?>
+    </table></div>
+  </div>
+  <?php } ?>
+</div>
+<?php } ?>
+
 <datalist id="plc-stock-codes">
   <?php foreach ($stockList as $s) { ?>
   <option value="<?= h((string) $s['code']) ?>"><?= h((string) $s['name']) ?> · เหลือ <?= number_format((int) $s['quantity']) ?></option>
@@ -276,6 +370,8 @@ page_header('ตรวจการจับคู่อะไหล่กับ�
 .plc-badge.is-bad { background: #fee2e2; color: #991b1b; }
 .plc-foot { margin-top: 12px; font-size: calc(12.5px * var(--font-scale, 1)); line-height: 1.6; }
 .plc-bind { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.plc-dupe { border: 1px solid var(--border, #e5e7eb); border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; }
+.plc-dupe-h { font-size: calc(13px * var(--font-scale, 1)); color: var(--muted, #6b7280); margin-bottom: 6px; }
 .plc-bind input { flex: 1 1 190px; min-width: 0; padding: 5px 10px; min-height: 0; font-size: calc(12.5px * var(--font-scale, 1)); }
 </style>
 <?php page_footer(); ?>
