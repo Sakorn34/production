@@ -68,14 +68,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $setup  = trim($_POST['setup_id'] ?? '');
         $setup  = $setup !== '' ? (int)$setup : null;
         $active = (int)($_POST['active'] ?? 1) === 1 ? 1 : 0;
-        $batch  = (int)($_POST['batch_id'] ?? 0);
+        // ปล่อยช่อง id ชุด ว่างไว้ = ไม่แตะค่าเดิม (ตอนเพิ่มใหม่จะออกเลขให้เอง)
+        $batchRaw = trim((string) ($_POST['batch_id'] ?? ''));
+        $batch  = $batchRaw !== '' ? (int) $batchRaw : null;
         if ($cname === '') { flash_set('ต้องกรอกชื่อผู้บันทึก — ตารางนี้ห้ามมีค่าว่าง', 'err'); header('Location: ' . BASE_URL . '/share.php'); exit; }
 
         if ($act === 'add') {
             $dup = qr('SELECT serial_number FROM stock WHERE serial_number=?', 's', [$sn], $DB)->fetch_assoc();
             if ($dup) flash_set("Serial \"$sn\" มีอยู่แล้วในตาราง", 'err');
             else {
-                if ($batch <= 0) $batch = stock_next_id();
+                if ($batch === null || $batch <= 0) $batch = stock_next_id();
                 q('INSERT INTO  stock (`timestamp`, serial_number, model, id, create_name, setup_id, active)
                    VALUES (?,?,?,?,?,?,?)', 'sssisii', [$ts, $sn, $model, $batch, $cname, $setup, $active], $DB);
                 flash_set("เพิ่มรายการ $sn แล้ว");
@@ -85,8 +87,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($sn !== $oldSn && qr('SELECT serial_number FROM stock WHERE serial_number=?', 's', [$sn], $DB)->fetch_assoc()) {
                 flash_set("Serial \"$sn\" ซ้ำกับรายการอื่น", 'err');
             } else {
-                q('UPDATE  stock SET `timestamp`=?, serial_number=?, model=?, id=?, create_name=?, setup_id=?, active=? WHERE serial_number=?',
-                  'sssisiis', [$ts, $sn, $model, $batch, $cname, $setup, $active, $oldSn], $DB);
+                if ($batch === null) {
+                    q('UPDATE  stock SET `timestamp`=?, serial_number=?, model=?, create_name=?, setup_id=?, active=? WHERE serial_number=?',
+                      'ssssiis', [$ts, $sn, $model, $cname, $setup, $active, $oldSn], $DB);
+                } else {
+                    q('UPDATE  stock SET `timestamp`=?, serial_number=?, model=?, id=?, create_name=?, setup_id=?, active=? WHERE serial_number=?',
+                      'sssisiis', [$ts, $sn, $model, $batch, $cname, $setup, $active, $oldSn], $DB);
+                }
                 flash_set("บันทึกการแก้ไข $sn แล้ว");
             }
         }
@@ -529,7 +536,7 @@ page_header('ทะเบียนสินค้า (stock)');
           <input type="datetime-local" name="timestamp" value="<?= $r['timestamp'] ? h(date('Y-m-d\TH:i', strtotime($r['timestamp']))) : '' ?>">
           <input type="text" name="serial_number" value="<?= h($r['serial_number']) ?>" required placeholder="Serial Number">
           <input type="text" name="model" value="<?= h($r['model'] ?? '') ?>" list="model-list" placeholder="รุ่น/Model">
-          <input type="number" name="batch_id" value="<?= h($r['id']) ?>" min="1" placeholder="id ชุดบันทึก">
+          <input type="number" name="batch_id" value="<?= h($r['id']) ?>" min="0" placeholder="id ชุดบันทึก (ว่าง = คงค่าเดิม)">
           <input type="text" name="create_name" value="<?= h($r['create_name'] ?? '') ?>" required placeholder="ผู้บันทึก (ห้ามว่าง)">
           <input type="number" name="setup_id" value="<?= h($r['setup_id'] ?? '') ?>" placeholder="Setup ID">
           <select name="active"><option value="1" <?= (int)$r['active'] === 1 ? 'selected' : '' ?>>Active: 1 — นับเป็น stock</option><option value="0" <?= (int)$r['active'] === 0 ? 'selected' : '' ?>>Active: 0 — ไม่นับ</option></select>

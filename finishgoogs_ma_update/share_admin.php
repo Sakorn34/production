@@ -154,7 +154,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ts = share_admin_parse_ts($_POST['timestamp'] ?? '');
             $model = trim($_POST['model'] ?? '');
             $cname = trim($_POST['create_name'] ?? '');
-            $batch = (int)($_POST['batch_id'] ?? 0);
+            // ปล่อยช่อง id ชุด ว่างไว้ = ไม่แตะค่าเดิม
+            $batchRaw = trim((string) ($_POST['batch_id'] ?? ''));
+            $batch = $batchRaw !== '' ? (int) $batchRaw : null;
             $setup = trim($_POST['setup_id'] ?? '');
             $setup = $setup !== '' ? (int)$setup : null;
             $active = (int)($_POST['active'] ?? 1) === 1 ? 1 : 0;
@@ -163,8 +165,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } elseif ($sn !== $oldSn && qr('SELECT serial_number FROM stock WHERE serial_number=?', 's', [$sn], $DB)->fetch_assoc()) {
                 flash_set("Serial \"$sn\" ซ้ำกับรายการอื่น", 'err');
             } else {
-                q('UPDATE stock SET `timestamp`=?, serial_number=?, model=?, id=?, create_name=?, setup_id=?, active=? WHERE serial_number=?',
-                  'sssisiis', [$ts, $sn, $model, $batch, $cname, $setup, $active, $oldSn], $DB);
+                if ($batch === null) {
+                    q('UPDATE stock SET `timestamp`=?, serial_number=?, model=?, create_name=?, setup_id=?, active=? WHERE serial_number=?',
+                      'ssssiis', [$ts, $sn, $model, $cname, $setup, $active, $oldSn], $DB);
+                } else {
+                    q('UPDATE stock SET `timestamp`=?, serial_number=?, model=?, id=?, create_name=?, setup_id=?, active=? WHERE serial_number=?',
+                      'sssisiis', [$ts, $sn, $model, $batch, $cname, $setup, $active, $oldSn], $DB);
+                }
                 flash_set("บันทึกแก้ไข stock $sn แล้ว");
             }
         }
@@ -416,7 +423,7 @@ page_header('หลังบ้าน — เปรียบเทียบ asse
           <input type="text" name="model" value="<?= h($r['s_model'] ?? '') ?>" placeholder="รุ่น">
           <input type="datetime-local" name="timestamp" value="<?= $r['s_ts'] ? h(date('Y-m-d\TH:i', strtotime((string)$r['s_ts']))) : '' ?>">
           <input type="text" name="create_name" value="<?= h($r['s_name'] ?? '') ?>" required placeholder="ผู้บันทึก">
-          <input type="number" name="batch_id" value="<?= h((string)($r['s_batch'] ?? '')) ?>" min="1" placeholder="id ชุด">
+          <input type="number" name="batch_id" value="<?= h((string)($r['s_batch'] ?? '')) ?>" min="0" placeholder="id ชุด (ว่าง = คงค่าเดิม)">
           <input type="number" name="setup_id" value="" placeholder="Setup ID">
           <select name="active"><option value="1" <?= (int)($r['s_active'] ?? 1) === 1 ? 'selected' : '' ?>>active 1</option><option value="0" <?= (int)($r['s_active'] ?? 1) === 0 ? 'selected' : '' ?>>active 0</option></select>
           <button type="submit" class="btn btn-sm"><?= ui_btn_label('save', 'บันทึก', 13) ?></button>
