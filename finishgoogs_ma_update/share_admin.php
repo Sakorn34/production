@@ -229,9 +229,12 @@ $list = share_reconcile_list($flt, $search, $page, $per);
 $qs = http_build_query(array_filter(['f' => $flt ?: null, 'q' => $search ?: null, 'page' => $page > 1 ? $page : null]));
 
 function rc_link($f, $label, $cur, $counts, $qsKeep) {
+    // ต้องมีคลาส btn ด้วย — btn-sm คุมแค่ความสูง/ระยะขอบใน/ขนาดอักษร
+    // มุมโค้งกับเส้นขอบอยู่ใน .btn (ชุดเดียวกับชิปในหน้าทะเบียนสินค้า)
     $on = $cur === $f;
     $u = '?' . http_build_query(array_filter(array_merge($qsKeep, ['f' => $f ?: null])));
-    return '<a href="' . h($u) . '" class="btn-sm ' . ($on ? '' : 'btn-line') . '" style="' . ($on ? 'background:var(--primary);color:#fff' : '') . '">' . $label . '</a>';
+    return '<a href="' . h($u) . '" class="btn btn-sm btn-line rc-chip' . ($on ? ' is-on' : '') . '"'
+         . ($on ? ' aria-current="page"' : '') . '>' . $label . '</a>';
 }
 $qsKeep = ['q' => $search ?: null];
 
@@ -253,10 +256,10 @@ page_header('หลังบ้าน — เปรียบเทียบ asse
 
 <div class="rc-stats">
   <div class="rc-stat"><div class="rc-num"><?= number_format($syncStats['assets']) ?></div><div class="muted rc-lbl">ระบบหลัก</div></div>
-  <div class="rc-stat"><div class="rc-num" style="color:#2a7c4a"><?= number_format($syncStats['in_stock']) ?></div><div class="muted rc-lbl">stock</div></div>
-  <div class="rc-stat"><div class="rc-num" style="color:#c0392b"><?= number_format($rc['assets_only']) ?></div><div class="muted rc-lbl">มีแค่ระบบหลัก</div></div>
-  <div class="rc-stat"><div class="rc-num" style="color:#b45309"><?= number_format($rc['stock_only']) ?></div><div class="muted rc-lbl">มีแค่ stock</div></div>
-  <div class="rc-stat"><div class="rc-num" style="color:#7b1fa2"><?= number_format($rc['meta_diff']) ?></div><div class="muted rc-lbl">ค่าไม่ตรงกัน</div></div>
+  <div class="rc-stat"><div class="rc-num is-ok"><?= number_format($syncStats['in_stock']) ?></div><div class="muted rc-lbl">stock</div></div>
+  <div class="rc-stat"><div class="rc-num is-bad"><?= number_format($rc['assets_only']) ?></div><div class="muted rc-lbl">มีแค่ระบบหลัก</div></div>
+  <div class="rc-stat"><div class="rc-num is-warn"><?= number_format($rc['stock_only']) ?></div><div class="muted rc-lbl">มีแค่ stock</div></div>
+  <div class="rc-stat"><div class="rc-num is-diff"><?= number_format($rc['meta_diff']) ?></div><div class="muted rc-lbl">ค่าไม่ตรงกัน</div></div>
   <div class="rc-stat"><div class="rc-num"><?= number_format($rc['total_diff']) ?></div><div class="muted rc-lbl">รวมที่ต่าง</div></div>
 </div>
 
@@ -265,19 +268,19 @@ page_header('หลังบ้าน — เปรียบเทียบ asse
   <div style="margin-top:12px; display:flex; flex-wrap:wrap; gap:8px">
     <form method="post" style="display:inline">
       <?= csrf_field() ?><input type="hidden" name="act" value="sync_all"><input type="hidden" name="back" value="<?= h($qs) ?>">
-      <button type="submit" class="btn-line" onclick="return confirm('ซิงก์ครบทุกเครื่อง?')"><?= ui_btn_label('refresh', 'Sync ทั้งหมดจากระบบหลัก') ?></button>
+      <button type="submit" class="btn btn-line" onclick="return confirm('ซิงก์ครบทุกเครื่อง?')"><?= ui_btn_label('refresh', 'Sync ทั้งหมดจากระบบหลัก') ?></button>
     </form>
     <form method="post" style="display:inline">
       <?= csrf_field() ?><input type="hidden" name="act" value="sync"><input type="hidden" name="back" value="<?= h($qs) ?>">
-      <button type="submit" class="btn-line">ดึงเครื่องที่ขาดใน stock</button>
+      <button type="submit" class="btn btn-line">ดึงเครื่องที่ขาดใน stock</button>
     </form>
     <form method="post" style="display:inline">
       <?= csrf_field() ?><input type="hidden" name="act" value="refresh_meta"><input type="hidden" name="back" value="<?= h($qs) ?>">
-      <button type="submit" class="btn-line">อัปเดตรุ่น/เวลาจากระบบ</button>
+      <button type="submit" class="btn btn-line">อัปเดตรุ่น/เวลาจากระบบ</button>
     </form>
     <form method="post" style="display:inline">
       <?= csrf_field() ?><input type="hidden" name="act" value="fill_made_by_all"><input type="hidden" name="back" value="<?= h($qs) ?>">
-      <button type="submit" class="btn-line" onclick="return confirm('เติมชื่อผู้ผลิตในระบบหลักจาก stock ทุกเครื่องที่ยังว่าง?')">👤 เติมผู้ผลิตจาก stock → ระบบหลัก</button>
+      <button type="submit" class="btn btn-line" onclick="return confirm('เติมชื่อผู้ผลิตในระบบหลักจาก stock ทุกเครื่องที่ยังว่าง?')">👤 เติมผู้ผลิตจาก stock → ระบบหลัก</button>
     </form>
   </div>
   <div id="import-basic" style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border,#dde3ec)">
@@ -298,7 +301,7 @@ page_header('หลังบ้าน — เปรียบเทียบ asse
       <input type="hidden" name="back" value="<?= h($qs) ?>">
       <span class="muted" style="font-size:13px">AppSheet:</span>
       <input type="file" name="csv" accept=".csv" required>
-      <button type="submit" class="btn-line btn-sm">Import AppSheet</button>
+      <button type="submit" class="btn btn-line btn-sm">Import AppSheet</button>
     </form>
   </div>
 </details>
@@ -339,15 +342,20 @@ page_header('หลังบ้าน — เปรียบเทียบ asse
 
 <div class="table-wrap table-wrap-fold">
 <table class="list" id="rc-table">
+  <?php // data-pri = ลำดับความสำคัญของคอลัมน์ (shared/ui_table.css)
+        // 1 เห็นทุกความกว้าง · 2 ยุบลงบรรทัดรองที่ < 900px · 3 ซ่อนที่ < 1100px ?>
+  <thead>
   <tr>
-    <th style="width:32px"><input type="checkbox" id="rc-all" title="เลือกทั้งหน้า"></th>
-    <th>ประเภท</th>
-    <th>Serial</th>
-    <th>รุ่น (ระบบ / stock)</th>
-    <th>วันที่ (ระบบ / stock)</th>
-    <th>ผู้ผลิต (ระบบ / stock)</th>
-    <th style="width:200px">จัดการ</th>
+    <th data-pri="1" style="width:32px; text-align:center"><input type="checkbox" id="rc-all" title="เลือกทั้งหน้า"></th>
+    <th data-pri="1">ประเภท</th>
+    <th data-pri="1">Serial</th>
+    <th data-pri="2">รุ่น (ระบบ / stock)</th>
+    <th data-pri="3">วันที่ (ระบบ / stock)</th>
+    <th data-pri="3">ผู้ผลิต (ระบบ / stock)</th>
+    <th data-pri="1" class="rc-act-col">จัดการ</th>
   </tr>
+  </thead>
+  <tbody>
   <?php foreach ($list['rows'] as $r) {
       $canSync = $r['type'] !== 'stock_only' && $r['asset_id'];
       $canSyncStock = $r['type'] === 'stock_only';
@@ -356,50 +364,53 @@ page_header('หลังบ้าน — เปรียบเทียบ asse
           && trim((string)$r['a_name']) === ''
           && trim((string)$r['s_name']) !== '';
       $badge = $typeLabels[$r['type']] ?? $r['type'];
-      $badgeColor = $r['type'] === 'assets_only' ? '#c0392b' : ($r['type'] === 'stock_only' ? '#b45309' : '#7b1fa2');
+      $badgeCls = $r['type'] === 'assets_only' ? 'is-bad' : ($r['type'] === 'stock_only' ? 'is-warn' : 'is-diff');
       $fmtTs = function ($v) {
           return $v ? date('d/m/Y H:i', strtotime((string)$v)) : '-';
       };
   ?>
   <tr data-serial="<?= h($r['serial']) ?>">
-    <td style="text-align:center">
+    <td data-pri="1" style="text-align:center">
       <input type="checkbox" class="rc-pick" value="<?= h($r['serial']) ?>" data-sync="<?= $canSync ? '1' : '0' ?>" data-sync-stock="<?= $canSyncStock ? '1' : '0' ?>" data-fill-madeby="<?= $canFillMadeBy ? '1' : '0' ?>" data-asset-id="<?= (int)($r['asset_id'] ?? 0) ?>">
     </td>
-    <td><span class="badge" style="background:<?= $badgeColor ?>;color:#fff;font-size:11px"><?= h($badge) ?></span>
-      <?php if ($r['diffs']) { ?><div class="muted" style="font-size:11px"><?= h(implode(', ', $r['diffs'])) ?></div><?php } ?>
+    <td data-pri="1"><span class="badge rc-badge <?= h($badgeCls) ?>"><?= h($badge) ?></span>
+      <?php if ($r['diffs']) { ?><div class="muted rc-diffs"><?= h(implode(', ', $r['diffs'])) ?></div><?php } ?>
     </td>
-    <td><b><?= h($r['serial']) ?></b>
-      <?php if ($r['asset_id']) { ?><div><a href="<?= BASE_URL ?>/asset.php?id=<?= (int)$r['asset_id'] ?>" class="muted" style="font-size:11px">เปิดในระบบหลัก</a></div><?php } ?>
+    <td data-pri="1"><b><?= h($r['serial']) ?></b>
+      <?php if ($r['asset_id']) { ?><div><a href="<?= BASE_URL ?>/asset.php?id=<?= (int)$r['asset_id'] ?>" class="muted rc-open">เปิดในระบบหลัก</a></div><?php } ?>
+      <?php // บรรทัดรอง — โผล่เองเมื่อคอลัมน์ระดับ 2 ถูกยุบที่จอแคบ ?>
+      <span class="cell-sub"><?= h($r['a_model'] ?: ($r['s_model'] ?: '-')) ?> · <?= $fmtTs($r['a_ts'] ?: $r['s_ts']) ?></span>
     </td>
-    <td style="font-size:12px">
+    <td data-pri="2" class="rc-cmp">
       <span title="ระบบหลัก"><?= h($r['a_model'] ?: '-') ?></span>
       <?php if ($r['type'] !== 'assets_only') { ?><br><span class="muted" title="stock"><?= h($r['s_model'] ?: '-') ?></span><?php } ?>
     </td>
-    <td style="font-size:12px; white-space:nowrap">
+    <td data-pri="3" class="rc-cmp" data-nowrap>
       <?= $fmtTs($r['a_ts']) ?>
       <?php if ($r['type'] !== 'assets_only') { ?><br><span class="muted"><?= $fmtTs($r['s_ts']) ?></span><?php } ?>
     </td>
-    <td style="font-size:12px">
+    <td data-pri="3" class="rc-cmp">
       <?= h($r['a_name'] ?: '-') ?>
       <?php if ($r['type'] !== 'assets_only') { ?><br><span class="muted"><?= h($r['s_name'] ?: '-') ?></span><?php } ?>
     </td>
-    <td>
+    <td data-pri="1">
+      <div class="rc-rowact">
       <?php if ($canSync) { ?>
       <form method="post" style="display:inline">
         <?= csrf_field() ?><input type="hidden" name="act" value="sync_one"><input type="hidden" name="serial" value="<?= h($r['serial']) ?>"><input type="hidden" name="back" value="<?= h($qs) ?>">
-        <button type="submit" class="btn-sm btn-line" title="ดึงค่าจากระบบหลักไป stock"><?= ui_btn_label('refresh', 'Sync', 13) ?></button>
+        <button type="submit" class="btn btn-sm btn-line" title="ดึงค่าจากระบบหลักไป stock"><?= ui_btn_label('refresh', 'Sync', 13) ?></button>
       </form>
       <?php } ?>
       <?php if ($canSyncStock) { ?>
       <form method="post" style="display:inline">
         <?= csrf_field() ?><input type="hidden" name="act" value="sync_stock_one"><input type="hidden" name="serial" value="<?= h($r['serial']) ?>"><input type="hidden" name="back" value="<?= h($qs) ?>">
-        <button type="submit" class="btn-sm btn-line" title="สร้างเครื่องในระบบหลักจากข้อมูล stock"><?= ui_btn_label('refresh', 'Sync → ระบบหลัก', 13) ?></button>
+        <button type="submit" class="btn btn-sm btn-line" title="สร้างเครื่องในระบบหลักจากข้อมูล stock"><?= ui_btn_label('refresh', '→ ระบบหลัก', 13) ?></button>
       </form>
       <?php } ?>
       <?php if ($r['type'] !== 'assets_only') { ?>
-      <details>
-        <summary class="btn btn-sm btn-line" style="list-style:none;cursor:pointer;display:inline-block">แก้ไข stock</summary>
-        <form method="post" style="margin-top:6px;display:grid;gap:4px;min-width:200px">
+      <details class="rc-edit">
+        <summary class="btn btn-sm btn-line">แก้ไข</summary>
+        <form method="post" class="rc-edit-form">
           <?= csrf_field() ?><input type="hidden" name="act" value="edit_stock"><input type="hidden" name="old_serial" value="<?= h($r['serial']) ?>"><input type="hidden" name="back" value="<?= h($qs) ?>">
           <input type="text" name="serial" value="<?= h($r['serial']) ?>" required placeholder="Serial">
           <input type="text" name="model" value="<?= h($r['s_model'] ?? '') ?>" placeholder="รุ่น">
@@ -408,26 +419,28 @@ page_header('หลังบ้าน — เปรียบเทียบ asse
           <input type="number" name="batch_id" value="<?= h((string)($r['s_batch'] ?? '')) ?>" min="1" placeholder="id ชุด">
           <input type="number" name="setup_id" value="" placeholder="Setup ID">
           <select name="active"><option value="1" <?= (int)($r['s_active'] ?? 1) === 1 ? 'selected' : '' ?>>active 1</option><option value="0" <?= (int)($r['s_active'] ?? 1) === 0 ? 'selected' : '' ?>>active 0</option></select>
-          <button type="submit" class="btn-sm"><?= ui_btn_label('save', 'บันทึก', 13) ?></button>
+          <button type="submit" class="btn btn-sm"><?= ui_btn_label('save', 'บันทึก', 13) ?></button>
         </form>
       </details>
       <form method="post" style="display:inline" onsubmit="return confirm('ลบ <?= h($r['serial']) ?> ออกจาก stock?')">
         <?= csrf_field() ?><input type="hidden" name="act" value="delete_stock"><input type="hidden" name="serial" value="<?= h($r['serial']) ?>"><input type="hidden" name="back" value="<?= h($qs) ?>">
-        <button type="submit" class="btn-sm btn-danger">ลบ stock</button>
+        <button type="submit" class="btn btn-sm btn-line rc-del">ลบ stock</button>
       </form>
       <?php } ?>
       <?php if ($r['type'] === 'assets_only' && $r['asset_id']) { ?>
       <form method="post" style="display:inline" onsubmit="return confirm('ลบเครื่อง <?= h($r['serial']) ?> และประวัติทั้งหมดในระบบหลัก?')">
         <?= csrf_field() ?><input type="hidden" name="act" value="delete_asset"><input type="hidden" name="asset_id" value="<?= (int)$r['asset_id'] ?>"><input type="hidden" name="serial" value="<?= h($r['serial']) ?>"><input type="hidden" name="back" value="<?= h($qs) ?>">
-        <button type="submit" class="btn-sm btn-danger">ลบระบบหลัก</button>
+        <button type="submit" class="btn btn-sm btn-line rc-del">ลบระบบหลัก</button>
       </form>
       <?php } ?>
+      </div>
     </td>
   </tr>
   <?php } ?>
   <?php if (!$list['rows']) { ?>
-  <tr><td colspan="7" class="muted" style="text-align:center;padding:24px">✅ ไม่พบรายการที่ต่างกัน<?= $flt || $search ? ' (ตามฟิลเตอร์)' : '' ?></td></tr>
+  <tr><td colspan="7" class="muted" style="text-align:center;padding:24px">ไม่พบรายการที่ต่างกัน<?= $flt || $search ? ' (ตามฟิลเตอร์)' : '' ?></td></tr>
   <?php } ?>
+  </tbody>
 </table>
 </div>
 
@@ -439,7 +452,37 @@ echo page_pager_html($list['page'], $list['pages'], $per, $list['total'], functi
 ?>
 
 <style>
-.rc-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin:14px 0; }
+/* ชิปตัวกรอง — โทนเดียวกับหน้าทะเบียนสินค้า */
+.rc-chip.is-on { background:var(--primary-soft,#fce7f3); color:var(--primary); font-weight:600;
+  box-shadow:inset 0 0 0 1.5px var(--primary); }
+.rc-chip.is-on:hover { background:var(--primary-soft,#fce7f3); }
+/* ตัวเลขสรุป — ใช้สีความหมายจาก ui_tokens.php ไม่ฝังเลขสีเอง */
+.rc-num.is-ok   { color:var(--success,#16a34a); }
+.rc-num.is-bad  { color:var(--danger,#b91c1c); }
+.rc-num.is-warn { color:var(--warning,#a16207); }
+.rc-num.is-diff { color:var(--info,#1d4ed8); }
+/* ป้ายประเภท — พื้นอ่อน ตัวอักษรเข้ม อ่านง่ายกว่าพื้นทึบตัวขาว */
+.rc-badge { font-size:calc(11px * var(--font-scale,1)); }
+.rc-badge.is-bad  { background:var(--danger-soft,#fee2e2);  color:var(--danger,#b91c1c); }
+.rc-badge.is-warn { background:var(--warning-soft,#fef9c3); color:var(--warning,#a16207); }
+.rc-badge.is-diff { background:var(--info-soft,#dbeafe);    color:var(--info,#1d4ed8); }
+.rc-diffs, .rc-open { font-size:calc(11px * var(--font-scale,1)); }
+.rc-cmp { font-size:calc(12px * var(--font-scale,1)); }
+/* จัดการ — ปุ่มอยู่บรรทัดเดียวกัน ไม่ซ้อนกันจนแถวสูง */
+.rc-act-col { width:272px; }
+#rc-table td:last-child, #rc-table th:last-child { padding-left:10px; padding-right:10px; }
+.rc-rowact { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.rc-rowact > form { display:inline-flex; margin:0; }
+.rc-rowact .btn-sm { padding-left:9px; padding-right:9px; }
+.rc-edit > summary { list-style:none; cursor:pointer; display:inline-flex;
+  align-items:center; justify-content:center; }
+.rc-edit > summary::-webkit-details-marker { display:none; }
+/* ฟอร์มแก้ไขต้องไม่กินที่ตอนยังไม่กาง — display:grid ตายตัวทำให้ details ที่ปิดอยู่ยังจองความสูง */
+.rc-edit:not([open]) > .rc-edit-form { display:none; }
+.rc-edit[open] > .rc-edit-form { margin-top:6px; display:grid; gap:4px; min-width:200px; }
+.rc-del { color:var(--danger,#b91c1c); border-color:var(--danger,#b91c1c);
+  box-shadow:inset 0 0 0 1px var(--danger,#b91c1c); }
+.rc-del:hover { background:var(--danger,#b91c1c); color:#fff; }.rc-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin:14px 0; }
 .rc-stat { background:var(--surface,#fff); border:1px solid var(--border,#dde3ec); border-radius:10px; padding:10px 8px; text-align:center; }
 .rc-num { font-size:20px; font-weight:700; color:var(--primary); }
 .rc-lbl { font-size:11px; }
