@@ -135,6 +135,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $params2[] = (int)$setActive;
             $desc[] = 'active = ' . $setActive;
         }
+        // ชื่อผู้บันทึก — create_name เป็น varchar(100) ตัดให้พอดีกันคอลัมน์ล้น
+        $setName = trim((string) ($_POST['set_name'] ?? ''));
+        if ($setName !== '') {
+            if (mb_strlen($setName) > 100) {
+                $setName = mb_substr($setName, 0, 100);
+            }
+            $set[] = 'create_name = ?';
+            $types2 .= 's';
+            $params2[] = $setName;
+            $desc[] = 'ผู้บันทึก = ' . $setName;
+        }
         $tsMode = $_POST['set_ts_mode'] ?? '';
         if ($tsMode === 'now') {
             $set[] = '`timestamp` = NOW()';
@@ -333,6 +344,15 @@ $page  = min($page, $pages);
 $off = ($page - 1) * $per;
 $rows = qr("SELECT * FROM stock $w ORDER BY {$sortSql[$sort]} LIMIT $per OFFSET $off", $types, $params, $DB);
 $modelList = $DB->query("SELECT DISTINCT model FROM stock WHERE model IS NOT NULL AND model<>'' ORDER BY model");
+// ชื่อผู้บันทึกที่เคยใช้ — ใช้เป็นตัวเลือกตอนตั้งชื่อให้หลายรายการพร้อมกัน
+$nameList = [];
+$nlRes = $DB->query("SELECT create_name, COUNT(*) c FROM stock WHERE create_name IS NOT NULL AND create_name<>''
+                     GROUP BY create_name ORDER BY c DESC, create_name LIMIT 60");
+if ($nlRes) {
+    while ($nl = $nlRes->fetch_assoc()) {
+        $nameList[] = $nl;
+    }
+}
 $qs = http_build_query(array_filter(['q' => $search, 'model' => $model, 'f' => $flt, 'sort' => $sort !== 'time_code' ? $sort : null, 'page' => $page > 1 ? $page : null]));
 $nextId = stock_next_id();
 
@@ -434,6 +454,7 @@ page_header('ทะเบียนสินค้า (stock)');
 </div>
 
 <datalist id="model-list"><?php while ($m = $modelList->fetch_assoc()) { ?><option value="<?= h($m['model']) ?>"><?php } ?></datalist>
+<datalist id="stock-name-list"><?php foreach ($nameList as $n) { ?><option value="<?= h($n['create_name']) ?>"><?= number_format((int) $n['c']) ?> รายการ</option><?php } ?></datalist>
 
 <div class="stock-toolbar">
 <form method="get" class="filter stock-search-form">
@@ -478,6 +499,12 @@ page_header('ทะเบียนสินค้า (stock)');
     <button type="button" class="btn btn-sm btn-line" id="stock-bulk-active0" disabled>ตั้งเป็น 0</button>
   </span>
   <span class="stock-bulk-group">
+    <span class="stock-bulk-glbl">ผู้บันทึก:</span>
+    <input type="text" id="stock-bulk-nameval" class="stock-bulk-ts stock-bulk-name" list="stock-name-list"
+           placeholder="พิมพ์หรือเลือกชื่อ" autocomplete="off" maxlength="100">
+    <button type="button" class="btn btn-sm btn-line" id="stock-bulk-nameset" disabled>ตั้งชื่อ</button>
+  </span>
+  <span class="stock-bulk-group">
     <span class="stock-bulk-glbl">เวลา:</span>
     <button type="button" class="btn btn-sm btn-line" id="stock-bulk-tsnow" disabled>= ตอนนี้</button>
     <input type="datetime-local" id="stock-bulk-tsval" class="stock-bulk-ts">
@@ -494,6 +521,7 @@ page_header('ทะเบียนสินค้า (stock)');
   <input type="hidden" name="act" value="delete_bulk" id="stock-bulk-act">
   <input type="hidden" name="back" value="<?= h($qs) ?>">
   <input type="hidden" name="set_active" value="" id="stock-bulk-set-active">
+  <input type="hidden" name="set_name" value="" id="stock-bulk-set-name">
   <input type="hidden" name="set_ts_mode" value="" id="stock-bulk-set-tsmode">
   <input type="hidden" name="ts_value" value="" id="stock-bulk-set-tsval">
   <div id="stock-bulk-hidden"></div>
@@ -591,6 +619,7 @@ page_header('ทะเบียนสินค้า (stock)');
   padding-left:14px; border-left:1px solid var(--border,#dde3ec); }
 .stock-bulk-glbl { font-size:calc(12.5px * var(--font-scale,1)); color:var(--text-muted,#6b6480); font-weight:600; }
 .stock-bulk-ts { padding:4px 6px; border:1px solid var(--border,#dde3ec); border-radius:6px; font-family:inherit; font-size:13px; }
+.stock-bulk-name { min-width:150px; max-width:200px; min-height:0; }
 #stock-table .stock-pick { width:16px; height:16px; cursor:pointer; accent-color:var(--primary); }
 #stock-table tr.stock-picked td { background:var(--surface-2,#faf9fd) !important; }
 #stock-table tr.stock-row-inc td { background:var(--surface-2,#faf9fd); }
@@ -630,7 +659,7 @@ page_header('ทะเบียนสินค้า (stock)');
       if (cb) tr.classList.toggle('stock-picked', cb.checked);
     });
   }
-  var actionBtns = ['stock-bulk-active1', 'stock-bulk-active0', 'stock-bulk-tsnow', 'stock-bulk-tsset']
+  var actionBtns = ['stock-bulk-active1', 'stock-bulk-active0', 'stock-bulk-tsnow', 'stock-bulk-tsset', 'stock-bulk-nameset']
     .map(function(id){ return document.getElementById(id); });
   function refresh(){
     var picksArr = picks();
@@ -667,13 +696,14 @@ page_header('ทะเบียนสินค้า (stock)');
     });
   }
   /** ส่งฟอร์ม bulk: act = delete_bulk | bulk_update พร้อมค่าที่จะตั้ง */
-  function submitBulk(act, setActive, tsMode, tsValue){
+  function submitBulk(act, setActive, tsMode, tsValue, setName){
     if (!form || !hidden) return;
     fillSelected();
     document.getElementById('stock-bulk-act').value = act;
     document.getElementById('stock-bulk-set-active').value = setActive || '';
     document.getElementById('stock-bulk-set-tsmode').value = tsMode || '';
     document.getElementById('stock-bulk-set-tsval').value = tsValue || '';
+    document.getElementById('stock-bulk-set-name').value = setName || '';
     form.submit();
   }
   if (delBtn) delBtn.addEventListener('click', function(){
@@ -695,6 +725,22 @@ page_header('ทะเบียนสินค้า (stock)');
       }
       if (!confirm('ตั้ง ' + msg + (needTs ? ' (' + tsValue.replace('T', ' ') + ')' : '') + ' ให้ ' + n + ' รายการที่เลือก ?')) return;
       submitBulk('bulk_update', setActive, tsMode, tsValue);
+    });
+  }
+  // ตั้งชื่อผู้บันทึกให้ทุกรายการที่เลือก — ช่องว่างไม่ทำอะไร (กันลบชื่อเดิมทิ้งโดยไม่ตั้งใจ)
+  var nameBtn = document.getElementById('stock-bulk-nameset');
+  var nameInp = document.getElementById('stock-bulk-nameval');
+  if (nameBtn && nameInp) {
+    nameBtn.addEventListener('click', function(){
+      var n = picks().length;
+      if (!n) return;
+      var v = nameInp.value.trim();
+      if (!v) { alert('พิมพ์ชื่อผู้บันทึกในช่องก่อน แล้วค่อยกด "ตั้งชื่อ"'); nameInp.focus(); return; }
+      if (!confirm('ตั้งผู้บันทึกเป็น "' + v + '" ให้ ' + n + ' รายการที่เลือก ?\n\nชื่อเดิมของรายการที่เลือกจะถูกแทนที่')) return;
+      submitBulk('bulk_update', '', '', '', v);
+    });
+    nameInp.addEventListener('keydown', function(e){
+      if (e.key === 'Enter') { e.preventDefault(); nameBtn.click(); }
     });
   }
   bindSet('stock-bulk-active1', 'Active = 1', '1', '', false);
