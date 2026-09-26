@@ -1289,7 +1289,7 @@ function rent_leasing_ma_history($serial)
         return [];
     }
     $q = rent_q_try(
-        'SELECT ma_date, ma_status, ma_remarks, ma_user_add FROM tbl_product_ma
+        'SELECT ma_id, ma_date, ma_status, ma_remarks, ma_user_add FROM tbl_product_ma
          WHERE ma_sn = ? ORDER BY ma_date DESC, ma_id DESC',
         's',
         [$serial]
@@ -1304,6 +1304,7 @@ function rent_leasing_ma_history($serial)
             continue;
         }
         $rows[] = [
+            'id' => (int) ($row['ma_id'] ?? 0),   // เลขอ้างอิงในระบบเช่า — ใช้ชี้ตำแหน่งตอนไปแก้ที่ต้นทาง
             'date' => trim((string) ($row['ma_date'] ?? '')),
             'status' => trim((string) ($row['ma_status'] ?? '')),
             'remarks' => $remarks,
@@ -1328,6 +1329,7 @@ function rent_leasing_ma_timeline_items(array $info)
     if (!$rows) {
         return [];
     }
+    $sn = trim((string) ($info['serial'] ?? ($info['sn'] ?? '')));
     $items = [];
     foreach ($rows as $r) {
         $isRetire = trim((string) ($r['status'] ?? '')) === 'Asset Retirement';
@@ -1352,9 +1354,59 @@ function rent_leasing_ma_timeline_items(array $info)
             'html' => implode('<br>', $body),
             'kind' => 'rent_ma',
             'rid' => 0,
+            'rent_ma_id' => (int) ($r['id'] ?? 0),
+            'rent_ma_sn' => $sn,
         ];
     }
     return $items;
+}
+
+/**
+ * URL ระบบเช่า ตั้งได้ที่หน้าปรับแต่งหน้าตา (ว่าง = ยังไม่ได้ตั้ง)
+ *
+ * @return string
+ */
+function rent_leasing_app_url(): string
+{
+    $u = trim((string) setting('leasing_app_url', ''));
+    if ($u === '' || !preg_match('~^https?://~i', $u)) {
+        return '';
+    }
+    return rtrim($u, '/');
+}
+
+/**
+ * ปุ่มท้ายรายการ MA ระบบเช่าใน timeline
+ *
+ * ระบบเช่าเป็นของทีมอื่น เราอ่านอย่างเดียว — ปุ่มนี้จึงพาไปแก้ที่ต้นทาง
+ * พร้อมบอกเลขอ้างอิง (ma_id) กับ S/N ไว้ให้ค้นเจอง่าย และมีปุ่มคัดลอกให้
+ *
+ * @param array<string,mixed> $e รายการ timeline
+ * @return string
+ */
+function rent_ma_source_actions_html(array $e): string
+{
+    $maId = (int) ($e['rent_ma_id'] ?? 0);
+    $sn   = trim((string) ($e['rent_ma_sn'] ?? ''));
+    $url  = rent_leasing_app_url();
+
+    $out = '<div class="tl-actions rent-ma-actions">';
+    if ($url !== '') {
+        $out .= '<a class="btn btn-sm btn-line btn-with-icon" target="_blank" rel="noopener" href="'
+              . h($url) . '">' . ui_btn_label('edit', 'แก้ที่ระบบเช่า') . ' ↗</a>';
+    }
+    if ($maId > 0) {
+        $out .= '<button type="button" class="btn btn-sm btn-line rent-ma-copy" data-copy="' . h((string) $maId)
+              . '" title="คัดลอกเลขอ้างอิงไปค้นในระบบเช่า">คัดลอกเลขอ้างอิง #' . (int) $maId . '</button>';
+    }
+    if ($sn !== '') {
+        $out .= '<button type="button" class="btn btn-sm btn-line rent-ma-copy" data-copy="' . h($sn)
+              . '" title="คัดลอก S/N ไปค้นในระบบเช่า">คัดลอก S/N</button>';
+    }
+    if ($url === '') {
+        $out .= '<span class="muted rent-ma-hint">ตั้ง URL ระบบเช่าได้ที่ ตั้งค่าระบบ → ปรับแต่งหน้าตา</span>';
+    }
+    return $out . '</div>';
 }
 
 /**

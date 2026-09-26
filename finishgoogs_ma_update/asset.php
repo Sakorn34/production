@@ -286,6 +286,11 @@ foreach ($tl as $e) {
  */
 function asset_tl_actions($e, $assetId) {
     global $assetShowSnippets;
+    // ประวัติ MA ของระบบเช่าอยู่ในฐานข้อมูลของทีมเช่า ระบบเราไม่เขียนทับ —
+    // ส่งไปแก้ที่ต้นทางแทน พร้อมบอกเลขอ้างอิงไว้ให้หาเจอ
+    if (($e['kind'] ?? '') === 'rent_ma') {
+        return rent_ma_source_actions_html($e);
+    }
     if (empty($e['kind']) || empty($e['rid'])) return '';
     $id = (int)$e['rid'];
     $out = '<div class="tl-actions" style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap">';
@@ -318,6 +323,30 @@ function asset_tl_actions($e, $assetId) {
 
 page_header('เครื่อง ' . $a['asset_code'], false);
 ?>
+<style>
+/* ประวัติ MA ระบบเช่า — ระบบเราอ่านอย่างเดียว ปุ่มพาไปแก้ที่ต้นทาง */
+.rent-ma-actions { margin-top:6px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+.rent-ma-hint { font-size:calc(12px * var(--font-scale,1)); }
+.rent-ma-copy.is-done { background:var(--primary-soft,#fce7f3); color:var(--primary); }
+</style>
+<script>
+document.addEventListener('click', function (ev) {
+  var b = ev.target.closest ? ev.target.closest('.rent-ma-copy') : null;
+  if (!b) { return; }
+  var txt = b.getAttribute('data-copy') || '';
+  var done = function () {
+    var old = b.textContent;
+    b.textContent = 'คัดลอกแล้ว';
+    b.classList.add('is-done');
+    setTimeout(function () { b.textContent = old; b.classList.remove('is-done'); }, 1400);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(done).catch(function () { window.prompt('คัดลอกข้อความนี้', txt); });
+  } else {
+    window.prompt('คัดลอกข้อความนี้', txt);
+  }
+});
+</script>
 <div class="asset-toolbar">
   <?= page_back_button_html($assetBackHref) ?>
   <h1 class="asset-toolbar-title">เครื่อง <?= h($a['asset_code']) ?></h1>

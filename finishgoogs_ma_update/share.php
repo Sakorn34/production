@@ -341,9 +341,12 @@ function stock_active_badge(int $v): string
 }
 
 function stflink($f, $v, $cur, $qsKeep) {
+    // ต้องมีคลาส btn ด้วย — btn-sm คุมแค่ความสูง/ระยะขอบใน/ขนาดอักษร
+    // มุมโค้ง เส้นขอบ และการจัดวางอยู่ใน .btn ถ้าไม่ใส่ ชิปจะกลายเป็นกล่องเหลี่ยมหลุดธีม
     $on = $cur === $f;
     $u = '?' . http_build_query(array_filter(array_merge($qsKeep, ['f' => $f])));
-    return '<a href="' . h($u) . '" class="btn-sm ' . ($on ? '' : 'btn-line') . '" style="' . ($on ? 'background:var(--primary);color:#fff' : '') . '">' . $v . '</a>';
+    return '<a href="' . h($u) . '" class="btn btn-sm btn-line stock-chip' . ($on ? ' is-on' : '') . '"'
+         . ($on ? ' aria-current="page"' : '') . '>' . $v . '</a>';
 }
 $qsKeep = ['q' => $search, 'model' => $model, 'sort' => $sort !== 'time_code' ? $sort : null];
 
@@ -567,6 +570,10 @@ page_header('ทะเบียนสินค้า (stock)');
 .stock-toolbar { margin-bottom:10px; }
 .stock-search-form { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 .stock-chips { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 10px; }
+/* ชิปที่เลือกอยู่ — โทนเดียวกับแท็บบน Dashboard และหน้าคู่มือ */
+.stock-chip.is-on { background:var(--primary-soft,#fce7f3); color:var(--primary); font-weight:600;
+  box-shadow:inset 0 0 0 1.5px var(--primary); }
+.stock-chip.is-on:hover { background:var(--primary-soft,#fce7f3); }
 .stock-list-meta { font-size:13px; margin:0 0 10px; }
 .stock-bulk-bar { display:flex; align-items:center; gap:14px; flex-wrap:wrap;
   margin:0 0 10px; padding:10px 14px; background:var(--surface-2,#faf9fd); border:1px solid var(--border,#dde3ec);

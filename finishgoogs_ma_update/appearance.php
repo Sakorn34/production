@@ -18,6 +18,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // ข้อความ
     set_setting('app_name', trim($_POST['app_name']));
     set_setting('login_subtitle', trim($_POST['login_subtitle']));
+    // URL ระบบเช่า — ใช้ทำปุ่ม "แก้ที่ระบบเช่า" ในประวัติเครื่อง (เก็บเฉพาะที่เป็น http/https)
+    $leaseUrl = trim((string) ($_POST['leasing_app_url'] ?? ''));
+    if ($leaseUrl === '' || preg_match('~^https?://~i', $leaseUrl)) {
+        set_setting('leasing_app_url', rtrim($leaseUrl, '/'));
+    }
     // สีธีม (เก็บเฉพาะที่เป็น hex ถูกต้อง)
     foreach ($COLORS as $k => $meta) {
         $v = trim(isset($_POST[$k]) ? $_POST[$k] : '');
@@ -119,6 +124,9 @@ page_header('ปรับแต่งหน้าตาระบบ');
         <input id="ap-app-name" type="text" name="app_name" value="<?= h(setting('app_name', APP_NAME)) ?>" style="width:100%"></div>
       <div class="field"><label for="ap-login-sub">ข้อความรองหน้า Login</label>
         <input id="ap-login-sub" type="text" name="login_subtitle" value="<?= h(setting('login_subtitle', 'บันทึกผลิตใหม่ · อัปเดต FW/HW · ซ่อมบำรุง · MA เครื่องเช่า/สำรอง')) ?>" style="width:100%"></div>
+      <div class="field"><label for="ap-lease-url">URL ระบบเช่า</label>
+        <input id="ap-lease-url" type="url" name="leasing_app_url" value="<?= h(setting('leasing_app_url', '')) ?>" placeholder="https://..." style="width:100%">
+        <div class="muted" style="font-size:<?= theme_fs_css(12) ?>; margin-top:3px">ใส่แล้วประวัติ MA ของระบบเช่าในหน้าเครื่องจะมีปุ่ม “แก้ที่ระบบเช่า” ให้กดไปแก้ที่ต้นทาง (ระบบเราอ่านอย่างเดียว ไม่เขียนทับ)</div></div>
       <div class="field"><label>ไอคอนบนแท็บเบราว์เซอร์ (Favicon)</label>
         <?php $favCur = setting('favicon'); if ($favCur) { ?>
           <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px">
