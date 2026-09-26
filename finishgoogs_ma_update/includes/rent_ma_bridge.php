@@ -144,6 +144,62 @@ function rent_find_asset_by_sn($sn)
 }
 
 /**
+ * อาการที่แจ้งของเครื่องที่ส่งเข้า MA — อ่านจากระบบเช่า
+ *
+ * ระบบเช่าไม่มีช่อง "อาการเสีย" ตรง ๆ ที่กรอกครบ:
+ *   tbl_product.pro_remarks        มีแค่ 64/777 แถว และเก็บเลข IMEI ไม่ใช่อาการ — ไม่ใช้
+ *   tbl_rent_product.p_remarks_claim  ครอบคลุม 495/777 (64%) และเป็นข้อความอาการจริง
+ *                                     เช่น "ชาร์จแบต ไม่เข้า" "จอหลุด" "ไม่อ่าน smartcard"
+ *   tbl_rent_product.p_remarks        ใช้เป็นตัวสำรองเมื่อไม่มีหมายเหตุเคลม
+ * ระบบซ่อม (biton_maintenance) ไม่มีงานของเครื่องเช่าพวกนี้เลย (ตรวจแล้ว 0 จาก 777) จึงไม่ดึงจากที่นั่น
+ *
+ * หมายเหตุ: ข้อความบางรายการเป็นเรื่องสัญญา ไม่ใช่อาการ (เช่น "ต่อสัญญาปีที่ 2")
+ * เพราะฝั่งระบบเช่าใช้ช่องเดียวกันบันทึกทั้งสองเรื่อง — แสดงตามที่เขาบันทึกไว้ ไม่ตีความเอง
+ *
+ * @param array<int,string> $sns S/N ที่ normalize แล้ว
+ * @return array<string,string> sn => อาการที่แจ้ง
+ */
+function rent_wait_ma_symptoms(array $sns): array
+{
+    $sns = array_values(array_unique(array_filter(array_map('rent_normalize_sn', $sns))));
+    if (!$sns) {
+        return [];
+    }
+    $out = [];
+    // แบ่งเป็นชุดละ 500 กัน IN(...) ยาวเกิน
+    foreach (array_chunk($sns, 500) as $chunk) {
+        $ph = implode(',', array_fill(0, count($chunk), '?'));
+        $q = rent_q_try(
+            "SELECT p_sn, p_remarks_claim, p_remarks FROM tbl_rent_product
+             WHERE p_sn IN ($ph)
+               AND ((p_remarks_claim IS NOT NULL AND TRIM(p_remarks_claim) <> '')
+                 OR (p_remarks IS NOT NULL AND TRIM(p_remarks) <> ''))
+             ORDER BY p_id ASC",
+            str_repeat('s', count($chunk)),
+            $chunk
+        );
+        if (!$q['ok'] || empty($q['result'])) {
+            continue;
+        }
+        // เรียง p_id จากน้อยไปมาก แถวหลังทับแถวหน้า → ได้สัญญาล่าสุดของ S/N นั้น
+        while ($r = $q['result']->fetch_assoc()) {
+            $sn = rent_normalize_sn($r['p_sn'] ?? '');
+            if ($sn === '') {
+                continue;
+            }
+            $v = trim((string) ($r['p_remarks_claim'] ?? ''));
+            if ($v === '') {
+                $v = trim((string) ($r['p_remarks'] ?? ''));
+            }
+            if ($v !== '') {
+                $out[$sn] = $v;
+            }
+        }
+    }
+    return $out;
+}
+
+/**
  * ดึงคิวสินค้าสถานะ MA จากระบบเช่า พร้อมจับคู่ทะเบียนผลิต
  *
  * @param int $limit
@@ -205,8 +261,17 @@ function rent_wait_ma_queue($limit = 2000)
             // คิวเช่ายังแสดงได้ แม้จับคู่ผลิตพลาด
         }
     }
+    $symptoms = [];
+    if ($snList) {
+        try {
+            $symptoms = rent_wait_ma_symptoms($snList);
+        } catch (Throwable $e) {
+            $symptoms = [];   // คิวยังแสดงได้แม้อ่านอาการไม่สำเร็จ
+        }
+    }
     foreach ($rows as $i => $row) {
         $rows[$i]['asset'] = $assetMap[$row['pro_sn']] ?? null;
+        $rows[$i]['symptom'] = $symptoms[$row['pro_sn']] ?? '';
     }
     return ['ok' => true, 'error' => '', 'rows' => $rows];
 }
@@ -1107,14 +1172,16 @@ function rent_wait_ma_panel_html($productId)
         <p class="muted" style="margin:8px 0"><?= number_format(count($matched)) ?> รายการลงทะเบียนแล้ว · กดรหัสเครื่องเพื่อเปิดฟอร์ม MA</p>
         <div class="table-wrap" style="margin-bottom:12px">
           <table class="list" style="margin:0">
-            <tr><th>S/N</th><th>สินค้า (เช่า)</th><th>วันที่บันทึกเช่า</th><th>สถานะผลิต</th></tr>
+            <tr><th>S/N</th><th>สินค้า (เช่า)</th><th>ปัญหา / อาการที่แจ้ง</th><th>วันที่บันทึกเช่า</th><th>สถานะผลิต</th></tr>
             <?php foreach ($matched as $row) {
                 $a = $row['asset'];
                 $st = rent_asset_status_label($a['status'] ?? '');
+                $sym = trim((string) ($row['symptom'] ?? ''));
                 ?>
             <tr>
               <td><a href="<?= h(BASE_URL . '/ma.php?product=' . (int)$a['product_id'] . '&record=' . (int)$a['id']) ?>"><b><?= h($row['pro_sn']) ?></b></a></td>
               <td><?= h($row['pro_name']) ?></td>
+              <td class="rent-q-sym"><?= $sym !== '' ? h($sym) : '<span class="muted">—</span>' ?></td>
               <td style="white-space:nowrap"><?= function_exists('dthai') ? dthai($row['pro_date'] ?? '') : h($row['pro_date'] ?? '') ?></td>
               <td class="muted">พบในทะเบียนผลิต<?= $st !== '' ? ' · ' . h($st) : '' ?></td>
             </tr>
@@ -1140,13 +1207,14 @@ function rent_wait_ma_panel_html($productId)
             <table class="list" style="margin:0">
               <tr>
                 <th style="width:36px"><input type="checkbox" id="rent-reg-all" checked title="เลือกทั้งหมด"></th>
-                <th>S/N</th><th>สินค้า (เช่า)</th><th>วันที่บันทึกเช่า</th>
+                <th>S/N</th><th>สินค้า (เช่า)</th><th>ปัญหา / อาการที่แจ้ง</th><th>วันที่บันทึกเช่า</th>
               </tr>
-              <?php foreach ($unmatched as $row) { ?>
+              <?php foreach ($unmatched as $row) { $sym = trim((string) ($row['symptom'] ?? '')); ?>
               <tr>
                 <td><input type="checkbox" class="rent-reg-sn" name="register_sns[]" value="<?= h($row['pro_sn']) ?>" checked></td>
                 <td><b><?= h($row['pro_sn']) ?></b></td>
                 <td><?= h($row['pro_name']) ?></td>
+                <td class="rent-q-sym"><?= $sym !== '' ? h($sym) : '<span class="muted">—</span>' ?></td>
                 <td style="white-space:nowrap"><?= function_exists('dthai') ? dthai($row['pro_date'] ?? '') : h($row['pro_date'] ?? '') ?></td>
               </tr>
               <?php } ?>

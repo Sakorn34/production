@@ -573,9 +573,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .part-move-table td { font-size: calc(13px * var(--font-scale, 1)); }
 .part-move-in { color: #059669; font-weight: 600; white-space: nowrap; }
 .part-move-out { color: #dc2626; font-weight: 600; white-space: nowrap; }
+/* ป้ายต้องอยู่บรรทัดเดียว — คอลัมน์แคบ ๆ ทำให้ "เบิกออก" ตัดเป็นสองบรรทัดแล้วชิดซ้ายในกรอบ */
 .part-move-badge {
-  display: inline-block; font-size: calc(11px * var(--font-scale, 1)); font-weight: 600;
-  padding: 2px 8px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: calc(11px * var(--font-scale, 1)); font-weight: 600;
+  padding: 2px 8px; border-radius: 999px; white-space: nowrap; text-align: center;
 }
 .part-move-badge-in { background: #ecfdf5; color: #059669; }
 .part-move-badge-out { background: #fef2f2; color: #dc2626; }
