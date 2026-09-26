@@ -166,17 +166,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif ($act === 'sync') {
         // ดึงเครื่องในระบบที่ยังไม่มีในตาราง stock — active ตามสถานะ (เครื่องใหม่เท่านั้นที่นับเป็นสต๊อก)
-        $max = stock_next_id() - 1;
-        $DB->query("INSERT IGNORE INTO  stock (`timestamp`, serial_number, model, id, create_name, setup_id, active)
-            SELECT COALESCE(pr.last_dt, a.produced_at), a.asset_code, p.name,
-                   $max + DENSE_RANK() OVER (ORDER BY COALESCE(pr.last_dt, a.produced_at), p.name, COALESCE(pr.last_made_by,'')),
-                   COALESCE(pr.last_made_by, ''), NULL, IF(a.status = 'new', 1, 0)
-            FROM assets a JOIN products p ON p.id = a.product_id
-            LEFT JOIN (SELECT asset_id,
-                              MAX(recorded_at) last_dt,
-                              SUBSTRING_INDEX(GROUP_CONCAT(made_by ORDER BY recorded_at DESC, id DESC SEPARATOR '||'), '||', 1) last_made_by
-                       FROM production_records WHERE made_by IS NOT NULL AND TRIM(made_by)<>'' GROUP BY asset_id) pr ON pr.asset_id = a.id");
-        flash_set('ดึงจากระบบแล้ว — เพิ่มใหม่ ' . $DB->affected_rows . ' รายการ');
+        //
+        // เดิมเป็น INSERT ... SELECT ข้ามฐานในคำสั่งเดียว (FROM assets JOIN products) ซึ่งรันบน
+        // คอนเนคชันของฐาน stock ที่ไม่มีสิทธิ์อ่านฐาน production — ล้มทุกครั้งด้วย
+        // "SELECT command denied" แต่โค้ดไม่ได้เช็คผล จึงเอา affected_rows (= -1) ไปขึ้นข้อความ
+        // ว่า "เพิ่มใหม่ -1 รายการ" ทั้งที่ไม่ได้เพิ่มอะไรเลย ตอนนี้ย้ายไปทำฝั่ง PHP
+        $r = stock_sync_missing_from_production();
+        if ($r['added'] > 0) {
+            flash_set('ดึงจากระบบแล้ว — เพิ่มใหม่ ' . number_format($r['added']) . ' รายการ'
+                . ' (เป็นเครื่องใหม่ ' . number_format($r['active1']) . ' รายการ · active 1)');
+        } else {
+            flash_set('ทะเบียนสินค้ามีครบทุกเครื่องแล้ว — ไม่มีรายการใหม่ต้องเพิ่ม');
+        }
     } elseif ($act === 'active_from_status') {
         $r = stock_active_apply();
         flash_set('ตั้ง Active ตามสถานะเครื่องแล้ว — เป็น 1 (เครื่องใหม่) ' . number_format($r['to1'])

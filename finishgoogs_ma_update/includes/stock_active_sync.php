@@ -134,6 +134,89 @@ function stock_active_write_batch(array $serials, int $active): int
 }
 
 /**
+ * เพิ่มเครื่องที่ยังไม่มีในทะเบียนสินค้า (stock) จากทะเบียนเครื่องผลิต
+ *
+ * ทำฝั่ง PHP เพราะบัญชีของฐาน stock อ่านฐาน production ไม่ได้
+ * (ของเดิมเป็น INSERT ... SELECT ข้ามฐานในคำสั่งเดียว จึงล้มทุกครั้งด้วย
+ *  "SELECT command denied" แล้ว affected_rows คืน -1 หน้าเว็บเลยขึ้นว่า
+ *  "เพิ่มใหม่ -1 รายการ" ทั้งที่ไม่ได้เพิ่มอะไรเลย)
+ *
+ * เลข "id ชุด" ยังเดินตามกติกาเดิม — เครื่องที่วันเวลา/รุ่น/ผู้บันทึกชุดเดียวกัน
+ * ได้เลขเดียวกัน (ของเดิมใช้ DENSE_RANK)
+ *
+ * @return array{added:int,skipped:int,active1:int}
+ */
+function stock_sync_missing_from_production(): array
+{
+    $stock = dbStock();
+    $have = [];
+    $res = $stock->query('SELECT serial_number FROM stock');
+    while ($r = $res->fetch_assoc()) {
+        $have[trim((string) $r['serial_number'])] = true;
+    }
+    $batchId = (int) $stock->query('SELECT COALESCE(MAX(id),0) m FROM stock')->fetch_assoc()['m'];
+
+    $res = db()->query(
+        "SELECT a.asset_code, a.status, p.name model,
+                COALESCE(pr.last_dt, a.produced_at) ts,
+                COALESCE(pr.last_made_by, '') made_by
+         FROM assets a JOIN products p ON p.id = a.product_id
+         LEFT JOIN (SELECT asset_id, MAX(recorded_at) last_dt,
+                           SUBSTRING_INDEX(GROUP_CONCAT(made_by ORDER BY recorded_at DESC, id DESC SEPARATOR '||'), '||', 1) last_made_by
+                    FROM production_records
+                    WHERE made_by IS NOT NULL AND TRIM(made_by) <> '' GROUP BY asset_id) pr ON pr.asset_id = a.id
+         ORDER BY COALESCE(pr.last_dt, a.produced_at), p.name, COALESCE(pr.last_made_by, '')"
+    );
+    $todo = [];
+    $skipped = 0;
+    while ($r = $res->fetch_assoc()) {
+        $code = trim((string) $r['asset_code']);
+        if ($code === '' || isset($have[$code])) {
+            $skipped++;
+            continue;
+        }
+        $have[$code] = true;
+        $todo[] = $r;
+    }
+    if (!$todo) {
+        return ['added' => 0, 'skipped' => $skipped, 'active1' => 0];
+    }
+
+    $st = $stock->prepare('INSERT IGNORE INTO stock (`timestamp`, serial_number, model, id, create_name, setup_id, active)
+                           VALUES (?,?,?,?,?,NULL,?)');
+    if (!$st) {
+        return ['added' => 0, 'skipped' => $skipped, 'active1' => 0];
+    }
+    $added = 0;
+    $act1 = 0;
+    $prevKey = null;
+    $stock->begin_transaction();
+    foreach ($todo as $r) {
+        $ts = ($r['ts'] !== null && $r['ts'] !== '') ? (string) $r['ts'] : null;
+        $key = $ts . '|' . $r['model'] . '|' . $r['made_by'];
+        if ($key !== $prevKey) {
+            $batchId++;
+            $prevKey = $key;
+        }
+        $code = (string) $r['asset_code'];
+        $model = (string) $r['model'];
+        $by = (string) $r['made_by'];
+        $active = stock_active_wanted($r['status']);
+        $st->bind_param('sssisi', $ts, $code, $model, $batchId, $by, $active);
+        $st->execute();
+        if ($st->affected_rows > 0) {
+            $added++;
+            if ($active === 1) {
+                $act1++;
+            }
+        }
+    }
+    $stock->commit();
+    $st->close();
+    return ['added' => $added, 'skipped' => $skipped, 'active1' => $act1];
+}
+
+/**
  * ตั้ง active ให้เฉพาะเครื่องที่ระบุ — ใช้ตอนสถานะเครื่องเปลี่ยน
  *
  * เรียกได้ถี่ ๆ ไม่ต้องกลัว: ถ้าค่าตรงอยู่แล้ว MySQL จะไม่เขียนทับ

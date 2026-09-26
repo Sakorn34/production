@@ -174,17 +174,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash_set('ซิงก์ครบแล้ว — เพิ่ม ' . number_format($r['added']) . ' · อัปเดต ' . number_format($r['updated_meta'])
                 . ' · เหลือไม่ครบ ' . number_format($r['incomplete_remaining']));
         } elseif ($act === 'sync') {
-            $max = (int)$DB->query("SELECT COALESCE(MAX(id),0)+1 m FROM stock")->fetch_assoc()['m'] - 1;
-            $DB->query("INSERT IGNORE INTO stock (`timestamp`, serial_number, model, id, create_name, setup_id, active)
-                SELECT COALESCE(pr.last_dt, a.produced_at), a.asset_code, p.name,
-                       $max + DENSE_RANK() OVER (ORDER BY COALESCE(pr.last_dt, a.produced_at), p.name, COALESCE(pr.last_made_by,'')),
-                       COALESCE(pr.last_made_by, ''), NULL, 1
-                FROM assets a JOIN products p ON p.id = a.product_id
-                LEFT JOIN (SELECT asset_id,
-                                  MAX(recorded_at) last_dt,
-                                  SUBSTRING_INDEX(GROUP_CONCAT(made_by ORDER BY recorded_at DESC, id DESC SEPARATOR '||'), '||', 1) last_made_by
-                           FROM production_records WHERE made_by IS NOT NULL AND TRIM(made_by)<>'' GROUP BY asset_id) pr ON pr.asset_id = a.id");
-            flash_set('ดึงจากระบบแล้ว — เพิ่มใหม่ ' . $DB->affected_rows . ' รายการ');
+            // เดิมเป็น INSERT ... SELECT ข้ามฐาน (FROM assets JOIN products) รันบนคอนเนคชันของฐาน stock
+            // ที่ไม่มีสิทธิ์อ่านฐาน production — ล้มทุกครั้งแล้วเอา affected_rows (= -1) ไปขึ้นข้อความ
+            // ว่า "เพิ่มใหม่ -1 รายการ" · แถม active ยังเป็น 1 ตายตัวไม่ดูสถานะเครื่อง
+            // ตอนนี้ใช้ตัวเดียวกับหน้า share.php (includes/stock_active_sync.php)
+            $r = stock_sync_missing_from_production();
+            if ($r['added'] > 0) {
+                flash_set('ดึงจากระบบแล้ว — เพิ่มใหม่ ' . number_format($r['added']) . ' รายการ'
+                    . ' (เป็นเครื่องใหม่ ' . number_format($r['active1']) . ' รายการ · active 1)');
+            } else {
+                flash_set('ทะเบียนสินค้ามีครบทุกเครื่องแล้ว — ไม่มีรายการใหม่ต้องเพิ่ม');
+            }
         } else {
             $n = share_refresh_meta_from_production();
             flash_set('อัปเดตรุ่น/เวลา/ผู้ผลิตจากระบบผลิตแล้ว — แก้ไข ' . number_format($n) . ' รายการ');
