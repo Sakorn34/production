@@ -593,7 +593,10 @@ page_header('ทะเบียนสินค้า (stock)');
 .stock-rowact { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .stock-rowact .btn-sm { padding-left:9px; padding-right:9px; }
 .stock-rowact > form { display:inline-flex; margin:0; }
-.stock-edit > summary { list-style:none; cursor:pointer; display:inline-block; }
+/* summary ต้องเป็น inline-flex เหมือน .btn ตัวอื่น — ถ้าตั้งเป็น inline-block
+   การจัดกึ่งกลางของ .btn จะไม่ทำงาน ตัวหนังสือเลยเกาะซ้ายบน */
+.stock-edit > summary { list-style:none; cursor:pointer; display:inline-flex;
+  align-items:center; justify-content:center; }
 .stock-edit > summary::-webkit-details-marker { display:none; }
 /* ฟอร์มแก้ไขต้องไม่กินที่ตอนยังไม่กาง — display:grid ตายตัวทำให้ details ที่ปิดอยู่ยังจองความสูง
    (ของเดิมเขียน display:grid ไว้ใน style ตรง ๆ แถวเลยสูงเกือบ 90px ทั้งที่ยังไม่ได้กดแก้ไข) */

@@ -18,6 +18,22 @@
   var MIN_H = 240;          /* เตี้ยกว่านี้แล้วเห็นไม่กี่แถว สู้เลื่อนทั้งหน้าไม่ได้ */
   var CARD_MODE_MAX = 760;  /* ต้องตรงกับ breakpoint การ์ดใน ui_table.css */
   var SLACK = 12;           /* เศษที่ยอมให้เลื่อนได้ — ของตกแต่งแบบ absolute ไล่ตามไม่จบ */
+  var ROWS_MIN = 10;        /* อย่างน้อยต้องเห็นกี่แถวพร้อมกัน */
+  var KEEP_TOP = 120;       /* กันไม่ให้กรอบสูงจนดันหัวหน้าหลุดจอไปทั้งหมด */
+
+  /* ความสูงต่ำสุดของกรอบนี้ — คิดจากแถวจริง ไม่ใช่ค่าคงที่
+     หน้าไหนหัวยาว (การ์ดสถิติ ตัวกรอง ชิป) ที่ว่างจะเหลือน้อยจนเห็นแค่ 3-4 แถว
+     กรณีนั้นยอมให้หน้าเลื่อนเอง ดีกว่าเปิดมาแล้วเห็นรายการไม่กี่บรรทัด */
+  function minHeightFor(w) {
+    var th = w.querySelector('thead th');
+    var tr = w.querySelector('tbody tr');
+    if (!th || !tr) { return MIN_H; }
+    var rowH = tr.getBoundingClientRect().height;
+    var headH = th.getBoundingClientRect().height;
+    if (rowH <= 0) { return MIN_H; }
+    var want = headH + ROWS_MIN * rowH;
+    return Math.max(MIN_H, Math.min(want, window.innerHeight - KEEP_TOP));
+  }
 
   function apply() {
     var wraps = document.querySelectorAll('.table-wrap-fold');
@@ -34,7 +50,8 @@
       var top = w.getBoundingClientRect().top + (window.pageYOffset || 0)
               - (document.documentElement.getBoundingClientRect().top + (window.pageYOffset || 0));
       var avail = window.innerHeight - top - 14;
-      w.style.maxHeight = Math.max(MIN_H, avail) + 'px';
+      var floorH = minHeightFor(w);
+      w.style.maxHeight = Math.max(floorH, avail) + 'px';
       w.style.overflowY = 'auto';
 
       // กันไม่ให้แถวที่เบราว์เซอร์เลื่อนมาหาเอง (กด Tab, Ctrl+F, scrollIntoView)
@@ -58,7 +75,7 @@
         var over = document.documentElement.scrollHeight - window.innerHeight;
         if (over <= SLACK) { break; }
         avail -= over;
-        w.style.maxHeight = Math.max(MIN_H, avail) + 'px';
+        w.style.maxHeight = Math.max(floorH, avail) + 'px';
       }
     }
   }
