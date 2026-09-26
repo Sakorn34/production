@@ -43,46 +43,24 @@ reset($notes);
 page_header('ประวัติการอัปเดตระบบ', true, count($notes) . ' รอบ · ' . number_format($total) . ' รายการ'
     . ($firstDate !== '' ? ' · ตั้งแต่ ' . $fmtDay($firstDate) : ''), $B . '/settings.php');
 ?>
-<details class="rn-int" open>
-  <summary class="rn-int-sum">
-    <span class="rn-int-h">การเชื่อมต่อกับระบบอื่น</span>
-    <span class="muted rn-int-sub"><?= count($integrations) ?> ระบบ · ระบบเราทำอะไรกับระบบไหนไปบ้าง</span>
-  </summary>
-  <div class="rn-int-grid">
+<section class="rn-int">
+  <div class="rn-int-head">
+    <div>
+      <b class="rn-int-h">การเชื่อมต่อกับระบบอื่น</b>
+      <div class="muted rn-int-sub">ระบบ production เข้าไปทำอะไรกับระบบไหนบ้าง · <?= count($integrations) ?> ระบบ</div>
+    </div>
+    <a class="btn btn-sm btn-line" href="<?= $B ?>/integration.php">ดูทั้งหมด</a>
+  </div>
+  <div class="rn-int-row">
     <?php foreach ($integrations as $g) { $ro = $g['mode'] === 'read'; ?>
-    <section class="rn-int-card">
-      <div class="rn-int-top">
-        <b class="rn-int-name"><?= h($g['name']) ?></b>
-        <span class="rn-int-mode <?= $ro ? 'is-ro' : 'is-rw' ?>"><?= $ro ? 'อ่านอย่างเดียว' : 'อ่าน + เขียน' ?></span>
-      </div>
-      <div class="rn-int-db"><code><?= h($g['db']) ?></code></div>
-      <p class="muted rn-int-note"><?= h($g['note']) ?></p>
-
-      <?php if (!empty($g['did'])) { ?>
-      <div class="rn-int-lbl">ระบบเราทำอะไรให้บ้าง</div>
-      <ul class="rn-int-ul"><?php foreach ($g['did'] as $t) { ?><li><?= h($t) ?></li><?php } ?></ul>
-      <?php } ?>
-
-      <?php if (!empty($g['read'])) { ?>
-      <div class="rn-int-lbl">ดึงข้อมูลอะไรมา</div>
-      <ul class="rn-int-ul is-read"><?php foreach ($g['read'] as $t) { ?><li><?= h($t) ?></li><?php } ?></ul>
-      <?php } ?>
-
-      <?php if (!empty($g['write'])) { ?>
-      <div class="rn-int-lbl">เขียนกลับอะไรบ้าง</div>
-      <ul class="rn-int-ul is-write"><?php foreach ($g['write'] as $t) { ?><li><?= h($t) ?></li><?php } ?></ul>
-      <?php } else { ?>
-      <div class="rn-int-lbl">เขียนกลับอะไรบ้าง</div>
-      <p class="muted rn-int-none">ไม่เขียนอะไรกลับเลย</p>
-      <?php } ?>
-
-      <?php if (!empty($g['where'])) { ?>
-      <div class="rn-int-where">ดูได้ที่ <?php $i = 0; foreach ($g['where'] as $w) { echo $i++ ? ' · ' : ''; ?><a href="<?= h($w['u']) ?>"><?= h($w['t']) ?></a><?php } ?></div>
-      <?php } ?>
-    </section>
+    <a class="rn-int-pill" href="<?= $B ?>/integration.php?s=<?= h($g['key']) ?>" title="<?= h((string) $g['short']) ?>">
+      <?= ui_icon_html($g['icon'], 15) ?>
+      <span><?= h($g['name']) ?></span>
+      <span class="rn-int-tag <?= $ro ? 'is-ro' : 'is-rw' ?>"><?= $ro ? 'อ่าน' : 'อ่าน+เขียน' ?></span>
+    </a>
     <?php } ?>
   </div>
-</details>
+</section>
 
 <h2 class="rn-h2">ประวัติการอัปเดตทีละรอบ</h2>
 
@@ -122,39 +100,22 @@ page_header('ประวัติการอัปเดตระบบ', true
 <p class="muted rn-foot">เนื้อหาสรุปจากประวัติการแก้ไขจริงของระบบ · เวอร์ชันที่ใช้อยู่ตอนนี้คือ <b><?= h(defined('APP_RELEASE_VERSION') ? (string) APP_RELEASE_VERSION : '-') ?></b></p>
 
 <style>
-/* ── การเชื่อมต่อกับระบบอื่น ── */
-.rn-int { margin-bottom: 20px; }
-.rn-int-sum { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 10px;
-  flex-wrap: wrap; padding: 4px 0; }
-.rn-int-sum::-webkit-details-marker { display: none; }
-.rn-int-sum::before { content: '▸'; color: var(--primary); font-size: calc(13px * var(--font-scale, 1)); }
-.rn-int[open] > .rn-int-sum::before { content: '▾'; }
-.rn-int-h { font-size: calc(17px * var(--font-scale, 1)); font-weight: 700; color: var(--primary); }
-.rn-int-sub { font-size: calc(12.5px * var(--font-scale, 1)); }
-.rn-int-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 10px; margin-top: 10px; }
-.rn-int-card { background: var(--surface, #fff); border: 1px solid var(--border, #e5e7eb);
-  border-radius: 12px; padding: 12px 14px; }
-.rn-int-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.rn-int-name { font-size: calc(14.5px * var(--font-scale, 1)); }
-.rn-int-mode { flex: 0 0 auto; font-size: calc(11.5px * var(--font-scale, 1)); border-radius: 999px; padding: 1px 9px; }
-.rn-int-mode.is-ro { background: var(--surface-2, #f1efe8); color: var(--text-muted, #5f5e5a); }
-.rn-int-mode.is-rw { background: var(--primary-soft, #fce7f3); color: var(--primary); }
-.rn-int-db { margin-top: 2px; }
-.rn-int-db code { font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); }
-.rn-int-note { font-size: calc(12.5px * var(--font-scale, 1)); line-height: 1.65; margin: 6px 0 2px; }
-.rn-int-lbl { font-size: calc(12px * var(--font-scale, 1)); font-weight: 700;
-  color: var(--text-muted, #6b6480); margin-top: 9px; }
-.rn-int-ul { margin: 4px 0 0; padding-left: 0; list-style: none;
-  display: flex; flex-direction: column; gap: 4px; }
-.rn-int-ul li { position: relative; padding-left: 15px; font-size: calc(13px * var(--font-scale, 1)); line-height: 1.6; }
-.rn-int-ul li::before { content: ''; position: absolute; left: 2px; top: 8px;
-  width: 5px; height: 5px; border-radius: 999px; background: var(--primary); }
-.rn-int-ul.is-read li::before { background: var(--info, #1d4ed8); }
-.rn-int-ul.is-write li::before { background: var(--warning, #a16207); }
-.rn-int-none { font-size: calc(13px * var(--font-scale, 1)); margin: 4px 0 0; }
-.rn-int-where { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border, #ece7f6);
-  font-size: calc(12.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); }
+/* ── แถบย่อ: การเชื่อมต่อกับระบบอื่น (รายละเอียดอยู่ที่ integration.php) ── */
+.rn-int { margin-bottom: 18px; padding: 12px 14px; background: var(--surface, #fff);
+  border: 1px solid var(--border, #e5e7eb); border-radius: 12px; }
+.rn-int-head { display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap; margin-bottom: 9px; }
+.rn-int-h { font-size: calc(15px * var(--font-scale, 1)); }
+.rn-int-sub { font-size: calc(12.5px * var(--font-scale, 1)); margin-top: 1px; }
+.rn-int-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.rn-int-pill { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: inherit;
+  border: 1px solid var(--border, #e5e7eb); border-radius: 999px; padding: 4px 11px;
+  font-size: calc(13px * var(--font-scale, 1)); }
+.rn-int-pill:hover { border-color: var(--primary); text-decoration: none; }
+.rn-int-pill svg { color: var(--primary); }
+.rn-int-tag { font-size: calc(11px * var(--font-scale, 1)); border-radius: 999px; padding: 0 7px; }
+.rn-int-tag.is-ro { background: var(--success-soft, #dcfce7); color: var(--success, #16a34a); }
+.rn-int-tag.is-rw { background: var(--warning-soft, #fef9c3); color: var(--warning, #a16207); }
 .rn-h2 { font-size: calc(17px * var(--font-scale, 1)); margin: 0 0 10px; }
 .rn-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
 .rn-chip { font-size: calc(13px * var(--font-scale, 1)); border: 1px solid var(--border, #e5e7eb); background: var(--surface, #fff);

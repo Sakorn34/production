@@ -138,6 +138,7 @@ function page_back_url_default() {
         case 'share_admin.php':
         case 'parts_link_check.php':
         case 'release_notes.php':
+        case 'integration.php':
         case 'system_doc.php':
         case 'work_report.php':
         case 'support_reports.php':
@@ -237,7 +238,7 @@ $dockClass = ($side === 'top') ? '' : ' nav-collapsed';
 $ubUser = ui_userbox_identity();
 $showName = $ubUser['name'] !== 'ผู้ใช้งาน' ? $ubUser['name'] : ($u ? $u['display_name'] : '-');
 $settingsActive = in_array($cur, ['settings.php', 'appearance.php', 'server_config.php', 'line_notify_settings.php', 'activity_logs.php', 'share_admin.php', 'system_doc.php', 'work_report.php', 'my_work.php',
-    'stock_scan.php', 'stock_check.php', 'unknown_assets.php', 'stock_movements.php', 'installation_history.php', 'production_dedupe.php', 'rent_retire_sync.php', 'share.php', 'support_reports.php', 'unused_images.php', 'inv_pickup_map.php', 'leasing_sn_fix.php', 'release_notes.php', 'parts_link_check.php'], true);
+    'stock_scan.php', 'stock_check.php', 'unknown_assets.php', 'stock_movements.php', 'installation_history.php', 'production_dedupe.php', 'rent_retire_sync.php', 'share.php', 'support_reports.php', 'unused_images.php', 'inv_pickup_map.php', 'leasing_sn_fix.php', 'release_notes.php', 'integration.php', 'parts_link_check.php'], true);
 ?>
 <div class="app<?= $sideClass . $dockClass ?>">
 <?php // ตั้ง class ให้ตรงกับที่ผู้ใช้เลือกไว้ ก่อนเบราว์เซอร์วาดเฟรมแรก
