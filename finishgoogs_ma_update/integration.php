@@ -102,6 +102,25 @@ if ($one) {
         </section>
       </div>
 
+      <?php if (!empty($one['uses'])) { ?>
+      <section class="ig-box ig-box-wide ig-useblk">
+        <h3 class="ig-h3"><?= ui_icon_html('chart', 16, 'h-svg') ?> เอาไปใช้ตรงไหน ทำอะไรได้</h3>
+        <div class="ig-use-head" aria-hidden="true">
+          <span>ข้อมูล</span><span></span><span>ใช้ที่ไหนในระบบเรา</span><span></span><span>ได้อะไร</span>
+        </div>
+        <?php foreach ((array) $one['uses'] as $u) { $out = ($u['kind'] ?? 'in') === 'out'; ?>
+        <div class="ig-use <?= $out ? 'is-out' : 'is-in' ?>">
+          <span class="ig-use-d"><?= h((string) $u['d']) ?></span>
+          <span class="ig-use-ar" aria-hidden="true"></span>
+          <a class="ig-use-at" href="<?= h((string) $u['u']) ?>"><?= h((string) $u['at']) ?></a>
+          <span class="ig-use-ar" aria-hidden="true"></span>
+          <span class="ig-use-g"><?= h((string) $u['g']) ?></span>
+        </div>
+        <?php } ?>
+        <p class="muted ig-use-note">ป้ายสีน้ำเงิน = ข้อมูลที่เราดึงมาใช้ · ป้ายสีเหลือง = สิ่งที่เราเขียนกลับไปให้ระบบนั้น</p>
+      </section>
+      <?php } ?>
+
       <section class="ig-box ig-box-wide">
         <h3 class="ig-h3"><?= ui_icon_html('check', 16, 'h-svg') ?> ข้อดีที่ได้</h3>
         <ul class="ig-ul"><?php foreach ((array) $one['did'] as $t) { ?><li><?= h($t) ?></li><?php } ?></ul>
@@ -209,6 +228,34 @@ if ($one) {
   background: var(--surface-2, #f6f4fb); border-left: 3px solid var(--primary); }
 .ig-why .ig-h3 { margin-bottom: 5px; }
 .ig-why-p { margin: 0; font-size: calc(13.5px * var(--font-scale, 1)); line-height: 1.75; }
+/* ── สายโซ่: ข้อมูล → ใช้ที่ไหน → ได้อะไร ── */
+.ig-useblk { margin-bottom: 12px; }
+.ig-use-head, .ig-use { display: grid; grid-template-columns: minmax(0, 0.9fr) 18px minmax(0, 1.1fr) 18px minmax(0, 1.5fr);
+  align-items: center; gap: 8px; }
+.ig-use-head { font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480);
+  font-weight: 700; padding: 0 2px 4px; border-bottom: 1px solid var(--border, #ece7f6); margin-bottom: 4px; }
+.ig-use { padding: 7px 2px; border-bottom: 1px solid var(--border, #ece7f6); }
+.ig-use:last-of-type { border-bottom: 0; }
+.ig-use-d { justify-self: start; font-size: calc(12.5px * var(--font-scale, 1)); line-height: 1.5;
+  border-radius: 8px; padding: 3px 9px; }
+.ig-use.is-in .ig-use-d { background: var(--info-soft, #dbeafe); color: var(--info, #1d4ed8); }
+.ig-use.is-out .ig-use-d { background: var(--warning-soft, #fef9c3); color: var(--warning, #a16207); }
+.ig-use-ar { position: relative; height: 2px; background: var(--border-strong, #cfc8e0); }
+.ig-use-ar::after { content: ''; position: absolute; right: -1px; top: -4px;
+  border: 5px solid transparent; border-left-color: var(--border-strong, #cfc8e0); border-right: 0; }
+.ig-use-at { font-size: calc(12.5px * var(--font-scale, 1)); line-height: 1.5; font-weight: 600; }
+.ig-use-g { font-size: calc(12.5px * var(--font-scale, 1)); line-height: 1.6; color: var(--text-muted, #5f5e5a); }
+.ig-use-note { font-size: calc(11.5px * var(--font-scale, 1)); margin: 9px 0 0; line-height: 1.6; }
+@media (max-width: 700px) {
+  /* จอแคบ: เรียงลงมาเป็นขั้น ๆ แทนสามคอลัมน์ */
+  .ig-use-head { display: none; }
+  .ig-use { grid-template-columns: minmax(0, 1fr); gap: 3px; padding: 9px 0; }
+  .ig-use-ar { height: 0; border-left: 2px solid var(--border-strong, #cfc8e0); width: 0;
+    height: 12px; margin-left: 11px; background: none; }
+  .ig-use-ar::after { top: auto; bottom: -1px; right: auto; left: -4px;
+    border: 5px solid transparent; border-top-color: var(--border-strong, #cfc8e0); border-bottom: 0; border-left-color: transparent; }
+  .ig-use-at, .ig-use-g { padding-left: 3px; }
+}
 .ig-guard { border-color: var(--success, #16a34a); }
 .ig-guard .ig-h3 { color: var(--success, #16a34a); }
 .ig-guard-lead { font-size: calc(13px * var(--font-scale, 1)); line-height: 1.7; margin: 0 0 8px; }
