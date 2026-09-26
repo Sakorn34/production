@@ -1362,7 +1362,7 @@ function rent_leasing_ma_timeline_items(array $info)
 }
 
 /**
- * URL ระบบเช่า ตั้งได้ที่หน้าปรับแต่งหน้าตา (ว่าง = ยังไม่ได้ตั้ง)
+ * รูปแบบ URL ระบบเช่าที่ตั้งไว้ (ว่าง = ยังไม่ได้ตั้ง / ไม่ใช่ http)
  *
  * @return string
  */
@@ -1373,6 +1373,38 @@ function rent_leasing_app_url(): string
         return '';
     }
     return rtrim($u, '/');
+}
+
+/** ทางลัดไปหน้าประวัติเครื่องในระบบเช่า ต่อท้ายให้เองเมื่อผู้ใช้ใส่มาแค่ URL หลัก */
+const RENT_LEASING_SN_PATH = '/product_history_usage.php?serial_number={sn}';
+
+/**
+ * URL เปิดเครื่องเครื่องนั้นในระบบเช่าโดยตรง
+ *
+ * ค่าที่ตั้งไว้ใส่ตัวแทนได้: {sn} = S/N · {ma_id} = เลขอ้างอิงแถวประวัติ MA
+ * ถ้าใส่มาแค่ URL หลัก (ไม่มีตัวแทนเลย) จะต่อ path หน้าประวัติเครื่องให้เอง
+ *
+ * @param string $sn
+ * @param int    $maId
+ * @return string ว่าง = ยังตั้ง URL ไม่ได้
+ */
+function rent_leasing_record_url(string $sn, int $maId = 0): string
+{
+    $tpl = rent_leasing_app_url();
+    if ($tpl === '') {
+        return '';
+    }
+    $sn = trim($sn);
+    if (strpos($tpl, '{sn}') === false && strpos($tpl, '{ma_id}') === false) {
+        if ($sn === '') {
+            return $tpl;   // ไม่รู้ S/N ก็ได้แค่หน้าแรก
+        }
+        $tpl .= RENT_LEASING_SN_PATH;
+    }
+    return strtr($tpl, [
+        '{sn}'    => rawurlencode($sn),
+        '{ma_id}' => rawurlencode((string) $maId),
+    ]);
 }
 
 /**
@@ -1388,12 +1420,13 @@ function rent_ma_source_actions_html(array $e): string
 {
     $maId = (int) ($e['rent_ma_id'] ?? 0);
     $sn   = trim((string) ($e['rent_ma_sn'] ?? ''));
-    $url  = rent_leasing_app_url();
+    $url  = rent_leasing_record_url($sn, $maId);
 
     $out = '<div class="tl-actions rent-ma-actions">';
     if ($url !== '') {
+        $label = $sn !== '' ? 'เปิดเครื่องนี้ในระบบเช่า' : 'เปิดระบบเช่า';
         $out .= '<a class="btn btn-sm btn-line btn-with-icon" target="_blank" rel="noopener" href="'
-              . h($url) . '">' . ui_btn_label('edit', 'แก้ที่ระบบเช่า') . ' ↗</a>';
+              . h($url) . '" title="เปิดหน้าประวัติของ S/N นี้ในระบบเช่า">' . ui_btn_label('edit', $label) . ' ↗</a>';
     }
     if ($maId > 0) {
         $out .= '<button type="button" class="btn btn-sm btn-line rent-ma-copy" data-copy="' . h((string) $maId)
