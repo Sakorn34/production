@@ -334,6 +334,10 @@ function asset_status_sync_row(array $row, array $saleMap, array $leaseMap, bool
     if ($write) {
         q('UPDATE assets SET status=? WHERE id=?', 'si', [$target, $id]);
         asset_status_sync_log($id, $current, $target, $reason);
+        // ทะเบียนสินค้า (stock) นับเฉพาะเครื่องใหม่ — สถานะเปลี่ยนแล้วต้องตาม active ไปด้วย
+        if (function_exists('stock_active_sync_codes') && $code !== '') {
+            stock_active_sync_codes([$code]);
+        }
     }
 
     return ['changed' => true, 'asset_code' => $code, 'from' => $current, 'to' => $target, 'reason' => $reason];

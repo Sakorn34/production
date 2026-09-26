@@ -1371,7 +1371,7 @@ function part_alerts_html($assetId, $producedAt) {
 
 /** upsert เครื่องลงตาราง stock ตามข้อมูลปัจจุบัน — เรียกหลังเพิ่มหรือแก้ไขเครื่อง ($oldCode = รหัสเดิมถ้ามีการเปลี่ยนรหัส) */
 function share_upsert_asset($assetId, $oldCode = null) {
-    $a = qr("SELECT a.asset_code, a.produced_at, p.name model,
+    $a = qr("SELECT a.asset_code, a.produced_at, a.status, p.name model,
                     (SELECT pr.made_by FROM production_records pr WHERE pr.asset_id=a.id AND pr.made_by IS NOT NULL AND pr.made_by<>''
                      ORDER BY pr.recorded_at DESC, pr.id DESC LIMIT 1) made_by,
                     COALESCE((SELECT MAX(pr2.recorded_at) FROM production_records pr2 WHERE pr2.asset_id=a.id), a.produced_at) last_dt
@@ -1400,10 +1400,13 @@ function share_upsert_asset($assetId, $oldCode = null) {
     }
     try {
         $madeBy = trim((string)($a['made_by'] ?? ''));
+        // active ตามสถานะเครื่อง — เครื่องใหม่เท่านั้นที่นับเป็นสต๊อก (ดู includes/stock_active_sync.php)
+        $activeVal = function_exists('stock_active_wanted') ? stock_active_wanted($a['status'] ?? '') : 1;
         $st = $conn->prepare("INSERT INTO stock (`timestamp`, serial_number, model, id, create_name, setup_id, active)
-            SELECT ?, ?, ?, COALESCE(MAX(s.id),0)+1, ?, NULL, 1 FROM stock s
+            SELECT ?, ?, ?, COALESCE(MAX(s.id),0)+1, ?, NULL, $activeVal FROM stock s
             ON DUPLICATE KEY UPDATE `timestamp`=VALUES(`timestamp`), model=VALUES(model),
-                                    create_name=IF(VALUES(create_name)='', create_name, VALUES(create_name))");
+                                    create_name=IF(VALUES(create_name)='', create_name, VALUES(create_name)),
+                                    active=VALUES(active)");
         if ($st === false) {
             error_log("[share_upsert_asset] prepare ล้มเหลว: " . $conn->error . " asset_id=$assetId code={$a['asset_code']}");
             return;
@@ -3144,6 +3147,7 @@ function effective_ma_form_fields($productId) {
 }
 
 require_once __DIR__ . '/includes/part_stock_bridge.php';
+require_once __DIR__ . '/includes/stock_active_sync.php';
 
 require_once dirname(__DIR__) . '/shared/activity_log_core.php';
 require_once dirname(__DIR__) . '/shared/datetime_helpers.php';

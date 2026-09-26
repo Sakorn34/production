@@ -33,6 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_status'])) {
         q("UPDATE assets SET status=? WHERE id=?", 'si', [$ns, $id]);
         q("INSERT INTO stock_movements (asset_id,moved_at,direction,reason,made_by) VALUES (?,NOW(),?,?,?)",
           'isss', [$id, $ns === 'new' ? 'in' : 'out', 'เปลี่ยนสถานะเป็น ' . status_th($ns), actor_name()]);
+        // ทะเบียนสินค้า (stock) นับเฉพาะเครื่องใหม่ — ตาม active ไปด้วย
+        stock_active_sync_codes([(string) $a['asset_code']]);
         flash_set('เปลี่ยนสถานะเป็น "' . status_th($ns) . '" เรียบร้อยแล้ว');
     }
     header('Location: ' . BASE_URL . '/asset.php?id=' . $id); exit;

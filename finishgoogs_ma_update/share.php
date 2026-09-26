@@ -51,7 +51,7 @@ function stock_next_id() {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
     $act = $_POST['act'] ?? '';
-    $adminActs = ['sync', 'sync_all', 'refresh_meta', 'import_basic', 'import'];
+    $adminActs = ['sync', 'sync_all', 'refresh_meta', 'import_basic', 'import', 'active_from_status'];
     if (in_array($act, $adminActs, true) && !settings_admin_unlocked()) {
         flash_set('ต้องเข้าหน้าหลังบ้านก่อน', 'err');
         header('Location: ' . BASE_URL . '/share.php');
@@ -165,18 +165,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash_set('ตั้ง ' . implode(' · ', $desc) . ' ให้ ' . count($sns) . ' รายการที่เลือกแล้ว (เปลี่ยนจริง ' . $updated . ')');
         }
     } elseif ($act === 'sync') {
-        // ดึงเครื่องในระบบที่ยังไม่มีในตาราง stock — เครื่องจากระบบผลิต = active 1
+        // ดึงเครื่องในระบบที่ยังไม่มีในตาราง stock — active ตามสถานะ (เครื่องใหม่เท่านั้นที่นับเป็นสต๊อก)
         $max = stock_next_id() - 1;
         $DB->query("INSERT IGNORE INTO  stock (`timestamp`, serial_number, model, id, create_name, setup_id, active)
             SELECT COALESCE(pr.last_dt, a.produced_at), a.asset_code, p.name,
                    $max + DENSE_RANK() OVER (ORDER BY COALESCE(pr.last_dt, a.produced_at), p.name, COALESCE(pr.last_made_by,'')),
-                   COALESCE(pr.last_made_by, ''), NULL, 1
+                   COALESCE(pr.last_made_by, ''), NULL, IF(a.status = 'new', 1, 0)
             FROM assets a JOIN products p ON p.id = a.product_id
             LEFT JOIN (SELECT asset_id,
                               MAX(recorded_at) last_dt,
                               SUBSTRING_INDEX(GROUP_CONCAT(made_by ORDER BY recorded_at DESC, id DESC SEPARATOR '||'), '||', 1) last_made_by
                        FROM production_records WHERE made_by IS NOT NULL AND TRIM(made_by)<>'' GROUP BY asset_id) pr ON pr.asset_id = a.id");
         flash_set('ดึงจากระบบแล้ว — เพิ่มใหม่ ' . $DB->affected_rows . ' รายการ');
+    } elseif ($act === 'active_from_status') {
+        $r = stock_active_apply();
+        flash_set('ตั้ง Active ตามสถานะเครื่องแล้ว — เป็น 1 (เครื่องใหม่) ' . number_format($r['to1'])
+            . ' · เป็น 0 (เบิกใช้งานแล้ว) ' . number_format($r['to0'])
+            . ' · เปลี่ยนจริง ' . number_format($r['changed']) . ' รายการ');
     } elseif ($act === 'refresh_meta') {
         $n = share_refresh_meta_from_production();
         flash_set('อัปเดตรุ่น/เวลา/ผู้ผลิตจากระบบผลิตแล้ว — แก้ไข ' . number_format($n) . ' รายการ');
@@ -265,6 +270,15 @@ $stat = $DB->query("SELECT COUNT(*) c, SUM(active=1) a1, SUM(active=0) a0,
                             SUM(`timestamp` IS NULL OR model='' OR model IS NULL OR create_name='' OR create_name IS NULL) inc
                      FROM stock")->fetch_assoc();
 
+// ---------- Active ตรงกับสถานะเครื่องหรือยัง ----------
+// นับทุกครั้งที่เปิดหน้า: อ่าน 2 ตารางแบบ scan ทั้งตาราง ใช้เวลาไม่ถึงวินาทีที่ขนาดข้อมูลจริง
+try {
+    $activeDiff = stock_active_diff();
+} catch (Throwable $e) {
+    error_log('[share.php stock_active_diff] ' . $e->getMessage());
+    $activeDiff = null;
+}
+
 // ---------- รายการ + ฟิลเตอร์ ----------
 $search = trim($_GET['q'] ?? '');
 $model  = $_GET['model'] ?? '';
@@ -314,6 +328,18 @@ $modelList = $DB->query("SELECT DISTINCT model FROM stock WHERE model IS NOT NUL
 $qs = http_build_query(array_filter(['q' => $search, 'model' => $model, 'f' => $flt, 'sort' => $sort !== 'time_code' ? $sort : null, 'page' => $page > 1 ? $page : null]));
 $nextId = stock_next_id();
 
+/**
+ * ป้าย Active — สีมาจากพาเลตสถานะกลางเท่านั้น (shared/ui_status_palette.php)
+ *
+ * @param int $v
+ * @return string
+ */
+function stock_active_badge(int $v): string
+{
+    $key = $v === 1 ? 'new' : 'retired';
+    return '<span class="badge" style="' . h(status_badge_style($key)) . '">' . ($v === 1 ? '1' : '0') . '</span>';
+}
+
 function stflink($f, $v, $cur, $qsKeep) {
     $on = $cur === $f;
     $u = '?' . http_build_query(array_filter(array_merge($qsKeep, ['f' => $f])));
@@ -323,11 +349,12 @@ $qsKeep = ['q' => $search, 'model' => $model, 'sort' => $sort !== 'time_code' ? 
 
 page_header('ทะเบียนสินค้า (stock)');
 ?>
-<p class="muted" style="margin-bottom:12px">
-  ทะเบียนสินค้า <code>stock</code> · <span class="badge st-new">active 1</span> นับเป็นสต๊อก ·
-  <span class="badge" style="background:#aaa;color:#fff">active 0</span> ไม่นับ
+<p class="muted stock-intro">
+  ทะเบียนสินค้า <code>stock</code> ·
+  <?= stock_active_badge(1) ?> เครื่องใหม่ที่ยังอยู่ในสต๊อก ·
+  <?= stock_active_badge(0) ?> เบิกใช้งานแล้ว (ขาย · เช่า · สำรอง · เสื่อมสภาพ · สูญหาย · ไม่มีสถานะ)
   <?php if (settings_admin_unlocked()) { ?>
-  · <a href="<?= BASE_URL ?>/share_admin.php" class="muted">⚙ เครื่องมือหลังบ้าน (Import / Sync)</a>
+  · <a href="<?= BASE_URL ?>/share_admin.php" class="muted"><?= ui_icon_html('settings', 13, 'h-svg') ?> เครื่องมือหลังบ้าน (Import / Sync)</a>
   <?php } ?>
 </p>
 
@@ -338,18 +365,44 @@ page_header('ทะเบียนสินค้า (stock)');
     <div class="muted stock-stat-lbl">ทั้งหมด</div>
   </div>
   <div class="stock-stat-card">
-    <div class="stock-stat-num" style="color:#2a7c4a"><?= number_format($stat['a1']) ?></div>
-    <div class="muted stock-stat-lbl">active 1</div>
+    <div class="stock-stat-num" style="color:<?= h(status_palette_entry('new')['fg']) ?>"><?= number_format($stat['a1']) ?></div>
+    <div class="muted stock-stat-lbl">active 1 · อยู่ในสต๊อก</div>
   </div>
   <div class="stock-stat-card">
-    <div class="stock-stat-num" style="color:#888"><?= number_format($stat['a0']) ?></div>
-    <div class="muted stock-stat-lbl">active 0</div>
+    <div class="stock-stat-num" style="color:<?= h(status_palette_entry('retired')['fg']) ?>"><?= number_format($stat['a0']) ?></div>
+    <div class="muted stock-stat-lbl">active 0 · เบิกใช้งานแล้ว</div>
   </div>
   <div class="stock-stat-card">
-    <div class="stock-stat-num" style="color:<?= (int)$stat['inc'] ? '#c0392b' : '#2a7c4a' ?>"><?= number_format($stat['inc']) ?></div>
+    <div class="stock-stat-num" style="color:<?= (int)$stat['inc'] ? h(status_palette_entry('lost')['fg']) : h(status_palette_entry('new')['fg']) ?>"><?= number_format($stat['inc']) ?></div>
     <div class="muted stock-stat-lbl">ข้อมูลไม่ครบ<?= (int)$stat['inc'] === 0 ? ' ' . ui_icon_html('check', 13) : '' ?></div>
   </div>
 </div>
+
+<?php if ($activeDiff !== null && $activeDiff['diff'] > 0) { ?>
+<div class="stock-fix">
+  <div class="stock-fix-txt">
+    <b><?= number_format($activeDiff['diff']) ?> รายการ</b> มีค่า Active ไม่ตรงกับสถานะเครื่องในระบบผลิต
+    <div class="muted stock-fix-sub">
+      ต้องเป็น 1 (เครื่องใหม่) <?= number_format($activeDiff['to1']) ?> ·
+      ต้องเป็น 0 (เบิกใช้งานแล้ว) <?= number_format($activeDiff['to0']) ?><?php
+      if ($activeDiff['no_asset'] > 0) { ?> · ไม่พบ serial ในระบบผลิต <?= number_format($activeDiff['no_asset']) ?><?php } ?>
+      · แก้แล้วจะเหลือ active 1 = <?= number_format($activeDiff['a1_after']) ?> รายการ
+      (เครื่องใหม่ในระบบผลิตมี <?= number_format($activeDiff['new_assets']) ?> เครื่อง<?php
+        if ($activeDiff['new_assets'] > $activeDiff['a1_after']) {
+            echo ' · อีก ' . number_format($activeDiff['new_assets'] - $activeDiff['a1_after']) . ' เครื่องยังไม่มีในทะเบียนนี้';
+        } ?>)
+    </div>
+  </div>
+  <?php if (settings_admin_unlocked()) { ?>
+  <form method="post" onsubmit="return confirm('ตั้ง Active ของทะเบียนสินค้าใหม่ตามสถานะเครื่อง?\n\nเป็น 1 จำนวน <?= number_format($activeDiff['to1']) ?> รายการ\nเป็น 0 จำนวน <?= number_format($activeDiff['to0']) ?> รายการ\n\nหลังแก้ active 1 จะเหลือ <?= number_format($activeDiff['a1_after']) ?> รายการ')">
+    <?= csrf_field() ?><input type="hidden" name="act" value="active_from_status"><input type="hidden" name="back" value="<?= h($qs) ?>">
+    <button type="submit" class="btn btn-sm btn-with-icon"><?= ui_btn_label('refresh', 'ตั้ง Active ตามสถานะเครื่อง') ?></button>
+  </form>
+  <?php } else { ?>
+  <span class="muted stock-fix-sub">แก้ได้ที่หน้าหลังบ้าน</span>
+  <?php } ?>
+</div>
+<?php } ?>
 
 <div class="stock-actions">
   <details class="panel stock-add-panel">
@@ -437,25 +490,37 @@ page_header('ทะเบียนสินค้า (stock)');
 
 <div class="table-wrap table-wrap-fold">
 <table class="list" id="stock-table">
+  <?php // data-pri = ลำดับความสำคัญของคอลัมน์ (shared/ui_table.css)
+        // 1 เห็นทุกความกว้าง · 2 ยุบลงบรรทัดรองที่ < 900px · 3 ซ่อนที่ < 1100px ?>
+  <thead>
   <tr>
-    <th style="width:36px; text-align:center"><input type="checkbox" id="stock-pick-all" title="เลือกทั้งหมดในหน้านี้"></th>
-    <th>วันเวลา</th><th>Serial Number</th><th>รุ่น/Model</th><th style="width:60px">id ชุด</th><th>ผู้บันทึก</th><th>Setup ID</th><th>Active</th><th style="width:150px">จัดการ</th>
+    <th data-pri="1" style="width:36px; text-align:center"><input type="checkbox" id="stock-pick-all" title="เลือกทั้งหมดในหน้านี้"></th>
+    <th data-pri="2">วันเวลา</th><th data-pri="1">Serial Number</th><th data-pri="2">รุ่น/Model</th>
+    <th data-pri="3" style="width:60px">id ชุด</th><th data-pri="3">ผู้บันทึก</th><th data-pri="3">Setup ID</th>
+    <th data-pri="1">Active</th><th data-pri="1" class="stock-act-col">จัดการ</th>
   </tr>
+  </thead>
+  <tbody>
   <?php while ($r = $rows->fetch_assoc()) {
       $inc = $r['timestamp'] === null || $r['model'] === '' || $r['model'] === null || $r['create_name'] === '' || $r['create_name'] === null; ?>
-  <tr<?= $inc ? ' style="background:rgba(192,57,43,.07)"' : '' ?> data-serial="<?= h($r['serial_number']) ?>">
-    <td style="text-align:center"><input type="checkbox" class="stock-pick" value="<?= h($r['serial_number']) ?>" aria-label="เลือก <?= h($r['serial_number']) ?>"></td>
-    <td style="white-space:nowrap"><?= $r['timestamp'] ? h(date('d/m/Y H:i', strtotime($r['timestamp']))) : '<span class="muted">-</span>' ?></td>
-    <td><b><?= h($r['serial_number']) ?></b></td>
-    <td><?= h($r['model'] ?: '-') ?></td>
-    <td><?= h($r['id']) ?></td>
-    <td><?= $r['create_name'] !== '' ? h($r['create_name']) : '<span class="muted">-</span>' ?></td>
-    <td><?= $r['setup_id'] !== null ? h($r['setup_id']) : '<span class="muted">-</span>' ?></td>
-    <td><?= (int)$r['active'] === 1 ? '<span class="badge st-new">1</span>' : '<span class="badge" style="background:#aaa;color:#fff">0</span>' ?></td>
-    <td>
-      <details>
-        <summary class="btn btn-sm btn-line" style="list-style:none; cursor:pointer; display:inline-block">แก้ไข</summary>
-        <form method="post" style="margin-top:8px; display:grid; gap:6px; min-width:220px">
+  <tr<?= $inc ? ' class="stock-row-inc"' : '' ?> data-serial="<?= h($r['serial_number']) ?>">
+    <td data-pri="1" style="text-align:center"><input type="checkbox" class="stock-pick" value="<?= h($r['serial_number']) ?>" aria-label="เลือก <?= h($r['serial_number']) ?>"></td>
+    <td data-pri="2" data-nowrap><?= $r['timestamp'] ? h(date('d/m/Y H:i', strtotime($r['timestamp']))) : '<span class="muted">-</span>' ?></td>
+    <td data-pri="1">
+      <b><?= h($r['serial_number']) ?></b>
+      <?php // บรรทัดรอง — โผล่เองเมื่อคอลัมน์ระดับ 2 ถูกยุบที่จอแคบ ?>
+      <span class="cell-sub"><?= h($r['model'] ?: '-') ?><?= $r['timestamp'] ? ' · ' . h(date('d/m/Y', strtotime($r['timestamp']))) : '' ?></span>
+    </td>
+    <td data-pri="2"><?= h($r['model'] ?: '-') ?></td>
+    <td data-pri="3"><?= h($r['id']) ?></td>
+    <td data-pri="3"><?= $r['create_name'] !== '' ? h($r['create_name']) : '<span class="muted">-</span>' ?></td>
+    <td data-pri="3"><?= $r['setup_id'] !== null ? h($r['setup_id']) : '<span class="muted">-</span>' ?></td>
+    <td data-pri="1"><?= stock_active_badge((int)$r['active']) ?></td>
+    <td data-pri="1">
+      <div class="stock-rowact">
+      <details class="stock-edit">
+        <summary class="btn btn-sm btn-line">แก้ไข</summary>
+        <form method="post" class="stock-edit-form">
           <?= csrf_field() ?><input type="hidden" name="act" value="edit"><input type="hidden" name="old_serial" value="<?= h($r['serial_number']) ?>"><input type="hidden" name="back" value="<?= h($qs) ?>">
           <input type="datetime-local" name="timestamp" value="<?= $r['timestamp'] ? h(date('Y-m-d\TH:i', strtotime($r['timestamp']))) : '' ?>">
           <input type="text" name="serial_number" value="<?= h($r['serial_number']) ?>" required placeholder="Serial Number">
@@ -467,13 +532,15 @@ page_header('ทะเบียนสินค้า (stock)');
           <button class="btn-sm" type="submit"><?= ui_btn_label('save', 'บันทึก', 13) ?></button>
         </form>
       </details>
-      <form method="post" style="display:inline" onsubmit="return confirm('ลบรายการ <?= h($r['serial_number']) ?> ออกจากตาราง stock ?')">
+      <form method="post" onsubmit="return confirm('ลบรายการ <?= h($r['serial_number']) ?> ออกจากตาราง stock ?')">
         <?= csrf_field() ?><input type="hidden" name="act" value="delete"><input type="hidden" name="serial_number" value="<?= h($r['serial_number']) ?>"><input type="hidden" name="back" value="<?= h($qs) ?>">
-        <button type="submit" class="btn-sm btn-danger">ลบ</button>
+        <button type="submit" class="btn btn-sm btn-line stock-del">ลบ</button>
       </form>
+      </div>
     </td>
   </tr>
   <?php } ?>
+  </tbody>
 </table>
 </div>
 
@@ -481,8 +548,14 @@ page_header('ทะเบียนสินค้า (stock)');
 .stock-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px; }
 @media (max-width:720px) { .stock-stats { grid-template-columns:repeat(2,1fr); } }
 .stock-stat-card { background:var(--surface,#fff); border:1px solid var(--border,#dde3ec); border-radius:10px; padding:12px 8px; text-align:center; }
-.stock-stat-num { font-size:22px; font-weight:700; color:var(--primary); line-height:1.2; }
-.stock-stat-lbl { font-size:11px; margin-top:2px; }
+.stock-stat-num { font-size:calc(22px * var(--font-scale,1)); font-weight:700; color:var(--primary); line-height:1.2; }
+.stock-stat-lbl { font-size:calc(11px * var(--font-scale,1)); margin-top:2px; }
+.stock-intro { margin-bottom:12px; line-height:1.9; }
+.stock-fix { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+  margin:0 0 14px; padding:11px 14px; border:1px solid var(--border,#dde3ec); border-left:3px solid var(--primary);
+  border-radius:10px; background:var(--surface,#fff); }
+.stock-fix-txt { min-width:0; }
+.stock-fix-sub { font-size:calc(12px * var(--font-scale,1)); margin-top:3px; line-height:1.7; }
 .stock-actions { margin-bottom:12px; }
 .stock-add-panel { padding:10px 14px; }
 .stock-add-panel summary { cursor:pointer; font-weight:600; color:var(--primary); }
@@ -496,14 +569,31 @@ page_header('ทะเบียนสินค้า (stock)');
 .stock-chips { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 10px; }
 .stock-list-meta { font-size:13px; margin:0 0 10px; }
 .stock-bulk-bar { display:flex; align-items:center; gap:14px; flex-wrap:wrap;
-  margin:0 0 10px; padding:10px 14px; background:#fff5f5; border:1px solid #e8b4b4; border-radius:8px; }
+  margin:0 0 10px; padding:10px 14px; background:var(--surface-2,#faf9fd); border:1px solid var(--border,#dde3ec);
+  border-left:3px solid var(--primary); border-radius:8px; }
 .stock-bulk-bar[hidden] { display:none !important; }
 .stock-bulk-group { display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;
-  padding-left:14px; border-left:1px solid #e8c9c9; }
-.stock-bulk-glbl { font-size:12.5px; color:#8a5f5f; font-weight:600; }
+  padding-left:14px; border-left:1px solid var(--border,#dde3ec); }
+.stock-bulk-glbl { font-size:calc(12.5px * var(--font-scale,1)); color:var(--text-muted,#6b6480); font-weight:600; }
 .stock-bulk-ts { padding:4px 6px; border:1px solid var(--border,#dde3ec); border-radius:6px; font-family:inherit; font-size:13px; }
 #stock-table .stock-pick { width:16px; height:16px; cursor:pointer; accent-color:var(--primary); }
-#stock-table tr.stock-picked td { background:#f0f6ff !important; }
+#stock-table tr.stock-picked td { background:var(--surface-2,#faf9fd) !important; }
+#stock-table tr.stock-row-inc td { background:var(--surface-2,#faf9fd); }
+#stock-table tr.stock-row-inc td:first-child { box-shadow:inset 3px 0 0 var(--danger,#c0392b); }
+/* จัดการ — ปุ่มอยู่บรรทัดเดียวกัน ไม่ซ้อนกันจนแถวสูง */
+.stock-act-col { width:132px; }
+#stock-table td:last-child, #stock-table th:last-child { padding-left:10px; padding-right:10px; }
+.stock-rowact { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.stock-rowact .btn-sm { padding-left:9px; padding-right:9px; }
+.stock-rowact > form { display:inline-flex; margin:0; }
+.stock-edit > summary { list-style:none; cursor:pointer; display:inline-block; }
+.stock-edit > summary::-webkit-details-marker { display:none; }
+/* ฟอร์มแก้ไขต้องไม่กินที่ตอนยังไม่กาง — display:grid ตายตัวทำให้ details ที่ปิดอยู่ยังจองความสูง
+   (ของเดิมเขียน display:grid ไว้ใน style ตรง ๆ แถวเลยสูงเกือบ 90px ทั้งที่ยังไม่ได้กดแก้ไข) */
+.stock-edit:not([open]) > .stock-edit-form { display:none; }
+.stock-edit[open] > .stock-edit-form { margin-top:8px; display:grid; gap:6px; min-width:220px; }
+.stock-del { color:var(--danger,#c0392b); border-color:var(--danger,#c0392b); }
+.stock-del:hover { background:var(--danger,#c0392b); color:#fff; }
 </style>
 <script>
 (function(){
