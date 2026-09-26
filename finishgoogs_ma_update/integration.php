@@ -102,6 +102,23 @@ if ($one) {
         </section>
       </div>
 
+      <?php if (!empty($one['shots'])) { ?>
+      <section class="ig-box ig-box-wide ig-shots">
+        <h3 class="ig-h3"><?= ui_icon_html('camera', 16, 'h-svg') ?> ภาพจากระบบจริง — ข้อมูลของคุณไปโผล่ตรงไหน</h3>
+        <p class="muted ig-shots-lead">กรอบสีชมพูคือจุดที่ใช้ข้อมูลจากระบบนี้ · กดที่ภาพเพื่อดูขนาดเต็ม</p>
+        <div class="ig-shot-grid">
+          <?php foreach ((array) $one['shots'] as $s) { $src = $B . '/assets/integration/' . $s['f'] . '.jpg'; ?>
+          <figure class="ig-shot">
+            <a href="<?= h($src) ?>" target="_blank" rel="noopener">
+              <img src="<?= h($src) ?>" alt="<?= h((string) $s['c']) ?>" loading="lazy">
+            </a>
+            <figcaption><?= h((string) $s['c']) ?></figcaption>
+          </figure>
+          <?php } ?>
+        </div>
+      </section>
+      <?php } ?>
+
       <?php if (!empty($one['uses'])) { ?>
       <section class="ig-box ig-box-wide ig-useblk">
         <h3 class="ig-h3"><?= ui_icon_html('chart', 16, 'h-svg') ?> เอาไปใช้ตรงไหน ทำอะไรได้</h3>
@@ -228,6 +245,17 @@ if ($one) {
   background: var(--surface-2, #f6f4fb); border-left: 3px solid var(--primary); }
 .ig-why .ig-h3 { margin-bottom: 5px; }
 .ig-why-p { margin: 0; font-size: calc(13.5px * var(--font-scale, 1)); line-height: 1.75; }
+/* ── ภาพหน้าจอจุดจริง ── */
+.ig-shots { margin-bottom: 12px; }
+.ig-shots-lead { font-size: calc(12.5px * var(--font-scale, 1)); margin: 0 0 10px; }
+.ig-shot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.ig-shot { margin: 0; }
+.ig-shot a { display: block; border: 1px solid var(--border, #e5e7eb); border-radius: 10px;
+  overflow: hidden; background: var(--surface-2, #f6f4fb); }
+.ig-shot a:hover { border-color: var(--primary); }
+.ig-shot img { display: block; width: 100%; height: auto; }
+.ig-shot figcaption { font-size: calc(12.5px * var(--font-scale, 1)); line-height: 1.6;
+  color: var(--text-muted, #5f5e5a); margin-top: 6px; }
 /* ── สายโซ่: ข้อมูล → ใช้ที่ไหน → ได้อะไร ── */
 .ig-useblk { margin-bottom: 12px; }
 .ig-use-head, .ig-use { display: grid; grid-template-columns: minmax(0, 0.9fr) 18px minmax(0, 1.1fr) 18px minmax(0, 1.5fr);
