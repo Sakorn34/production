@@ -1592,36 +1592,6 @@ function rent_ma_source_actions_html(array $e): string
     return '';
 }
 
-/** เนื้อฟังก์ชันเดิม เก็บไว้อ้างอิงไม่ได้ถูกเรียกแล้ว */
-function rent_ma_source_actions_html_legacy(array $e): string
-{
-    $maId = (int) ($e['rent_ma_id'] ?? 0);
-    $sn   = trim((string) ($e['rent_ma_sn'] ?? ''));
-    $url  = rent_leasing_record_url($sn, $maId);
-
-    // ใช้คลาสและไอคอนชุดเดียวกับปุ่มของรายการฝั่งเรา ไม่งั้นสองแบบวางติดกันแล้วดูคนละระบบ
-    $out = '<div class="tl-actions rent-ma-actions">';
-    if ($url !== '') {
-        $label = $sn !== '' ? 'เปิดเครื่องนี้ในระบบเช่า' : 'เปิดระบบเช่า';
-        $out .= '<a class="btn btn-sm btn-line btn-with-icon" target="_blank" rel="noopener" href="'
-              . h($url) . '" title="เปิดหน้าประวัติของ S/N นี้ในระบบเช่า">'
-              . ui_btn_label('external-link', $label) . '</a>';
-    }
-    if ($maId > 0) {
-        $out .= '<button type="button" class="btn btn-sm btn-line btn-with-icon rent-ma-copy" data-copy="' . h((string) $maId)
-              . '" title="คัดลอกเลขอ้างอิงไปค้นในระบบเช่า">' . ui_btn_label('copy', 'เลขอ้างอิง #' . (int) $maId) . '</button>';
-    }
-    if ($sn !== '') {
-        $out .= '<button type="button" class="btn btn-sm btn-line btn-with-icon rent-ma-copy" data-copy="' . h($sn)
-              . '" title="คัดลอก S/N ไปค้นในระบบเช่า">' . ui_btn_label('copy', 'S/N') . '</button>';
-    }
-    $out .= '</div>';
-    if ($url === '') {
-        // คำอธิบายอยู่คนละบรรทัด ไม่ปนกับแถวปุ่ม
-        $out .= '<div class="muted rent-ma-hint">ตั้ง URL ระบบเช่าได้ที่ ตั้งค่าระบบ → ปรับแต่งหน้าตา</div>';
-    }
-    return $out;
-}
 
 /**
  * เหตุผลที่ปลดระวาง — แถว Asset Retirement ล่าสุด

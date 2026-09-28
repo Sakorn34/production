@@ -26,7 +26,6 @@
         updateBodyModalState();
         var focus = modal.querySelector('[data-autofocus], input:not([type=hidden]):not([readonly]), select, textarea');
         if (focus) setTimeout(function () { focus.focus(); }, 50);
-        initProductSearchIn(modal);
     }
 
     function closeModal(modal) {
@@ -129,39 +128,6 @@
                 picker.addEventListener('change', apply);
             }
             apply();
-        });
-    }
-
-    /* ─ ค้นหาอะไหล่ใน select (modal / หน้าเบิกรายชิ้น) ─ */
-    function initProductSearchIn(root) {
-        var scope = root || document;
-        scope.querySelectorAll('[data-product-search]').forEach(function (searchInput) {
-            if (searchInput.dataset.bound === '1') return;
-            searchInput.dataset.bound = '1';
-            var selectId = searchInput.getAttribute('data-product-search');
-            var productSelect = selectId ? document.getElementById(selectId) : null;
-            if (!productSelect) return;
-            var originalOptions = Array.from(productSelect.options).map(function (option) {
-                return { value: option.value, text: option.text, disabled: option.disabled };
-            });
-            searchInput.addEventListener('input', function () {
-                var query = searchInput.value.trim().toLowerCase();
-                productSelect.innerHTML = '';
-                var placeholder = document.createElement('option');
-                placeholder.value = '';
-                placeholder.textContent = '-- เลือกอะไหล่ --';
-                productSelect.appendChild(placeholder);
-                originalOptions.forEach(function (optionData) {
-                    if (!optionData.value) return;
-                    if (!query || optionData.text.toLowerCase().includes(query)) {
-                        var option = document.createElement('option');
-                        option.value = optionData.value;
-                        option.textContent = optionData.text;
-                        if (optionData.disabled) option.disabled = true;
-                        productSelect.appendChild(option);
-                    }
-                });
-            });
         });
     }
 
@@ -529,7 +495,6 @@
         });
     }
 
-    initProductSearchIn(document);
     initProductPickers(document);
     initTableFilters(document);
     initSetItemsPreview(document);
