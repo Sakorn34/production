@@ -2036,3 +2036,6 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
 .tl-del { color: var(--danger, #b91c1c); box-shadow: inset 0 0 0 1px var(--danger, #b91c1c); }
 .tl-del:hover { background: var(--danger, #b91c1c); color: #fff; }
 .rent-ma-hint { margin-top: 5px; font-size: calc(12px * var(--font-scale, 1)); }
+/* ปุ่ม "เปิดในระบบเช่า" บนหัวการ์ดการเบิกเช่า — ชิดขวา ไม่เบียดชื่อการ์ด */
+.rent-card-open { margin-left: auto; flex: 0 0 auto; }
+.asset-rent-card .asset-sales-card-head { flex-wrap: wrap; }

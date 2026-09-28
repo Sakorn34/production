@@ -1574,15 +1574,26 @@ function rent_leasing_record_url(string $sn, int $maId = 0): string
 }
 
 /**
- * ปุ่มท้ายรายการ MA ระบบเช่าใน timeline
+ * ปุ่มท้ายรายการ MA ระบบเช่าใน timeline — ตอนนี้ไม่มีปุ่มแล้ว
  *
- * ระบบเช่าเป็นของทีมอื่น เราอ่านอย่างเดียว — ปุ่มนี้จึงพาไปแก้ที่ต้นทาง
- * พร้อมบอกเลขอ้างอิง (ma_id) กับ S/N ไว้ให้ค้นเจอง่าย และมีปุ่มคัดลอกให้
+ * เดิมมี 3 ปุ่มซ้ำทุกแถว (เปิดในระบบเช่า · คัดลอกเลขอ้างอิง · คัดลอก S/N)
+ * เครื่องที่มีประวัติ 5 ครั้งจึงมีปุ่มซ้ำ 10 ปุ่ม ทั้งที่
+ *   • เลขอ้างอิงคัดลอกไปก็ค้นที่ระบบเช่าไม่ได้ — ระบบนั้นไม่มีช่องค้นหาด้วยเลขนี้
+ *   • S/N แสดงอยู่บนหัวหน้าจอตลอดอยู่แล้ว
+ *   • "เปิดในระบบเช่า" เป็นคำสั่งระดับเครื่อง ไม่ใช่ระดับรายการ MA
+ *     จึงย้ายไปอยู่บนการ์ด「การเบิกเช่า」ปุ่มเดียวจบ (asset_leasing_card_html)
+ * เก็บฟังก์ชันไว้เพื่อไม่ให้จุดที่เรียกอยู่พัง
  *
  * @param array<string,mixed> $e รายการ timeline
  * @return string
  */
 function rent_ma_source_actions_html(array $e): string
+{
+    return '';
+}
+
+/** เนื้อฟังก์ชันเดิม เก็บไว้อ้างอิงไม่ได้ถูกเรียกแล้ว */
+function rent_ma_source_actions_html_legacy(array $e): string
 {
     $maId = (int) ($e['rent_ma_id'] ?? 0);
     $sn   = trim((string) ($e['rent_ma_sn'] ?? ''));
@@ -2204,8 +2215,20 @@ function rent_leasing_dl_row($label, $value)
 function asset_leasing_card_html(array $info, $extraHtml = '')
 {
     $icon = function_exists('ui_icon_html') ? ui_icon_html('customers', 16) : '';
+    // ปุ่มเปิดไปดูเครื่องนี้ที่ระบบเช่า — วางไว้ตรงหัวการ์ดที่พูดถึงเรื่องเช่าอยู่แล้ว
+    // ขึ้นเฉพาะเครื่องที่มีข้อมูลในระบบเช่าจริง และต่อเมื่อตั้ง URL ระบบเช่าไว้แล้ว
+    $openBtn = '';
+    if (!empty($info['found'])) {
+        $sn = trim((string) ($info['serial'] ?? ($info['sn'] ?? '')));
+        $url = function_exists('rent_leasing_record_url') ? rent_leasing_record_url($sn) : '';
+        if ($url !== '') {
+            $openBtn = '<a class="btn btn-sm btn-line btn-with-icon rent-card-open" target="_blank" rel="noopener"'
+                     . ' href="' . h($url) . '" title="เปิดหน้าประวัติของ S/N นี้ในระบบเช่า">'
+                     . ui_btn_label('external-link', 'เปิดในระบบเช่า') . '</a>';
+        }
+    }
     $out = '<div class="asset-sales-card asset-rent-card">';
-    $out .= '<div class="asset-sales-card-head">' . $icon . '<b>การเบิกเช่า</b></div>';
+    $out .= '<div class="asset-sales-card-head">' . $icon . '<b>การเบิกเช่า</b>' . $openBtn . '</div>';
     $out .= '<div class="asset-sales-card-body">';
 
     if (empty($info['found'])) {
