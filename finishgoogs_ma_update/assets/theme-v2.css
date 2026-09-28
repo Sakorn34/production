@@ -2030,3 +2030,9 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
 .ma-rent-note { font-size: calc(12.5px * var(--font-scale, 1)); line-height: 1.6; color: var(--text-muted, #5f5e5a); }
 .ma-rent-retire { display: inline-block; font-size: calc(10.5px * var(--font-scale, 1)); font-weight: 600;
   background: var(--danger-soft, #fee2e2); color: var(--danger, #b91c1c); border-radius: 999px; padding: 1px 7px; }
+
+/* ปุ่มลบในไทม์ไลน์หน้าเครื่อง — ทรงเดียวกับปุ่มแก้ไข/อื่น ๆ ต่างกันแค่สีเตือน
+   ของเดิมใส่แค่ btn-sm btn-danger (ไม่มีคลาส btn) จึงกลายเป็นปุ่มแดงทึบคนละทรงกับเพื่อนข้าง ๆ */
+.tl-del { color: var(--danger, #b91c1c); box-shadow: inset 0 0 0 1px var(--danger, #b91c1c); }
+.tl-del:hover { background: var(--danger, #b91c1c); color: #fff; }
+.rent-ma-hint { margin-top: 5px; font-size: calc(12px * var(--font-scale, 1)); }

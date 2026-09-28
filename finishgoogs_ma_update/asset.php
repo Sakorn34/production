@@ -302,21 +302,21 @@ function asset_tl_actions($e, $assetId) {
         $out .= '<a class="btn btn-sm btn-line btn-with-icon" href="' . BASE_URL . '/update_edit.php?id=' . $id . '&back=' . $back . '">' . ui_btn_label('edit', 'แก้ไข') . '</a>';
         $out .= '<form method="post" style="display:inline" onsubmit="return confirm(\'ลบรายการนี้?\')">' . csrf_field()
               . '<input type="hidden" name="del_update" value="1"><input type="hidden" name="record_id" value="' . $id . '">'
-              . '<button class="btn-sm btn-danger btn-with-icon" type="submit">' . ui_icon_html('trash', 16, 'btn-svg') . '<span>ลบ</span></button></form>';
+              . '<button class="btn btn-sm btn-line btn-with-icon tl-del" type="submit">' . ui_icon_html('trash', 16, 'btn-svg') . '<span>ลบ</span></button></form>';
     } elseif ($e['kind'] === 'ma') {
         $out .= '<a class="btn btn-sm btn-line btn-with-icon" href="' . BASE_URL . '/ma.php?edit=' . $id . '">' . ui_btn_label('edit', 'แก้ไข') . '</a>';
         $out .= '<form method="post" style="display:inline" onsubmit="return confirm(\'ลบรายการ MA นี้?\')">' . csrf_field()
               . '<input type="hidden" name="del_ma_asset" value="1"><input type="hidden" name="record_id" value="' . $id . '">'
-              . '<button class="btn-sm btn-danger btn-with-icon" type="submit">' . ui_icon_html('trash', 16, 'btn-svg') . '<span>ลบ</span></button></form>';
+              . '<button class="btn btn-sm btn-line btn-with-icon tl-del" type="submit">' . ui_icon_html('trash', 16, 'btn-svg') . '<span>ลบ</span></button></form>';
     } elseif ($e['kind'] === 'part_move') {
         $out .= '<button class="btn btn-sm btn-line btn-with-icon" onclick="showListModal(' . h(json_encode('แก้ไขรายการเบิก', JSON_UNESCAPED_UNICODE)) . ',' . h(json_encode(BASE_URL . '/parts.php?ajax=edit_move_form&id=' . $id . '&back=' . urlencode(BASE_URL . '/asset.php?id=' . $assetId))) . ',\'\')">' . ui_btn_label('edit', 'แก้ไข') . '</button>';
         $out .= '<form method="post" style="display:inline" onsubmit="return confirm(\'ลบรายการเบิกนี้?\')">' . csrf_field()
               . '<input type="hidden" name="del_part_move" value="1"><input type="hidden" name="record_id" value="' . $id . '">'
-              . '<button class="btn-sm btn-danger btn-with-icon" type="submit">' . ui_icon_html('trash', 16, 'btn-svg') . '<span>ลบ</span></button></form>';
+              . '<button class="btn btn-sm btn-line btn-with-icon tl-del" type="submit">' . ui_icon_html('trash', 16, 'btn-svg') . '<span>ลบ</span></button></form>';
     } elseif ($e['kind'] === 'production') {
         $out .= '<form method="post" style="display:inline" onsubmit="return confirm(\'ลบบันทึกผลิตนี้?\')">' . csrf_field()
               . '<input type="hidden" name="del_production" value="1"><input type="hidden" name="record_id" value="' . $id . '">'
-              . '<button class="btn-sm btn-danger btn-with-icon" type="submit">' . ui_icon_html('trash', 16, 'btn-svg') . '<span>ลบ</span></button></form>';
+              . '<button class="btn btn-sm btn-line btn-with-icon tl-del" type="submit">' . ui_icon_html('trash', 16, 'btn-svg') . '<span>ลบ</span></button></form>';
     }
     return $out . $snippetBtn . '</div>';
 }
