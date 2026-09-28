@@ -63,6 +63,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $sets = $stock->getAllSetsWithItems();
 $products = parts_enrich_products($stock->getAllProducts());
 $partIcons = parts_product_icon_map($products);
+// ลำดับสำหรับตัวเลือกอะไหล่ใน modal — แยกจาก $products เผื่อหน้านี้ไปเรียงตารางทีหลัง
+$pickerProducts = $products;
 $partProdLabels = production_part_labels_by_stock_codes(array_column($products, 'code'));
 
 $actions = parts_btn_open_modal('set-add-modal', 'สร้าง Set', 'plus', 'btn-primary')
@@ -111,19 +113,11 @@ parts_page_header(
             <?php endforeach; ?>
         </select>
     </div>
-    <div class="form-group">
-        <label for="set-item-search">ค้นหาอะไหล่</label>
-        <input type="text" id="set-item-search" data-product-search="set-item-product" placeholder="พิมพ์ชื่อหรือรหัสอะไหล่" autocomplete="off">
-    </div>
-    <div class="form-group">
-        <label for="set-item-product">เลือกอะไหล่</label>
-        <select name="product_id" id="set-item-product" required>
-            <option value="">-- เลือกอะไหล่ --</option>
-            <?php foreach ($products as $p): ?>
-            <option value="<?= (int) $p['id'] ?>"><?= e(parts_format_product_option($p)) ?></option>
-            <?php endforeach; ?>
-        </select>
-    </div>
+    <?= parts_product_picker_html('product_id', $pickerProducts, $partIcons, [
+        'id'             => 'set-item-product',
+        'placeholder'    => 'พิมพ์ชื่อหรือรหัสอะไหล่เพื่อค้นหา…',
+        'disableZeroQty' => false,
+    ]) ?>
     <div class="form-group">
         <label for="set-item-qty">จำนวนต่อ 1 Set</label>
         <input type="number" id="set-item-qty" name="quantity" min="1" value="1" required>
