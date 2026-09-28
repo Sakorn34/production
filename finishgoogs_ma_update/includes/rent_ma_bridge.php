@@ -1466,18 +1466,38 @@ function rent_leasing_ma_history($serial)
  * รับ $info ที่โหลดมาแล้ว ไม่ query ซ้ำ เพราะ asset.php เรียก asset_leasing_info()
  * ไว้ตั้งแต่ต้นหน้าอยู่แล้ว
  *
- * @param array<string,mixed> $info จาก asset_leasing_info()
+ * กันซ้ำ: งาน MA ที่บันทึกในระบบเราจะถูกเขียนลง tbl_product_ma ให้อยู่แล้วตอนปิดงาน
+ * ถ้าไม่กัน ไทม์ไลน์จะขึ้นงานเดียวกันสองรายการ — รายการของระบบเราละเอียดกว่า
+ * (แยกปกติ/เปลี่ยน/ซ่อม มี FW มีปุ่มแก้ไข) จึงยึดของเราเป็นหลัก แล้วตัดฝั่งเช่าที่วันตรงกันทิ้ง
+ *
+ * @param array<string,mixed>             $info จาก asset_leasing_info()
+ * @param array<int,array<string,mixed>>  $ownItems รายการ timeline ที่มีอยู่แล้ว (ใช้หาว่าวันไหนมีของเราแล้ว)
  * @return array<int,array<string,mixed>>
  */
-function rent_leasing_ma_timeline_items(array $info)
+function rent_leasing_ma_timeline_items(array $info, array $ownItems = [])
 {
     $rows = is_array($info['ma_history'] ?? null) ? $info['ma_history'] : [];
     if (!$rows) {
         return [];
     }
+    // วันที่ที่มีบันทึก MA ของระบบเราแล้ว (timeline_dt ทำให้ทั้งสองฝั่งเป็น Y-m-d H:i:s เหมือนกัน)
+    $ownDates = [];
+    foreach ($ownItems as $it) {
+        if (($it['kind'] ?? '') !== 'ma') {
+            continue;
+        }
+        $d = substr((string) ($it['d'] ?? ''), 0, 10);
+        if ($d !== '') {
+            $ownDates[$d] = true;
+        }
+    }
     $sn = trim((string) ($info['serial'] ?? ($info['sn'] ?? '')));
     $items = [];
     foreach ($rows as $r) {
+        $rowDate = substr((string) (function_exists('timeline_dt') ? timeline_dt($r['date'] ?? '') : ($r['date'] ?? '')), 0, 10);
+        if ($rowDate !== '' && isset($ownDates[$rowDate])) {
+            continue;   // วันนี้มีบันทึกของระบบเราแล้ว — ใช้ของเราเป็นหลัก
+        }
         $isRetire = trim((string) ($r['status'] ?? '')) === 'Asset Retirement';
         $body = [];
         $body[] = $isRetire

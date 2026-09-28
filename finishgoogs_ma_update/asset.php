@@ -247,7 +247,7 @@ $leaseInfo = asset_leasing_info(
 );
 // ประวัติงาน MA ฝั่งระบบเช่าไปรวมใน timeline board เป็นคอลัมน์ของตัวเอง
 // ใช้ข้อมูลที่ asset_leasing_info() โหลดมาแล้ว ไม่ query ซ้ำ
-$tl = array_merge($tl, rent_leasing_ma_timeline_items($leaseInfo));
+$tl = array_merge($tl, rent_leasing_ma_timeline_items($leaseInfo, $tl));
 
 // ประวัติซ่อมจากระบบ MA — อ่านอย่างเดียว ต่อฐานไม่ได้ก็ไม่ล้มทั้งหน้า
 $maRepairInfo = asset_maintenance_info((string) $a['asset_code']);

@@ -351,7 +351,7 @@ function line_bot_history_messages(int $assetId): array
         $tl = asset_timeline_items($assetId)['tl'];
         if (function_exists('asset_leasing_info')) {
             $lease = asset_leasing_info((string) $a['asset_code'], (string) ($a['factory_serial'] ?? ''));
-            $tl = array_merge($tl, rent_leasing_ma_timeline_items($lease));
+            $tl = array_merge($tl, rent_leasing_ma_timeline_items($lease, $tl));
         }
     } catch (\Throwable $e) {
         error_log('[line_bot_history] ' . $e->getMessage());
