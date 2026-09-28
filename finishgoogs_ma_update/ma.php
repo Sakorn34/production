@@ -371,13 +371,15 @@ function ma_list_qs($productId, array $over = []) {
         'mr' => isset($_GET['mr']) ? trim((string)$_GET['mr']) : '',
         'mround' => isset($_GET['mround']) ? trim((string)$_GET['mround']) : '',
         'msort' => isset($_GET['msort']) ? trim((string)$_GET['msort']) : 'date_desc',
+        // mrent=0 = ซ่อนรายการจากระบบเช่า — ต้องพกไปกับลิงก์เรียง/แบ่งหน้าด้วย
+        'mrent' => isset($_GET['mrent']) ? trim((string)$_GET['mrent']) : '',
         'page' => isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1,
     ];
     foreach ($over as $k => $v) {
         $q[$k] = $v;
     }
     $parts = ['product=' . (int)$q['product']];
-    foreach (['mq', 'mby', 'mr', 'mround', 'msort'] as $k) {
+    foreach (['mq', 'mby', 'mr', 'mround', 'msort', 'mrent'] as $k) {
         if ($q[$k] !== '') $parts[] = rawurlencode($k) . '=' . rawurlencode($q[$k]);
     }
     if ((int)$q['page'] > 1) $parts[] = 'page=' . (int)$q['page'];
@@ -1008,15 +1010,72 @@ $maSortMap = [
 $maOrder = isset($maSortMap[$msort]) ? $maSortMap[$msort] : $maSortMap['date_desc'];
 $maW = 'WHERE ' . implode(' AND ', $maWhere);
 
-$total = (int)qr("SELECT COUNT(*) c FROM ma_records m
-                  JOIN assets a ON a.id=m.asset_id
-                  $maW", $maTypes, $maParams)->fetch_assoc()['c'];
+// ─── รายการของเรา ───
+// ดึงทั้งชุดของรุ่นนี้ (ไม่ LIMIT ใน SQL) เพราะต้องเอาไปรวมกับรายการจากระบบเช่าก่อน
+// แล้วค่อยเรียงและแบ่งหน้าพร้อมกัน — จำนวนต่อรุ่นหลักร้อยถึงพันแถว ไม่หนัก
+$ourRows = [];
+$res = qr("SELECT m.*, a.asset_code, a.id asset_id FROM ma_records m
+           JOIN assets a ON a.id=m.asset_id
+           $maW", $maTypes, $maParams);
+while ($r = $res->fetch_assoc()) {
+    $r['src'] = 'own';
+    $ourRows[] = $r;
+}
+
+// ─── รายการจากระบบเช่า (ช่างบางคน MA ที่นั่นอย่างเดียว และงานเก่าก็อยู่ที่นั่นทั้งหมด) ───
+$maShowRent = !isset($_GET['mrent']) || $_GET['mrent'] !== '0';
+$rentRows = [];
+$rentTotal = 0;
+if ($maShowRent) {
+    // คีย์กันซ้ำ: งานที่เราปิดจากระบบเรา จะถูกเขียนลงระบบเช่าด้วยอยู่แล้ว
+    $ourKeys = [];
+    foreach ($ourRows as $r) {
+        $ourKeys[strtoupper(trim((string) $r['asset_code'])) . '|' . substr((string) $r['visited_at'], 0, 10)] = true;
+    }
+    try {
+        $rentRows = rent_ma_records_for_product($productId, $ourKeys);
+    } catch (Throwable $e) {
+        $rentRows = [];   // ระบบเช่าล่ม — รายการของเรายังแสดงได้ตามปกติ
+    }
+    // ใช้ตัวกรองชุดเดียวกับฝั่งเรา
+    if ($mq !== '' || $mby !== '' || $mround !== '' || $mr !== '') {
+        $rentRows = array_values(array_filter($rentRows, function ($r) use ($mq, $mby, $mround, $mr) {
+            if ($mq !== '' && mb_stripos((string) $r['asset_code'], $mq) === false) { return false; }
+            if ($mby !== '' && mb_stripos((string) $r['done_by'], $mby) === false) { return false; }
+            if ($mround !== '') { return false; }   // รายการฝั่งเช่าไม่มีเลขรอบ
+            if ($mr !== '' && mb_stripos((string) $r['remark'], $mr) === false) { return false; }
+            return true;
+        }));
+    }
+    $rentTotal = count($rentRows);
+}
+
+$allRows = array_merge($ourRows, $rentRows);
+$total = count($allRows);
+$ownTotal = count($ourRows);
 $pages = max(1, (int)ceil($total / $per));
-$recentMA = qr("SELECT m.*, a.asset_code, a.id asset_id FROM ma_records m
-                JOIN assets a ON a.id=m.asset_id
-                $maW
-                ORDER BY $maOrder
-                LIMIT $per OFFSET $off", $maTypes, $maParams);
+
+// ─── เรียงตามหัวคอลัมน์ที่เลือก (แทน ORDER BY เดิม) ───
+$maSortPhp = [
+    'date'    => 'visited_at',  'round'  => 'ma_round',      'asset' => 'asset_code',
+    'ok'      => 'ok_items',    'replace' => 'replace_items', 'repair' => 'repair_items',
+    'fw'      => 'fw_version',  'by'     => 'done_by',
+];
+$sortKey = 'visited_at';
+$sortDir = -1;
+if (preg_match('/^(.*)_(asc|desc)$/', $msort, $mm) && isset($maSortPhp[$mm[1]])) {
+    $sortKey = $maSortPhp[$mm[1]];
+    $sortDir = $mm[2] === 'asc' ? 1 : -1;
+}
+usort($allRows, function ($x, $y) use ($sortKey, $sortDir) {
+    $a = (string) ($x[$sortKey] ?? '');
+    $b = (string) ($y[$sortKey] ?? '');
+    $c = ($sortKey === 'ma_round') ? ((int) $a <=> (int) $b) : strcmp($a, $b);
+    if ($c !== 0) { return $c * $sortDir; }
+    // ตัวตัดสินรอง: ใหม่สุดก่อนเสมอ ไม่ว่าจะเรียงด้วยคอลัมน์ไหน
+    return strcmp((string) ($y['visited_at'] ?? ''), (string) ($x['visited_at'] ?? ''));
+});
+$recentMA = array_slice($allRows, $off, $per);
 
 $maListUrl = BASE_URL . '/ma.php?product=' . $productId;
 $maClearUrl = $maListUrl;
@@ -1919,6 +1978,18 @@ list_search_form([
   <p class="muted">ยังไม่มีรายการ MA ของรุ่นนี้</p>
 <?php } else { ?>
 <div class="table-wrap">
+<?php if ($rentTotal > 0 || !$maShowRent) { ?>
+<p class="muted ma-src-note">
+  <?php if ($maShowRent) { ?>
+    รวมรายการที่บันทึกไว้ในระบบเช่าด้วย <b><?= number_format($rentTotal) ?></b> รายการ
+    (ของระบบเรา <?= number_format($ownTotal) ?>) · งานที่บันทึกทั้งสองที่นับครั้งเดียว
+    · <a href="<?= h(ma_list_qs($productId, ['mrent' => '0', 'page' => 1])) ?>">ซ่อนรายการจากระบบเช่า</a>
+  <?php } else { ?>
+    แสดงเฉพาะรายการที่บันทึกในระบบเรา
+    · <a href="<?= h(ma_list_qs($productId, ['mrent' => '', 'page' => 1])) ?>">รวมรายการจากระบบเช่าด้วย</a>
+  <?php } ?>
+</p>
+<?php } ?>
 <table class="list ma-list-table">
   <tr>
     <th><?= ma_sort_th('วันเวลา', 'date_asc', 'date_desc', $msort, $productId) ?></th>
@@ -1931,23 +2002,45 @@ list_search_form([
     <th><?= ma_sort_th('โดย', 'by_asc', 'by_desc', $msort, $productId) ?></th>
     <?= can('ma') ? '<th></th>' : '' ?>
   </tr>
-  <?php while ($m = $recentMA->fetch_assoc()) { ?>
+  <?php foreach ($recentMA as $m) { $isRent = ($m['src'] ?? '') === 'rent'; ?>
   <tr class="ma-row-click" title="คลิกดูรายละเอียด MA และคำสั่งตั้งค่าหมายเลขสินค้า" <?= ma_row_data_attrs($m) ?>>
-    <td style="white-space:nowrap"><?= dthai_full($m['visited_at']) ?></td>
+    <td style="white-space:nowrap"><?= dthai_full($m['visited_at']) ?>
+      <?php if ($isRent) { ?><span class="ma-src-tag">ระบบเช่า</span><?php } ?></td>
     <td style="text-align:center"><?= $m['ma_round'] ? (int)$m['ma_round'] : '-' ?></td>
     <td><a href="<?= BASE_URL ?>/asset.php?id=<?= (int)$m['asset_id'] ?>"><?= h($m['asset_code']) ?></a></td>
+    <?php if ($isRent) {
+        // ฝั่งระบบเช่าบันทึกงานเป็นข้อความก้อนเดียว ไม่ได้แยก ปกติ/เปลี่ยน/ซ่อม
+        // จึงกางข้อความคลุมสามช่องนั้นแทนการเดาว่าอะไรอยู่ช่องไหน
+        $rentNote = trim((string) ($m['remark'] ?? ''));
+        $retire = ($m['ma_status'] ?? '') === 'Asset Retirement';
+    ?>
+    <td colspan="3" class="ma-rent-note">
+      <?php if ($retire) { ?><span class="ma-rent-retire">ปลดระวาง</span> <?php } ?>
+      <?= $rentNote !== '' ? nl2br(h($rentNote)) : '<span class="muted">ไม่มีรายละเอียด</span>' ?>
+    </td>
+    <?php } else { ?>
     <td style="max-width:200px; font-size:12.5px"><?= ma_items_cell($m, 'ok_items', 'OK') ?></td>
     <td style="max-width:180px; font-size:12.5px"><?= ma_items_cell($m, 'replace_items', 'Replace') ?></td>
     <td style="max-width:160px; font-size:12.5px"><?= ma_items_cell($m, 'repair_items', 'Repair') ?></td>
+    <?php } ?>
     <?php if ($maListShowFw) { ?><td><?= h($m['fw_version'] ?: '-') ?></td><?php } ?>
     <td><?= h($m['done_by'] ?: '-') ?></td>
     <?php if (can('ma')) { ?>
     <td class="ma-row-actions row-actions">
+      <?php if ($isRent) {
+          // รายการนี้เป็นของทีมเช่า ระบบเราไม่แก้ให้ — ส่งไปแก้ที่ต้นทางแทน
+          $rentUrl = function_exists('rent_leasing_record_url') ? rent_leasing_record_url((string) $m['asset_code'], (int) $m['id']) : '';
+      ?>
+        <?php if ($rentUrl !== '') { ?>
+        <a class="btn btn-sm btn-line" href="<?= h($rentUrl) ?>" target="_blank" rel="noopener">เปิดในระบบเช่า ↗</a>
+        <?php } else { ?><span class="muted" style="font-size:11.5px">บันทึกที่ระบบเช่า</span><?php } ?>
+      <?php } else { ?>
       <a class="btn btn-sm btn-line" href="<?= BASE_URL ?>/ma.php?product=<?= $productId ?>&edit=<?= (int)$m['id'] ?>">แก้ไข</a>
       <form method="post" onsubmit="return confirm('ลบรายการ MA นี้?')">
         <?= csrf_field() ?><input type="hidden" name="del_ma" value="1"><input type="hidden" name="ma_id" value="<?= (int)$m['id'] ?>"><input type="hidden" name="back" value="<?= h($maListUrl) ?>">
         <button class="btn-sm btn-danger" type="submit">ลบ</button>
       </form>
+      <?php } ?>
     </td>
     <?php } ?>
   </tr>

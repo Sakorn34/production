@@ -2020,3 +2020,13 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
   .panel-meta { white-space: nowrap; }
 }
 @media (max-width: 640px) { #dash-inventory-panel #dash-fg-filter { border-radius: 16px; } }
+
+/* ── รายการ MA ที่ดึงมาจากระบบเช่า (ma.php) ───────────────────────────
+   ช่างบางคนบันทึก MA ที่ระบบเช่าอย่างเดียว และงานยุคก่อนอยู่ที่นั่นทั้งหมด
+   จึงเอามารวมในตารางเดียวกัน แต่ต้องดูออกว่าแถวไหนมาจากไหน */
+.ma-src-tag { display: inline-block; margin-left: 6px; font-size: calc(10.5px * var(--font-scale, 1));
+  background: var(--info-soft, #dbeafe); color: var(--info, #1d4ed8); border-radius: 999px; padding: 1px 7px; }
+.ma-src-note { font-size: calc(12.5px * var(--font-scale, 1)); margin: 0 0 8px; line-height: 1.7; }
+.ma-rent-note { font-size: calc(12.5px * var(--font-scale, 1)); line-height: 1.6; color: var(--text-muted, #5f5e5a); }
+.ma-rent-retire { display: inline-block; font-size: calc(10.5px * var(--font-scale, 1)); font-weight: 600;
+  background: var(--danger-soft, #fee2e2); color: var(--danger, #b91c1c); border-radius: 999px; padding: 1px 7px; }

@@ -144,6 +144,84 @@ function rent_find_asset_by_sn($sn)
 }
 
 /**
+ * ประวัติ MA ที่บันทึกไว้ในระบบเช่า ของเครื่องรุ่นหนึ่ง — เอามารวมกับรายการของเรา
+ *
+ * ทำไมต้องรวม: ช่างบางคน MA ที่ระบบเช่าอย่างเดียวไม่ได้บันทึกฝั่งเรา และก่อนหน้านี้
+ * ทั้งบริษัท MA ที่ระบบเช่าที่เดียว รายการเก่าจึงไม่มีในทะเบียนเราเลย
+ * (ตรวจข้อมูลจริง: tbl_product_ma 3,156 แถว · จับคู่เครื่องในทะเบียนเราได้ 1,518 แถว
+ *  ในนั้นซ้ำกับของเรา 525 แถว เหลือ 993 แถวที่ระบบเราไม่เคยแสดง
+ *  บางรุ่นมีเฉพาะฝั่งเช่าล้วน ๆ เช่น bitScan 222 แถว · Smart Card Reader S 97 แถว)
+ *
+ * ตัดรายการซ้ำด้วย S/N + วันที่ เพราะตอนเราปิดงาน MA ระบบจะเขียนลง tbl_product_ma
+ * ให้ด้วยอยู่แล้ว ถ้าไม่ตัดจะเห็นงานเดียวกันสองบรรทัด
+ *
+ * @param int                    $productId
+ * @param array<string,string>   $ourKeys  คีย์ 'SN|Y-m-d' ของรายการฝั่งเรา ไว้กันซ้ำ
+ * @return array<int,array<string,mixed>>
+ */
+function rent_ma_records_for_product(int $productId, array $ourKeys = []): array
+{
+    if ($productId <= 0) {
+        return [];
+    }
+    $assets = [];
+    try {
+        $res = qr('SELECT id, asset_code FROM assets WHERE product_id = ?', 'i', [$productId]);
+        while ($a = $res->fetch_assoc()) {
+            $code = rent_normalize_sn($a['asset_code'] ?? '');
+            if ($code !== '') {
+                $assets[$code] = (int) $a['id'];
+            }
+        }
+    } catch (Throwable $e) {
+        return [];
+    }
+    if (!$assets) {
+        return [];
+    }
+
+    $out = [];
+    foreach (array_chunk(array_keys($assets), 500) as $chunk) {
+        $ph = implode(',', array_fill(0, count($chunk), '?'));
+        $q = rent_q_try(
+            "SELECT ma_id, ma_sn, ma_date, ma_status, ma_remarks, ma_user_add
+             FROM tbl_product_ma WHERE ma_sn IN ($ph) ORDER BY ma_date DESC, ma_id DESC",
+            str_repeat('s', count($chunk)),
+            $chunk
+        );
+        if (!$q['ok'] || empty($q['result'])) {
+            continue;
+        }
+        while ($r = $q['result']->fetch_assoc()) {
+            $sn = rent_normalize_sn($r['ma_sn'] ?? '');
+            $date = trim((string) ($r['ma_date'] ?? ''));
+            if ($sn === '' || $date === '' || $date === '0000-00-00') {
+                continue;
+            }
+            if (isset($ourKeys[$sn . '|' . $date])) {
+                continue;   // งานเดียวกับที่บันทึกฝั่งเราแล้ว
+            }
+            $out[] = [
+                'src'        => 'rent',
+                'id'         => (int) $r['ma_id'],
+                'asset_id'   => $assets[$sn] ?? 0,
+                'asset_code' => $sn,
+                'visited_at' => $date . ' 00:00:00',
+                'ma_round'   => null,
+                'ok_items'   => '',
+                'replace_items' => '',
+                'repair_items'  => '',
+                'fw_version' => '',
+                'remark'     => trim((string) ($r['ma_remarks'] ?? '')),
+                'done_by'    => trim((string) ($r['ma_user_add'] ?? '')),
+                'ma_status'  => trim((string) ($r['ma_status'] ?? '')),
+            ];
+        }
+    }
+    return $out;
+}
+
+/**
  * อาการที่แจ้งของเครื่องที่ส่งเข้า MA — อ่านจากระบบเช่า
  *
  * ระบบเช่าไม่มีช่อง "อาการเสีย" ตรง ๆ ที่กรอกครบ:
