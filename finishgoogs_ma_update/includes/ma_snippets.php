@@ -93,16 +93,3 @@ function ma_snippet_data_attrs(array $payload) {
     }
     return $out;
 }
-
-/**
- * ปุ่มเปิด popup คำสั่งตั้งค่าหมายเลขสินค้า
- *
- * @param array{code?:string,replace?:string,repair?:string,fw?:string,remark?:string} $payload
- * @param bool $withRental true = popup นั้นมีข้อ 4 สรุปส่งงานเช่า Office ด้วย
- * @return string
- */
-function ma_snippet_open_button(array $payload, $withRental = false) {
-    return '<button type="button" class="btn btn-sm btn-line btn-with-icon asset-snippet-open"'
-        . ma_snippet_data_attrs($payload) . '>'
-        . ui_btn_label('clipboard', ma_snippets_title($withRental)) . '</button>';
-}
