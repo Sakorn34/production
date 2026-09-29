@@ -278,25 +278,19 @@ foreach ($tl as $e) {
 }
 
 /**
- * ปุ่มแก้ไข/ลบ/คำสั่งตั้งค่าหมายเลขสินค้า ในประวัติ timeline
+ * ปุ่มแก้ไข/ลบ ในประวัติ timeline
  *
- * ปุ่มคำสั่งต้องเคารพสวิตช์หลังบ้านของรุ่นนั้น — ฟังก์ชันนี้อยู่นอก scope จึงมองไม่เห็น
- * $assetShowSnippets ที่คำนวณไว้ด้านบน ต้องอ่านผ่าน global ไม่งั้นปุ่มจะโผล่ทุกรุ่น
- * แม้หลังบ้านจะไม่ได้ติ๊กเปิดไว้
+ * ไม่มีปุ่ม「คำสั่งตั้งค่าหมายเลขสินค้า」แล้ว — แถบเครื่องมือด้านบนมีปุ่มนี้อยู่แล้ว
+ * การใส่ซ้ำทุกแถวทำให้ประวัติที่มีหลายรายการเต็มไปด้วยปุ่มเดิม
  */
 function asset_tl_actions($e, $assetId) {
-    global $assetShowSnippets;
-    // ประวัติ MA ของระบบเช่าอยู่ในฐานข้อมูลของทีมเช่า ระบบเราไม่เขียนทับ —
-    // ส่งไปแก้ที่ต้นทางแทน พร้อมบอกเลขอ้างอิงไว้ให้หาเจอ
+    // ประวัติ MA ของระบบเช่าอยู่ในฐานข้อมูลของทีมเช่า ระบบเราไม่เขียนทับ
     if (($e['kind'] ?? '') === 'rent_ma') {
         return rent_ma_source_actions_html($e);
     }
     if (empty($e['kind']) || empty($e['rid'])) return '';
     $id = (int)$e['rid'];
     $out = '<div class="tl-actions" style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap">';
-    $snippetBtn = (!empty($assetShowSnippets) && !empty($e['snippet']) && is_array($e['snippet']))
-        ? ma_snippet_open_button($e['snippet'])
-        : '';
     if ($e['kind'] === 'update') {
         $back = urlencode(BASE_URL . '/asset.php?id=' . $assetId);
         $out .= '<a class="btn btn-sm btn-line btn-with-icon" href="' . BASE_URL . '/update_edit.php?id=' . $id . '&back=' . $back . '">' . ui_btn_label('edit', 'แก้ไข') . '</a>';
@@ -318,7 +312,7 @@ function asset_tl_actions($e, $assetId) {
               . '<input type="hidden" name="del_production" value="1"><input type="hidden" name="record_id" value="' . $id . '">'
               . '<button class="btn btn-sm btn-line btn-with-icon tl-del" type="submit">' . ui_icon_html('trash', 16, 'btn-svg') . '<span>ลบ</span></button></form>';
     }
-    return $out . $snippetBtn . '</div>';
+    return $out . '</div>';
 }
 
 page_header('เครื่อง ' . $a['asset_code'], false);
