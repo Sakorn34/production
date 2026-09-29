@@ -341,45 +341,32 @@ document.addEventListener('click', function (ev) {
   }
 });
 </script>
+<?php // หัวหน้าเครื่อง — ชื่อ/รุ่น/สถานะ บรรทัดบน · ปุ่มคำสั่งบรรทัดล่าง
+      // ที่ว่างข้างชื่อเดิมไม่ได้ใช้ เอามาบอกรุ่นกับสถานะซึ่งเป็นสองอย่างที่ดูบ่อยสุด
+      // ปุ่มอยู่บรรทัดของตัวเองแล้ว จึงไม่ต้องยุบเข้าเมนู "อื่นๆ" บนมือถืออีก ?>
 <div class="asset-toolbar">
-  <?= page_back_button_html($assetBackHref) ?>
-  <h1 class="asset-toolbar-title">เครื่อง <?= h($a['asset_code']) ?></h1>
-  <?php // มือถือ (แบบ ข): เหลือปุ่มบันทึก MA กับปุ่ม "อื่นๆ" ที่เปิดคำสั่งที่เหลือ — เดิม 5 ปุ่มใหญ่กินเกือบ 1/3 จอ
-        // จอใหญ่ .asset-more-menu เป็น display:contents ปุ่มเรียงแถวเดียวเหมือนเดิม ?>
+  <div class="asset-toolbar-head">
+    <?= page_back_button_html($assetBackHref) ?>
+    <h1 class="asset-toolbar-title">เครื่อง <?= h($a['asset_code']) ?></h1>
+    <span class="asset-toolbar-model"><?= h($a['pname']) ?></span>
+    <?= status_badge($a['status']) ?>
+  </div>
   <div class="asset-toolbar-actions">
     <a class="btn btn-sm btn-with-icon asset-act-main" href="<?= BASE_URL ?>/ma.php?record=<?= $id ?>"><?= ui_btn_label('ma', 'บันทึก MA') ?></a>
-    <button type="button" class="btn btn-sm btn-line asset-more-btn" aria-expanded="false" aria-controls="asset-more-menu">อื่นๆ ▾</button>
-    <div class="asset-more-menu" id="asset-more-menu">
     <a class="btn btn-sm btn-with-icon asset-act-update" href="<?= BASE_URL ?>/update_new.php?asset=<?= $id ?>"><?= ui_btn_label('updates', 'บันทึกอัปเดต FW/HW') ?></a>
     <?php if ($assetShowSnippets) { ?>
-    <button type="button" class="btn btn-sm btn-with-icon asset-snippet-open"<?= ma_snippet_data_attrs($assetSnippetPayload) ?>><?= ui_btn_label('clipboard', ma_snippets_title(false)) ?></button>
+    <button type="button" class="btn btn-sm btn-line btn-with-icon asset-snippet-open"<?= ma_snippet_data_attrs($assetSnippetPayload) ?>><?= ui_btn_label('clipboard', ma_snippets_title(false)) ?></button>
     <?php } ?>
-  <?php if ($showPartsWithdraw) { ?>
-      <button type="button" class="btn btn-sm btn-line btn-with-icon"
-        onclick="showListModal(<?= h(json_encode('เพิ่มรายการเบิก — ' . $a['asset_code'], JSON_UNESCAPED_UNICODE)) ?>,<?= h(json_encode($addWithdrawModalUrl)) ?>,'')">
-        <?= ui_btn_label('stock-out-item', 'เพิ่มรายการเบิก') ?>
-      </button>
-      <?php } ?>
-
-      <button type="button" class="btn btn-sm btn-line btn-with-icon asset-edit-toggle"
-        aria-expanded="false" aria-controls="asset-edit-details"><?= ui_btn_label('edit', 'แก้ไขเครื่อง') ?></button>
-    </div>
-      </div>
+    <?php if ($showPartsWithdraw) { ?>
+    <button type="button" class="btn btn-sm btn-line btn-with-icon"
+      onclick="showListModal(<?= h(json_encode('เพิ่มรายการเบิก — ' . $a['asset_code'], JSON_UNESCAPED_UNICODE)) ?>,<?= h(json_encode($addWithdrawModalUrl)) ?>,'')">
+      <?= ui_btn_label('stock-out-item', 'เพิ่มรายการเบิก') ?>
+    </button>
+    <?php } ?>
+    <button type="button" class="btn btn-sm btn-line btn-with-icon asset-edit-toggle"
+      aria-expanded="false" aria-controls="asset-edit-details"><?= ui_btn_label('edit', 'แก้ไขเครื่อง') ?></button>
+  </div>
 </div>
-<script>
-(function(){
-  var btn = document.querySelector('.asset-more-btn');
-  var menu = document.getElementById('asset-more-menu');
-  if (!btn || !menu) return;
-  function set(open){ menu.classList.toggle('is-open', open); btn.setAttribute('aria-expanded', open ? 'true' : 'false'); }
-  btn.addEventListener('click', function(e){ e.stopPropagation(); set(!menu.classList.contains('is-open')); });
-  // เลือกคำสั่งแล้วปิดเมนู · แตะนอกเมนูก็ปิด
-  menu.addEventListener('click', function(){ set(false); });
-  document.addEventListener('click', function(e){ if (!menu.contains(e.target)) set(false); });
-  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') set(false); });
-})();
-</script>
-
 <div class="asset-head">
   <div class="asset-head-photo"><?= img_tag($a['icon_path'], $a['pname'], 'thumb-lg') ?></div>
   <div class="info asset-head-main">
