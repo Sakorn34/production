@@ -67,7 +67,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-$data = inv_pickup_load();
+// เลือกเดือนที่จะดู — ไม่เลือก = ตั้งแต่วันเริ่มติดตามตามเดิม
+// เลือกเดือน = โหลดตั้งแต่ต้นเดือนนั้น แล้วกรองเหลือเฉพาะใบของเดือนนั้น
+$mSel = isset($_GET['m']) ? trim((string) $_GET['m']) : '';
+if (!preg_match('/^\d{4}-\d{2}$/', $mSel)) {
+    $mSel = '';
+}
+$data = $mSel !== '' ? inv_pickup_load(['since' => $mSel . '-01']) : inv_pickup_load();
+if ($mSel !== '') {
+    $data['items'] = array_values(array_filter($data['items'], function ($it) use ($mSel) {
+        return strpos((string) ($it['date'] ?? ''), $mSel) === 0;
+    }));
+}
 $canMap = function_exists('can_access_settings') ? can_access_settings() : true;
 $mapLink = $canMap ? '<a class="btn btn-line" href="' . $B . '/inv_pickup_map.php" data-same-tab>' . ui_btn_label('settings', ' ผูกรุ่น') . '</a>' : '';
 $fmtD = function ($d) { return $d !== '' ? date('d/m/y', strtotime($d)) : '—'; };
@@ -175,7 +186,13 @@ foreach ($byModel['ready'] as $list) {
     }
 }
 
-page_header('ใบเบิกรอผลิต', true, $data['ok'] ? 'รอผลิต ' . number_format($sumLeft) . ' เครื่อง · ตั้งแต่ ' . $fmtD(inv_pickup_since()) : 'จากระบบ inventory', $B . '/assets.php', $mapLink);
+$monthList = inv_pickup_months(24);
+$headSub = $data['ok']
+    ? ($mSel !== ''
+        ? 'เดือน ' . inv_pickup_month_label($mSel) . ' · รอผลิต ' . number_format($sumLeft) . ' เครื่อง'
+        : 'รอผลิต ' . number_format($sumLeft) . ' เครื่อง · ตั้งแต่ ' . $fmtD(inv_pickup_since()))
+    : 'จากระบบ inventory';
+page_header('ใบเบิกรอผลิต', true, $headSub, $B . '/assets.php', $mapLink);
 if (!$data['ok']) { ?>
 <div class="panel"><p class="err" style="margin:0">ต่อระบบ inventory ไม่ได้: <?= h($data['error']) ?></p></div>
 <?php page_footer(); exit; } ?>
@@ -186,10 +203,30 @@ if (!$data['ok']) { ?>
 
 <div class="ip-tabs" role="tablist">
   <?php foreach (['ready' => 'รอผลิต', 'waiting' => 'รอคลังจ่าย', 'done' => 'ผลิตครบ'] as $k => $label) { ?>
-  <a class="ip-tab<?= $tab === $k ? ' is-on' : '' ?>" href="?tab=<?= $k ?>" role="tab" aria-selected="<?= $tab === $k ? 'true' : 'false' ?>"><?= $label ?> (<?= count($byModel[$k]) ?> รุ่น)</a>
+  <a class="ip-tab<?= $tab === $k ? ' is-on' : '' ?>" href="?tab=<?= $k ?><?= $mSel !== '' ? '&amp;m=' . h($mSel) : '' ?>" role="tab" aria-selected="<?= $tab === $k ? 'true' : 'false' ?>"><?= $label ?> (<?= count($byModel[$k]) ?> รุ่น)</a>
   <?php } ?>
-  <a class="ip-tab ip-tab-warn<?= $tab === 'unmatched' ? ' is-on' : '' ?>" href="?tab=unmatched" role="tab" aria-selected="<?= $tab === 'unmatched' ? 'true' : 'false' ?>">ลงทะเบียนโดยไม่มีใบเบิก (<?= count($unmatched) ?>)</a>
+  <a class="ip-tab ip-tab-warn<?= $tab === 'unmatched' ? ' is-on' : '' ?>" href="?tab=unmatched<?= $mSel !== '' ? '&amp;m=' . h($mSel) : '' ?>" role="tab" aria-selected="<?= $tab === 'unmatched' ? 'true' : 'false' ?>">ลงทะเบียนโดยไม่มีใบเบิก (<?= count($unmatched) ?>)</a>
 </div>
+
+<?php // ใบที่เบิกก่อนวันเริ่มจับคู่ ไม่เคยถูกผูกกับเครื่องที่ผลิต ยอดผลิตแล้วจึงเป็น 0 เสมอ
+      // เช็คด้วยต้นเดือน เพราะเดือนที่คร่อมวันเริ่มก็มีใบแบบนี้ปนอยู่ ?>
+<?php if ($mSel !== '' && $mSel . '-01' < inv_pickup_since()) { ?>
+<div class="panel ip-note">ใบที่เบิกก่อน <?= h($fmtD(inv_pickup_since())) ?> ระบบยังไม่ได้จับคู่กับเครื่องที่ผลิต ยอด <b>ผลิตแล้ว</b> จึงขึ้น 0 — เดือนนี้ดูได้ว่าเบิกอะไรลงมาบ้าง แต่เทียบยอดผลิตไม่ได้</div>
+<?php } ?>
+
+<?php if ($monthList) { ?>
+<form method="get" class="ip-month">
+  <input type="hidden" name="tab" value="<?= h($tab) ?>">
+  <label for="ip-month-sel">เดือนที่เบิกของ</label>
+  <select id="ip-month-sel" name="m" onchange="this.form.submit()">
+    <option value="">ล่าสุด (ตั้งแต่ <?= h($fmtD(inv_pickup_since())) ?>)</option>
+    <?php foreach ($monthList as $mo) { ?>
+    <option value="<?= h($mo['m']) ?>" <?= $mSel === $mo['m'] ? 'selected' : '' ?>><?= h(inv_pickup_month_label($mo['m'])) ?> · <?= (int) $mo['n'] ?> ใบ</option>
+    <?php } ?>
+  </select>
+  <?php if ($mSel !== '') { ?><a class="btn btn-sm btn-line" href="?tab=<?= h($tab) ?>">กลับไปดูล่าสุด</a><?php } ?>
+</form>
+<?php } ?>
 
 <?php if ($tab === 'unmatched') {
     // ใบที่รับรุ่นนั้นได้และยังเหลือ (รอผลิต) — ให้เลือกจับคู่
@@ -369,6 +406,12 @@ function inv_pickups_css(): void
 .ip-skipped summary { cursor: pointer; font-size: calc(13.5px * var(--font-scale, 1)); }
 .ip-match { max-width: 100%; min-width: 0; }
 .ip-tab.is-on { background: var(--accent-soft, #fdf2f8); border-color: var(--accent, #e0337f); color: var(--accent, #e0337f); font-weight: 700; }
+.ip-month { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+.ip-month label { font-size: calc(12.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); font-weight: 600; }
+.ip-month select { min-width: 210px; }
+.ip-mhead { font-size: calc(13px * var(--font-scale, 1)); font-weight: 700; color: var(--text-muted, #6b6480);
+  margin: 4px 0 8px; padding-bottom: 5px; border-bottom: 1px solid var(--border, #ece7f6); }
+.ip-mhead:not(:first-child) { margin-top: 18px; }
 .ip-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 12px; margin-bottom: 12px; }
 .ip-card { background: var(--surface, #fff); border: 1px solid var(--border, #e5e7eb); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
 .ip-c-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }

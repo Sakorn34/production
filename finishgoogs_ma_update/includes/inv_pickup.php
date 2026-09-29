@@ -184,6 +184,62 @@ function inv_pickup_mode(array $vals): int
 }
 
 /**
+ * เดือนที่มีใบเบิกผลิต — ไว้ทำตัวเลือกดูย้อนหลัง
+ *
+ * ถามตาราง pre_stock ตรง ๆ ไม่ผ่าน inv_pickup_load() เพราะแค่ต้องการรายชื่อเดือน
+ * ไม่ต้องคำนวณยอดผลิต/คงเหลือ ซึ่งหนักกว่ามาก
+ *
+ * @param int $limit จำนวนเดือนล่าสุดที่คืน
+ * @return array<int,array{m:string,n:int}> ใหม่สุดก่อน
+ */
+function inv_pickup_months(int $limit = 24): array
+{
+    $inv = function_exists('dbInventory') ? dbInventory() : null;
+    if (!$inv) {
+        return [];
+    }
+    $limit = max(1, min(60, $limit));
+    $st = $inv->prepare("SELECT DATE_FORMAT(pre_date, '%Y-%m') m, COUNT(DISTINCT pre_id) n
+                         FROM pre_stock
+                         WHERE pre_type = ? AND pre_status <> 'cancel' AND pre_date IS NOT NULL
+                         GROUP BY m ORDER BY m DESC LIMIT $limit");
+    if (!$st) {
+        return [];
+    }
+    $type = INV_PICKUP_TYPE;
+    $st->bind_param('s', $type);
+    if (!$st->execute()) {
+        return [];
+    }
+    $res = $st->get_result();
+    $out = [];
+    while ($r = $res->fetch_assoc()) {
+        $m = (string) $r['m'];
+        if (preg_match('/^\d{4}-\d{2}$/', $m)) {
+            $out[] = ['m' => $m, 'n' => (int) $r['n']];
+        }
+    }
+    return $out;
+}
+
+/**
+ * ชื่อเดือนภาษาไทยจาก YYYY-MM
+ *
+ * @param string $m
+ * @return string
+ */
+function inv_pickup_month_label(string $m): string
+{
+    if (!preg_match('/^(\d{4})-(\d{2})$/', $m, $x)) {
+        return $m;
+    }
+    $th = ['01' => 'มกราคม', '02' => 'กุมภาพันธ์', '03' => 'มีนาคม', '04' => 'เมษายน',
+           '05' => 'พฤษภาคม', '06' => 'มิถุนายน', '07' => 'กรกฎาคม', '08' => 'สิงหาคม',
+           '09' => 'กันยายน', '10' => 'ตุลาคม', '11' => 'พฤศจิกายน', '12' => 'ธันวาคม'];
+    return ($th[$x[2]] ?? $x[2]) . ' ' . ((int) $x[1] + 543);
+}
+
+/**
  * ใบเบิกผลิตทั้งหมดตั้งแต่วันเริ่มติดตาม แตกเป็นรายการ (ใบ × รุ่นของเรา) พร้อมยอดผลิตแล้ว/คงเหลือ
  *
  * @param array<string,mixed> $opts since (Y-m-d) · with_lines (bool รายละเอียดอะไหล่)
