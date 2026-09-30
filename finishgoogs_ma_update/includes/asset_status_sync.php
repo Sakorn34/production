@@ -117,7 +117,23 @@ function asset_status_lease_idle_days(?array $lease): ?int
     return (int) floor((time() - $t) / 86400);
 }
 
-function asset_status_target_from_external(string $current, ?array $sale, ?array $lease): array
+/**
+ * ป้ายอธิบายหลักฐานขาย/ส่งมอบจากระบบ setup
+ *
+ * @param array<string,mixed> $hit แถวจาก asset_status_setup_sold_map()
+ */
+function asset_status_setup_reason(array $hit): string
+{
+    $label = [
+        'order' => 'ส่งมอบตามใบสั่งงาน',
+        'claim' => 'ส่งออกไปเคลม',
+        'sale'  => 'ขายตามระบบ setup',
+    ][(string) ($hit['src'] ?? '')] ?? 'ส่งมอบแล้ว';
+    $ref = trim((string) ($hit['ref'] ?? ''));
+    return 'ระบบ Setup: ' . $label . ($ref !== '' ? ' ' . $ref : '');
+}
+
+function asset_status_target_from_external(string $current, ?array $sale, ?array $lease, ?array $setup = null): array
 {
     $current = trim($current) !== '' ? trim($current) : 'new';
 
@@ -149,15 +165,23 @@ function asset_status_target_from_external(string $current, ?array $sale, ?array
         if (empty($lease['had_contract']) && $sale && !empty($sale['sold']) && empty($sale['from_delivery'])) {
             return ['target' => 'sold', 'reason' => 'เบิกขายจาก stock (อยู่ในทะเบียนเช่าแต่ไม่เคยปล่อยเช่า)'];
         }
-        // เครื่องที่ลงทะเบียนเข้าคลังเช่าไว้เฉย ๆ นานแล้ว ไม่เคยปล่อยเช่าสักครั้ง
-        // แถวฝั่งเช่าเป็นของค้าง ไม่ได้บอกว่าเครื่องอยู่ไหน = "ไม่มีสถานะ"
         if (empty($lease['had_contract'])) {
+            // ใบสั่งงาน/ประวัติขายของระบบ setup — บางเครื่องคลังจ่ายออกผ่านใบสั่งงาน
+            // โดยไม่ได้ทำใบเบิกขายใน stock หลักฐานชุดนี้เคยถูกแถวทะเบียนเช่าบังไว้ทั้งหมด
+            // ใช้ได้เฉพาะเครื่องที่ไม่เคยมีสัญญาเช่าเลย จึงแปลว่าใบสั่งงานนั้นไม่ใช่การส่งเช่า
+            if ($setup) {
+                return ['target' => 'sold',
+                        'reason' => asset_status_setup_reason($setup) . ' (อยู่ในทะเบียนเช่าแต่ไม่เคยปล่อยเช่า)'];
+            }
+            // เครื่องที่ลงทะเบียนเข้าคลังเช่าไว้เฉย ๆ นานแล้ว ไม่เคยปล่อยเช่าสักครั้ง
+            // แถวฝั่งเช่าเป็นของค้าง ไม่ได้บอกว่าเครื่องอยู่ไหน = "ไม่มีสถานะ"
             $idle = asset_status_lease_idle_days($lease);
             if ($idle !== null && $idle >= (int) ASSET_LEASE_IDLE_UNKNOWN_DAYS) {
-                return ['target' => 'unknown',
+                return ['target' => 'unknown', 'want_setup' => true,
                         'reason' => 'ลงทะเบียนคลังเช่าไว้ ' . number_format($idle) . ' วัน ไม่เคยปล่อยเช่า'];
             }
-            return ['target' => 'rental', 'reason' => 'คลังพร้อมเช่า (ยังไม่เคยปล่อยเช่า)'];
+            return ['target' => 'rental', 'want_setup' => true,
+                    'reason' => 'คลังพร้อมเช่า (ยังไม่เคยปล่อยเช่า)'];
         }
         return ['target' => 'rental', 'reason' => 'รับคืนเข้าคลังเช่า'];
     }
@@ -347,20 +371,21 @@ function asset_status_sync_row(array $row, array $saleMap, array $leaseMap, bool
     $resolved = asset_status_target_from_external(
         $current,
         $code !== '' ? ($saleMap[$code] ?? null) : null,
-        $code !== '' ? ($leaseMap[$code] ?? null) : null
+        $code !== '' ? ($leaseMap[$code] ?? null) : null,
+        $code !== '' ? ($setupMap[strtoupper($code)] ?? null) : null
     );
     $target = $resolved['target'];
     $reason = (string) ($resolved['reason'] ?? '');
 
     // ขาย/ส่งมอบตามระบบ setup — คลังจ่ายออกผ่านใบสั่งงานโดยไม่ได้ทำใบเบิกขายใน stock
     // แตะเฉพาะเครื่องที่ยังเป็น "ใหม่" และไม่มีชื่อในระบบเช่า (สัญญาเช่าชนะเสมอ)
+    // เครื่องที่อยู่ในทะเบียนเช่าใช้หลักฐานชุดนี้ในกฎข้างบนแล้ว
     if ($target === null && $current === 'new' && $code !== '') {
         $lease = $leaseMap[strtoupper($code)] ?? ($leaseMap[$code] ?? null);
         $hit = $setupMap[strtoupper($code)] ?? null;
         if ($hit && empty($lease['found'])) {
-            $label = ['order' => 'ส่งมอบตามใบสั่งงาน', 'claim' => 'ส่งออกไปเคลม', 'sale' => 'ขายตามระบบ setup'][$hit['src']] ?? 'ส่งมอบแล้ว';
             $target = 'sold';
-            $reason = 'ระบบ Setup: ' . $label . ($hit['ref'] !== '' ? ' ' . $hit['ref'] : '');
+            $reason = asset_status_setup_reason($hit);
         }
     }
 
@@ -424,6 +449,30 @@ function asset_status_sync_batch(array $assetRows, bool $write = true): array
     // หลักฐานฝั่ง setup ใช้กับเครื่องที่ยังเป็น "ใหม่" เหมือนกัน จึงถามเฉพาะชุดนั้น
     $setupMap = $newRows ? asset_status_setup_sold_map(array_column($newRows, 'asset_code')) : [];
 
+    // รอบตรวจก่อน: เครื่องที่กฎตอบว่า "อยู่ในทะเบียนเช่าแต่ไม่เคยปล่อยเช่า" ต้องดูหลักฐาน
+    // ฝั่ง setup ด้วย ไม่งั้นเครื่องที่ขายไปแล้วผ่านใบสั่งงานจะถูกแถวทะเบียนเช่าบังไว้
+    // ถามเฉพาะชุดนี้ เพราะเป็นการอ่านฐานของระบบอื่น ไม่อยากยิงทั้งทะเบียน
+    $wantSetup = [];
+    foreach ($assetRows as $row) {
+        $c = trim((string) ($row['asset_code'] ?? ''));
+        if ($c === '' || isset($setupMap[strtoupper($c)])) {
+            continue;
+        }
+        $peek = asset_status_target_from_external(
+            trim((string) ($row['status'] ?? 'new')),
+            $saleMap[$c] ?? null,
+            $leaseMap[$c] ?? null
+        );
+        if (!empty($peek['want_setup'])) {
+            $wantSetup[] = $c;
+        }
+    }
+    if ($wantSetup) {
+        foreach (asset_status_setup_sold_map($wantSetup) as $k => $v) {
+            $setupMap[$k] = $v;
+        }
+    }
+
     foreach ($assetRows as $row) {
         $item = asset_status_sync_row($row, $saleMap, $leaseMap, $write, $installMap, $setupMap);
         if (!empty($item['changed'])) {
@@ -457,7 +506,8 @@ function asset_status_sync_by_id(int $assetId, bool $write = true): array
     $leaseMap = asset_leasing_status_by_assets([$row]);
     $isNew = trim((string) $row['status']) === 'new';
     $installMap = $isNew ? installation_history_map([$row]) : [];
-    $setupMap = ($isNew && $code !== '') ? asset_status_setup_sold_map([$code]) : [];
+    // ถามหลักฐานฝั่ง setup ทุกครั้ง — เครื่องเดียวไม่หนัก และกฎทะเบียนเช่าก็ใช้หลักฐานชุดนี้
+    $setupMap = $code !== '' ? asset_status_setup_sold_map([$code]) : [];
     $item = asset_status_sync_row($row, $saleMap, $leaseMap, $write, $installMap, $setupMap);
     return [
         'changed' => !empty($item['changed']),

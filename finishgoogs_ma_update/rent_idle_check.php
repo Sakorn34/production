@@ -135,6 +135,8 @@ if (!$l) {
             }
         }
         $saleMap = asset_stockparts_sale_status_by_sn($codes);
+        // ใบสั่งงาน/ประวัติขายฝั่งระบบ setup — บางเครื่องจ่ายออกทางนั้นโดยไม่มีใบเบิกขายใน stock
+        $setupMap = asset_status_setup_sold_map($codes);
         $today = new DateTime('today');
         foreach ($cand as $sn => $c) {
             $sale = $saleMap[$sn] ?? null;
@@ -156,6 +158,7 @@ if (!$l) {
                 'sold' => $sale && !empty($sale['sold']),
                 'sold_hard' => $sale && !empty($sale['sold']) && empty($sale['from_delivery']),
                 'sale_ref' => trim((string) ($sale['setup_id'] ?? '')),
+                'setup' => $setupMap[strtoupper($sn)] ?? null,
             ];
         }
     }
@@ -169,13 +172,13 @@ usort($rows, function ($a, $b) {
 const RENT_IDLE_LONG = 180;   // ค้างเกินครึ่งปีถือว่านานผิดปกติ
 $nSold = 0; $nLong = 0; $nNoAsset = 0;
 foreach ($rows as $x) {
-    if ($x['sold']) { $nSold++; }
+    if ($x['sold'] || $x['setup']) { $nSold++; }
     if (($x['days'] ?? 0) >= RENT_IDLE_LONG) { $nLong++; }
     if (!$x['asset']) { $nNoAsset++; }
 }
 $show = $rows;
 if ($flt === 'sold') {
-    $show = array_values(array_filter($rows, function ($x) { return $x['sold']; }));
+    $show = array_values(array_filter($rows, function ($x) { return $x['sold'] || $x['setup']; }));
 } elseif ($flt === 'long') {
     $show = array_values(array_filter($rows, function ($x) { return ($x['days'] ?? 0) >= RENT_IDLE_LONG; }));
 } elseif ($flt === 'noasset') {
@@ -277,7 +280,7 @@ arsort($noMap); ?>
   <tr><td colspan="8" class="muted" style="text-align:center;padding:20px">ไม่มีเครื่องที่ตรงกับเงื่อนไข</td></tr>
   <?php } ?>
   <?php foreach ($show as $x) { $long = ($x['days'] ?? 0) >= RENT_IDLE_LONG; ?>
-  <tr<?= $x['sold'] ? ' class="ric-row-warn"' : '' ?>>
+  <tr<?= ($x['sold'] || $x['setup']) ? ' class="ric-row-warn"' : '' ?>>
     <?php if ($canAct) { ?>
     <td data-pri="1" style="text-align:center">
       <?php if (!$x['asset'] && ($x['pid'] ?? 0) > 0) { ?>
@@ -303,6 +306,12 @@ arsort($noMap); ?>
       <?php if ($x['sold_hard']) { ?>
         <span class="ric-flag is-hard">มีใบเบิกขาย</span>
         <?php if ($x['sale_ref'] !== '') { ?><div class="cell-sub muted"><?= h($x['sale_ref']) ?></div><?php } ?>
+      <?php } elseif ($x['setup']) {
+        $su = $x['setup'];
+        $suLabel = ['order' => 'มีใบสั่งงาน', 'claim' => 'ส่งออกไปเคลม', 'sale' => 'ขายตามระบบ setup'][(string) $su['src']] ?? 'ส่งมอบแล้ว';
+        $suSub = trim(trim((string) $su['ref']) . ' ' . trim((string) $su['customer'])); ?>
+        <span class="ric-flag is-hard"><?= h($suLabel) ?></span>
+        <?php if ($suSub !== '') { ?><div class="cell-sub muted"><?= h($suSub) ?></div><?php } ?>
       <?php } elseif ($x['sold']) { ?>
         <span class="ric-flag is-soft">มีประวัติส่งมอบ</span>
         <?php if ($x['sale_ref'] !== '') { ?><div class="cell-sub muted"><?= h($x['sale_ref']) ?></div><?php } ?>
@@ -315,8 +324,8 @@ arsort($noMap); ?>
 </div>
 
 <p class="muted ric-foot">
-  <b>มีใบเบิกขาย</b> = หลักฐานหนัก ระบบจะตัดสินสถานะเครื่องเป็น “ขายแล้ว” ให้เอง —
-  แถวในทะเบียนเช่าควรให้ทีมเช่าลบออก ·
+  <b>มีใบเบิกขาย</b> และ <b>มีใบสั่งงาน</b> (ฝั่งระบบ setup) = หลักฐานหนัก
+  ระบบจะตัดสินสถานะเครื่องเป็น “ขายแล้ว” ให้เอง — แถวในทะเบียนเช่าควรให้ทีมเช่าลบออก ·
   <b>มีประวัติส่งมอบ</b> = หลักฐานอ่อน (บันทึกไซต์งาน ไม่มีใบเบิก) ยังไม่พอตัดเป็น “ขายแล้ว” ต้องตรวจเอง ·
   เครื่องที่ค้างเกิน <?= (int) ASSET_LEASE_IDLE_UNKNOWN_DAYS ?> วันจะเป็น “ไม่มีสถานะ” แล้วไปตามหลักฐานต่อได้ที่
   <a href="<?= $B ?>/unknown_assets.php">ติดตามเครื่องไม่มีสถานะ</a> ·
