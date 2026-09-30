@@ -482,6 +482,34 @@ function stockparts_fetch_movement_for_serial($db, string $serial, string $setup
  * @param array<int,string> $serials
  * @return array<string,array<string,mixed>>  คีย์เป็น S/N ตามที่ส่งเข้ามา
  */
+/**
+ * แปลงแถวทะเบียนเก่า (stock_old) เป็นหลักฐานส่งมอบ
+ *
+ * stock_old คือทะเบียนของระบบเดิมก่อน import เข้าระบบปัจจุบัน แถวหนึ่งบันทึกว่า
+ * เครื่องถูกส่งไปติดตั้งที่ไซต์งานไหน เมื่อไหร่ ใครเป็นคนบันทึก — เป็นหลักฐาน
+ * คนละชุดกับใบเบิกขายใน stock ปัจจุบัน และไม่มีในระบบเช่า คนไล่ดูจึงหาไม่เจอ
+ * ถ้าไม่บอกที่มาไว้ ต้องส่งรายละเอียดออกไปให้หน้าจอแสดงด้วย
+ *
+ * @param array<string,mixed> $oldRow แถวจาก stock_old
+ * @return array<string,mixed>
+ */
+function stockparts_delivery_evidence(array $oldRow): array
+{
+    $label = trim((string) ($oldRow['setup_id'] ?? ''));
+    return [
+        'sold' => true,
+        'setup_id' => $label !== '' ? $label : 'ส่งมอบแล้ว',
+        'resolve_source' => 'stock_old',
+        // หลักฐานมาจากประวัติส่งมอบ ไม่ใช่ใบเบิกขาย — ตัวตัดสินสถานะ
+        // ต้องถ่วงน้ำหนักเบากว่า เพื่อไม่ให้ไปทับเครื่องที่อยู่ในสัญญาเช่า
+        'from_delivery' => true,
+        'delivery_site' => $label,
+        'delivery_date' => substr(trim((string) ($oldRow['timestamp'] ?? '')), 0, 10),
+        'delivery_by' => trim((string) ($oldRow['create_name'] ?? '')),
+        'delivery_guard' => trim((string) ($oldRow['security_company'] ?? '')),
+    ];
+}
+
 function stockparts_fetch_stock_old_rows($db, array $serials): array
 {
     $serials = array_values(array_unique(array_filter(array_map('trim', $serials), 'strlen')));
@@ -1306,15 +1334,7 @@ function asset_stockparts_sale_status_by_sn(array $serials): array
                 'resolve_source' => $resolvedMap[$sn]['source'],
             ];
         } elseif (isset($oldRows[$sn])) {
-            $label = trim((string) ($oldRows[$sn]['setup_id'] ?? ''));
-            $out[$sn] = [
-                'sold' => true,
-                'setup_id' => $label !== '' ? $label : 'ส่งมอบแล้ว',
-                'resolve_source' => 'stock_old',
-                // หลักฐานมาจากประวัติส่งมอบ ไม่ใช่ใบเบิกขาย — ตัวตัดสินสถานะ
-                // ต้องถ่วงน้ำหนักเบากว่า เพื่อไม่ให้ไปทับเครื่องที่อยู่ในสัญญาเช่า
-                'from_delivery' => true,
-            ];
+            $out[$sn] = stockparts_delivery_evidence($oldRows[$sn]);
         } else {
             $out[$sn] = [
                 'sold' => false,
@@ -1338,16 +1358,7 @@ function asset_stockparts_sale_status_by_sn(array $serials): array
         }
         $oldRow = stockparts_fetch_stock_old_row($db, $sn);
         if ($oldRow) {
-            $label = trim((string) ($oldRow['setup_id'] ?? ''));
-            if ($label === '') {
-                $label = 'ส่งมอบแล้ว';
-            }
-            $out[$sn] = [
-                'sold' => true,
-                'setup_id' => $label,
-                'resolve_source' => 'stock_old',
-                'from_delivery' => true,
-            ];
+            $out[$sn] = stockparts_delivery_evidence($oldRow);
         }
     }
 

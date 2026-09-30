@@ -24,7 +24,7 @@ $flt = isset($_GET['f']) ? (string) $_GET['f'] : '';
 const RSC_LEVELS = [
     'clash'  => ['th' => 'ขัดกันชัด',        'pal' => 'lost',   'note' => 'ระบบเช่าบอกว่าเครื่องอยู่กับลูกค้า แต่ฝั่งขายมีใบเบิกขายหรือใบสั่งงานจริง — ต้องตรวจว่าฝั่งไหนถูก'],
     'after'  => ['th' => 'อาจขายหลังรับคืน', 'pal' => 'spare',  'note' => 'เคยปล่อยเช่าแล้วรับคืนเข้าคลัง แล้วมีหลักฐานขายตามมา — ระบบยังนับเป็นเครื่องเช่าเพราะใบเบิกไม่ได้แยกว่าเบิกไปขายหรือไปเช่า'],
-    'weak'   => ['th' => 'ที่อยู่ไม่ตรงกัน',  'pal' => 'new',    'note' => 'ระบบเช่าว่าเครื่องควรอยู่ในคลังหรือปลดระวางแล้ว แต่มีประวัติส่งมอบไปไซต์งาน — ยังไม่พอบอกว่าขาย แต่ที่อยู่ของเครื่องไม่ตรงกัน'],
+    'weak'   => ['th' => 'ที่อยู่ไม่ตรงกัน',  'pal' => 'new',    'note' => 'ระบบเช่าว่าเครื่องควรอยู่ในคลังหรือปลดระวางแล้ว แต่ทะเบียน stock ของระบบเดิมบันทึกว่าส่งไปติดตั้งที่ไซต์งาน — ยังไม่พอบอกว่าขาย แต่ที่อยู่ของเครื่องไม่ตรงกัน'],
 ];
 
 $rows = [];
@@ -95,10 +95,15 @@ if (!dbLeasing()) {
                 $evDate  = '';
                 $evCus   = '';
             } else {
-                $evLabel = 'ประวัติส่งมอบ';
-                $evRef   = trim((string) ($sale['setup_id'] ?? ''));
-                $evDate  = '';
-                $evCus   = '';
+                // ทะเบียน stock ของระบบเดิม — ไม่มีในระบบเช่าและไม่ใช่ใบเบิกปัจจุบัน
+                $evLabel = 'ส่งมอบ (ทะเบียนเก่า)';
+                $evRef   = trim((string) ($sale['delivery_site'] ?? $sale['setup_id'] ?? ''));
+                $evDate  = trim((string) ($sale['delivery_date'] ?? ''));
+                $evCus   = trim((string) ($sale['delivery_guard'] ?? ''));
+                $by      = trim((string) ($sale['delivery_by'] ?? ''));
+                if ($by !== '') {
+                    $evCus = trim($evCus . ' · บันทึกโดย ' . $by, ' ·');
+                }
             }
 
             $rows[] = [
@@ -132,6 +137,18 @@ foreach ($rows as $x) {
 $show = $flt !== '' && isset($nBy[$flt])
     ? array_values(array_filter($rows, function ($x) use ($flt) { return $x['level'] === $flt; }))
     : $rows;
+
+/** วันที่แบบไทย จาก Y-m-d — คืนค่าเดิมถ้าอ่านไม่ได้ */
+function rsc_date(string $ymd): string
+{
+    $ymd = trim($ymd);
+    $head = substr($ymd, 0, 10);
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $head) || $head === '0000-00-00') {
+        return $ymd;
+    }
+    $d = date_create($head);
+    return $d ? $d->format('d/m/Y') : $ymd;
+}
 
 /** ชิปตัวกรอง — ต้องมีคลาส btn ไม่งั้นได้กล่องเหลี่ยมหลุดธีม */
 function rsc_chip(string $f, string $label, string $cur): string
@@ -204,7 +221,7 @@ page_header('เครื่องที่สองระบบขัดกั�
     </td>
     <td data-pri="1">
       <span class="rsc-flag"><?= h($x['ev_label']) ?></span>
-      <?php $sub = trim(implode(' · ', array_filter([$x['ev_ref'], $x['ev_date'], $x['ev_cus']])));
+      <?php $sub = trim(implode(' · ', array_filter([$x['ev_ref'], rsc_date($x['ev_date']), $x['ev_cus']])));
       if ($sub !== '') { ?><div class="cell-sub muted"><?= h($sub) ?></div><?php } ?>
     </td>
     <td data-pri="1"><span class="badge" style="<?= h(status_badge_style($L['pal'])) ?>"><?= h($L['th']) ?></span></td>

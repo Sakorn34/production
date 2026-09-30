@@ -159,6 +159,7 @@ if (!$l) {
                 'sold_hard' => $sale && !empty($sale['sold']) && empty($sale['from_delivery']),
                 'sale_ref' => trim((string) ($sale['setup_id'] ?? '')),
                 'setup' => $setupMap[strtoupper($sn)] ?? null,
+                'deliv' => ($sale && !empty($sale['from_delivery'])) ? $sale : null,
             ];
         }
     }
@@ -183,6 +184,17 @@ if ($flt === 'sold') {
     $show = array_values(array_filter($rows, function ($x) { return ($x['days'] ?? 0) >= RENT_IDLE_LONG; }));
 } elseif ($flt === 'noasset') {
     $show = array_values(array_filter($rows, function ($x) { return !$x['asset']; }));
+}
+
+/** วันที่แบบไทย จาก Y-m-d — ว่างถ้าอ่านไม่ได้ */
+function rent_idle_thai_date(string $ymd): string
+{
+    $ymd = substr(trim($ymd), 0, 10);
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $ymd) || $ymd === '0000-00-00') {
+        return '';
+    }
+    $d = date_create($ymd);
+    return $d ? $d->format('d/m/Y') : '';
 }
 
 /** ชิปตัวกรอง — ต้องมีคลาส btn ไม่งั้นได้กล่องเหลี่ยมหลุดธีม */
@@ -312,9 +324,18 @@ arsort($noMap); ?>
         $suSub = trim(trim((string) $su['ref']) . ' ' . trim((string) $su['customer'])); ?>
         <span class="ric-flag is-hard"><?= h($suLabel) ?></span>
         <?php if ($suSub !== '') { ?><div class="cell-sub muted"><?= h($suSub) ?></div><?php } ?>
-      <?php } elseif ($x['sold']) { ?>
-        <span class="ric-flag is-soft">มีประวัติส่งมอบ</span>
-        <?php if ($x['sale_ref'] !== '') { ?><div class="cell-sub muted"><?= h($x['sale_ref']) ?></div><?php } ?>
+      <?php } elseif ($x['sold']) {
+        // บอกที่มาให้ชัด — หลักฐานชุดนี้อยู่ในทะเบียนเก่า ไม่ได้อยู่ในระบบเช่าหรือใบเบิกปัจจุบัน
+        // คนไล่ดูสองที่นั้นแล้วไม่เจอ จะได้รู้ว่าต้องไปดูที่ไหน
+        $dv = $x['deliv'];
+        $dvSub = $dv ? trim(implode(' · ', array_filter([
+            (string) ($dv['delivery_site'] ?? ''),
+            rent_idle_thai_date((string) ($dv['delivery_date'] ?? '')),
+            (string) ($dv['delivery_guard'] ?? ''),
+            ($dv['delivery_by'] ?? '') !== '' ? 'บันทึกโดย ' . $dv['delivery_by'] : '',
+        ]))) : $x['sale_ref']; ?>
+        <span class="ric-flag is-soft">ส่งมอบ (ทะเบียนเก่า)</span>
+        <?php if ($dvSub !== '') { ?><div class="cell-sub muted"><?= h($dvSub) ?></div><?php } ?>
       <?php } else { ?><span class="muted">—</span><?php } ?>
     </td>
   </tr>
@@ -326,7 +347,9 @@ arsort($noMap); ?>
 <p class="muted ric-foot">
   <b>มีใบเบิกขาย</b> และ <b>มีใบสั่งงาน</b> (ฝั่งระบบ setup) = หลักฐานหนัก
   ระบบจะตัดสินสถานะเครื่องเป็น “ขายแล้ว” ให้เอง — แถวในทะเบียนเช่าควรให้ทีมเช่าลบออก ·
-  <b>มีประวัติส่งมอบ</b> = หลักฐานอ่อน (บันทึกไซต์งาน ไม่มีใบเบิก) ยังไม่พอตัดเป็น “ขายแล้ว” ต้องตรวจเอง ·
+  <b>ส่งมอบ (ทะเบียนเก่า)</b> = แถวในทะเบียน stock ของระบบเดิม ที่บันทึกว่าเครื่องถูกส่งไปติดตั้งที่ไซต์งานไหน
+  เมื่อไหร่ ใครบันทึก — คนละชุดกับใบเบิกขายปัจจุบัน และไม่มีในระบบเช่า ค้นสองที่นั้นจึงไม่เจอ
+  ยังไม่พอตัดเป็น “ขายแล้ว” ให้อัตโนมัติ ต้องตรวจเอง ·
   เครื่องที่ค้างเกิน <?= (int) ASSET_LEASE_IDLE_UNKNOWN_DAYS ?> วันจะเป็น “ไม่มีสถานะ” แล้วไปตามหลักฐานต่อได้ที่
   <a href="<?= $B ?>/unknown_assets.php">ติดตามเครื่องไม่มีสถานะ</a> ·
   หน้านี้เขียนเฉพาะทะเบียนของเรา ไม่แตะข้อมูลฝั่งระบบเช่าเลย
