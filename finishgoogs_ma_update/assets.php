@@ -181,6 +181,9 @@ require_once __DIR__ . '/includes/stockparts_withdraw.php';
 require_once __DIR__ . '/includes/rent_ma_bridge.php';
 require_once __DIR__ . '/includes/asset_status_sync.php';
 $saleStatus = asset_stockparts_sale_status_by_sn(array_column($assetRows, 'asset_code'));
+// ใบสั่งงาน/ประวัติขายฝั่งระบบ setup — บางเครื่องคลังจ่ายออกทางนั้นโดยไม่มีใบเบิกใน stock
+// ถ้าไม่อ่านด้วย คอลัมน์นี้จะขึ้นว่า "อยู่ในคลัง" ทั้งที่ของส่งถึงลูกค้าแล้ว
+$saleSetup = asset_status_setup_sold_map(array_column($assetRows, 'asset_code'));
 $leaseStatus = asset_leasing_status_by_assets($assetRows);
 try {
     asset_status_sync_batch($assetRows, true);
@@ -286,6 +289,8 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
 .sale-out { background: var(--warning-soft, #fef9c3); color: #a16207; }
 /* ไม่พบ S/N ในทะเบียน stock — ต่างจาก "อยู่ในคลัง" เพราะเราไม่รู้ ไม่ใช่รู้ว่ายังไม่ขาย */
 .sale-unknown { background: transparent; color: var(--text-muted, #6b6480); font-weight: 500; }
+/* ขายแล้วแต่ไม่มีเอกสารการเบิกที่ไหนเลย — ช่องว่างของข้อมูล ไม่ใช่สถานะปกติ */
+.sale-none { background: var(--surface-2, #f1efe8); color: var(--text-muted, #5f5e5a); }
 .sale-tag.asset-rent-status { border: 1px solid transparent; font-size: calc(11px * var(--font-scale, 1)); }
 </style>
 <script>
@@ -348,6 +353,7 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
     <?php
       $lease = $leaseStatus[$r['asset_code']] ?? null;
       $sale = $saleStatus[$r['asset_code']] ?? null;
+      $saleSu = $saleSetup[strtoupper((string) $r['asset_code'])] ?? null;
     ?>
     <td data-pri="3" data-nowrap>
       <?php if (!empty($lease['found'])) { ?>
@@ -363,6 +369,20 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
           }
       ?>
         <span class="sale-tag sale-out" title="<?= h($saleTitle) ?>">เบิกขายแล้ว</span>
+      <?php } elseif ($saleSu) {
+          // ไม่มีใบเบิกใน stock แต่ระบบ setup มีใบสั่งงาน/ประวัติขาย = ของออกไปแล้วจริง
+          $suLabel = ['order' => 'ใบสั่งงาน', 'claim' => 'ส่งออกไปเคลม', 'sale' => 'ขายตามระบบ setup'][(string) $saleSu['src']] ?? 'ส่งมอบแล้ว';
+          $suTitle = trim(implode(' · ', array_filter([
+              'ระบบ setup',
+              (string) $saleSu['ref'],
+              (string) $saleSu['date'],
+              (string) $saleSu['customer'],
+          ]))); ?>
+        <span class="sale-tag sale-out" title="<?= h($suTitle) ?>"><?= h($suLabel) ?></span>
+      <?php } elseif ($r['status'] === 'sold') { ?>
+        <?php // สถานะบอกว่าขายแล้ว แต่ไม่มีเอกสารการเบิกที่ไหนเลย — เขียนว่า "อยู่ในคลัง"
+              // จะขัดกับคอลัมน์สถานะข้าง ๆ บอกตรง ๆ ว่าไม่มีใบเบิกดีกว่า ?>
+        <span class="sale-tag sale-none" title="สถานะเป็นขายแล้ว แต่หาใบเบิกขาย ใบสั่งงาน และประวัติส่งมอบไม่เจอเลย">ไม่มีใบเบิก</span>
       <?php } else { ?>
         <span class="sale-tag sale-in">อยู่ในคลัง</span>
       <?php } ?>
