@@ -106,9 +106,20 @@ function asset_status_target_from_external(string $current, ?array $sale, ?array
         if (asset_status_leasing_implies_retired($lease)) {
             return ['target' => 'retired', 'reason' => 'ระบบเช่าแจ้งปลดระวาง'];
         }
-        // ลงทะเบียนในระบบเช่าแล้ว = เครื่องเช่า ไม่ว่าจะอยู่กับลูกค้า รอ MA หรือรับคืนรอปล่อยเช่าใหม่
-        // (เดิมเครื่องที่รับคืนเข้าคลังเช่าถูกนับเป็น "ใหม่" ทำให้ยอดสต็อกผลิตใหม่ปนเครื่องเช่าวนกลับ)
-        return ['target' => 'rental', 'reason' => asset_status_leasing_implies_rental($lease) ? 'สถานะระบบเช่า' : 'ลงทะเบียนในระบบเช่า (คลังเช่า)'];
+        // อยู่ในสายงานเช่าจริง (อยู่กับลูกค้า · รอ MA · ติดเคลม) = เครื่องเช่าแน่นอน
+        if (asset_status_leasing_implies_rental($lease)) {
+            return ['target' => 'rental', 'reason' => 'สถานะระบบเช่า'];
+        }
+        // เหลือกรณี "คลังพร้อมเช่า" (finished goods) — ปกติคือเครื่องพร้อมส่งให้ลูกค้าเช่า
+        // หรือเครื่องที่รับคืนมาแล้วรอปล่อยใหม่ ทั้งสองแบบถือเป็นเครื่องเช่าตามเดิม
+        //
+        // ข้อยกเว้นเดียว: เครื่องที่ "ไม่เคยมีสัญญาเช่าเลย" แต่มีใบเบิกขายจริงจาก stock
+        // แปลว่าถูกขายออกไปแล้ว ส่วนแถวในทะเบียนเช่าเป็นของค้างที่ไม่ได้ใช้งาน
+        // เดิมกฎนี้บังหลักฐานขายไว้ทั้งหมด เครื่องที่ขายไปแล้วจึงค้างเป็น "เครื่องเช่า" อยู่เป็นปี
+        if (empty($lease['had_contract']) && $sale && !empty($sale['sold']) && empty($sale['from_delivery'])) {
+            return ['target' => 'sold', 'reason' => 'เบิกขายจาก stock (อยู่ในทะเบียนเช่าแต่ไม่เคยปล่อยเช่า)'];
+        }
+        return ['target' => 'rental', 'reason' => empty($lease['had_contract']) ? 'คลังพร้อมเช่า (ยังไม่เคยปล่อยเช่า)' : 'รับคืนเข้าคลังเช่า'];
     }
 
     if ($sale && !empty($sale['sold']) && empty($sale['from_delivery'])) {

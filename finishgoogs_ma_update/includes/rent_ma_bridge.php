@@ -2135,6 +2135,9 @@ function asset_leasing_status_by_assets(array $assets): array
             'status_label' => rent_leasing_status_label($pro, $pSt),
             'badge_class' => rent_leasing_status_badge_class($pro, $pSt),
             'customer_name' => $cusId !== '' ? ($cusNames[$cusId] ?? '') : '',
+            // เคยมีแถวในสัญญาเช่าไหม — ใช้แยก "เคยปล่อยเช่าจริงแล้วรับคืน"
+            // ออกจาก "ลงทะเบียนเข้าคลังเช่าไว้เฉย ๆ ไม่เคยปล่อยเช่า"
+            'had_contract' => $line !== null,
         ];
     }
 
