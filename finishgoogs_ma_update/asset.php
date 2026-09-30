@@ -381,6 +381,11 @@ document.addEventListener('click', function (ev) {
   <?php } ?>
 </div>
 <?php
+// เครื่องอื่นที่ถูกส่งไปไซต์งานเดียวกัน — ชุดอุปกรณ์ของไซต์นั้นมักมาด้วยกันทั้งชุด
+require_once __DIR__ . '/includes/site_assets.php';
+echo site_assets_card_html((string) $a['asset_code']);
+?>
+<?php
 // ใบเบิกผลิตจาก inventory ที่เครื่องนี้ถูกตัดยอด (ตารางมีเมื่อเปิดใช้ฟีเจอร์ใบเบิกแล้ว)
 require_once __DIR__ . '/includes/inv_pickup.php';
 $invAlloc = inv_pickup_for_asset($id);
