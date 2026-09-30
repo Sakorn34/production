@@ -1974,7 +1974,7 @@ function stockparts_withdraw_provenance_html(array $info): string
  * @param  array<string,mixed> $info
  * @return string
  */
-function asset_stockparts_withdraw_card_html(array $info): string
+function asset_stockparts_withdraw_card_html(array $info, string $footHtml = ''): string
 {
     $out = '<div class="asset-sales-card">';
     $out .= '<div class="asset-sales-card-head">' . ui_icon_html('stock-out-set', 16)
@@ -1995,7 +1995,7 @@ function asset_stockparts_withdraw_card_html(array $info): string
     if (empty($info['ok'])) {
         $msg = '<p class="muted asset-sales-empty">'
             . h((string) ($info['message'] ?? 'ไม่มีข้อมูล')) . '</p>';
-        return $out . ($setupHtml !== '' ? $setupHtml : $msg) . '</div></div>';
+        return $out . ($setupHtml !== '' ? $setupHtml : $msg) . $footHtml . '</div></div>';
     }
 
     $hasWithdraw = !empty($info['has_withdraw']);
@@ -2003,7 +2003,7 @@ function asset_stockparts_withdraw_card_html(array $info): string
     if (!$hasWithdraw && !$hasStockOld) {
         $msg = '<p class="muted asset-sales-empty">'
             . h((string) ($info['message'] ?? 'ยังไม่มีการเบิกใช้งานขาย')) . '</p>';
-        return $out . ($setupHtml !== '' ? $setupHtml : $msg) . '</div></div>';
+        return $out . ($setupHtml !== '' ? $setupHtml : $msg) . $footHtml . '</div></div>';
     }
 
     // ① ขายให้ใคร เมื่อไหร่ อ้างอิงอะไร
@@ -2033,6 +2033,7 @@ function asset_stockparts_withdraw_card_html(array $info): string
     $out .= '<p class="asset-sales-foot muted"><a href="'
         . h(BASE_URL . '/share.php?q=' . rawurlencode((string) $info['serial']))
         . '">ดูในทะเบียน stock →</a></p>';
+    $out .= $footHtml;
 
     return $out . '</div></div>';
 }

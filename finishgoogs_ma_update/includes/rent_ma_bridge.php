@@ -2219,7 +2219,7 @@ function rent_leasing_dl_row($label, $value)
  * @param array<string,mixed> $info จาก asset_leasing_info()
  * @return string
  */
-function asset_leasing_card_html(array $info, $extraHtml = '')
+function asset_leasing_card_html(array $info, $extraHtml = '', $footHtml = '')
 {
     $icon = function_exists('ui_icon_html') ? ui_icon_html('customers', 16) : '';
     // ปุ่มเปิดไปดูเครื่องนี้ที่ระบบเช่า — วางไว้ตรงหัวการ์ดที่พูดถึงเรื่องเช่าอยู่แล้ว
@@ -2241,6 +2241,7 @@ function asset_leasing_card_html(array $info, $extraHtml = '')
     if (empty($info['found'])) {
         $msg = trim((string) ($info['message'] ?? 'ไม่พบข้อมูลเช่า'));
         $out .= '<p class="muted asset-sales-empty">' . h($msg !== '' ? $msg : 'ไม่พบ S/N ในระบบเช่า') . '</p>';
+        $out .= (string) $footHtml;
         $out .= '</div></div>';
         return $out;
     }
@@ -2329,6 +2330,7 @@ function asset_leasing_card_html(array $info, $extraHtml = '')
     }
     $out .= '</dl>';
 
+    $out .= (string) $footHtml;
     $out .= '</div></div>';
     return $out;
 }

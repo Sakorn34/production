@@ -374,17 +374,18 @@ document.addEventListener('click', function (ev) {
       <?= asset_head_dl_html($a, $assetEditCtx, $componentRows) ?>
     </dl>
   </div>
+  <?php
+  // เครื่องอื่นที่ถูกส่งไปไซต์งานเดียวกัน — ชุดอุปกรณ์ของไซต์นั้นมักมาด้วยกันทั้งชุด
+  // วางไว้ท้ายกรอบเดิม ไม่แยกการ์ดใหม่ เพราะเป็นเรื่องเดียวกับข้อมูลการเบิก
+  require_once __DIR__ . '/includes/site_assets.php';
+  $siteHtml = site_assets_inline_html((string) $a['asset_code']);
+  ?>
   <?php if (!empty($leaseInfo['found'])) { ?>
-  <?= asset_leasing_card_html($leaseInfo, rent_retire_sync_asset_box_html($a, $leaseInfo)) ?>
+  <?= asset_leasing_card_html($leaseInfo, rent_retire_sync_asset_box_html($a, $leaseInfo), $siteHtml) ?>
   <?php } else { ?>
-  <?= asset_stockparts_withdraw_card_html($stockWithdraw) ?>
+  <?= asset_stockparts_withdraw_card_html($stockWithdraw, $siteHtml) ?>
   <?php } ?>
 </div>
-<?php
-// เครื่องอื่นที่ถูกส่งไปไซต์งานเดียวกัน — ชุดอุปกรณ์ของไซต์นั้นมักมาด้วยกันทั้งชุด
-require_once __DIR__ . '/includes/site_assets.php';
-echo site_assets_card_html((string) $a['asset_code']);
-?>
 <?php
 // ใบเบิกผลิตจาก inventory ที่เครื่องนี้ถูกตัดยอด (ตารางมีเมื่อเปิดใช้ฟีเจอร์ใบเบิกแล้ว)
 require_once __DIR__ . '/includes/inv_pickup.php';

@@ -350,12 +350,16 @@ function site_assets_of_serial(string $sn): array
 }
 
 /**
- * การ์ด "ไซต์งานเดียวกัน" สำหรับหน้าโปรไฟล์เครื่อง
+ * บล็อก "เครื่องอื่นที่ไซต์งานเดียวกัน" — ใส่ไว้ท้ายกรอบการเบิกเช่า/การเบิกใช้งานขาย
  *
- * @param string $sn       รหัสเครื่อง
- * @param int    $preview  จำนวนแถวที่โชว์ในการ์ด
+ * อยู่ในกรอบเดียวกับข้อมูลสัญญา เพราะเป็นเรื่องเดียวกัน คือเครื่องชุดนี้ไปอยู่ที่ไหน
+ * กรอบนั้นแคบและเลื่อนได้อยู่แล้ว ตารางจึงเอาแค่ รหัส · รุ่น · สถานะ
+ * ส่วนชื่อลูกค้ากับวันที่ไปดูต่อได้ที่หน้าไซต์งาน
+ *
+ * @param string $sn      รหัสเครื่อง
+ * @param int    $preview จำนวนแถวที่โชว์
  */
-function site_assets_card_html(string $sn, int $preview = 6): string
+function site_assets_inline_html(string $sn, int $preview = 5): string
 {
     $sites = site_assets_of_serial($sn);
     if (!$sites) {
@@ -393,9 +397,7 @@ function site_assets_card_html(string $sn, int $preview = 6): string
             $blocks .= '<td>' . ($r['status'] !== ''
                     ? '<span class="badge" style="' . h(status_badge_style($r['status'])) . '">'
                       . h(status_palette_entry($r['status'])['th']) . '</span>'
-                    : '<span class="muted">ไม่มีในทะเบียนเรา</span>') . '</td>';
-            $sub = trim(implode(' · ', array_filter([(string) $r['tag'], (string) $r['note']])));
-            $blocks .= '<td class="muted">' . h($sub) . '</td></tr>';
+                    : '<span class="muted">ไม่มีในทะเบียนเรา</span>') . '</td></tr>';
         }
         $blocks .= '</tbody></table>';
         if (count($others) > $preview) {
@@ -410,9 +412,7 @@ function site_assets_card_html(string $sn, int $preview = 6): string
         return '';
     }
 
-    $out = '<div class="asset-site-card">';
-    $out .= '<div class="asset-site-card-head">' . ui_icon_html('search', 16) . ' เครื่องอื่นที่ไซต์งานเดียวกัน</div>';
-    $out .= '<div class="asset-site-card-body">' . $blocks . '</div>';
-    $out .= '</div>';
-    return $out;
+    return '<div class="asset-site-inline">'
+        . '<div class="asset-sales-section-title">เครื่องอื่นที่ไซต์งานเดียวกัน</div>'
+        . $blocks . '</div>';
 }

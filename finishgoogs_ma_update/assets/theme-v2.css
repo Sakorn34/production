@@ -2020,18 +2020,10 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
 .rent-card-open { margin-left: auto; flex: 0 0 auto; }
 .asset-rent-card .asset-sales-card-head { flex-wrap: wrap; }
 
-/* ── การ์ด "เครื่องอื่นที่ไซต์งานเดียวกัน" ในหน้าโปรไฟล์เครื่อง ──
+/* ── "เครื่องอื่นที่ไซต์งานเดียวกัน" ท้ายกรอบการเบิกเช่า/การเบิกใช้งานขาย ──
    ชุดอุปกรณ์ของไซต์หนึ่งมักถูกส่งไปพร้อมกันทั้งชุด แต่ชื่อไซต์อยู่คนละระบบ
    จึงแยกเป็นบล็อกตามแหล่งที่มา ไม่รวมกันเป็นตารางเดียว */
-.asset-site-card {
-  margin: 0 0 16px;
-  background: var(--surface-muted); border: 1px solid var(--border); border-radius: var(--radius-sm, 8px);
-  padding: 12px 14px; font-size: calc(13px * var(--font-scale, 1));
-}
-.asset-site-card-head {
-  display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
-  font-size: calc(14px * var(--font-scale, 1)); color: var(--text-muted, #4b5563);
-}
+.asset-site-inline { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
 .asset-site-block + .asset-site-block { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
 .asset-site-block-head { margin-bottom: 6px; line-height: 1.7; }
 .asset-site-src {
