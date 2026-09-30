@@ -148,7 +148,7 @@ $res = qr(
 while ($r = $res->fetch_assoc()) { $rows[] = $r; }
 $suggest = unknown_assets_suggest($rows);
 
-page_header('ติดตามเครื่องไม่มีสถานะ', true, 'เครื่องที่นับสต็อกแล้วไม่เจอ และไม่มีหลักฐานว่าไปไหน — ตั้งสถานะให้ถูกทีละหลายเครื่อง', $B . '/settings.php');
+page_header('ติดตามเครื่องไม่มีสถานะ', true, 'เครื่องที่ไม่มีหลักฐานว่าอยู่ไหน — นับสต็อกแล้วไม่เจอ หรือค้างในทะเบียนเช่าโดยไม่เคยปล่อยเช่า — ตั้งสถานะให้ถูกทีละหลายเครื่อง', $B . '/settings.php');
 ?>
 <div class="panel ua-models">
   <div class="ua-total"><b><?= number_format($totalUnknown) ?></b> <span class="muted">เครื่องที่ยังไม่มีสถานะ</span></div>

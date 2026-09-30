@@ -2076,7 +2076,7 @@ function asset_leasing_status_by_assets(array $assets): array
     foreach (array_chunk($sns, 100) as $chunk) {
         $ph = implode(',', array_fill(0, count($chunk), '?'));
         $q = rent_q_try(
-            "SELECT pro_sn, pro_status FROM tbl_product WHERE pro_sn IN ($ph)",
+            "SELECT pro_sn, pro_status, pro_date FROM tbl_product WHERE pro_sn IN ($ph)",
             str_repeat('s', count($chunk)),
             $chunk
         );
@@ -2170,6 +2170,8 @@ function asset_leasing_status_by_assets(array $assets): array
             // เคยมีแถวในสัญญาเช่าไหม — ใช้แยก "เคยปล่อยเช่าจริงแล้วรับคืน"
             // ออกจาก "ลงทะเบียนเข้าคลังเช่าไว้เฉย ๆ ไม่เคยปล่อยเช่า"
             'had_contract' => $line !== null,
+            // วันที่ลงทะเบียนเข้าคลังเช่า — ใช้วัดว่าค้างมานานแค่ไหน
+            'lease_date' => trim((string) ($prod['pro_date'] ?? '')),
         ];
     }
 

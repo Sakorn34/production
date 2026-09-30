@@ -87,6 +87,36 @@ function asset_status_leasing_implies_new(array $lease): bool
  * @param array<string,mixed>|null $lease   จาก asset_leasing_status_by_assets
  * @return array{target:?string,reason:string}
  */
+/**
+ * ลงทะเบียนเข้าคลังเช่าไว้นานกี่วัน ถึงเลิกนับว่าเป็น "เครื่องพร้อมส่งให้เช่า"
+ *
+ * เครื่องที่ลงไว้ไม่นานยังเชื่อว่ารอปล่อยเช่าอยู่จริง แต่ถ้าค้างเกินเกณฑ์นี้
+ * โดยไม่เคยมีสัญญาเช่าเลย แปลว่าแถวในทะเบียนเช่าเป็นของค้าง ไม่ได้บอกที่อยู่จริง
+ * ของเครื่อง จึงตัดเป็น "ไม่มีสถานะ" ให้ไปตามหลักฐานที่หน้าติดตามเครื่องไม่มีสถานะ
+ */
+if (!defined('ASSET_LEASE_IDLE_UNKNOWN_DAYS')) {
+    define('ASSET_LEASE_IDLE_UNKNOWN_DAYS', 30);
+}
+
+/**
+ * ค้างในคลังเช่ามากี่วัน
+ *
+ * @param array<string,mixed>|null $lease
+ * @return int|null null = ไม่รู้วันที่ (0000-00-00 หรือว่าง) — ไม่เอามาตัดสิน
+ */
+function asset_status_lease_idle_days(?array $lease): ?int
+{
+    $d = trim((string) ($lease['lease_date'] ?? ''));
+    if ($d === '' || strpos($d, '0000-00-00') === 0) {
+        return null;
+    }
+    $t = strtotime($d);
+    if ($t === false || $t <= 0) {
+        return null;
+    }
+    return (int) floor((time() - $t) / 86400);
+}
+
 function asset_status_target_from_external(string $current, ?array $sale, ?array $lease): array
 {
     $current = trim($current) !== '' ? trim($current) : 'new';
@@ -119,7 +149,17 @@ function asset_status_target_from_external(string $current, ?array $sale, ?array
         if (empty($lease['had_contract']) && $sale && !empty($sale['sold']) && empty($sale['from_delivery'])) {
             return ['target' => 'sold', 'reason' => 'เบิกขายจาก stock (อยู่ในทะเบียนเช่าแต่ไม่เคยปล่อยเช่า)'];
         }
-        return ['target' => 'rental', 'reason' => empty($lease['had_contract']) ? 'คลังพร้อมเช่า (ยังไม่เคยปล่อยเช่า)' : 'รับคืนเข้าคลังเช่า'];
+        // เครื่องที่ลงทะเบียนเข้าคลังเช่าไว้เฉย ๆ นานแล้ว ไม่เคยปล่อยเช่าสักครั้ง
+        // แถวฝั่งเช่าเป็นของค้าง ไม่ได้บอกว่าเครื่องอยู่ไหน = "ไม่มีสถานะ"
+        if (empty($lease['had_contract'])) {
+            $idle = asset_status_lease_idle_days($lease);
+            if ($idle !== null && $idle >= (int) ASSET_LEASE_IDLE_UNKNOWN_DAYS) {
+                return ['target' => 'unknown',
+                        'reason' => 'ลงทะเบียนคลังเช่าไว้ ' . number_format($idle) . ' วัน ไม่เคยปล่อยเช่า'];
+            }
+            return ['target' => 'rental', 'reason' => 'คลังพร้อมเช่า (ยังไม่เคยปล่อยเช่า)'];
+        }
+        return ['target' => 'rental', 'reason' => 'รับคืนเข้าคลังเช่า'];
     }
 
     if ($sale && !empty($sale['sold']) && empty($sale['from_delivery'])) {
