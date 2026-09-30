@@ -1100,7 +1100,7 @@ function rent_bulk_retire(array $serials, $remark)
  * @param string $note
  * @return array{ok:bool, asset_id?:int, message:string}
  */
-function rent_register_single_asset($productId, $sn, $note = '')
+function rent_register_single_asset($productId, $sn, $note = '', array $allowStatuses = ['MA'])
 {
     $productId = (int)$productId;
     $sn = rent_normalize_sn($sn);
@@ -1122,8 +1122,9 @@ function rent_register_single_asset($productId, $sn, $note = '')
     if (!$row) {
         return ['ok' => false, 'message' => 'ไม่พบ S/N ' . $sn . ' ในระบบเช่า'];
     }
-    if ((string)$row['pro_status'] !== 'MA') {
-        return ['ok' => false, 'message' => 'S/N ' . $sn . ' ไม่ได้อยู่ในคิวรอ MA'];
+    // ปกติรับเฉพาะเครื่องในคิวรอ MA — หน้า "เครื่องค้างในคลังเช่า" ส่ง finished goods เข้ามาด้วย
+    if (!in_array((string) $row['pro_status'], $allowStatuses, true)) {
+        return ['ok' => false, 'message' => 'S/N ' . $sn . ' สถานะฝั่งเช่าเป็น "' . (string) $row['pro_status'] . '" ไม่อยู่ในกลุ่มที่ลงทะเบียนได้'];
     }
     if (!rent_product_name_matches($row['pro_name'], $p['name'])) {
         return ['ok' => false, 'message' => 'S/N ' . $sn . ' ไม่ใช่รุ่น ' . $p['name'] . ' ในระบบเช่า'];
@@ -1163,6 +1164,37 @@ function rent_register_single_asset($productId, $sn, $note = '')
 }
 
 /**
+ * จับคู่ชื่อรุ่นฝั่งเช่ากับรุ่นสินค้าของเรา
+ *
+ * ใช้ products.leasing_name ที่ตั้งไว้ที่หลังบ้าน — ไม่เดาเอง เพราะเขียนชื่อผิด
+ * ลงฐานคนอื่นแก้ยากกว่าไม่เขียน (กติกาเดียวกับตอนย้ายเครื่องเข้าระบบเช่า)
+ *
+ * @param string $leaseName ชื่อรุ่นใน tbl_product.pro_name
+ * @return int product id · 0 ถ้าจับคู่ไม่ได้
+ */
+function rent_product_id_from_lease_name(string $leaseName): int
+{
+    $leaseName = trim($leaseName);
+    if ($leaseName === '') {
+        return 0;
+    }
+    static $map = null;
+    if ($map === null) {
+        $map = [];
+        $res = qr("SELECT id, name, leasing_name FROM products WHERE is_active = 1");
+        while ($p = $res->fetch_assoc()) {
+            foreach ([(string) ($p['leasing_name'] ?? ''), (string) $p['name']] as $k) {
+                $k = mb_strtolower(trim($k));
+                if ($k !== '' && !isset($map[$k])) {
+                    $map[$k] = (int) $p['id'];
+                }
+            }
+        }
+    }
+    return $map[mb_strtolower($leaseName)] ?? 0;
+}
+
+/**
  * ลงทะเบียน S/N หลายรายการจากคิวเช่า
  *
  * @param int              $productId
@@ -1170,7 +1202,7 @@ function rent_register_single_asset($productId, $sn, $note = '')
  * @param string           $note
  * @return array{ok:bool, success:int, fail:int, messages:array<int,string>}
  */
-function rent_register_assets_to_product($productId, array $serials, $note = '')
+function rent_register_assets_to_product($productId, array $serials, $note = '', array $allowStatuses = ['MA'])
 {
     $success = 0;
     $fail = 0;
@@ -1182,7 +1214,7 @@ function rent_register_assets_to_product($productId, array $serials, $note = '')
             continue;
         }
         $seen[$sn] = true;
-        $res = rent_register_single_asset($productId, $sn, $note);
+        $res = rent_register_single_asset($productId, $sn, $note, $allowStatuses);
         if ($res['ok']) {
             $success++;
         } else {
