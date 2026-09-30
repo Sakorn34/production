@@ -2032,3 +2032,17 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
   background: var(--primary-soft, #fce7f3); color: var(--primary);
 }
 .asset-site-more { display: inline-block; margin-top: 6px; font-size: calc(12px * var(--font-scale, 1)); }
+
+/* ── การ์ด "การเบิกใช้งานขาย" แบบไทม์ไลน์ ──
+   เรียงตามลำดับที่เกิดจริง: ระบบขาย → ทะเบียน stock → ส่งมอบ
+   แต่ละเรื่องพูดครั้งเดียว ชื่อสินค้ากับสถานะส่งมอบอยู่หัวการ์ด ไม่ซ้ำลงมาในขั้น */
+.asset-sales-head-sub { font-size: calc(12px * var(--font-scale, 1)); margin-left: 2px; }
+.asset-sales-head-flag { margin-left: auto; }
+.asset-sales-timeline { border-left: 2px solid var(--border); padding-left: 14px; margin-left: 4px; }
+.asset-sales-step + .asset-sales-step { margin-top: 14px; }
+.asset-sales-step-when {
+  font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480);
+}
+.asset-sales-step-title { margin-top: 2px; line-height: 1.7; }
+.asset-sales-step-meta { margin-top: 2px; font-size: calc(12px * var(--font-scale, 1)); line-height: 1.7; }
+.asset-sales-line-sn { white-space: nowrap; }

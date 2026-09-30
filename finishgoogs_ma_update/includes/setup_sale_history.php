@@ -212,92 +212,83 @@ function setup_sale_history_conflicts(array $row, array $info): array
 }
 
 /**
- * บล็อกประวัติขาย/เคลม สำหรับต่อท้ายการ์ด "การเบิกใช้งานขาย"
+ * ประวัติขาย/เคลม ในรูปขั้นของไทม์ไลน์ — การ์ดเอาไปเรียงรวมกับขั้นอื่นเอง
+ *
+ * เดิมฟังก์ชันนี้วาดบล็อกของตัวเองพร้อมหัวข้อและกรอบ พอเอาไปต่อท้ายการ์ด
+ * ลูกค้า วันที่ และชื่อสินค้าจึงขึ้นซ้ำกับส่วนบนของการ์ดอีกชุด
  *
  * @param string              $serial
- * @param array<string,mixed> $info ผลจาก asset_stockparts_withdraw_info() (ใช้เทียบค่า)
- * @return string HTML ('' ถ้าไม่มีอะไรจะแสดง)
+ * @param array<string,mixed> $info ผลจาก stockparts_withdraw_summary_fields() (ใช้เทียบค่า)
+ * @return array{steps:array<int,array<string,mixed>>,error:string}
  */
-function setup_sale_history_html(string $serial, array $info = []): string
+function setup_sale_history_steps(string $serial, array $info = []): array
 {
     $hist = setup_sale_history_for_serial($serial);
+    $out = ['steps' => [], 'error' => ''];
     if (!$hist['ok'] || !$hist['rows']) {
         // ต่อฐานไม่ได้ต้องบอก ไม่ใช่เงียบ — ไม่งั้นผู้ใช้แยกไม่ออกระหว่าง
         // "ไม่มีประวัติขาย" กับ "อ่านประวัติขายไม่ได้" ซึ่งคนละเรื่องกัน
-        if ($hist['error'] !== '') {
-            return '<div class="asset-sales-block"><div class="asset-sales-block-title">ประวัติขาย/เคลม</div>'
-                . '<p class="muted">' . h($hist['error']) . '</p></div>';
-        }
-        return '';
+        $out['error'] = $hist['error'];
+        return $out;
     }
-
-    $out = '<div class="asset-sales-block asset-sales-setup-block">';
-    $out .= '<div class="asset-sales-block-title">ประวัติขาย/เคลม <span class="muted">(ระบบ setup)</span></div>';
 
     foreach ($hist['rows'] as $r) {
         $isClaim = ((string) ($r['issue_type'] ?? '')) === 'claim';
         $role = (string) ($r['_role'] ?? 'new');
         $v = setup_sale_history_norm($r);
 
-        $out .= '<div class="asset-sales-setup-row">';
-        $out .= '<p class="asset-sales-summary">' . setup_sale_history_badge($r);
+        $title = setup_sale_history_badge($r);
+        if ($v['ref'] !== '') {
+            $title .= ' <b class="asset-sales-setup-id">#' . h($v['ref']) . '</b>';
+        }
         if ($v['org'] !== '') {
-            $out .= ' <b class="asset-sales-cust">' . h($v['org']) . '</b>';
+            $title .= ' <b class="asset-sales-cust">' . h($v['org']) . '</b>';
         }
         if ($v['dept'] !== '') {
-            $out .= ' <span class="asset-sales-dept">' . h($v['dept']) . '</span>';
-        }
-        if ($v['date'] !== '') {
-            $out .= ' <span class="asset-sales-sep">·</span> <span class="asset-sales-when">'
-                . h(dthai($v['date'])) . '</span>';
-        }
-        if ($v['ref'] !== '') {
-            $out .= ' <span class="asset-sales-sep">·</span> อ้างอิง <b class="asset-sales-setup-id">#'
-                . h($v['ref']) . '</b>';
-        }
-        $out .= '</p>';
-
-        // คู่เครื่องที่เคลมเปลี่ยนกัน — เรื่องที่ฝั่ง stock ตอบไม่ได้
-        if ($isClaim && $v['other_sn'] !== '') {
-            $verb = $role === 'new' ? 'เปลี่ยนมาจากเครื่อง' : 'ถูกเปลี่ยนเป็นเครื่อง';
-            $out .= '<p class="asset-sales-claim-pair">' . h($verb) . ' <b>' . h($v['other_sn']) . '</b></p>';
+            $title .= ' <span class="asset-sales-dept">' . h($v['dept']) . '</span>';
         }
 
-        $rows = '';
-        $add = function ($label, $val) use (&$rows) {
-            if (trim((string) $val) !== '') {
-                $rows .= stockparts_withdraw_dl_row($label, stockparts_fmt_field((string) $val));
-            }
-        };
-        $add('สินค้า', $v['product']);
-        $add('PO', $v['po']);
-        // customer_name กับ contact_person มักเป็นคนเดียวกัน — ต่อกันตรง ๆ ได้ "คุณผิว คุณผิว"
+        // บรรทัดรายละเอียด — เอาเฉพาะที่การ์ดส่วนอื่นไม่ได้บอกไว้แล้ว
+        // (ชื่อสินค้าอยู่หัวการ์ด ลูกค้ากับวันที่อยู่บรรทัดบนของขั้นนี้)
         $who = array_values(array_unique(array_filter([$v['person'], $v['contact']], function ($x) {
             return trim($x) !== '';
         })));
         if (count($who) === 2 && mb_stripos($who[1], $who[0]) !== false) {
             $who = [$who[1]];
         }
+        $bits = [];
+        $add = function ($label, $val) use (&$bits) {
+            $val = trim((string) $val);
+            if ($val !== '' && $val !== '-') {
+                $bits[] = $label . ' ' . $val;
+            }
+        };
+        $add('สถานะ', $v['status']);
         $add('ผู้ติดต่อ', implode(' · ', $who));
+        $add('PO', $v['po']);
         $add('เลขสัญญาเช่า', (string) ($r['lease_number'] ?? ''));
-        $add('ที่อยู่', (string) ($r['customer_address'] ?? ''));
         $add('วันส่งมอบ', $v['delivery'] !== '' ? dthai($v['delivery']) : '');
         $add('ประกัน', $v['warranty']);
-        $add('สถานะ Order', $v['status']);
-        $add('หมายเหตุ', $v['remark']);
         $add('ผู้บันทึก', $v['by']);
-        if ($rows !== '') {
-            $out .= '<dl class="asset-sales-dl asset-sales-dl-inline">' . $rows . '</dl>';
-        }
+        $add('หมายเหตุ', $v['remark']);
 
+        $extra = '';
+        // คู่เครื่องที่เคลมเปลี่ยนกัน — เรื่องที่ฝั่ง stock ตอบไม่ได้
+        if ($isClaim && $v['other_sn'] !== '') {
+            $verb = $role === 'new' ? 'เปลี่ยนมาจากเครื่อง' : 'ถูกเปลี่ยนเป็นเครื่อง';
+            $extra .= '<p class="asset-sales-claim-pair">' . h($verb) . ' <b>' . h($v['other_sn']) . '</b></p>';
+        }
         foreach (setup_sale_history_conflicts($r, $info) as $c) {
-            $out .= '<p class="asset-sales-conflict">' . ui_icon_html('alert', 13, 'h-svg') . ' ' . h($c) . '</p>';
+            $extra .= '<p class="asset-sales-conflict">' . ui_icon_html('alert', 13, 'h-svg') . ' ' . h($c) . '</p>';
         }
-        $out .= '</div>';
-    }
 
-    $out .= '<p class="asset-sales-foot muted"><a href="'
-        . h(SETUP_SALE_HISTORY_URL . '?serial=' . rawurlencode($serial))
-        . '" target="_blank" rel="noopener">ดูในระบบขาย ↗</a></p>';
-    return $out . '</div>';
+        $out['steps'][] = [
+            'date'  => $v['date'],
+            'where' => 'ระบบขาย',
+            'title' => $title,
+            'meta'  => $bits ? implode(' · ', array_map('h', $bits)) : '',
+            'extra' => $extra,
+        ];
+    }
+    return $out;
 }
