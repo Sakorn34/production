@@ -66,7 +66,7 @@ class StockService
     public function getProductStockOutHistory(int $productId, ?int $limit = 20): array
     {
         $sql = "
-            SELECT so.id, so.doc_no, so.note, so.issued_by, so.created_at,
+            SELECT so.id, so.doc_no, so.note, so.issued_by, so.created_at, so.asset_code,
                    soi.quantity, so.set_id, s.code AS set_code, s.name AS set_name
             FROM stock_out_items soi
             JOIN stock_out so ON so.id = soi.stock_out_id

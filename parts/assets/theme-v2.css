@@ -84,3 +84,23 @@ table tbody tr:hover td { background: #faf8fe; }
 .btn-with-icon .btn-svg { flex-shrink: 0; }
 .alert.h-with-icon { align-items: flex-start; }
 .alert.h-with-icon .h-svg { margin-top: 2px; }
+
+/* ── ประวัติการเบิกของอะไหล่: รุ่นสินค้า → หมายเลขเครื่อง → ใบงาน ──
+   เดิมเป็นตารางเรียงตามเวลาล้วน อ่านแล้วไม่รู้ว่าอะไหล่ชิ้นนี้ลงไปกับรุ่นไหนบ้าง
+   หมายเหตุ: .part-hist-body ต้องไม่เป็น grid/flex ตอน details ปิด ไม่งั้นจองความสูงไว้ */
+.part-hist-grp { border-bottom: 1px solid var(--border, #e8e4f2); }
+.part-hist-sum { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  padding: 9px 4px; cursor: pointer; list-style: none; }
+.part-hist-sum::-webkit-details-marker { display: none; }
+.part-hist-sum::before { content: '\25B8'; color: var(--text-muted, #6b6480); font-size: 0.8em; }
+.part-hist-grp[open] > .part-hist-sum::before { content: '\25BE'; }
+.part-hist-sum-meta { margin-left: auto; font-size: 0.82rem; white-space: nowrap; }
+.part-hist-body { padding: 0 0 8px 20px; }
+.part-hist-sn + .part-hist-sn { margin-top: 8px; }
+.part-hist-sn-head { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; margin-bottom: 2px; }
+.part-hist-doc { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; padding: 3px 0; font-size: 0.85rem; }
+.part-hist-doc-no { white-space: nowrap; }
+.part-hist-who { min-width: 0; overflow-wrap: anywhere; }
+.part-hist-qty { margin-left: auto; white-space: nowrap; font-weight: 600; }
+.part-hist-when { white-space: nowrap; }
+@media (max-width: 560px) { .part-hist-body { padding-left: 10px; } .part-hist-qty { margin-left: 0; } }

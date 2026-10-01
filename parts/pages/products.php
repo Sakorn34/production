@@ -27,58 +27,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $action = $_POST['action'] ?? '';
 
-    // งานสต็อกประจำวัน (รับเข้า / เบิกออก) — ย้ายมาจาก stock-in.php, stock-out-item.php, stock-out.php
-    //
-    // ทุก branch ต้องมีชื่อ action ชัดเจน ห้ามใช้ else ตกท้ายเด็ดขาด: ฟอร์มสวิตช์เปิด/ปิดอะไหล่
-    // ถูก auto-submit จาก app.js ทุกครั้งที่คลิก ถ้ามี else ตกท้ายที่เรียกการเบิกออก
-    // แค่คลิกสวิตช์ก็จะตัดสต็อกจริงทันที
-    //
-    // และต้องแยก try ออกจากก้อนล่าง เพราะก้อนล่าง catch เฉพาะ PDOException
-    // แต่ StockService โยน Exception ธรรมดาเมื่อของไม่พอ — จะหลุดไปเป็น fatal
-    if ($action === 'stock_in' || $action === 'stock_out_item' || $action === 'stock_out_set') {
-        try {
-            if ($action === 'stock_in') {
-                ensureStockInColumns($db);
-                $stock->stockIn(
-                    (int) $_POST['product_id'],
-                    (int) $_POST['quantity'],
-                    trim($_POST['note'] ?? '') ?: null,
-                    $line_name
-                );
-                flash('success', 'บันทึกรับเข้าเรียบร้อย');
-                parts_log_stock_action('stock-in.php');
-            } elseif ($action === 'stock_out_item') {
-                $docNo = $stock->stockOutItem(
-                    (int) $_POST['product_id'],
-                    (int) $_POST['quantity'],
-                    validateStockOutNote($_POST['note'] ?? null),
-                    trim($line_name ?? '') ?: null,
-                    trim($_POST['asset_code'] ?? '') ?: null
-                );
-                flash('success', "เบิกออกเรียบร้อย เลขที่: {$docNo}");
-                parts_log_stock_action('stock-out-item.php');
-            } else {
-                // เดิมเป็น else ตกท้ายจึงไม่เคยตรวจค่า — ตอนนี้เรียกด้วยชื่อ action จึงต้องกันเอง
-                $setId = (int) ($_POST['set_id'] ?? 0);
-                $setCount = (int) ($_POST['set_count'] ?? 0);
-                if ($setId <= 0 || $setCount <= 0) {
-                    flash('error', 'กรุณาเลือก Set และระบุจำนวนชุดที่เบิก');
-                    redirect($productsReturnTo);
-                }
-                $docNo = $stock->stockOutBySet(
-                    $setId,
-                    $setCount,
-                    validateStockOutNote($_POST['note'] ?? null),
-                    trim($line_name ?? '') ?: null,
-                    trim($_POST['asset_code'] ?? '') ?: null
-                );
-                flash('success', "เบิกออกเรียบร้อย เลขที่: {$docNo}");
-                parts_log_stock_action('stock-out.php');
-            }
-        } catch (Exception $e) {
-            flash('error', safe_exception_message($e));
-        }
-        redirect($productsReturnTo);
+    // งานสต็อกประจำวัน (รับเข้า / เบิกออก) — ตัวจัดการอยู่ใน product_edit.php
+    // เพราะหน้ารายละเอียดอะไหล่เปิดฟอร์มชุดเดียวกันได้ด้วย
+    if (parts_stock_forms_handle_post($db, $stock, $productsReturnTo, $line_name)) {
+        exit;
     }
 
     try {

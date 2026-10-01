@@ -36,6 +36,106 @@ function production_db(): PDO
 }
 
 /**
+ * URL ฐานของแอป production (คู่กับ parts_app_base_url() ฝั่งโน้น)
+ */
+function production_app_base_url(): string
+{
+    return str_replace('/parts', '/finishgoogs_ma_update', rtrim(BASE_PATH, '/'));
+}
+
+/**
+ * รุ่นสินค้าของหมายเลขเครื่องแต่ละตัว
+ *
+ * ชื่อรุ่นอยู่ในทะเบียนเครื่องฝั่ง production เท่านั้น ฝั่ง parts เก็บแต่หมายเลข
+ * (stock_out.asset_code) จึงต้องถามข้ามมา — อ่านอย่างเดียว ถามครั้งเดียวทั้งหน้า
+ *
+ * @param string[] $codes
+ * @return array<string,array{id:int,model:string}> หมายเลข(ตัวใหญ่) => ข้อมูล
+ */
+function production_asset_models(array $codes): array
+{
+    $codes = array_values(array_unique(array_filter(array_map('trim', $codes), 'strlen')));
+    if (!$codes) {
+        return [];
+    }
+    try {
+        $ph = implode(',', array_fill(0, count($codes), '?'));
+        $st = production_db()->prepare(
+            "SELECT a.id, a.asset_code, p.name AS model
+             FROM assets a JOIN products p ON p.id = a.product_id
+             WHERE a.asset_code IN ($ph)"
+        );
+        $st->execute($codes);
+        $out = [];
+        while ($row = $st->fetch()) {
+            $out[strtoupper(trim((string) $row['asset_code']))] = [
+                'id'    => (int) $row['id'],
+                'model' => trim((string) $row['model']),
+            ];
+        }
+        return $out;
+    } catch (Throwable $e) {
+        error_log('[production_asset_models] ' . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * จัดประวัติการเบิกเป็น รุ่นสินค้า → หมายเลขเครื่อง → ใบงาน
+ *
+ * ใบที่ไม่ได้ผูกกับเครื่อง (เบิกเข้าชุด หรือเบิกทั่วไป) ไปรวมกลุ่มท้ายสุด
+ * ไม่ทิ้ง เพราะเป็นยอดที่หายไปจากคลังจริงเหมือนกัน
+ *
+ * @param array<int,array<string,mixed>> $history แถวจาก getProductStockOutHistory()
+ * @return array<int,array<string,mixed>>
+ */
+function parts_history_group_by_model(array $history): array
+{
+    if (!$history) {
+        return [];
+    }
+    $models = production_asset_models(array_column($history, 'asset_code'));
+
+    $groups = [];
+    foreach ($history as $h) {
+        $sn  = strtoupper(trim((string) ($h['asset_code'] ?? '')));
+        $hit = $sn !== '' ? ($models[$sn] ?? null) : null;
+        $key = $hit ? $hit['model'] : ($sn !== '' ? '~' . $sn : '');
+        if (!isset($groups[$key])) {
+            $groups[$key] = [
+                'model'   => $hit ? $hit['model'] : ($sn !== '' ? 'ไม่พบรุ่นในทะเบียน' : 'ไม่ได้ระบุเครื่อง'),
+                'known'   => $hit !== null,
+                'sns'     => [],
+                'docs'    => 0,
+                'qty'     => 0,
+                'last'    => '',
+            ];
+        }
+        $g = &$groups[$key];
+        $g['docs']++;
+        $g['qty'] += (int) ($h['quantity'] ?? 0);
+        $when = (string) ($h['created_at'] ?? '');
+        if ($when > $g['last']) {
+            $g['last'] = $when;
+        }
+        $snKey = $sn !== '' ? $sn : '';
+        if (!isset($g['sns'][$snKey])) {
+            $g['sns'][$snKey] = ['sn' => $sn, 'asset_id' => $hit['id'] ?? 0, 'rows' => []];
+        }
+        $g['sns'][$snKey]['rows'][] = $h;
+        unset($g);
+    }
+
+    // รุ่นที่รู้จักก่อน เรียงตามจำนวนครั้ง · กลุ่มไม่ระบุเครื่องไว้ท้ายสุดเสมอ
+    uasort($groups, function ($a, $b) {
+        $an = $a['known'] ? 0 : ($a['model'] === 'ไม่ได้ระบุเครื่อง' ? 2 : 1);
+        $bn = $b['known'] ? 0 : ($b['model'] === 'ไม่ได้ระบุเครื่อง' ? 2 : 1);
+        return [$an, -$a['docs'], $a['model']] <=> [$bn, -$b['docs'], $b['model']];
+    });
+    return array_values($groups);
+}
+
+/**
  * เพิ่มคอลัมน์ sync ใน tech_parts และ production (รันครั้งเดียวต่อ request)
  *
  * @param PDO $techDb biton_tech_parts
