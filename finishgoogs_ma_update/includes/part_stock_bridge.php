@@ -424,6 +424,51 @@ function tech_parts_qty_map_for_parts(array $partRows) {
     return $map;
 }
 
+/**
+ * id ของอะไหล่ในแอป parts จากรหัส stock (ไว้ลิงก์ไปหน้ารายละเอียดของแอปนั้น)
+ *
+ * หน้ารายละเอียดของแอป parts รับ products.id ไม่ใช่รหัส จึงต้องแปลงก่อน
+ *
+ * @param string[] $codes
+ * @return array<string,int> รหัส => products.id
+ */
+function parts_app_ids_by_code(array $codes): array
+{
+    $codes = array_values(array_unique(array_filter(array_map('trim', $codes), 'strlen')));
+    if (!$codes) {
+        return [];
+    }
+    try {
+        $ph = implode(',', array_fill(0, count($codes), '?'));
+        $st = dbParts()->prepare('SELECT id, code FROM products WHERE code IN (' . $ph . ')');
+        $st->execute($codes);
+        $map = [];
+        while ($row = $st->fetch()) {
+            $map[(string) $row['code']] = (int) $row['id'];
+        }
+        return $map;
+    } catch (Throwable $e) {
+        error_log('[parts_app_ids_by_code] ' . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * รหัสที่ใช้คุยกับแอป parts ของแถว movement (ลำดับเดียวกับ parts_stock_quantities_by_code)
+ *
+ * @param array<string,mixed> $mv
+ */
+function part_movement_stock_code(array $mv): string
+{
+    foreach (['stock_code', 'part_code', 'pname'] as $k) {
+        $v = trim((string) ($mv[$k] ?? ''));
+        if ($v !== '') {
+            return $v;
+        }
+    }
+    return '';
+}
+
 // ─ Asset parts status (production UI) ────────────────────────────────────────
 
 /**
@@ -627,6 +672,11 @@ function asset_parts_withdraw_summary($assetId) {
         );
         while ($r = $res->fetch_assoc()) {
             $movements[] = $r;
+        }
+        // ผูก id ฝั่งแอป parts ไว้ให้หน้าจอทำลิงก์ไปหน้ารายละเอียดอะไหล่ได้
+        $idMap = parts_app_ids_by_code(array_map('part_movement_stock_code', $movements));
+        foreach ($movements as $i => $m) {
+            $movements[$i]['app_id'] = $idMap[part_movement_stock_code($m)] ?? 0;
         }
     }
 

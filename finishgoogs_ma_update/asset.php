@@ -485,8 +485,16 @@ if ($invAlloc) { ?>
         <?php } else { ?>
           <span class="thumb-sm part-row-noimg" aria-hidden="true"></span>
         <?php } ?>
+        <?php // ชื่ออะไหล่กดเปิดหน้ารายละเอียดในแอปอะไหล่ — แท็บใหม่ เพราะคนกำลังไล่ดูเครื่องอยู่
+             // ตัวที่ยังจับคู่รหัสกับแอปนั้นไม่ได้ ก็เป็นข้อความเฉย ๆ ไม่ใช่ลิงก์ตาย
+             $mvAppId = (int) ($mv['app_id'] ?? 0);
+             $mvUrl = $mvAppId > 0 ? parts_app_base_url() . '/pages/product-detail.php?id=' . $mvAppId : ''; ?>
         <span>
+          <?php if ($mvUrl !== '') { ?>
+          <a href="<?= h($mvUrl) ?>" target="_blank" rel="noopener" title="เปิดหน้าอะไหล่ชิ้นนี้ในแอปอะไหล่"><?= h($mv['pname']) ?></a>
+          <?php } else { ?>
           <?= h($mv['pname']) ?>
+          <?php } ?>
           <?php if (!empty($mv['part_code']) && trim((string)$mv['part_code']) !== trim((string)$mv['pname'])) { ?>
             <br><span class="muted" style="font-size:11px"><?= h($mv['part_code']) ?></span>
           <?php } ?>
