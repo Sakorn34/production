@@ -1051,9 +1051,16 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
    ต่างกันทั้งรูปทรงและสี กวาดตาผ่าน ๆ ก็แยกออกโดยไม่ต้องเทียบเฉด */
 .fg-mark.is-min, .fg-legend-mark.is-min { color: var(--text-muted, #6b6480); font-size: 13px; }
 .fg-mark.is-po, .fg-legend-mark.is-po { color: #b45309; }
-/* ช่วงระหว่างขั้นต่ำกับต้องมี = ยอด PO ที่ต้องผลิตส่ง — ตัวเลขที่ต้องลงมือทำ */
-.fg-po-band { position: absolute; top: 8px; height: 3px; border-radius: 2px; background: #b45309; opacity: .5; pointer-events: auto; }
-.fg-legend-mark.is-band { display: inline-block; width: 14px; height: 3px; border-radius: 2px; background: #b45309; opacity: .5; vertical-align: 2px; }
+/* รางเหนือแถบ = ยอดที่ต้องมี แบ่งสองท่อนตามที่มา: เทา = ขั้นต่ำที่ตั้งไว้ · ส้ม = PO ที่ค้างส่ง
+   ต่อกันเป็นรางเดียวจบที่หมุด ▼ จึงอ่านสัดส่วนได้เลยว่ายอดที่ต้องมีมาจากอะไรเท่าไหร่ */
+.fg-min-band, .fg-po-band { position: absolute; top: 8px; height: 3px; border-radius: 2px; pointer-events: auto; }
+.fg-min-band { background: var(--text-faint, #a39fb3); }
+.fg-po-band { background: #b45309; opacity: .55; }
+.fg-min-band.has-next { border-radius: 2px 0 0 2px; }
+.fg-po-band.has-prev { border-radius: 0 2px 2px 0; }
+.fg-legend-mark.is-band, .fg-legend-mark.is-band-min { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: 2px; }
+.fg-legend-mark.is-band { background: #b45309; opacity: .55; }
+.fg-legend-mark.is-band-min { background: var(--text-faint, #a39fb3); }
 .fg-mark.is-clip { top: 11px; right: -2px; left: auto; transform: none; font-size: 13px; line-height: 12px; color: var(--text-muted, #6b6480); }
 .fg-legend-mark { font-size: 10px; color: var(--text, #2a2440); }
 .fg-bar-note { margin-top: 4px; font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); white-space: nowrap; }

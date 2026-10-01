@@ -558,7 +558,7 @@ $partsBase = ui_parts_base_url();
       <tr>
         <th data-pri="2" style="width:44px"></th>
         <th data-pri="1">รุ่น</th>
-        <th data-pri="2" class="fg-bar-col" title="ทุกรุ่นใช้สเกลเดียวกัน — แถบยาวเท่ากันคือจำนวนเครื่องเท่ากัน · ขีด ▏= ขั้นต่ำ · ขีดคาดส้ม = ยอด PO ที่ต้องผลิตเพิ่ม · ▼ = ยอดที่ต้องมีทั้งหมด · ส่วนสีจาง = เกินจากที่ต้องมี"><span class="fg-legend"><i class="is-new"></i>เครื่องใหม่</span> <span class="fg-legend"><i class="is-pool"></i>คลังพร้อมเช่า</span> <span class="fg-legend"><b class="fg-legend-mark is-min">▏</b>ขั้นต่ำ</span> <span class="fg-legend"><b class="fg-legend-mark is-band"></b>ช่วง PO</span> <span class="fg-legend"><b class="fg-legend-mark is-po">▼</b>ต้องมี</span></th>
+        <th data-pri="2" class="fg-bar-col" title="ทุกรุ่นใช้สเกลเดียวกัน — แถบยาวเท่ากันคือจำนวนเครื่องเท่ากัน · รางบนแถบคือยอดที่ต้องมี ท่อนเทา = ขั้นต่ำ ท่อนส้ม = PO ค้าง จบที่หมุด ▼ · ส่วนสีจาง = เกินจากที่ต้องมี"><span class="fg-legend"><i class="is-new"></i>เครื่องใหม่</span> <span class="fg-legend"><i class="is-pool"></i>คลังพร้อมเช่า</span> <span class="fg-legend"><b class="fg-legend-mark is-band-min"></b>ขั้นต่ำ</span> <span class="fg-legend"><b class="fg-legend-mark is-band"></b>PO ค้าง</span> <span class="fg-legend"><b class="fg-legend-mark is-po">▼</b>ต้องมี</span></th>
         <th data-pri="1" class="num-col">เครื่องใหม่</th>
         <th data-pri="2" class="num-col" title="ระบบเช่าเป็น finished goods รอปล่อยเช่า — นับรวมในยอดที่มี">คลังพร้อมเช่า</th>
         <th data-pri="2" class="num-col" title="ของที่ระบบ inventory จ่ายลงมาแล้ว ยังไม่ได้ลงทะเบียนเครื่อง — กำลังจะผลิตเพิ่ม">เบิกแล้ว รอผลิต</th>
@@ -937,7 +937,7 @@ $partsBase = ui_parts_base_url();
         var poQ = Number(row.po) || 0;
         var marks = cell('marks');
         if (marks) {
-          marks.querySelectorAll('.fg-mark, .fg-po-band').forEach(function (m) { m.remove(); });
+          marks.querySelectorAll('.fg-mark, .fg-po-band, .fg-min-band').forEach(function (m) { m.remove(); });
           // ชิดขอบไม่ให้หมุดครึ่งซีกล้นออกนอกช่อง
           var at = function (n) { return Math.min(99, Math.max(1, pc(n))); };
           var mark = function (cls, n, tip, glyph) {
@@ -952,14 +952,27 @@ $partsBase = ui_parts_base_url();
           // กวาดตาผ่าน ๆ ก็แยกออก ไม่ต้องเทียบเฉดสีสองอันที่คล้ายกัน
           if (minQ > 0 && minQ <= fgScale) { mark(' is-min', minQ, 'ขั้นต่ำ ' + fgNum(minQ), '▏'); }
           if ((poQ > 0 || minQ === 0) && req <= fgScale) { mark(' is-po', req, 'ขั้นต่ำ ' + fgNum(minQ) + ' + PO ' + fgNum(poQ) + ' = ต้องมี ' + fgNum(req), '▼'); }
-          // ช่วงระหว่างสองหมุดคือยอด PO ที่ต้องผลิตส่ง — ขีดคาดไว้ให้เห็นว่ากินแค่ไหน
-          if (poQ > 0 && minQ <= fgScale) {
-            var band = document.createElement('span');
-            band.className = 'fg-po-band';
-            band.style.left = at(minQ) + '%';
-            band.style.width = Math.max(0, at(Math.min(req, fgScale)) - at(minQ)) + '%';
-            band.title = 'PO ค้าง ' + fgNum(poQ) + ' เครื่อง — ส่วนที่ต้องผลิตเพิ่มจากขั้นต่ำ';
-            marks.appendChild(band);
+          // รางเหนือแถบ = ยอดที่ต้องมี แบ่งเป็นสองท่อนตามที่มา
+          // ท่อนแรกคือขั้นต่ำที่ตั้งไว้ ท่อนสองคือ PO ที่ค้างส่ง ต่อกันจบที่หมุด ▼
+          var bandAt = function (n) { return Math.max(0, Math.min(100, pc(n))); };
+          var minW = minQ > 0 ? bandAt(Math.min(minQ, fgScale)) : 0;
+          var reqW = bandAt(Math.min(req, fgScale));
+          var poW = Math.max(0, reqW - minW);
+          var band = function (cls, left, width, tip) {
+            if (width <= 0) { return; }
+            var el = document.createElement('span');
+            el.className = cls;
+            el.style.left = left + '%';
+            el.style.width = width + '%';
+            el.title = tip;
+            marks.appendChild(el);
+          };
+          // ท่อน PO ที่ล้นสเกลจะวาดไม่ได้ ท่อนขั้นต่ำต้องปิดขอบมนเองไม่ให้ค้างเป็นปลายตัด
+          band('fg-min-band' + (poW > 0 ? ' has-next' : ''), 0, minW,
+               'ขั้นต่ำที่ตั้งไว้ ' + fgNum(minQ) + ' เครื่อง');
+          if (poW > 0) {
+            band('fg-po-band' + (minW > 0 ? ' has-prev' : ''), minW, poW,
+                 'PO ค้าง ' + fgNum(poQ) + ' เครื่อง — ส่วนที่ต้องผลิตเพิ่มจากขั้นต่ำ');
           }
           // เกินสเกล — บอกด้วย › ท้ายแถบ แทนหมุดที่จะไปกองอยู่ริมขวาแบบผิด ๆ
           if (Math.max(req, have + pool) > fgScale) {
