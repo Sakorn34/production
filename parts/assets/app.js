@@ -356,6 +356,15 @@
                     var iconFile = modal.querySelector('input[type="file"][name="icon"]');
                     if (iconFile) iconFile.value = '';
                 }
+                if (modalId === 'product-edit-modal') {
+                    // ปุ่มเปลี่ยนรูปในหน้าต่างนี้เปิดอีกหน้าต่าง จึงต้องได้ค่าของอะไหล่ตัวเดียวกันไปด้วย
+                    var iconBtn = modal.querySelector('#edit-modal-icon-btn');
+                    if (iconBtn) {
+                        iconBtn.setAttribute('data-product-id', pid);
+                        iconBtn.setAttribute('data-product-name', pname);
+                        iconBtn.setAttribute('data-product-return-to', fillBtn.getAttribute('data-product-return-to') || '');
+                    }
+                }
                 if (modalId === 'product-photo-modal') {
                     var photoImg = modal.querySelector('#photo-modal-img');
                     var photoTitle = modal.querySelector('#product-photo-modal-title');

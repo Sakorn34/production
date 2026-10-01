@@ -807,14 +807,11 @@ function parts_product_img_cell(?string $iconPath, array $product, string $retur
     $name = parts_display_name($product);
     $returnAttr = $returnTo !== '' ? ' data-product-return-to="' . e($returnTo) . '"' : '';
     if ($iconPath !== '') {
-        $html = parts_photo_button_html(parts_img_tag($iconPath, $name), $iconPath, $product, 'parts-photo-btn-cell');
-        $html .= '<button type="button" class="btn-cell-mini btn-cell-img" title="เปลี่ยนรูป"'
-            . ' data-open-modal="product-icon-modal"'
-            . ' data-fill-modal="product-icon-modal"'
-            . ' data-product-id="' . (int) ($product['id'] ?? 0) . '"'
-            . ' data-product-name="' . e($name) . '"' . $returnAttr . '>'
-            . ui_icon_html('edit', 12, 'btn-svg') . '</button>';
-        return '<div class="col-img-wrap">' . $html . '</div>';
+        // ช่องรูปกว้าง 34 จุด ใส่ปุ่มแก้ไขทับลงไปอีกจนดูรูปไม่ออก
+        // เปลี่ยนรูปย้ายไปอยู่ในหน้าต่าง "แก้ไขรายละเอียด" ของคอลัมน์จัดการแทน
+        return '<div class="col-img-wrap">'
+            . parts_photo_button_html(parts_img_tag($iconPath, $name), $iconPath, $product, 'parts-photo-btn-cell')
+            . '</div>';
     }
     return '<button type="button" class="btn btn-sm btn-outline btn-cell-action"'
         . ' data-open-modal="product-icon-modal"'

@@ -348,6 +348,14 @@ function parts_product_edit_modals(): void
             รหัส: <strong id="edit-modal-product-code"></strong>
             · <span id="edit-modal-product-display-name"></span>
         </p>
+        <?php // เปลี่ยนรูปอยู่ตรงนี้แทนปุ่มเล็กข้างรูปย่อในตาราง — ค่าของอะไหล่เติมพร้อมกับฟอร์ม ?>
+        <p style="margin:0 0 14px">
+            <button type="button" class="btn btn-sm btn-outline btn-with-icon"
+                id="edit-modal-icon-btn"
+                data-open-modal="product-icon-modal" data-fill-modal="product-icon-modal">
+                <?= ui_icon_html('camera', 14, 'btn-svg') ?> เปลี่ยนรูปอะไหล่
+            </button>
+        </p>
         <div class="form-group">
             <label for="edit-modal-name">ชื่ออะไหล่</label>
             <input type="text" name="name" id="edit-modal-name" required maxlength="255" data-autofocus>
