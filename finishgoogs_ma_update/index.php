@@ -558,7 +558,7 @@ $partsBase = ui_parts_base_url();
       <tr>
         <th data-pri="2" style="width:44px"></th>
         <th data-pri="1">รุ่น</th>
-        <th data-pri="2" class="fg-bar-col" title="ทุกรุ่นใช้สเกลเดียวกัน — แถบยาวเท่ากันคือจำนวนเครื่องเท่ากัน · รางบนแถบคือยอดที่ต้องมี ท่อนเทา = ขั้นต่ำ ท่อนส้ม = PO ค้าง จบที่หมุด ▼ · ส่วนสีจาง = เกินจากที่ต้องมี"><span class="fg-legend"><i class="is-new"></i>เครื่องใหม่</span> <span class="fg-legend"><i class="is-pool"></i>คลังพร้อมเช่า</span> <span class="fg-legend"><b class="fg-legend-mark is-band-min"></b>ขั้นต่ำ</span> <span class="fg-legend"><b class="fg-legend-mark is-band"></b>PO ค้าง</span> <span class="fg-legend"><b class="fg-legend-mark is-po">▼</b>ต้องมี</span></th>
+        <th data-pri="2" class="fg-bar-col" title="ทุกรุ่นใช้สเกลเดียวกัน — แถบยาวเท่ากันคือจำนวนเครื่องเท่ากัน · รางบนแถบคือยอดที่ต้องมี ท่อนเทา = ขั้นต่ำ ท่อนส้ม = PO ค้าง จบที่หมุด ▼ · ส่วนสีจาง = เกินจากที่ต้องมี"><span class="fg-legend"><i class="is-new"></i>เครื่องใหม่</span> <span class="fg-legend"><i class="is-pool"></i>คลังพร้อมเช่า</span> <span class="fg-legend"><b class="fg-legend-mark is-band-min"></b>ขั้นต่ำ</span> <span class="fg-legend"><b class="fg-legend-mark is-band"></b>PO ค้าง</span> <span class="fg-legend"><b class="fg-legend-mark is-po"></b>ต้องมี</span></th>
         <th data-pri="1" class="num-col">เครื่องใหม่</th>
         <th data-pri="2" class="num-col" title="ระบบเช่าเป็น finished goods รอปล่อยเช่า — นับรวมในยอดที่มี">คลังพร้อมเช่า</th>
         <th data-pri="2" class="num-col" title="ของที่ระบบ inventory จ่ายลงมาแล้ว ยังไม่ได้ลงทะเบียนเครื่อง — กำลังจะผลิตเพิ่ม">เบิกแล้ว รอผลิต</th>
@@ -940,18 +940,18 @@ $partsBase = ui_parts_base_url();
           marks.querySelectorAll('.fg-mark, .fg-po-band, .fg-min-band').forEach(function (m) { m.remove(); });
           // ชิดขอบไม่ให้หมุดครึ่งซีกล้นออกนอกช่อง
           var at = function (n) { return Math.min(99, Math.max(1, pc(n))); };
-          var mark = function (cls, n, tip, glyph) {
+          var mark = function (cls, n, tip) {
             var el = document.createElement('span');
             el.className = 'fg-mark' + cls;
             el.style.left = at(n) + '%';
-            el.textContent = glyph;
             el.title = tip;
             marks.appendChild(el);
           };
           // ขั้นต่ำเป็นขีดตั้ง ต้องมีเป็นสามเหลี่ยม — ต่างกันทั้งรูปทรงและสี
-          // กวาดตาผ่าน ๆ ก็แยกออก ไม่ต้องเทียบเฉดสีสองอันที่คล้ายกัน
-          if (minQ > 0 && minQ <= fgScale) { mark(' is-min', minQ, 'ขั้นต่ำ ' + fgNum(minQ), '▏'); }
-          if ((poQ > 0 || minQ === 0) && req <= fgScale) { mark(' is-po', req, 'ขั้นต่ำ ' + fgNum(minQ) + ' + PO ' + fgNum(poQ) + ' = ต้องมี ' + fgNum(req), '▼'); }
+          // วาดด้วย CSS ไม่ใช้อักษร ▏/▼ เพราะหมึกของอักษรไม่ได้อยู่กลางช่องของมัน
+          // (▏ ชิดซ้าย) หมุดจึงเยื้องจากรอยต่อสีจริงไปครึ่งตัวอักษร
+          if (minQ > 0 && minQ <= fgScale) { mark(' is-min', minQ, 'ขั้นต่ำ ' + fgNum(minQ)); }
+          if ((poQ > 0 || minQ === 0) && req <= fgScale) { mark(' is-po', req, 'ขั้นต่ำ ' + fgNum(minQ) + ' + PO ' + fgNum(poQ) + ' = ต้องมี ' + fgNum(req)); }
           // รางเหนือแถบ = ยอดที่ต้องมี แบ่งเป็นสองท่อนตามที่มา
           // ท่อนแรกคือขั้นต่ำที่ตั้งไว้ ท่อนสองคือ PO ที่ค้างส่ง ต่อกันจบที่หมุด ▼
           var bandAt = function (n) { return Math.max(0, Math.min(100, pc(n))); };
