@@ -558,7 +558,7 @@ $partsBase = ui_parts_base_url();
       <tr>
         <th data-pri="2" style="width:44px"></th>
         <th data-pri="1">รุ่น</th>
-        <th data-pri="2" class="fg-bar-col" title="ทุกรุ่นใช้สเกลเดียวกัน — แถบยาวเท่ากันคือจำนวนเครื่องเท่ากัน · หมุด ▼ = ยอดที่ต้องมีของรุ่นนั้น · ส่วนสีจาง = เกินจากที่ต้องมี"><span class="fg-legend"><i class="is-new"></i>เครื่องใหม่</span> <span class="fg-legend"><i class="is-pool"></i>คลังพร้อมเช่า</span> <span class="fg-legend"><b class="fg-legend-mark">▼</b>ขั้นต่ำ</span> <span class="fg-legend"><b class="fg-legend-mark is-po">▼</b>ขั้นต่ำ+PO</span></th>
+        <th data-pri="2" class="fg-bar-col" title="ทุกรุ่นใช้สเกลเดียวกัน — แถบยาวเท่ากันคือจำนวนเครื่องเท่ากัน · ขีด ▏= ขั้นต่ำ · ขีดคาดส้ม = ยอด PO ที่ต้องผลิตเพิ่ม · ▼ = ยอดที่ต้องมีทั้งหมด · ส่วนสีจาง = เกินจากที่ต้องมี"><span class="fg-legend"><i class="is-new"></i>เครื่องใหม่</span> <span class="fg-legend"><i class="is-pool"></i>คลังพร้อมเช่า</span> <span class="fg-legend"><b class="fg-legend-mark is-min">▏</b>ขั้นต่ำ</span> <span class="fg-legend"><b class="fg-legend-mark is-band"></b>ช่วง PO</span> <span class="fg-legend"><b class="fg-legend-mark is-po">▼</b>ต้องมี</span></th>
         <th data-pri="1" class="num-col">เครื่องใหม่</th>
         <th data-pri="2" class="num-col" title="ระบบเช่าเป็น finished goods รอปล่อยเช่า — นับรวมในยอดที่มี">คลังพร้อมเช่า</th>
         <th data-pri="2" class="num-col" title="ของที่ระบบ inventory จ่ายลงมาแล้ว ยังไม่ได้ลงทะเบียนเครื่อง — กำลังจะผลิตเพิ่ม">เบิกแล้ว รอผลิต</th>
@@ -937,19 +937,30 @@ $partsBase = ui_parts_base_url();
         var poQ = Number(row.po) || 0;
         var marks = cell('marks');
         if (marks) {
-          marks.querySelectorAll('.fg-mark').forEach(function (m) { m.remove(); });
+          marks.querySelectorAll('.fg-mark, .fg-po-band').forEach(function (m) { m.remove(); });
           // ชิดขอบไม่ให้หมุดครึ่งซีกล้นออกนอกช่อง
           var at = function (n) { return Math.min(99, Math.max(1, pc(n))); };
-          var mark = function (cls, n, tip) {
+          var mark = function (cls, n, tip, glyph) {
             var el = document.createElement('span');
             el.className = 'fg-mark' + cls;
             el.style.left = at(n) + '%';
-            el.textContent = '▼';
+            el.textContent = glyph;
             el.title = tip;
             marks.appendChild(el);
           };
-          if (minQ > 0 && minQ <= fgScale) { mark('', minQ, 'ขั้นต่ำ ' + fgNum(minQ)); }
-          if ((poQ > 0 || minQ === 0) && req <= fgScale) { mark(' is-po', req, 'ขั้นต่ำ ' + fgNum(minQ) + ' + PO ' + fgNum(poQ) + ' = ต้องมี ' + fgNum(req)); }
+          // ขั้นต่ำเป็นขีดตั้ง ต้องมีเป็นสามเหลี่ยม — ต่างกันทั้งรูปทรงและสี
+          // กวาดตาผ่าน ๆ ก็แยกออก ไม่ต้องเทียบเฉดสีสองอันที่คล้ายกัน
+          if (minQ > 0 && minQ <= fgScale) { mark(' is-min', minQ, 'ขั้นต่ำ ' + fgNum(minQ), '▏'); }
+          if ((poQ > 0 || minQ === 0) && req <= fgScale) { mark(' is-po', req, 'ขั้นต่ำ ' + fgNum(minQ) + ' + PO ' + fgNum(poQ) + ' = ต้องมี ' + fgNum(req), '▼'); }
+          // ช่วงระหว่างสองหมุดคือยอด PO ที่ต้องผลิตส่ง — ขีดคาดไว้ให้เห็นว่ากินแค่ไหน
+          if (poQ > 0 && minQ <= fgScale) {
+            var band = document.createElement('span');
+            band.className = 'fg-po-band';
+            band.style.left = at(minQ) + '%';
+            band.style.width = Math.max(0, at(Math.min(req, fgScale)) - at(minQ)) + '%';
+            band.title = 'PO ค้าง ' + fgNum(poQ) + ' เครื่อง — ส่วนที่ต้องผลิตเพิ่มจากขั้นต่ำ';
+            marks.appendChild(band);
+          }
           // เกินสเกล — บอกด้วย › ท้ายแถบ แทนหมุดที่จะไปกองอยู่ริมขวาแบบผิด ๆ
           if (Math.max(req, have + pool) > fgScale) {
             var ov = document.createElement('span');
@@ -961,7 +972,12 @@ $partsBase = ui_parts_base_url();
         }
         var note = cell('note');
         if (note) {
-          note.textContent = 'ขั้นต่ำ ' + fgNum(minQ) + ' + PO ' + fgNum(poQ) + ' = ต้องมี ' + fgNum(req);
+          // PO คือตัวเลขที่ต้องลงมือทำ จึงเน้นสุด ขั้นต่ำเป็นค่าตั้งไว้เฉย ๆ ให้จางที่สุด
+          note.innerHTML = '<span class="fg-n-min">ขั้นต่ำ ' + fgNum(minQ) + '</span>'
+            + '<span class="fg-n-op">+</span>'
+            + '<span class="fg-n-po">PO ' + fgNum(poQ) + '</span>'
+            + '<span class="fg-n-op">=</span>'
+            + '<span class="fg-n-req">ต้องมี ' + fgNum(req) + '</span>';
         }
       }
       var v = cell('verdict');
