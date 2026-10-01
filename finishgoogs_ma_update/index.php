@@ -765,7 +765,8 @@ $partsBase = ui_parts_base_url();
       document.getElementById('dash-pk-prog').hidden = !d.qty;
       // รายรุ่น 5 อันดับแรก — กดแถวเปิด popup รายละเอียด (ใบเบิก · ของที่ยังไม่จ่าย · อะไหล่ที่จ่ายแล้ว)
       // ป้าย = ความขาดสต็อกของรุ่นนั้น (เกณฑ์เดียวกับตารางรุ่นด้านล่าง) · บรรทัดรองบอกว่าของค้างมากี่วัน
-      var SHOW = 5, list = document.getElementById('dash-pk-list'), models = d.models || [];
+      // 6 ใบลงตัวทั้งจอกว้าง (3 คอลัมน์ × 2 แถว) และจอแคบ (2 × 3)
+      var SHOW = 6, list = document.getElementById('dash-pk-list'), models = d.models || [];
       var stageLabel = ['ต่ำกว่าขั้นต่ำ', 'ไม่พอส่ง PO', ''];
       var pkSorters = {
         urgent: function (a, b) { return a.stage - b.stage || b.gap - a.gap || b.days - a.days || b.left - a.left; },
@@ -792,19 +793,24 @@ $partsBase = ui_parts_base_url();
           if (stageLabel[m.stage]) { sub.push(stageLabel[m.stage]); }
           sub.push('ค้าง ' + fgNum(m.days) + ' วัน');
           if (m.docs > 1) { sub.push(m.docs + ' ใบ'); }
-          sub.push(m.done > 0 ? 'ผลิตแล้ว ' + fgNum(m.done) + '/' + fgNum(m.qty) : 'ยังไม่ได้ผลิต');
+          // ยอดผลิตแล้วไปอยู่ท้ายแถบความคืบหน้า ไม่ปนกับบรรทัดบอกสถานะ
+          var ratio = m.done > 0 ? fgNum(m.done) + '/' + fgNum(m.qty) : 'ยังไม่ได้ผลิต';
           // ใบเบิกชุดเดียวประกอบได้หลายรุ่น — โชว์ชื่อรุ่นที่ควรผลิตก่อน แล้วบอกว่ามีอีกกี่รุ่น
           if ((m.models_n || 1) > 1) {
             tag = '<span class="dash-pk-tag is-more">+' + ((m.models_n || 1) - 1) + ' รุ่น</span>' + tag;
             sub.unshift('ควรผลิตรุ่นนี้ก่อน');
           }
           return '<button type="button" class="dash-pk-row" data-grp="' + esc(m.grp) + '" data-name="' + esc(m.name) + '">'
+            + '<span class="dash-pk-head">'
             + (m.icon ? '<img src="' + esc(m.icon) + '" alt="" class="dash-pk-img" loading="lazy">' : '<span class="dash-pk-img dash-pk-noimg"></span>')
             + '<span class="dash-pk-nm"><b>' + esc(m.lead || m.name) + '</b>' + tag
             + (m.missing.length ? ' <span class="dash-pk-miss">' + esc(m.missing.slice(0, 2).join(', ')) + ' ยังไม่จ่าย</span>' : '')
-            + '<small>' + esc(sub.join(' · ')) + '</small>'
-            + '<span class="pk-bar pk-bar-row"><span style="width:' + pctOf(m.done, m.qty) + '%;background:' + d.bar + '"></span></span></span>'
-            + '<span class="dash-pk-q"><b>' + fgNum(m.left) + '</b>เครื่อง</span></button>';
+            + '</span>'
+            + '<span class="dash-pk-q"><b>' + fgNum(m.left) + '</b>เครื่อง</span></span>'
+            + '<span class="dash-pk-prog-row">'
+            + '<span class="pk-bar pk-bar-row"><span style="width:' + pctOf(m.done, m.qty) + '%;background:' + d.bar + '"></span></span>'
+            + '<span class="dash-pk-ratio">' + esc(ratio) + '</span></span>'
+            + '<small class="dash-pk-sub">' + esc(sub.join(' · ')) + '</small></button>';
         }).join('');
         more.hidden = models.length <= SHOW;
         more.textContent = '+ อีก ' + (models.length - SHOW) + ' รุ่น ›';

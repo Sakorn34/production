@@ -961,14 +961,31 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .dash-pk-stats { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 8px; }
 .dash-pk-stat { font-size: calc(12.5px * var(--font-scale, 1)); padding: 4px 12px; border-radius: 999px; background: var(--surface-2, #f6f4fb); color: inherit; text-decoration: none; }
 .dash-pk-stat.is-warn { background: #fffbeb; color: #854d0e; }
-.dash-pk-row { display: flex; gap: 12px; align-items: center; width: 100%; padding: 8px 4px; border: 0; border-top: 1px solid var(--border, #eee); background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
-.dash-pk-row:hover { background: var(--surface-2, #f6f4fb); }
-.dash-pk-img { width: 44px; height: 44px; border-radius: 8px; object-fit: contain; background: var(--surface-2, #f6f4fb); flex: 0 0 auto; }
+/* แต่ละรุ่นเป็นการ์ดเรียงเป็นตาราง — เดิมเป็นแถวเต็มความกว้าง ชื่อชิดซ้าย ตัวเลขชิดขวา
+   บนจอคอมกลางแถวจึงโล่งยาว และ 5 รุ่นก็ไล่ลงไปเรื่อย ๆ จนการ์ดสูงเกินจำเป็น */
+.dash-pk-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin-top: 10px; }
+.dash-pk-row { display: block; width: 100%; padding: 10px 11px; border: 1px solid var(--border, #eee); border-radius: var(--radius-sm, 8px); background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.dash-pk-row:hover { background: var(--surface-2, #f6f4fb); border-color: var(--primary); }
+.dash-pk-head { display: flex; gap: 8px; align-items: flex-start; }
+.dash-pk-img { width: 30px; height: 30px; border-radius: 6px; object-fit: contain; background: var(--surface-2, #f6f4fb); flex: 0 0 auto; }
 .dash-pk-nm { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.dash-pk-nm small { display: block; color: var(--muted, #6b7280); font-size: calc(12px * var(--font-scale, 1)); }
+.dash-pk-nm b { display: block; line-height: 1.4; }
+.dash-pk-prog-row { display: flex; align-items: center; gap: 7px; margin-top: 8px; }
+.dash-pk-ratio { font-size: calc(11px * var(--font-scale, 1)); color: var(--muted, #6b7280); white-space: nowrap; }
+.dash-pk-sub { display: block; margin-top: 5px; color: var(--muted, #6b7280); font-size: calc(11.5px * var(--font-scale, 1)); }
+/* จอแคบมีคอลัมน์เดียวอยู่แล้ว ชื่อกับป้ายจึงอยู่บรรทัดเดียวกันได้ ไม่ต้องเสียอีกบรรทัด */
+@media (max-width: 560px) {
+  .dash-pk-list { grid-template-columns: 1fr; gap: 0; }
+  .dash-pk-row { padding: 8px 4px; border: 0; border-top: 1px solid var(--border, #eee); border-radius: 0; }
+  .dash-pk-row:hover { border-color: var(--border, #eee); }
+  .dash-pk-nm b { display: inline; }
+  .dash-pk-nm .dash-pk-tag { margin-left: 6px; }
+  .dash-pk-prog-row { margin-top: 4px; }
+  .dash-pk-sub { margin-top: 3px; }
+}
 .dash-pk-miss { display: inline-block; font-size: 11.5px; background: #fef3c7; color: #854d0e; border-radius: 6px; padding: 0 6px; font-weight: 400; }
 /* ป้ายความขาดสต็อกของรุ่นนั้น — สี 3 ระดับเดียวกับหัวกลุ่มในตารางรุ่น */
-.dash-pk-tag { display: inline-block; margin-left: 6px; font-size: 11.5px; font-weight: 400; border-radius: 999px; padding: 1px 8px; }
+.dash-pk-tag { display: inline-block; margin-right: 4px; font-size: 11.5px; font-weight: 400; border-radius: 999px; padding: 1px 8px; }
 .dash-pk-tag.is-st0 { background: #fef2f2; color: #991b1b; }
 .dash-pk-tag.is-st1 { background: #fffbeb; color: #92400e; }
 .dash-pk-tag.is-st2 { background: var(--surface-2, #f6f4fb); color: var(--muted, #6b7280); }
@@ -976,8 +993,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .dash-pk-sort { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: calc(12px * var(--font-scale, 1)); color: var(--muted, #6b7280); white-space: nowrap; }
 .dash-pk-sort select { width: auto; min-width: 0; padding: 3px 24px 3px 9px; min-height: 0; font-size: calc(12px * var(--font-scale, 1)); }
 @media (max-width: 480px) { .dash-pk-sort { margin-left: 0; width: 100%; } .dash-pk-sort select { flex: 1; } }
-.dash-pk-q { text-align: right; font-size: calc(12px * var(--font-scale, 1)); color: var(--muted, #6b7280); white-space: nowrap; }
-.dash-pk-q b { display: block; font-size: calc(20px * var(--font-scale, 1)); color: var(--text, #2a2440); }
+.dash-pk-q { text-align: right; font-size: calc(11px * var(--font-scale, 1)); color: var(--muted, #6b7280); white-space: nowrap; flex: 0 0 auto; }
+.dash-pk-q b { display: block; font-size: calc(19px * var(--font-scale, 1)); line-height: 1.1; color: var(--text, #2a2440); }
 .dash-pk-more { display: inline-block; margin-top: 6px; font-size: calc(13px * var(--font-scale, 1)); }
 /* popup รายละเอียด */
 .pk-pop-head { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
@@ -992,7 +1009,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .pk-bar { height: 10px; border-radius: 999px; background: var(--surface-2, #f6f4fb); overflow: hidden; margin: 2px 0 12px; }
 .pk-bar > span { display: block; height: 100%; border-radius: 999px; }
 .pk-bar-sm { height: 6px; margin: 6px 0 8px; }
-.pk-bar-row { display: block; height: 5px; margin: 5px 0 0; }
+.pk-bar-row { display: block; height: 5px; margin: 0; flex: 1; min-width: 0; }
 .dash-pk-prog { margin: 2px 0 6px; }
 .dash-pk-prog-lb { display: flex; justify-content: space-between; gap: 8px; font-size: calc(12.5px * var(--font-scale, 1)); color: var(--muted, #6b7280); }
 .dash-pk-prog-lb b { color: var(--text, #2a2440); }
