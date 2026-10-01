@@ -102,8 +102,8 @@ table tbody tr:hover td { background: #faf8fe; }
 .part-hist-sum { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
   padding: 9px 4px; cursor: pointer; list-style: none; }
 .part-hist-sum::-webkit-details-marker { display: none; }
-.part-hist-sum::before { content: "B8"; color: var(--text-muted, #6b6480); font-size: 0.8em; }
-.part-hist-grp[open] > .part-hist-sum::before { content: "BE"; }
+.part-hist-sum::before { content: "▸"; color: var(--text-muted, #6b6480); font-size: 0.8em; }
+.part-hist-grp[open] > .part-hist-sum::before { content: "▾"; }
 .part-hist-sum-meta { margin-left: auto; font-size: 0.82rem; white-space: nowrap; }
 .part-hist-body { padding: 0 0 10px 20px; }
 .part-hist-sn { margin-top: 12px; }
