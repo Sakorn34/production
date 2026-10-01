@@ -1254,20 +1254,50 @@ switch ($type) {
             if ($poLive) {
                 echo '<p class="muted" style="font-size:12px;margin:0 0 6px">ใบสั่งงานที่ยังไม่ได้ส่งของ '
                    . number_format(count($poLive)) . ' ใบ · ระบบ Setup ถือว่าส่งแล้วเมื่อปิดงานและเขียนประเภทการขายลงในรายการ</p>';
-                echo '<ul class="fg-sn-list fg-po-list">';
+
+                // แยกกองตามประเภทการขาย — ของเช่ากับของขายขาดคนละเรื่องกันในมุมคนเตรียมของ
+                // ประเภทย้ายไปอยู่บนหัวกอง จึงไม่ต้องเขียนซ้ำในทุกใบอีก
+                $poByType = [];
                 foreach ($poLive as $po) {
-                    $sub = ['#' . (int) $po['order_id']];
-                    if ($po['customer'] !== '')  { $sub[] = $po['customer']; }
-                    if ($po['sale_type'] !== '') { $sub[] = $po['sale_type']; }
-                    if ($po['status'] !== '')    { $sub[] = 'สถานะ ' . $po['status']; }
-                    $when = $fgPoDate($po);
-                    echo '<li class="fg-sn fg-po">'
-                       . '<span class="fg-po-main"><b>' . h($po['po_number'] !== '' ? $po['po_number'] : 'ไม่มีเลข PO') . '</b>'
-                       . '<span class="muted fg-po-sub">' . h(implode(' · ', $sub)) . '</span></span>'
-                       . '<span class="muted fg-po-qty">' . number_format($po['qty']) . ' ชิ้น'
-                       . ($when !== '' ? ' · ' . h($when) : '') . '</span></li>';
+                    $t = trim((string) $po['sale_type']);
+                    $poByType[$t !== '' ? $t : ''][] = $po;
                 }
-                echo '</ul>';
+                // เรียงให้ประเภทที่รู้ชัดขึ้นก่อน ส่วนใบที่ยังไม่ได้ระบุไว้ท้ายสุด
+                $poOrder = ['แบบเช่า', 'ขายขาด'];
+                $poTypes = [];
+                foreach ($poOrder as $t) {
+                    if (isset($poByType[$t])) { $poTypes[] = $t; }
+                }
+                foreach (array_keys($poByType) as $t) {
+                    if ($t !== '' && !in_array($t, $poTypes, true)) { $poTypes[] = $t; }
+                }
+                if (isset($poByType[''])) { $poTypes[] = ''; }
+
+                $manyTypes = count($poTypes) > 1;
+                foreach ($poTypes as $t) {
+                    $group = $poByType[$t];
+                    if ($manyTypes) {
+                        $gQty = 0;
+                        foreach ($group as $po) { $gQty += (int) $po['qty']; }
+                        echo '<div class="fg-po-group">' . h($t !== '' ? $t : 'ยังไม่ระบุประเภท')
+                           . ' <span class="muted">' . number_format(count($group)) . ' ใบ · '
+                           . number_format($gQty) . ' ชิ้น</span></div>';
+                    }
+                    echo '<ul class="fg-sn-list fg-po-list">';
+                    foreach ($group as $po) {
+                        $sub = ['#' . (int) $po['order_id']];
+                        if ($po['customer'] !== '')  { $sub[] = $po['customer']; }
+                        if (!$manyTypes && $po['sale_type'] !== '') { $sub[] = $po['sale_type']; }
+                        if ($po['status'] !== '')    { $sub[] = 'สถานะ ' . $po['status']; }
+                        $when = $fgPoDate($po);
+                        echo '<li class="fg-sn fg-po">'
+                           . '<span class="fg-po-main"><b>' . h($po['po_number'] !== '' ? $po['po_number'] : 'ไม่มีเลข PO') . '</b>'
+                           . '<span class="muted fg-po-sub">' . h(implode(' · ', $sub)) . '</span></span>'
+                           . '<span class="muted fg-po-qty">' . number_format($po['qty']) . ' ชิ้น'
+                           . ($when !== '' ? ' · ' . h($when) : '') . '</span></li>';
+                    }
+                    echo '</ul>';
+                }
             } else {
                 echo '<p class="muted" style="font-size:13px">ไม่มีใบสั่งงานค้างส่ง</p>';
             }

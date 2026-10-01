@@ -1899,6 +1899,12 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
 .fg-po-qty { text-align: right; }
 .fg-po-gone { border-style: dashed; background: var(--surface-soft, #f8fafc); }
 .fg-po-gone .fg-po-main > b { color: var(--text-muted, #6b7280); }
+/* หัวกองประเภทการขาย — ของเช่ากับของขายขาดคนละเรื่องกันในมุมคนเตรียมของ */
+.fg-po-group {
+  margin: 12px 0 6px; font-size: calc(13px * var(--font-scale, 1)); font-weight: 600;
+}
+.fg-po-group:first-of-type { margin-top: 2px; }
+.fg-po-group .muted { font-weight: 400; font-size: calc(12px * var(--font-scale, 1)); }
 
 /* การ์ดรายการ "อะไหล่ควรสั่งเพิ่ม" บนจอมือถือ — 4 คอลัมน์ในแถวเดียวไม่พอให้ชื่อยาว ๆ ขึ้น:
    ย้ายตัวเลขลงไปบรรทัดใต้ชื่อ ให้คอลัมน์ชื่อกว้างเต็มที่ */
