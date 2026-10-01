@@ -81,6 +81,27 @@ function production_asset_models(array $codes): array
 }
 
 /**
+ * เติมรุ่นสินค้าให้แต่ละแถวประวัติ โดยไม่จัดกลุ่ม (มุมมองเรียงตามเวลา)
+ *
+ * @param array<int,array<string,mixed>> $history
+ * @return array<int,array<string,mixed>>
+ */
+function parts_history_with_model(array $history): array
+{
+    if (!$history) {
+        return [];
+    }
+    $models = production_asset_models(array_column($history, "asset_code"));
+    foreach ($history as $i => $h) {
+        $sn  = strtoupper(trim((string) ($h["asset_code"] ?? "")));
+        $hit = $sn !== "" ? ($models[$sn] ?? null) : null;
+        $history[$i]["_model"]    = $hit ? $hit["model"] : "";
+        $history[$i]["_asset_id"] = $hit["id"] ?? 0;
+    }
+    return $history;
+}
+
+/**
  * จัดประวัติการเบิกเป็น รุ่นสินค้า → หมายเลขเครื่อง → ใบงาน
  *
  * ใบที่ไม่ได้ผูกกับเครื่อง (เบิกเข้าชุด หรือเบิกทั่วไป) ไปรวมกลุ่มท้ายสุด
