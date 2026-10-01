@@ -356,6 +356,16 @@
                     var iconFile = modal.querySelector('input[type="file"][name="icon"]');
                     if (iconFile) iconFile.value = '';
                 }
+                if (modalId === 'product-photo-modal') {
+                    var photoImg = modal.querySelector('#photo-modal-img');
+                    var photoTitle = modal.querySelector('#product-photo-modal-title');
+                    var photoSub = modal.querySelector('#photo-modal-sub');
+                    var photoSrc = fillBtn.getAttribute('data-photo-src') || '';
+                    if (photoImg) { photoImg.src = photoSrc; photoImg.alt = pname; }
+                    if (photoTitle) photoTitle.textContent = pname || 'รูปอะไหล่';
+                    var photoCode = fillBtn.getAttribute('data-product-code') || '';
+                    if (photoSub) photoSub.textContent = photoCode !== '' ? 'รหัสอะไหล่ (สต็อก): ' + photoCode : '';
+                }
                 if (modalId === 'product-price-modal') {
                     var pricePid = modal.querySelector('#price-modal-product-id');
                     var priceName = modal.querySelector('#price-modal-product-name');

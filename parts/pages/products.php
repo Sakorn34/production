@@ -405,6 +405,8 @@ foreach ($sets as $s) {
 // ย้ายมาจาก stock-in.php / stock-out-item.php / stock-out.php เพื่อให้ทำงานได้จบในหน้าเดียว
 // ทุกฟอร์มมี action ชัดเจน (ดูเหตุผลที่บล็อก POST ด้านบน)
 ?>
+<?php parts_photo_modal_html(); ?>
+
 <?php parts_modal_begin('stock-in-add-modal', 'บันทึกรับเข้า', true, $openModal === 'stock_in'); ?>
 <form method="POST">
     <input type="hidden" name="action" value="stock_in">

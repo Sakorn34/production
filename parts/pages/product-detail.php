@@ -56,12 +56,11 @@ parts_page_header('products', 'รายละเอียดอะไหล่'
             <div class="product-detail-hero-media">
                 <?php if ($icon): ?>
                     <?php // รูปย่อขนาด 80px ดูรายละเอียดอะไหล่ไม่ออก — กดแล้วเปิดรูปเต็มใน popup
-                          // ใช้ปุ่มจริงไม่ใช่ div เพื่อให้กด Tab + Enter ได้ด้วย ?>
-                    <button type="button" class="parts-photo-btn" data-open-modal="product-photo-modal"
-                            title="กดดูรูปขนาดเต็ม">
-                        <?= parts_img_tag($icon, parts_display_name($product), 'parts-thumb-lg') ?>
-                        <span class="parts-photo-zoom" aria-hidden="true"><?= ui_icon_html('search', 13) ?></span>
-                    </button>
+                          // ปุ่มกับ modal เป็นตัวเดียวกับที่ตารางอะไหล่รวมใช้ ?>
+                    <?= parts_photo_button_html(
+                        parts_img_tag($icon, parts_display_name($product), 'parts-thumb-lg'),
+                        $icon, $product
+                    ) ?>
                 <?php else: ?>
                     <div class="parts-thumb-lg-placeholder" aria-hidden="true"></div>
                 <?php endif; ?>
@@ -232,10 +231,6 @@ parts_page_header('products', 'รายละเอียดอะไหล่'
 
 <?php parts_product_edit_modals(); ?>
 <?php if ($product) { parts_stock_modals_for_product($product); } ?>
-<?php if ($product && $icon):
-    parts_modal_begin('product-photo-modal', parts_display_name($product)); ?>
-    <?= parts_img_tag($icon, parts_display_name($product), "parts-photo-full") ?>
-    <p class="text-muted" style="margin:0.75rem 0 0;font-size:0.82rem">รหัสอะไหล่ (สต็อก): <?= e($product['code']) ?></p>
-<?php parts_modal_end(); endif; ?>
+<?php if ($product && $icon) { parts_photo_modal_html(); } ?>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

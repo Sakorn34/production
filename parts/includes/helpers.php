@@ -756,12 +756,58 @@ function parts_save_product_image(string $field): ?string
  * @param array<string,mixed> $product
  * @return string HTML
  */
+/**
+ * ปุ่มกดดูรูปอะไหล่ขนาดเต็ม — ครอบ <img> ที่ส่งเข้ามา
+ *
+ * ใช้ modal ตัวเดียวร่วมกันทั้งหน้า (ตารางอะไหล่มีเป็นร้อยแถว จะวาด modal ร้อยตัวไม่ไหว)
+ * ค่าของรูปส่งผ่าน data-* ให้ app.js เติมตอนกด
+ *
+ * @param string              $imgHtml  <img> ที่วาดไว้แล้ว
+ * @param string              $iconPath path รูปในระบบ
+ * @param array<string,mixed> $product
+ * @param string              $extraCls คลาสเพิ่มของปุ่ม
+ */
+function parts_photo_button_html(string $imgHtml, string $iconPath, array $product, string $extraCls = ''): string
+{
+    $url = parts_upload_img_url($iconPath);
+    if ($url === null || $imgHtml === '') {
+        return $imgHtml;
+    }
+    $name = parts_display_name($product);
+    return '<button type="button" class="parts-photo-btn' . ($extraCls !== '' ? ' ' . e($extraCls) : '') . '"'
+        . ' title="กดดูรูปขนาดเต็ม"'
+        . ' data-open-modal="product-photo-modal" data-fill-modal="product-photo-modal"'
+        . ' data-photo-src="' . e($url) . '"'
+        . ' data-product-name="' . e($name) . '"'
+        . ' data-product-code="' . e((string) ($product['code'] ?? '')) . '">'
+        . $imgHtml
+        . '<span class="parts-photo-zoom" aria-hidden="true">' . ui_icon_html('search', 12) . '</span>'
+        . '</button>';
+}
+
+/**
+ * เปลือก modal รูปเต็ม — เนื้อในเติมจาก data-* ของปุ่มที่กด
+ */
+function parts_photo_modal_html(): void
+{
+    parts_modal_begin('product-photo-modal', 'รูปอะไหล่');
+    ?>
+    <?php // ไฟล์รูปหายจากเซิร์ฟเวอร์ได้ (ย้าย/ลบทิ้ง) — บอกเป็นข้อความ ดีกว่าโชว์ไอคอนรูปแตก ?>
+    <img src="" alt="" id="photo-modal-img" class="parts-photo-full"
+         onerror="this.hidden=true;var w=document.getElementById('photo-modal-missing');if(w)w.hidden=false;"
+         onload="this.hidden=false;var w=document.getElementById('photo-modal-missing');if(w)w.hidden=true;">
+    <p class="text-muted" id="photo-modal-missing" hidden style="margin:1.5rem 0;text-align:center">ไม่พบไฟล์รูปบนเซิร์ฟเวอร์</p>
+    <p class="text-muted" id="photo-modal-sub" style="margin:0.75rem 0 0;font-size:0.82rem"></p>
+    <?php
+    parts_modal_end();
+}
+
 function parts_product_img_cell(?string $iconPath, array $product, string $returnTo = ''): string
 {
     $name = parts_display_name($product);
     $returnAttr = $returnTo !== '' ? ' data-product-return-to="' . e($returnTo) . '"' : '';
     if ($iconPath !== '') {
-        $html = parts_img_tag($iconPath, $name);
+        $html = parts_photo_button_html(parts_img_tag($iconPath, $name), $iconPath, $product, 'parts-photo-btn-cell');
         $html .= '<button type="button" class="btn-cell-mini btn-cell-img" title="เปลี่ยนรูป"'
             . ' data-open-modal="product-icon-modal"'
             . ' data-fill-modal="product-icon-modal"'
