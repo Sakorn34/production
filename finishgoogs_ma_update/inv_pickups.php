@@ -5,6 +5,7 @@
  * ของที่ระบบ inventory เบิกลงมาให้ผลิตแล้ว → รุ่นไหนต้องผลิตอีกกี่เครื่อง
  * ลงทะเบียนเครื่องผลิตใหม่แล้วตัดยอดให้เอง (asset_new.php → inv_pickup_allocate) · ตัด/ย้าย/ปิดเองได้ในหน้ารายละเอียด
  * ข้อมูลใบเบิกอ่านจาก inventory อย่างเดียว — ไม่แก้อะไรในระบบนั้น
+ * ของสำเร็จรูปที่ปนในใบชุด (ผูกใน inv_part_map) แยกเป็นคิวรุ่นนั้น ไม่โชว์เป็นอะไหล่ของรุ่นหลัก
  */
 require __DIR__ . '/config.php';
 require __DIR__ . '/includes/layout.php';
@@ -154,11 +155,44 @@ if ($preQ !== '' && $grpQ !== '') {
   <?php } else { ?><p class="muted" style="margin:0">ยังไม่มี</p><?php } ?>
 </div>
 
+<?php
+$pkMaps = inv_pickup_maps();
+$prodNames = [];
+$prN = db()->query('SELECT id, name FROM products');
+while ($prN && ($px = $prN->fetch_row())) {
+    $prodNames[(int) $px[0]] = (string) $px[1];
+}
+$otherMachines = [];
+$kitLines = [];
+$docNames = inv_pickup_line_names($doc['lines']);
+foreach ($doc['lines'] as $pid => $ln) {
+    if (inv_pickup_line_other_machine((int) $pid, $item['grp'], $pkMaps, $item['set'], $ln['name'], $docNames)) {
+        $og = inv_pickup_set_companion_grp($item['set'], $ln['name'], $docNames);
+        if ($og === '') {
+            $og = $pkMaps['parts'][(int) $pid]['grp'] ?? '';
+        }
+        $onames = array_map(function ($id) use ($prodNames) { return $prodNames[$id] ?? ('#' . $id); }, inv_pickup_grp_ids($og));
+        $otherMachines[] = $ln['name'] . ' → ' . implode(' / ', $onames) . ' · ' . (0 + ($doc['issued'] ? $ln['got'] : $ln['req'])) . ' เครื่อง';
+        continue;
+    }
+    if ($item['kind'] === 'parts' && !array_filter($item['parts'], function ($p) use ($ln) { return strpos($p, $ln['name']) === 0; })) {
+        continue;
+    }
+    $kitLines[] = $ln;
+}
+?>
+<?php if ($otherMachines && $item['kind'] === 'set') { ?>
 <div class="panel">
-  <h3 style="margin:0 0 8px">อะไหล่ในใบเบิก (ขอ / คลังจ่าย)</h3>
+  <h3 style="margin:0 0 8px">ของสำเร็จรูปที่แยกนับเป็นเครื่องอีกรุ่น</h3>
+  <p class="muted" style="margin:0 0 8px;font-size:12.5px">ไม่ใช่อะไหล่ประกอบรุ่นนี้ — ลงทะเบียน S/N ของรุ่นนั้นแล้วตัดยอดจากคิวของรุ่นนั้น</p>
+  <ul class="ip-other-m" style="margin:0;padding-left:18px;line-height:1.7"><?php foreach ($otherMachines as $om) { ?><li><?= h($om) ?></li><?php } ?></ul>
+</div>
+<?php } ?>
+<div class="panel">
+  <h3 style="margin:0 0 8px"><?= $item['kind'] === 'parts' ? 'ของในใบที่นับเป็นรุ่นนี้' : 'อะไหล่ในใบเบิก (ขอ / คลังจ่าย)' ?></h3>
   <div class="table-wrap"><table class="list">
     <tr><th>อะไหล่</th><th class="num-col">ขอ</th><th class="num-col">จ่ายแล้ว</th></tr>
-    <?php foreach ($doc['lines'] as $ln) { $short = $doc['issued'] && $ln['got'] + 0.001 < $ln['req']; ?>
+    <?php foreach ($kitLines as $ln) { $short = $doc['issued'] && $ln['got'] + 0.001 < $ln['req']; ?>
     <tr><td><?= h($ln['name']) ?></td><td class="num-col"><?= 0 + $ln['req'] ?></td>
       <td class="num-col"><?= $doc['issued'] ? '<b' . ($short ? ' class="ip-short"' : '') . '>' . (0 + $ln['got']) . '</b>' : '<span class="muted">—</span>' ?></td></tr>
     <?php } ?>

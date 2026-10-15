@@ -5,6 +5,7 @@
  * inventory ไม่มีรหัสรุ่น มีแค่ชื่อชุด (bitVisitor Plus, bitStamp-G …) และชื่ออะไหล่
  * จึงต้องผูกเองครั้งเดียว:
  *   ชุดทั่วไป        → ทั้งใบ = รุ่นเดียว (bitStamp-G → bitStamp Guard)
+ *   ของสำเร็จรูปปนในใบชุด → ตั้งค่ารายชุดว่าอะไหล่ไหนเป็นเครื่องอีกรุ่น (และต้องเบิกพร้อมกันไหม)
  *   ชุด Accessories → แยกรายชิ้น แล้วผูกอะไหล่แต่ละตัว (Mobile Printer → Portable Printer · สายคล้อง = ไม่ใช่เครื่อง)
  *   ไม่ติดตาม         → ไม่ขึ้นในคิวผลิต
  * เลือกได้หลายรุ่น (อะไหล่/ชุดที่ใช้ได้หลายรุ่น) · อะไหล่ตั้ง "ชิ้นต่อเครื่อง" ได้ (บางตัวใช้ 2 ชิ้นต่อเครื่อง)
@@ -53,12 +54,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_map'])) {
         q('REPLACE INTO inv_part_map (inv_part_id, product_ids, per_unit, updated_by) VALUES (?, ?, ?, ?)',
           'isds', [$partId, $grp, $per > 0 ? min($per, 999) : 1, $who]);
     }
+    foreach ((array) ($_POST['line_seen'] ?? []) as $setName => $parts) {
+        $setName = mb_substr(trim((string) $setName), 0, 191);
+        if ($setName === '') {
+            continue;
+        }
+        foreach ((array) $parts as $partId => $_) {
+            $partId = (int) $partId;
+            if ($partId <= 0) {
+                continue;
+            }
+            $partName = mb_substr(trim((string) ($_POST['line_name'][$setName][$partId] ?? '')), 0, 191);
+            $picked = [];
+            foreach ((array) ($_POST['line_products'][$setName][$partId] ?? []) as $id) {
+                $id = (int) $id;
+                if ($id > 0) {
+                    $picked[] = $id;
+                }
+            }
+            $needAll = !empty($_POST['line_need'][$setName][$partId]);
+            if (!$picked) {
+                q('DELETE FROM inv_set_line_map WHERE inv_name = ? AND inv_part_id = ?', 'si', [$setName, $partId]);
+                continue;
+            }
+            q('REPLACE INTO inv_set_line_map (inv_name, inv_part_id, part_name, product_ids, need_all, updated_by) VALUES (?, ?, ?, ?, ?, ?)',
+              'sissis', [$setName, $partId, $partName, inv_pickup_grp($picked), $needAll ? 1 : 0, $who]);
+        }
+    }
     flash_set('บันทึกการผูกรุ่นแล้ว');
     header('Location: ' . $B . '/inv_pickup_map.php');
     exit;
 }
 
 $rows = inv_pickup_mapping_rows();
+$lineMaps = inv_pickup_line_maps();
 $products = [];
 $r = db()->query('SELECT id, name FROM products WHERE is_active = 1 ORDER BY name');
 while ($x = $r->fetch_row()) {
@@ -70,12 +99,13 @@ while ($x = $r->fetch_row()) {
  * @param string $field     ชื่อ input (ต่อท้าย [] เอง)
  * @param int[]  $sel       รุ่นที่เลือก
  * @param bool   $allowNone มีตัวเลือก "ไม่ใช่เครื่อง"
- * @param bool   $noneSel   เลือก "ไม่ใช่เครื่อง" อยู่
+ * @param bool   $noneSel    เลือก "ไม่ใช่เครื่อง" อยู่
+ * @param string $emptyLabel ข้อความเมื่อยังไม่เลือก
  */
-$modelPicker = function (string $field, array $sel, bool $allowNone, bool $noneSel = false) use ($products) {
+$modelPicker = function (string $field, array $sel, bool $allowNone, bool $noneSel = false, string $emptyLabel = '— เลือกรุ่น —') use ($products) {
     $names = array_values(array_filter(array_map(function ($id) use ($products) { return $products[$id] ?? null; }, $sel)));
-    $sum = $noneSel ? 'ไม่ใช่เครื่อง' : ($names ? implode(' / ', $names) : '— เลือกรุ่น —');
-    $h = '<details class="im-pick"><summary>' . h($sum) . '</summary><div class="im-pick-list">';
+    $sum = $noneSel ? 'ไม่ใช่เครื่อง' : ($names ? implode(' / ', $names) : $emptyLabel);
+    $h = '<details class="im-pick" data-empty="' . h($emptyLabel) . '"><summary>' . h($sum) . '</summary><div class="im-pick-list">';
     if ($allowNone) {
         $h .= '<label class="im-none"><input type="checkbox" name="' . h($field) . '[]" value="0"' . ($noneSel ? ' checked' : '') . '> ไม่ใช่เครื่อง (ไม่ติดตาม)</label>';
     }
@@ -103,7 +133,8 @@ page_header('ผูกใบเบิก inventory กับรุ่น', true,
   <div class="panel">
     <h3 style="margin:0 0 4px">ชุด / หมวดในใบเบิก</h3>
     <p class="muted" style="margin:0 0 10px;font-size:12.5px"><b>ทั้งใบ = 1 รุ่น</b> — ใบผลิตทั้งชุด นับจำนวนเครื่องจากจำนวนชุดที่เบิก ·
-      <b>แยกรายชิ้น</b> — ใบที่รวมของสำเร็จรูปหลายอย่าง (Accessories) ผูกรายอะไหล่ในตารางถัดไป</p>
+      <b>แยกรายชิ้น</b> — ใบที่รวมของสำเร็จรูปหลายอย่าง (Accessories) ผูกรายอะไหล่ในตารางถัดไป ·
+      ของที่ปนในใบชุดตั้งค่าได้ด้านล่างรายชุด</p>
     <div class="table-wrap"><table class="list im-table">
       <tr><th>ในระบบ inventory</th><th class="num-col">ใบ (1 ปี)</th><th>วิธีนับ</th><th>รุ่นของเรา</th></tr>
       <?php foreach ($rows['sets'] as $s) {
@@ -126,10 +157,59 @@ page_header('ผูกใบเบิก inventory กับรุ่น', true,
     </table></div>
   </div>
 
+  <?php
+  $setLineBlocks = false;
+  foreach ($rows['sets'] as $s) {
+      $mode = $s['mode'] !== '' ? $s['mode'] : (stripos($s['name'], 'accessor') !== false ? 'parts' : 'set');
+      if ($mode === 'set' && !empty($rows['set_parts'][$s['name']])) {
+          $setLineBlocks = true;
+          break;
+      }
+  }
+  if ($setLineBlocks) { ?>
+  <div class="panel">
+    <h3 style="margin:0 0 4px">อะไหล่ในใบชุด — นับเป็นรุ่นไหน</h3>
+    <p class="muted" style="margin:0 0 10px;font-size:12.5px">ค่าเริ่มต้น = <b>ของรุ่นนี้</b> (อะไหล่ประกอบชุด) · ถ้าเป็นเครื่องอีกรุ่นที่ปนมาในใบ เลือกรุ่นนั้น ·
+      ติ๊ก <b>ต้องเบิกพร้อมกัน</b> เมื่อรายการที่เป็นรุ่นเดียวกันต้องครบในใบเดียวกันถึงนับ (กล่อง Card Cam + Logitech Brio → Card Camera) — มีแค่ตัวใดตัวหนึ่งยังเป็นอะไหล่ของรุ่นในใบนั้น</p>
+    <?php foreach ($rows['sets'] as $s) {
+        $mode = $s['mode'] !== '' ? $s['mode'] : (stripos($s['name'], 'accessor') !== false ? 'parts' : 'set');
+        $lines = $rows['set_parts'][$s['name']] ?? [];
+        if ($mode !== 'set' || !$lines) {
+            continue;
+        }
+        $savedLines = $lineMaps[$s['name']] ?? [];
+        $open = $savedLines ? ' open' : '';
+        $setKey = $s['name']; ?>
+    <details class="im-set-lines"<?= $open ?>>
+      <summary><b><?= h($s['name']) ?></b>
+        <span class="muted"><?= count($savedLines) ? 'แยก ' . count($savedLines) . ' รายการเป็นเครื่องอื่น' : 'ทั้งหมดเป็นของรุ่นนี้' ?></span></summary>
+      <div class="table-wrap"><table class="list im-table im-line-table">
+        <tr><th>อะไหล่ในใบเบิก</th><th class="num-col">ใบ</th><th>นับเป็น</th><th>ต้องเบิกพร้อมกัน</th></tr>
+        <?php foreach ($lines as $ln) {
+            $pid = (int) $ln['part_id'];
+            $rule = $savedLines[$pid] ?? null;
+            $sel = $rule ? inv_pickup_grp_ids($rule['grp']) : [];
+            $need = $rule && !empty($rule['need_all']); ?>
+        <tr>
+          <td><?= h($ln['name']) ?>
+            <input type="hidden" name="line_seen[<?= h($setKey) ?>][<?= $pid ?>]" value="1">
+            <input type="hidden" name="line_name[<?= h($setKey) ?>][<?= $pid ?>]" value="<?= h($ln['name']) ?>"></td>
+          <td class="num-col"><?= (int) $ln['docs'] ?></td>
+          <td><?= $modelPicker('line_products[' . $setKey . '][' . $pid . ']', $sel, false, false, 'ของรุ่นนี้') ?></td>
+          <td><label class="im-need"><input type="checkbox" name="line_need[<?= h($setKey) ?>][<?= $pid ?>]" value="1"<?= $need ? ' checked' : '' ?>> ครบชุดกับรายการอื่นที่เป็นรุ่นเดียวกัน</label></td>
+        </tr>
+        <?php } ?>
+      </table></div>
+    </details>
+    <?php } ?>
+  </div>
+  <?php } ?>
+
   <?php if ($rows['parts']) { ?>
   <div class="panel">
     <h3 style="margin:0 0 4px">อะไหล่ในใบแบบแยกรายชิ้น</h3>
-    <p class="muted" style="margin:0 0 10px;font-size:12.5px">ของสำเร็จรูปที่เป็นเครื่องของเรา → ติ๊กรุ่น (ใช้ได้หลายรุ่นติ๊กได้หลายอัน) · ของที่ไม่ใช่เครื่อง (สายคล้อง กล่อง PCB) → "ไม่ใช่เครื่อง"<br><b>ชิ้นต่อเครื่อง</b> — ใช้ 2 ชิ้นต่อ 1 เครื่อง ใส่ 2 · จำนวนเครื่อง = ชิ้นที่เบิก ÷ ชิ้นต่อเครื่อง</p>
+    <p class="muted" style="margin:0 0 10px;font-size:12.5px">ของสำเร็จรูปที่เป็นเครื่องของเรา → ติ๊กรุ่น (ใช้ได้หลายรุ่นติ๊กได้หลายอัน) · ของที่ไม่ใช่เครื่อง (สายคล้อง กล่อง PCB) → "ไม่ใช่เครื่อง"<br>
+      <b>ชิ้นต่อเครื่อง</b> — ใช้ 2 ชิ้นต่อ 1 เครื่อง ใส่ 2 · จำนวนเครื่อง = ชิ้นที่เบิก ÷ ชิ้นต่อเครื่อง</p>
     <div class="table-wrap"><table class="list im-table">
       <tr><th>อะไหล่ใน inventory</th><th class="num-col">ใบ</th><th>รุ่นของเรา</th><th>ชิ้นต่อเครื่อง</th></tr>
       <?php foreach ($rows['parts'] as $p) {
@@ -174,7 +254,7 @@ document.querySelectorAll('.im-pick').forEach(function (d) {
       boxes.forEach(function (b) { if (b.value === '0') { b.checked = false; } });
     }
     var on = boxes.filter(function (b) { return b.checked; });
-    d.querySelector('summary').textContent = !on.length ? '— เลือกรุ่น —'
+    d.querySelector('summary').textContent = !on.length ? (d.getAttribute('data-empty') || '— เลือกรุ่น —')
       : on.map(function (b) { return b.value === '0' ? 'ไม่ใช่เครื่อง' : b.parentNode.textContent.trim(); }).join(' / ');
   });
 });
@@ -195,5 +275,11 @@ document.querySelectorAll('.im-pick').forEach(function (d) {
 .im-pick-list label { display: flex; gap: 8px; align-items: center; padding: 4px 0; font-weight: 400; }
 .im-pick-list .im-none { border-bottom: 1px dashed var(--border, #e5e7eb); margin-bottom: 4px; padding-bottom: 6px; }
 .im-per { width: 76px; }
+.im-set-lines { margin: 0 0 12px; border: 1px solid var(--border, #e5e7eb); border-radius: 10px; padding: 8px 12px; background: var(--surface, #fff); }
+.im-set-lines > summary { cursor: pointer; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; list-style: none; }
+.im-set-lines > summary::-webkit-details-marker { display: none; }
+.im-set-lines > summary::after { content: ' ▾'; color: var(--muted, #6b7280); margin-left: auto; }
+.im-set-lines .im-line-table { margin-top: 8px; }
+.im-need { display: flex; gap: 6px; align-items: flex-start; font-weight: 400; font-size: calc(12.5px * var(--font-scale, 1)); }
 </style>
 <?php page_footer(); ?>
