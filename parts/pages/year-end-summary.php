@@ -177,7 +177,18 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
     <?php if (empty($rows)): ?>
         <p class="empty-state">ไม่มีอะไหล่คงเหลือในคลัง</p>
-    <?php else: ?>
+    <?php else:
+        $nMissing = 0;
+        foreach ($rows as $r) { if (!year_end_has_price($r['price'] ?? null)) { $nMissing++; } }
+        $nHas = count($rows) - $nMissing;
+    ?>
+    <?php // กรองด้วย JS ไม่โหลดหน้าใหม่ — แถวที่ซ่อนยังอยู่ในฟอร์ม ราคาที่พิมพ์ค้างไว้จึงไม่หาย ?>
+    <div class="ye-chip-row" role="group" aria-label="กรองรายการ">
+        <button type="button" class="ye-chip is-active" data-ye-filter="all">ทั้งหมด <b><?= formatNumber(count($rows)) ?></b></button>
+        <button type="button" class="ye-chip" data-ye-filter="none">ยังไม่มีราคา <b><?= formatNumber($nMissing) ?></b></button>
+        <button type="button" class="ye-chip" data-ye-filter="has">ใส่ราคาแล้ว <b><?= formatNumber($nHas) ?></b></button>
+        <span class="ye-chip-note muted" id="ye-filter-note" hidden></span>
+    </div>
     <div class="table-wrap table-wrap-fold">
         <table>
             <thead>
@@ -196,7 +207,7 @@ require_once __DIR__ . '/../includes/header.php';
                     $priceVal = $hasPrice ? (float) $row['price'] : null;
                     $lineTotal = $hasPrice ? $qty * $priceVal : null;
                 ?>
-                <tr class="<?= $hasPrice ? '' : 'row-missing-price' ?>">
+                <tr class="<?= $hasPrice ? '' : 'row-missing-price' ?>" data-ye-price="<?= $hasPrice ? 'has' : 'none' ?>">
                     <td><?= e($row['code']) ?></td>
                     <td>
                         <a href="<?= url('/pages/product-detail.php?id=' . (int) $row['id']) ?>" target="_blank" rel="noopener noreferrer" title="เปิดโปรไฟล์อะไหล่ในแท็บใหม่"><?= e(parts_display_name($row)) ?></a>
@@ -223,7 +234,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <?php endforeach; ?>
             </tbody>
             <tfoot>
-                <tr style="background:var(--bg); font-weight:600">
+                <tr class="ye-foot-row" style="background:var(--bg); font-weight:600">
                     <td colspan="2">รวม (เฉพาะรายการที่มีราคา)</td>
                     <td class="text-right"><?= formatNumber($summary['total_qty']) ?></td>
                     <td></td>
@@ -246,6 +257,59 @@ require_once __DIR__ . '/../includes/header.php';
     font-family: inherit;
 }
 .price-input:focus { outline: none; border-color: var(--border-focus); }
+/* ชิปกรองรายการ — หน้าตาเดียวกับชิปในหน้าสั่งซื้ออะไหล่หลัก */
+.ye-chip-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.ye-chip {
+    cursor: pointer; font: inherit; background: var(--card, #fff);
+    border: 1px solid var(--border, #e8e4f2); border-radius: 999px;
+    padding: 6px 12px; font-size: calc(12px * var(--font-scale, 1));
+    font-variant-numeric: tabular-nums; color: inherit;
+}
+.ye-chip:hover { border-color: var(--primary, #e11d74); background: var(--primary-soft, #fce7f3); }
+.ye-chip.is-active { border-color: var(--primary, #e11d74); box-shadow: inset 0 0 0 1px var(--primary, #e11d74); background: var(--primary-soft, #fce7f3); }
+.ye-chip b { color: var(--primary, #e11d74); margin-left: 2px; }
+.ye-chip-note { font-size: calc(12px * var(--font-scale, 1)); }
+tr[data-ye-price].is-hidden { display: none; }
+.ye-foot-row.is-dim td { opacity: .6; }
 </style>
+
+<script>
+(function () {
+    var chips = [].slice.call(document.querySelectorAll('[data-ye-filter]'));
+    if (!chips.length) { return; }
+    var rows = [].slice.call(document.querySelectorAll('tr[data-ye-price]'));
+    var note = document.getElementById('ye-filter-note');
+    var foot = document.querySelector('.ye-foot-row');
+    var KEY = 'parts_year_end_filter';
+
+    function apply(mode) {
+        var shown = 0;
+        rows.forEach(function (tr) {
+            var hit = mode === 'all' || tr.getAttribute('data-ye-price') === mode;
+            tr.classList.toggle('is-hidden', !hit);
+            if (hit) { shown++; }
+        });
+        chips.forEach(function (c) {
+            c.classList.toggle('is-active', c.getAttribute('data-ye-filter') === mode);
+        });
+        // ยอดรวมท้ายตารางเป็นของทั้งคลังเสมอ ไม่ได้คิดตามที่กรอง จึงต้องบอกไว้ไม่ให้อ่านผิด
+        if (note) {
+            note.hidden = mode === 'all';
+            note.textContent = mode === 'all' ? '' : 'แสดง ' + shown + ' รายการ · ยอดรวมท้ายตารางยังเป็นของทั้งคลัง';
+        }
+        if (foot) { foot.classList.toggle('is-dim', mode !== 'all'); }
+        try { localStorage.setItem(KEY, mode); } catch (e) {}
+    }
+
+    chips.forEach(function (c) {
+        c.addEventListener('click', function () { apply(c.getAttribute('data-ye-filter')); });
+    });
+
+    var saved = 'all';
+    try { saved = localStorage.getItem(KEY) || 'all'; } catch (e) {}
+    if (['all', 'none', 'has'].indexOf(saved) < 0) { saved = 'all'; }
+    apply(saved);
+})();
+</script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
