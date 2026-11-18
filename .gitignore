@@ -16,6 +16,7 @@ ai_studio_code/
 # ไฟล์ที่ generate/runtime ไม่ควร commit
 **/uploads/*
 !**/uploads/.htaccess
+!**/uploads/kpo/.htaccess
 **/logs/*.log
 *.log
 
@@ -38,3 +39,6 @@ ai_studio_code/
 # ข้อมูลส่งออกจากระบบ installation เดิม — มีชื่อลูกค้า ไม่ใส่ใน repo
 **/installation_history.csv
 **/installation_history.csv.gz
+
+# ภาพหน้าจอ/หน้าเทียบดีไซน์ที่ใช้ระหว่างทำงาน — ไม่ใช่โค้ด
+/deploy/reports/
