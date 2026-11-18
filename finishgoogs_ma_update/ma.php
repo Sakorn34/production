@@ -4,11 +4,15 @@
  *
  * ขั้นที่ 1: เลือกรุ่นสินค้า (การ์ดรูป)
  * ขั้นที่ 2: ฟอร์มบันทึก + รายการ MA ของรุ่นนั้น
+ *
+ * เครื่องสำรอง = บันทึกเฉพาะระบบผลิต ไม่เรียกปิดคิว/ไม่เขียนระบบเช่า
+ * เครื่องเช่า = ซิงก์ระบบเช่าตาม rent_close_action (ซ่อมแล้ว / เสื่อมสภาพ) เหมือนเดิม
  */
 require __DIR__ . '/config.php';
 require_login();
 require __DIR__ . '/includes/ma_snippets.php';
 require __DIR__ . '/includes/rent_ma_bridge.php';
+require_once __DIR__ . '/includes/sd_image.php';
 
 /** แปลงข้อความรายการ (คั่นด้วย ,) เป็น array */
 function ma_items($s) {
@@ -102,14 +106,45 @@ function ma_last_product_prefill(int $productId): array {
     ];
 }
 
-/** แสดงรายการในคอลัมน์ตาราง (ย่อถ้ายาว) */
+/**
+ * MA เครื่องสำรอง — ไม่ซิงก์/ไม่ปิดคิวระบบเช่า (เสื่อมสภาพใช้กับเครื่องเช่าเท่านั้น)
+ *
+ * @param string $postedStatus rental|spare จากฟอร์ม
+ * @return bool
+ */
+function ma_spare_skips_rent_sync($postedStatus): bool
+{
+    return $postedStatus === 'spare';
+}
+
+/**
+ * แสดงรายการ OK/Replace/Repair ในตาราง MA เป็นชิปข้อความ
+ *
+ * @param array<string,mixed> $rec
+ * @param string            $col     คอลัมน์ ma_records
+ * @param string            $jsonKey คีย์ใน versions_json
+ * @param int               $max     จำนวนชิปสูงสุดต่อเซลล์
+ * @return string HTML
+ */
 function ma_items_cell(array $rec, $col, $jsonKey, $max = 6) {
     $items = ma_record_items($rec, $col, $jsonKey);
-    if (!$items) return '<span class="muted">-</span>';
+    if (!$items) {
+        return '<span class="muted">-</span>';
+    }
+    $toneMap = ['OK' => 'ok', 'Replace' => 'replace', 'Repair' => 'repair'];
+    $tone = isset($toneMap[$jsonKey]) ? $toneMap[$jsonKey] : 'ok';
     $show = array_slice($items, 0, $max);
-    $txt = h(implode(' · ', $show));
-    if (count($items) > $max) $txt .= ' <span class="muted">(+' . (count($items) - $max) . ')</span>';
-    return $txt;
+    $extra = count($items) - count($show);
+    $html = '<div class="ma-list-item-chips">';
+    foreach ($show as $it) {
+        $html .= '<span class="ma-list-item-chip ma-list-item-chip-' . h($tone) . '">' . h($it) . '</span>';
+    }
+    if ($extra > 0) {
+        $html .= '<span class="ma-list-item-chip ma-list-item-chip-more" title="' . h(implode(', ', array_slice($items, $max))) . '">+'
+            . (int) $extra . '</span>';
+    }
+    $html .= '</div>';
+    return $html;
 }
 
 /** แสดงรายการเป็นบรรทัดพร้อมหัวข้อ */
@@ -272,13 +307,27 @@ function ma_sanitize_item_sets($okRaw, $repRaw, $fixRaw) {
 /**
  * สร้างข้อความสรุป MA สำหรับบันทึกไประบบเช่า — ส่งเฉพาะหัวข้อที่มีข้อมูล (ไม่ใส่ FW/Note ว่าง)
  *
+ * ซ่อมแล้ว (close_fg) ขึ้นต้นว่าใช้งานได้ปกติตามงานเช่า Office
+ * เสื่อมสภาพ (retire) ส่งเฉพาะหมายเหตุ — ห้ามบอกว่าใช้งานได้ปกติ
+ *
  * @param string|null $replace รายการเปลี่ยนอะไหล่
  * @param string|null $repair  รายการซ่อม
  * @param string|null $fw       เวอร์ชัน FW
  * @param string|null $remark   หมายเหตุ
+ * @param string      $action  close_fg|retire|เสื่อมสภาพ
  * @return string
  */
-function ma_rental_office_summary($replace, $repair, $fw, $remark) {
+function ma_rental_office_summary($replace, $repair, $fw, $remark, $action = 'close_fg') {
+    $action = trim((string)$action);
+    $isRetire = ($action === 'retire' || $action === 'เสื่อมสภาพ');
+    if (!$isRetire && $action !== 'close_fg' && $action !== 'keep' && $action !== 'ซ่อมแล้ว' && $action !== 'ไม่ปิดคิว') {
+        $isRetire = function_exists('mb_strpos') && mb_strpos(trim((string)$remark), 'เสื่อมสภาพ') === 0;
+    }
+    if ($isRetire) {
+        return function_exists('rent_ensure_retire_remark')
+            ? rent_ensure_retire_remark($remark)
+            : (trim((string)$remark) !== '' ? trim((string)$remark) : 'เสื่อมสภาพ');
+    }
     $parts = ['ใช้งานได้ปกติ เช็ดทำความสะอาด'];
     $rep = trim((string)$replace);
     $fix = trim((string)$repair);
@@ -350,10 +399,180 @@ function ma_row_data_attrs(array $rec) {
         'fw' => (string)($rec['fw_version'] ?? ''),
         'remark' => (string)($rec['remark'] ?? ''),
     ]);
+    $extra['data-rent-close'] = ma_rent_close_label($rec);
+    $kind = ma_list_machine_kind($rec);
+    $extra['data-machine-kind'] = status_th_chip($kind);
     foreach ($extra as $k => $v) {
         $out .= ' ' . $k . '="' . h($v) . '"';
     }
     return $out;
+}
+
+/**
+ * ประเภทเครื่องตอนบันทึก MA สำหรับรายการในตาราง (เช่า / สำรอง)
+ *
+ * @param array<string,mixed> $rec
+ * @return string rental|spare
+ */
+function ma_list_machine_kind(array $rec)
+{
+    if (($rec['src'] ?? '') === 'rent') {
+        return 'rental';
+    }
+    $ms = trim((string) ($rec['machine_status'] ?? ''));
+    if ($ms === 'spare') {
+        return 'spare';
+    }
+    if ($ms === 'rental') {
+        return 'rental';
+    }
+    // รายการก่อนมีคอลัมน์ machine_status — อนุมานจากสถานะทะเบียนเครื่อง
+    $ast = trim((string) ($rec['ast_status'] ?? ''));
+    if ($ast === 'spare') {
+        return 'spare';
+    }
+    return 'rental';
+}
+
+/**
+ * ป้ายประเภทเครื่อง (เช่า / สำรอง) ในตาราง MA
+ *
+ * @param string $kind rental|spare
+ * @return string HTML
+ */
+function ma_list_kind_chip_html($kind)
+{
+    $kind = ($kind === 'spare') ? 'spare' : 'rental';
+    $e = status_palette_entry($kind);
+    return '<span class="ma-kind-chip ma-kind-chip-' . h($kind) . '" style="background:' . h($e['bg'])
+        . ';color:' . h($e['fg']) . '">' . h($e['chip']) . '</span>';
+}
+
+/**
+ * ตรวจค่าวันที่จาก query (input type=date)
+ *
+ * @param mixed $raw
+ * @return string Y-m-d หรือว่างถ้าไม่ถูกต้อง
+ */
+function ma_list_parse_date_param($raw)
+{
+    $raw = trim((string) $raw);
+    if ($raw === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw)) {
+        return '';
+    }
+    return $raw;
+}
+
+/**
+ * @return bool มีตัวกรองรายการ MA อยู่หรือไม่
+ */
+function ma_list_filter_active($mq, $mby, $mround, $mkind, $mfrom, $mto, $mok, $mrepl, $mrepair, $mrLegacy = '')
+{
+    return $mq !== '' || $mby !== '' || $mround !== '' || $mkind !== ''
+        || $mfrom !== '' || $mto !== ''
+        || $mok !== '' || $mrepl !== '' || $mrepair !== ''
+        || $mrLegacy !== '';
+}
+
+/**
+ * เพิ่มเงื่อนไข SQL กรอง ok/replace/repair (หรือ legacy mr)
+ *
+ * @param list<string> $maWhere
+ */
+function ma_list_apply_item_sql_filters(array &$maWhere, &$maTypes, array &$maParams, $mok, $mrepl, $mrepair, $mrLegacy)
+{
+    $mok = trim((string) $mok);
+    $mrepl = trim((string) $mrepl);
+    $mrepair = trim((string) $mrepair);
+    $mrLegacy = trim((string) $mrLegacy);
+    if ($mrLegacy !== '' && $mok === '' && $mrepl === '' && $mrepair === '') {
+        $maWhere[] = '(m.ok_items LIKE ? OR m.replace_items LIKE ? OR m.repair_items LIKE ? OR m.remark LIKE ?)';
+        $maTypes .= 'ssss';
+        $like = '%' . $mrLegacy . '%';
+        array_push($maParams, $like, $like, $like, $like);
+        return;
+    }
+    if ($mok !== '') {
+        $maWhere[] = 'm.ok_items LIKE ?';
+        $maTypes .= 's';
+        $maParams[] = '%' . $mok . '%';
+    }
+    if ($mrepl !== '') {
+        $maWhere[] = 'm.replace_items LIKE ?';
+        $maTypes .= 's';
+        $maParams[] = '%' . $mrepl . '%';
+    }
+    if ($mrepair !== '') {
+        $maWhere[] = 'm.repair_items LIKE ?';
+        $maTypes .= 's';
+        $maParams[] = '%' . $mrepair . '%';
+    }
+}
+
+/**
+ * กรองรายการระบบเช่าตามช่องรายการตรวจ (ข้อความรวมใน remark)
+ *
+ * @param array<string,mixed> $r
+ */
+function ma_list_rent_passes_item_filters(array $r, $mok, $mrepl, $mrepair, $mrLegacy)
+{
+    $note = (string) ($r['remark'] ?? '');
+    $mok = trim((string) $mok);
+    $mrepl = trim((string) $mrepl);
+    $mrepair = trim((string) $mrepair);
+    $mrLegacy = trim((string) $mrLegacy);
+    if ($mrLegacy !== '' && $mok === '' && $mrepl === '' && $mrepair === '') {
+        return mb_stripos($note, $mrLegacy) !== false;
+    }
+    if ($mok !== '' && mb_stripos($note, $mok) === false) {
+        return false;
+    }
+    if ($mrepl !== '' && mb_stripos($note, $mrepl) === false) {
+        return false;
+    }
+    if ($mrepair !== '' && mb_stripos($note, $mrepair) === false) {
+        return false;
+    }
+    return true;
+}
+
+/**
+ * ข้อความผลต่อระบบเช่าของรายการ MA หนึ่งแถว
+ *
+ * @param array<string,mixed> $rec
+ * @return string ซ่อมแล้ว|เสื่อมสภาพ|ไม่ปิดคิว|—
+ */
+function ma_rent_close_label(array $rec)
+{
+    $st = trim((string) ($rec['ma_status'] ?? $rec['rent_close_status'] ?? ''));
+    if ($st === 'Asset Retirement') {
+        return 'เสื่อมสภาพ';
+    }
+    if ($st === 'finished goods') {
+        return 'ซ่อมแล้ว';
+    }
+    if (($rec['src'] ?? '') !== 'rent' && ($rec['machine_status'] ?? '') === 'spare') {
+        return 'ไม่ปิดคิว';
+    }
+    return '—';
+}
+
+/**
+ * เซลล์คอลัมน์ผลต่อระบบเช่า
+ *
+ * @param array<string,mixed> $rec
+ * @return string
+ */
+function ma_rent_close_cell(array $rec)
+{
+    $label = ma_rent_close_label($rec);
+    if ($label === 'เสื่อมสภาพ') {
+        return '<span class="ma-pill ma-pill-urgent">เสื่อมสภาพ</span>';
+    }
+    if ($label === 'ซ่อมแล้ว') {
+        return '<span class="ma-pill ma-pill-done">ซ่อมแล้ว</span>';
+    }
+    return '<span class="muted">' . h($label) . '</span>';
 }
 
 /**
@@ -369,17 +588,23 @@ function ma_list_qs($productId, array $over = []) {
         'mq' => isset($_GET['mq']) ? trim((string)$_GET['mq']) : '',
         'mby' => isset($_GET['mby']) ? trim((string)$_GET['mby']) : '',
         'mr' => isset($_GET['mr']) ? trim((string)$_GET['mr']) : '',
+        'mok' => isset($_GET['mok']) ? trim((string)$_GET['mok']) : '',
+        'mrepl' => isset($_GET['mrepl']) ? trim((string)$_GET['mrepl']) : '',
+        'mrepair' => isset($_GET['mrepair']) ? trim((string)$_GET['mrepair']) : '',
+        'mfrom' => ma_list_parse_date_param($_GET['mfrom'] ?? ''),
+        'mto' => ma_list_parse_date_param($_GET['mto'] ?? ''),
         'mround' => isset($_GET['mround']) ? trim((string)$_GET['mround']) : '',
         'msort' => isset($_GET['msort']) ? trim((string)$_GET['msort']) : 'date_desc',
         // mrent=0 = ซ่อนรายการจากระบบเช่า — ต้องพกไปกับลิงก์เรียง/แบ่งหน้าด้วย
         'mrent' => isset($_GET['mrent']) ? trim((string)$_GET['mrent']) : '',
+        'mkind' => isset($_GET['mkind']) ? trim((string)$_GET['mkind']) : '',
         'page' => isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1,
     ];
     foreach ($over as $k => $v) {
         $q[$k] = $v;
     }
     $parts = ['product=' . (int)$q['product']];
-    foreach (['mq', 'mby', 'mr', 'mround', 'msort', 'mrent'] as $k) {
+    foreach (['mq', 'mby', 'mr', 'mok', 'mrepl', 'mrepair', 'mfrom', 'mto', 'mround', 'msort', 'mrent', 'mkind'] as $k) {
         if ($q[$k] !== '') $parts[] = rawurlencode($k) . '=' . rawurlencode($q[$k]);
     }
     if ((int)$q['page'] > 1) $parts[] = 'page=' . (int)$q['page'];
@@ -424,8 +649,12 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'history') {
     echo ' · ผลิต ' . dthai($a['produced_at']);
     echo '</div>';
 
-    // แจ้งเตือนอะไหล่ครบกำหนดเปลี่ยน (SD Card / Battery Backup RTC) ให้เห็นก่อนบันทึก MA
+    // แจ้งเตือนอะไหล่ครบกำหนดเปลี่ยน (SD Card / Battery Backup RTC / Battery Power) ให้เห็นก่อนบันทึก MA
     echo part_alerts_html($a['id'], $a['produced_at']);
+    $sdHist = sd_image_info($a, (string) $a['pname']);
+    if (!empty($sdHist['tracked'])) {
+        echo '<p class="muted" style="margin:8px 0 0">SD image: ' . h($sdHist['reason'] !== '' ? $sdHist['reason'] : 'ยังไม่ระบุบอร์ด') . '</p>';
+    }
 
     $canMa = can('ma');
     $histShowFw = product_show_fw((int) $a['product_id']);
@@ -511,7 +740,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ma_detail') {
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'items') {
     header('Content-Type: application/json; charset=utf-8');
     $code = trim(isset($_GET['code']) ? $_GET['code'] : '');
-    $a = qr("SELECT id, product_id, status FROM assets WHERE asset_code=? OR factory_serial=?", 'ss', [$code, $code])->fetch_assoc();
+    $a = qr("SELECT id, product_id, status, asset_code, produced_at, current_fw_version FROM assets WHERE asset_code=? OR factory_serial=?", 'ss', [$code, $code])->fetch_assoc();
     if (!$a) { echo json_encode(['found' => false]); exit; }
 
     // pool รายการ = config หลังบ้านเท่านั้น (ไม่รวมประวัติเก่า) — แยกตามช่อง
@@ -531,6 +760,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'items') {
         'pool_repair' => $poolRepair,
         'fw_options' => product_show_fw($a['product_id']) ? effective_fw_options($a['product_id']) : [],
         'prefill_ok' => $lastMa ? ma_record_items($lastMa, 'ok_items', 'OK') : [],
+        'sd' => sd_image_ajax_payload(sd_image_info($a)),
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -560,7 +790,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'parts') {
             'stock_code' => (string)($r['stock_code'] ?? ''),
             'search'     => part_search_key($r),
             'icon'       => img_url($r['icon_path'] ?? '') ?: '',
-            'stock_qty'  => ($codeKey !== '' && isset($qtyMap[$codeKey])) ? (int)$qtyMap[$codeKey] : null,
+            'stock_qty'  => ($codeKey !== '' && isset($qtyMap[$codeKey])) ? (float)$qtyMap[$codeKey] : null,
         ];
     }
     echo json_encode($out, JSON_UNESCAPED_UNICODE);
@@ -685,18 +915,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_ma'])) {
         header('Location: ' . BASE_URL . '/ma.php?product=' . $maProductId);
         exit;
     }
+    $sdErr = sd_image_validate_post($maProductId, $_POST);
+    if ($sdErr !== '') {
+        flash_set($sdErr, 'err');
+        header('Location: ' . BASE_URL . '/ma.php?product=' . $maProductId);
+        exit;
+    }
     $okItems = $san['ok'];
     $repItems = $san['replace'];
     $fixItems = $san['repair'];
     // ผลรวมของรอบนี้: มีซ่อม > มีเปลี่ยน > ปกติ
     $result = $fixItems ? 'repair' : ($repItems ? 'replace' : ($okItems ? 'ok' : null));
     $fw      = resolve_fw_post_value($maProductId);
-    $newStatus = in_array($_POST['machine_status'], ['rental','spare'], true) ? $_POST['machine_status'] : 'rental';
+    $postedStatus = in_array($_POST['machine_status'] ?? '', ['rental', 'spare'], true) ? (string) $_POST['machine_status'] : 'rental';
     $remark = trim((string)($_POST['remark'] ?? ''));
     $rentAction = isset($_POST['rent_close_action']) ? (string)$_POST['rent_close_action'] : '';
-    if (!in_array($rentAction, ['close_fg', 'retire'], true)) {
+    if (!in_array($rentAction, ['close_fg', 'retire', 'keep'], true)) {
         $rentAction = 'close_fg';
     }
+    if ($postedStatus === 'spare') {
+        $rentAction = 'keep';
+    }
+    $newStatus = $postedStatus;
     if ($rentAction === 'retire') {
         $newStatus = 'rental';
         $remark = rent_ensure_retire_remark($remark);
@@ -739,6 +979,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_ma'])) {
     if (!empty($w['count'])) {
         $flashMsg .= ' · เบิกอะไหล่ ' . (int)$w['count'] . ' รายการ';
     }
+    $sdRes = sd_image_apply_post((int) $a['id'], $maProductId, $_POST);
+    if (!empty($sdRes['message'])) {
+        $flashMsg .= ' · ' . $sdRes['message'];
+    }
     if ($result === 'repair' && function_exists('line_notify_instant_enabled') && line_notify_instant_enabled('ma.repair_required') && date('Y-m-d', strtotime($visited)) === date('Y-m-d')) {
         line_notify_dispatch('ma.repair_required', [
             'asset_id'     => (int)$a['id'],
@@ -753,6 +997,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_ma'])) {
             'dedup_key' => 'ma.repair_required:' . $maRecordId,
         ]);
     }
+    if (ma_spare_skips_rent_sync($postedStatus)) {
+        flash_set($flashMsg, 'ok', $flashMsg);
+    } else {
     $rentRes = rent_apply_after_ma_save_for_asset($a, $rentAction, $repItems, $fixItems, $fw, $remark);
     // เสื่อมสภาพนับว่าสำเร็จเฉพาะตอนระบบเช่ารับแล้วจริง — ถ้าไม่รับ cron รอบหน้าจะ sync สถานะกลับ
     // ต้องขึ้นเป็นข้อความเตือน ไม่ใช่เขียวผ่านเหมือนเดิม ไม่งั้นคนบันทึกไม่รู้ว่าสถานะไม่เปลี่ยน
@@ -768,6 +1015,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_ma'])) {
         $flashMsg .= ' — สถานะเครื่องยังไม่เป็นเสื่อมสภาพ';
     }
     flash_set($flashMsg, $rentDone ? 'ok' : 'err', $flashMsg);
+    }
     header('Location: ' . BASE_URL . '/ma.php?product=' . $maProductId); exit;
     } finally {
         ma_round_lock_release($maRoundLock);
@@ -790,6 +1038,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_ma'])) {
         header('Location: ' . BASE_URL . '/ma.php?edit=' . $mid);
         exit;
     }
+    $sdErr = sd_image_validate_post($maProductId, $_POST);
+    if ($sdErr !== '') {
+        flash_set($sdErr, 'err');
+        header('Location: ' . BASE_URL . '/ma.php?edit=' . $mid);
+        exit;
+    }
     $okItems = $san['ok'];
     $repItems = $san['replace'];
     $fixItems = $san['repair'];
@@ -797,10 +1051,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_ma'])) {
     $fw = resolve_fw_post_value((int) $rec['product_id'], (string) ($rec['fw_version'] ?? ''));
     $remark = trim((string)($_POST['remark'] ?? ''));
     $rentAction = isset($_POST['rent_close_action']) ? (string)$_POST['rent_close_action'] : '';
-    if (!in_array($rentAction, ['close_fg', 'retire'], true)) {
+    if (!in_array($rentAction, ['close_fg', 'retire', 'keep'], true)) {
         $rentAction = 'close_fg';
     }
-    $newStatus = in_array($_POST['machine_status'] ?? '', ['rental', 'spare'], true) ? $_POST['machine_status'] : null;
+    $postedStatus = in_array($_POST['machine_status'] ?? '', ['rental', 'spare'], true) ? (string) $_POST['machine_status'] : 'rental';
+    if ($postedStatus === 'spare') {
+        $rentAction = 'keep';
+    }
+    $newStatus = $postedStatus;
     if ($rentAction === 'retire') {
         $newStatus = 'rental';
         $remark = rent_ensure_retire_remark($remark);
@@ -828,6 +1086,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_ma'])) {
         header('Location: ' . BASE_URL . '/ma.php?edit=' . $mid);
         exit;
     }
+    $sdRes = sd_image_apply_post((int) $rec['asset_id'], $maProductId, $_POST);
+    $sdNote = !empty($sdRes['message']) ? ' · ' . $sdRes['message'] : '';
+    if (ma_spare_skips_rent_sync($postedStatus)) {
+        flash_set('แก้ไขรายการ MA เรียบร้อยแล้ว' . $sdNote, 'ok');
+    } else {
     $rentRes = rent_apply_after_ma_save_for_asset($assetRow ?: [], $rentAction, $repItems, $fixItems, $fw, $remark);
     $rentDone = $rentAction === 'retire'
         ? (!empty($rentRes['ok']) && in_array((string)($rentRes['code'] ?? ''), ['closed', 'already'], true))
@@ -835,11 +1098,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_ma'])) {
     if ($rentAction === 'retire' && $rentDone) {
         rent_mark_asset_retired((int)$rec['asset_id']);
     }
-    $flashMsg = 'แก้ไขรายการ MA เรียบร้อยแล้ว · ' . $rentRes['message'];
+    // ย้อนจากเสื่อมสภาพเป็นซ่อมแล้ว — ต้องเปลี่ยนสถานะเครื่องกลับจาก retired เป็น rental
+    if ($rentAction === 'close_fg' && $rentDone) {
+        $curSt = qr('SELECT status FROM assets WHERE id=? LIMIT 1', 'i', [(int)$rec['asset_id']])->fetch_assoc();
+        if ($curSt && (string)$curSt['status'] === 'retired') {
+            q('UPDATE assets SET status=? WHERE id=?', 'si', ['rental', (int)$rec['asset_id']]);
+            q('INSERT INTO stock_movements (asset_id, moved_at, direction, reason, made_by) VALUES (?, NOW(), ?, ?, ?)',
+              'isss', [(int)$rec['asset_id'], 'in', 'แก้ไข MA: ย้อนเสื่อมสภาพ → ซ่อมแล้ว (retired → rental)', actor_name() ?: 'system']);
+        }
+    }
+    $flashMsg = 'แก้ไขรายการ MA เรียบร้อยแล้ว' . $sdNote . ' · ' . $rentRes['message'];
     if ($rentAction === 'retire' && !$rentDone) {
         $flashMsg .= ' — สถานะเครื่องยังไม่เป็นเสื่อมสภาพ';
     }
     flash_set($flashMsg, $rentDone ? 'ok' : 'err', $flashMsg);
+    }
     header('Location: ' . BASE_URL . '/ma.php?product=' . $maProductId); exit;
 }
 // ---------------------------------------------------------------
@@ -848,7 +1121,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_ma'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_ma'])) {
     csrf_check(); require_can('ma');
     $mid = (int)$_POST['ma_id'];
-    $rec = qr("SELECT asset_id FROM ma_records WHERE id=?", 'i', [$mid])->fetch_assoc();
+    $rec = qr("SELECT m.asset_id, m.machine_status, m.remark, a.asset_code, a.factory_serial, a.status ast_status
+               FROM ma_records m JOIN assets a ON a.id = m.asset_id WHERE m.id=?", 'i', [$mid])->fetch_assoc();
     if ($rec && ma_withdrawal_count($mid) > 0) {
         $rb = ma_rollback_withdrawals($mid, actor_name());
         if (!$rb['ok']) {
@@ -859,14 +1133,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_ma'])) {
             exit;
         }
     }
+    // ถ้ารายการที่ลบเป็นเสื่อมสภาพ ย้อนสถานะระบบเช่ากลับเป็น finished goods
+    $delRetireReverted = false;
+    if ($rec) {
+        $wasRetire = (string)($rec['ast_status'] ?? '') === 'retired'
+            || mb_strpos(trim((string)($rec['remark'] ?? '')), 'เสื่อมสภาพ') === 0;
+        if ($wasRetire) {
+            $revertRes = rent_apply_after_ma_save_for_asset(
+                ['asset_code' => (string)$rec['asset_code'], 'factory_serial' => (string)($rec['factory_serial'] ?? '')],
+                'close_fg', null, null, '', ''
+            );
+            if (!empty($revertRes['ok']) && in_array((string)($revertRes['code'] ?? ''), ['closed'], true)) {
+                $delRetireReverted = true;
+            }
+        }
+    }
     q("DELETE FROM ma_records WHERE id=?", 'i', [$mid]);
     if ($rec) {
         recompute_asset_status_from_ma((int) $rec['asset_id']);
         recompute_asset_fw((int) $rec['asset_id']);
     }
-    flash_set('ลบรายการ MA เรียบร้อยแล้ว');
+    $delFlash = 'ลบรายการ MA เรียบร้อยแล้ว';
+    if ($delRetireReverted) {
+        $delFlash .= ' · ย้อนสถานะระบบเช่ากลับเป็นคลังพร้อมเช่าแล้ว';
+    }
+    flash_set($delFlash);
     $back = (isset($_POST['back']) && $_POST['back'] !== '') ? $_POST['back']
           : ($rec ? BASE_URL . '/asset.php?id=' . $rec['asset_id'] : BASE_URL . '/ma.php');
+    header('Location: ' . $back); exit;
+}
+
+// ---------------------------------------------------------------
+// ลบรายการ MA ที่บันทึกจากระบบเช่า (tbl_product_ma)
+// ---------------------------------------------------------------
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_rent_ma'])) {
+    csrf_check(); require_can('ma');
+    $rentMaId = (int)$_POST['rent_ma_id'];
+    $rentSn   = trim((string)($_POST['rent_sn'] ?? ''));
+
+    $rentDel = rent_delete_ma_record($rentMaId, $rentSn);
+    if ($rentDel['ok']) {
+        // sync สถานะฝั่ง production — อ่านจากระบบเช่าอีกครั้งเพื่อให้ assets.status ตรงกัน
+        $sn = $rentDel['sn'] ?: $rentSn;
+        if ($sn !== '') {
+            $assetRow = qr('SELECT id FROM assets WHERE UPPER(TRIM(asset_code)) = ? LIMIT 1',
+                           's', [strtoupper(trim($sn))])->fetch_assoc();
+            if ($assetRow) {
+                asset_status_sync_one((int)$assetRow['id'], true);
+            }
+        }
+        flash_set($rentDel['message']);
+    } else {
+        flash_set($rentDel['message'], 'err');
+    }
+    $back = (isset($_POST['back']) && $_POST['back'] !== '') ? $_POST['back'] : BASE_URL . '/ma.php';
     header('Location: ' . $back); exit;
 }
 
@@ -874,9 +1194,9 @@ require __DIR__ . '/includes/layout.php';
 
 $productId  = (int)(isset($_GET['product']) ? $_GET['product'] : 0);
 $recAssetId = (int)(isset($_GET['record']) ? $_GET['record'] : 0);
-$recAsset = $recAssetId ? qr("SELECT id, asset_code, status, product_id, produced_at FROM assets WHERE id=?", 'i', [$recAssetId])->fetch_assoc() : null;
+$recAsset = $recAssetId ? qr("SELECT id, asset_code, status, product_id, produced_at, current_fw_version FROM assets WHERE id=?", 'i', [$recAssetId])->fetch_assoc() : null;
 $editId = (int)(isset($_GET['edit']) ? $_GET['edit'] : 0);
-$editRec = $editId ? qr("SELECT m.*, a.asset_code, a.status ast_status, a.product_id, a.produced_at
+$editRec = $editId ? qr("SELECT m.*, a.asset_code, a.status ast_status, a.product_id, a.produced_at, a.current_fw_version
                          FROM ma_records m JOIN assets a ON a.id=m.asset_id WHERE m.id=?", 'i', [$editId])->fetch_assoc() : null;
 $formOpen = ($recAsset || $editRec) ? true : false;
 
@@ -907,6 +1227,16 @@ if ($productId <= 0) {
 
     page_header('บันทึก MA — เลือกรุ่นสินค้า');
     echo rent_bulk_retire_pending_alert_html();
+    $sdCounts = sd_image_queue_counts_by_product();
+    $sdAll = 0;
+    foreach ($sdCounts as $n) {
+        $sdAll += (int) $n;
+    }
+    if ($sdAll > 0) {
+        echo '<p class="ma-sd-banner">มี ' . number_format($sdAll)
+            . ' เครื่องเช่า/สำรองที่ยังต้องดูบอร์ดหรือเขียน SD image ชุด AL-26-10-14 — '
+            . '<a href="' . h(BASE_URL . '/sd_image_check.php') . '">เปิดคิว</a></p>';
+    }
     $rentMaCounts = rent_wait_ma_counts_by_product();
     if ($rentMaCounts['ok'] && $rentMaCounts['total_matched'] > 0) {
         echo '<p class="muted" style="margin:0 0 12px">มี ' . number_format($rentMaCounts['total_matched'])
@@ -926,6 +1256,7 @@ if ($productId <= 0) {
           $waitN = ($rentMaCounts['ok'] && isset($rentMaCounts['counts'][(int)$p['id']]))
               ? (int)$rentMaCounts['counts'][(int)$p['id']]
               : 0;
+          $sdN = (int) ($sdCounts[(int) $p['id']] ?? 0);
           ?>
         <a class="pcard" href="<?= BASE_URL ?>/ma.php?product=<?= (int)$p['id'] ?>"
            data-name="<?= h(mb_strtolower($p['name'] . ' ' . $p['product_code'])) ?>"
@@ -937,6 +1268,7 @@ if ($productId <= 0) {
             <?= number_format((int)$p['assets_n']) ?> เครื่อง ·
             <b><?= number_format((int)$p['ma_n']) ?></b> รายการ MA
             <?php if ($waitN > 0) { ?><br><b style="color:var(--primary)">รอ MA <?= number_format($waitN) ?></b><?php } ?>
+            <?php if ($sdN > 0) { ?><br><b style="color:#b45309">รอเขียน image <?= number_format($sdN) ?></b><?php } ?>
           </div>
         </a>
       <?php } ?>
@@ -969,8 +1301,17 @@ $off = ($page - 1) * $per;
 
 $mq = trim(isset($_GET['mq']) ? $_GET['mq'] : '');       // หมายเลขเครื่อง
 $mby = trim(isset($_GET['mby']) ? $_GET['mby'] : '');     // ผู้บันทึก
-$mr = trim(isset($_GET['mr']) ? $_GET['mr'] : '');       // รายละเอียด
+$mr = trim(isset($_GET['mr']) ? $_GET['mr'] : '');       // legacy รวมรายการ
+$mok = trim(isset($_GET['mok']) ? $_GET['mok'] : '');
+$mrepl = trim(isset($_GET['mrepl']) ? $_GET['mrepl'] : '');
+$mrepair = trim(isset($_GET['mrepair']) ? $_GET['mrepair'] : '');
+$mfrom = ma_list_parse_date_param($_GET['mfrom'] ?? '');
+$mto = ma_list_parse_date_param($_GET['mto'] ?? '');
 $mround = trim(isset($_GET['mround']) ? $_GET['mround'] : ''); // รอบ MA
+$mkind = trim(isset($_GET['mkind']) ? $_GET['mkind'] : ''); // ประเภทเครื่องตอน MA
+if (!in_array($mkind, ['', 'rental', 'spare'], true)) {
+    $mkind = '';
+}
 $msort = trim(isset($_GET['msort']) ? $_GET['msort'] : 'date_desc');
 
 $maWhere = ['a.product_id=?'];
@@ -978,17 +1319,18 @@ $maTypes = 'i';
 $maParams = [$productId];
 if ($mq !== '') { $maWhere[] = 'a.asset_code LIKE ?'; $maTypes .= 's'; $maParams[] = "%$mq%"; }
 if ($mby !== '') { $maWhere[] = 'm.done_by LIKE ?'; $maTypes .= 's'; $maParams[] = "%$mby%"; }
-if ($mround !== '') {
-    $maWhere[] = 'CAST(m.ma_round AS CHAR) LIKE ?';
+if ($mfrom !== '') {
+    $maWhere[] = 'm.visited_at >= ?';
     $maTypes .= 's';
-    $maParams[] = '%' . $mround . '%';
+    $maParams[] = $mfrom . ' 00:00:00';
 }
-if ($mr !== '') {
-    $maWhere[] = '(m.ok_items LIKE ? OR m.replace_items LIKE ? OR m.repair_items LIKE ? OR m.remark LIKE ?)';
-    $maTypes .= 'ssss';
-    $like = "%$mr%";
-    array_push($maParams, $like, $like, $like, $like);
+if ($mto !== '') {
+    $maWhere[] = 'm.visited_at <= ?';
+    $maTypes .= 's';
+    $maParams[] = $mto . ' 23:59:59';
 }
+// mround ไม่ใช้กรองใน SQL อีก — คำนวณรอบรวมหลัง merge กับรายการระบบเช่าก่อนจึงกรองทีเดียว
+ma_list_apply_item_sql_filters($maWhere, $maTypes, $maParams, $mok, $mrepl, $mrepair, $mr);
 $maSortMap = [
     'date_desc'     => 'm.visited_at DESC, a.asset_code DESC, m.id DESC',
     'date_asc'      => 'm.visited_at ASC, a.asset_code ASC, m.id ASC',
@@ -1014,7 +1356,7 @@ $maW = 'WHERE ' . implode(' AND ', $maWhere);
 // ดึงทั้งชุดของรุ่นนี้ (ไม่ LIMIT ใน SQL) เพราะต้องเอาไปรวมกับรายการจากระบบเช่าก่อน
 // แล้วค่อยเรียงและแบ่งหน้าพร้อมกัน — จำนวนต่อรุ่นหลักร้อยถึงพันแถว ไม่หนัก
 $ourRows = [];
-$res = qr("SELECT m.*, a.asset_code, a.id asset_id FROM ma_records m
+$res = qr("SELECT m.*, a.asset_code, a.id asset_id, a.status ast_status FROM ma_records m
            JOIN assets a ON a.id=m.asset_id
            $maW", $maTypes, $maParams);
 while ($r = $res->fetch_assoc()) {
@@ -1037,13 +1379,13 @@ if ($maShowRent) {
     } catch (Throwable $e) {
         $rentRows = [];   // ระบบเช่าล่ม — รายการของเรายังแสดงได้ตามปกติ
     }
-    // ใช้ตัวกรองชุดเดียวกับฝั่งเรา
-    if ($mq !== '' || $mby !== '' || $mround !== '' || $mr !== '') {
-        $rentRows = array_values(array_filter($rentRows, function ($r) use ($mq, $mby, $mround, $mr) {
+    // ใช้ตัวกรองชุดเดียวกับฝั่งเรา (ยกเว้น mround — คำนวณหลัง merge)
+    $rentItemFilter = ($mr !== '' || $mok !== '' || $mrepl !== '' || $mrepair !== '');
+    if ($mq !== '' || $mby !== '' || $rentItemFilter) {
+        $rentRows = array_values(array_filter($rentRows, function ($r) use ($mq, $mby, $mok, $mrepl, $mrepair, $mr) {
             if ($mq !== '' && mb_stripos((string) $r['asset_code'], $mq) === false) { return false; }
             if ($mby !== '' && mb_stripos((string) $r['done_by'], $mby) === false) { return false; }
-            if ($mround !== '') { return false; }   // รายการฝั่งเช่าไม่มีเลขรอบ
-            if ($mr !== '' && mb_stripos((string) $r['remark'], $mr) === false) { return false; }
+            if (!ma_list_rent_passes_item_filters($r, $mok, $mrepl, $mrepair, $mr)) { return false; }
             return true;
         }));
     }
@@ -1051,8 +1393,58 @@ if ($maShowRent) {
 }
 
 $allRows = array_merge($ourRows, $rentRows);
+
+// คำนวณรอบ MA รวมจากทั้งสองระบบ — นับต่อเครื่องเรียงตามวันที่
+$_roundGroups = [];
+foreach ($allRows as $idx => $row) {
+    $code = strtoupper(trim((string)($row['asset_code'] ?? '')));
+    if ($code !== '') { $_roundGroups[$code][] = $idx; }
+}
+foreach ($_roundGroups as $_indices) {
+    usort($_indices, function ($a, $b) use ($allRows) {
+        $cmp = strcmp((string)($allRows[$a]['visited_at'] ?? ''), (string)($allRows[$b]['visited_at'] ?? ''));
+        return $cmp !== 0 ? $cmp : ($a - $b);
+    });
+    $n = 1;
+    foreach ($_indices as $idx) {
+        $allRows[$idx]['ma_round'] = $n++;
+    }
+}
+unset($_roundGroups);
+
+// กรองวันที่หลัง merge (ครอบคลุมรายการระบบเช่าที่ไม่ผ่าน SQL ฝั่งเรา)
+if ($mfrom !== '' || $mto !== '') {
+    $allRows = array_values(array_filter($allRows, function ($r) use ($mfrom, $mto) {
+        $day = substr((string) ($r['visited_at'] ?? ''), 0, 10);
+        if ($day === '' || $day === '0000-00-00') {
+            return false;
+        }
+        if ($mfrom !== '' && $day < $mfrom) {
+            return false;
+        }
+        if ($mto !== '' && $day > $mto) {
+            return false;
+        }
+        return true;
+    }));
+}
+
+// กรองรอบ MA (mround) หลังคำนวณรอบรวมแล้ว — ครอบคลุมทั้งรายการของเราและระบบเช่า
+if ($mround !== '') {
+    $allRows = array_values(array_filter($allRows, function ($r) use ($mround) {
+        return mb_stripos((string)($r['ma_round'] ?? ''), $mround) !== false;
+    }));
+}
+
+// กรองประเภทเครื่อง (เช่า/สำรอง) หลัง merge — ใช้ logic เดียวกับป้ายในตาราง
+if ($mkind === 'rental' || $mkind === 'spare') {
+    $allRows = array_values(array_filter($allRows, function ($r) use ($mkind) {
+        return ma_list_machine_kind($r) === $mkind;
+    }));
+}
+
 $total = count($allRows);
-$ownTotal = count($ourRows);
+$ownTotal = count(array_filter($allRows, function ($r) { return ($r['src'] ?? '') !== 'rent'; }));
 $pages = max(1, (int)ceil($total / $per));
 
 // ─── เรียงตามหัวคอลัมน์ที่เลือก (แทน ORDER BY เดิม) ───
@@ -1076,6 +1468,28 @@ usort($allRows, function ($x, $y) use ($sortKey, $sortDir) {
     return strcmp((string) ($y['visited_at'] ?? ''), (string) ($x['visited_at'] ?? ''));
 });
 $recentMA = array_slice($allRows, $off, $per);
+$rentCloseMap = [];
+if (function_exists('rent_ma_close_status_map')) {
+    $sns = [];
+    foreach ($recentMA as $m) {
+        $sns[] = (string) ($m['asset_code'] ?? '');
+    }
+    try {
+        $rentCloseMap = rent_ma_close_status_map($sns);
+    } catch (Throwable $e) {
+        $rentCloseMap = [];
+    }
+}
+foreach ($recentMA as $i => $m) {
+    if (trim((string) ($m['ma_status'] ?? '')) !== '') {
+        continue;
+    }
+    $sn = function_exists('rent_normalize_sn')
+        ? rent_normalize_sn($m['asset_code'] ?? '')
+        : strtoupper(trim((string) ($m['asset_code'] ?? '')));
+    $key = $sn . '|' . substr((string) ($m['visited_at'] ?? ''), 0, 10);
+    $recentMA[$i]['rent_close_status'] = $rentCloseMap[$key] ?? '';
+}
 
 $maListUrl = BASE_URL . '/ma.php?product=' . $productId;
 $maClearUrl = $maListUrl;
@@ -1084,6 +1498,15 @@ $maListShowFw = product_show_fw($productId);
 page_header('บันทึก MA — ' . $product['name'] . ' (' . number_format($total) . ')');
 echo rent_bulk_retire_pending_alert_html();
 echo rent_wait_ma_panel_html($productId);
+if (sd_image_slug_for_product($productId) !== '') {
+    $sdQ = sd_image_queue('queue', $productId, '');
+    $sdN = (int) ($sdQ['counts']['queue'] ?? 0);
+    if ($sdN > 0) {
+        echo '<p class="ma-sd-banner">มี ' . number_format($sdN)
+            . ' เครื่องเช่า/สำรองของรุ่นนี้ที่ยังต้องดูบอร์ดหรือเขียน SD image — '
+            . '<a href="' . h(BASE_URL . '/sd_image_check.php?product=' . $productId) . '">เปิดคิว</a></p>';
+    }
+}
 require __DIR__ . '/includes/list_search.php';
 ?>
 <?php if (can('ma')) { $ea = $editRec; $maProductPrefill = $ea ? ['fw_version' => '', 'remark' => ''] : ma_last_product_prefill($productId); ?>
@@ -1119,10 +1542,12 @@ require __DIR__ . '/includes/list_search.php';
         ['วันที่เข้า MA', d.date || '-', false],
         ['รอบ MA', d.round || '-', false],
         ['รหัสเครื่อง', d.asset || d.code || '-', false],
+        ['สถานะเครื่อง', d.machineKind || '-', false],
         ['✅ ใช้งานได้ปกติ', d.ok || '-', true],
         ['🔄 เปลี่ยนอะไหล่', d.replaceDisp || '-', true],
         ['🔩 อะไหล่ที่เบิก (MA)', d.partsWithdraw || '-', true],
         ['🔧 ซ่อม', d.repairDisp || '-', true],
+        ['ผลต่อระบบเช่า', d.rentClose || '-', false],
       ];
       if (MA_SHOW_FW) {
         rows.push(['Firmware หลังตรวจ', d.fw || '-', false]);
@@ -1143,7 +1568,8 @@ require __DIR__ . '/includes/list_search.php';
       replace: d.replace || '',
       repair: d.repair || '',
       fw: d.fw || '',
-      remark: d.remark || ''
+      remark: d.remark || '',
+      rentClose: d.rentClose || ''
     });
     var titleEl = document.getElementById('ma-detail-modal-title');
     if (titleEl) {
@@ -1167,10 +1593,36 @@ require __DIR__ . '/includes/list_search.php';
 $maShowFw = product_show_fw($productId);
 $maFwOpts = $maShowFw ? effective_fw_options($productId) : [];
 $maFwMode = effective_fw_input_mode($productId);
+$maMachineStatus = 'rental';
+if ($ea) {
+    $maMachineStatus = in_array($ea['machine_status'] ?? '', ['rental', 'spare'], true)
+        ? (string) $ea['machine_status']
+        : (in_array($ea['ast_status'] ?? '', ['rental', 'spare'], true) ? (string) $ea['ast_status'] : 'rental');
+} elseif ($recAsset && in_array((string) ($recAsset['status'] ?? ''), ['rental', 'spare'], true)) {
+    $maMachineStatus = (string) $recAsset['status'];
+}
+$maRentAction = $maMachineStatus === 'spare' ? 'keep' : 'close_fg';
+$maSdInit = ['tracked' => false];
+$sdSrc = null;
+if ($ea) {
+    $sdSrc = [
+        'id'                  => (int) ($ea['asset_id'] ?? 0),
+        'product_id'          => (int) ($ea['product_id'] ?? $productId),
+        'asset_code'          => (string) ($ea['asset_code'] ?? ''),
+        'status'              => (string) ($ea['ast_status'] ?? ''),
+        'produced_at'         => (string) ($ea['produced_at'] ?? ''),
+        'current_fw_version'  => (string) ($ea['current_fw_version'] ?? ($ea['fw_version'] ?? '')),
+    ];
+} elseif ($recAsset) {
+    $sdSrc = $recAsset;
+}
+if ($sdSrc) {
+    $maSdInit = sd_image_ajax_payload(sd_image_info($sdSrc, (string) $product['name']));
+}
 ?>
 <div class="<?= $maShowSnippets ? 'ma-page-grid' : '' ?>">
   <div class="ma-form-col">
-    <form method="post" class="formgrid form-wide ma-formgrid" id="ma-form">
+    <form method="post" class="formgrid form-wide ma-formgrid<?= $maMachineStatus === 'spare' ? ' ma-spare-mode' : '' ?>" id="ma-form">
       <?= csrf_field() ?>
       <?php if ($ea) { ?><input type="hidden" name="edit_ma" value="1"><input type="hidden" name="edit_id" value="<?= (int)$editId ?>"><?php } else { ?><input type="hidden" name="new_ma" value="1"><?php } ?>
       <input type="hidden" name="ok_items" id="h-ok">
@@ -1183,22 +1635,22 @@ $maFwMode = effective_fw_input_mode($productId);
         <?php
         $maKnownProduced = $ea ? ($ea['produced_at'] ?? '') : ($recAsset ? ($recAsset['produced_at'] ?? '') : '');
         $maKnownAge = dt_age_text($maKnownProduced);
+        $maKnownCode = $ea ? (string) ($ea['asset_code'] ?? '') : ($recAsset ? (string) ($recAsset['asset_code'] ?? '') : '');
+        $maKnownSymptom = '';
+        if ($maKnownCode !== '') {
+            $symMap = rent_wait_ma_symptoms([$maKnownCode]);
+            $maKnownSymptom = trim((string) ($symMap[rent_normalize_sn($maKnownCode)] ?? ''));
+        }
         ?>
-        <div class="muted ma-field-hint">รุ่น <?= h($product['name']) ?> · พิมพ์แล้วเลือกจากรายการ<span id="ma-age-hint"><?= $maKnownAge !== '' ? ' · อายุเครื่อง <b>' . h($maKnownAge) . '</b>' : '' ?></span></div>
+        <div class="ma-field-hint ma-asset-meta-hint">
+          <div id="ma-age-hint" class="ma-asset-meta-age"<?= $maKnownAge === '' ? ' hidden' : '' ?>><?= $maKnownAge !== '' ? 'อายุเครื่อง <b>' . h($maKnownAge) . '</b>' : '' ?></div>
+          <div id="ma-symptom-hint" class="ma-asset-meta-symptom"<?= $maKnownSymptom === '' ? ' hidden' : '' ?>><?= $maKnownSymptom !== '' ? '<b>' . h($maKnownSymptom) . '</b>' : '' ?></div>
+        </div>
       </div>
 
       <label for="ma_visited_at">วันเวลาเข้า MA</label>
       <input type="datetime-local" name="visited_at" id="ma_visited_at" value="<?= h(dt_for_input($ea ? $ea['visited_at'] : dt_now())) ?>">
 
-      <?php
-      $maMachineStatus = 'rental';
-      if ($ea) {
-          $maMachineStatus = in_array($ea['machine_status'] ?? '', ['rental', 'spare'], true)
-              ? (string) $ea['machine_status']
-              : (in_array($ea['ast_status'] ?? '', ['rental', 'spare'], true) ? (string) $ea['ast_status'] : 'rental');
-      }
-      $maRentAction = 'close_fg';
-      ?>
       <label id="machine_status_label">สถานะเครื่อง</label>
       <div class="ma-field-stack">
         <div class="ma-choice-group" id="machine_status_group" role="group" aria-labelledby="machine_status_label">
@@ -1206,10 +1658,11 @@ $maFwMode = effective_fw_input_mode($productId);
           <button type="button" class="ma-choice-btn ma-choice-btn-rental<?= $maMachineStatus === 'rental' ? ' is-active' : '' ?>" data-value="rental">เครื่องเช่า</button>
           <button type="button" class="ma-choice-btn ma-choice-btn-spare<?= $maMachineStatus === 'spare' ? ' is-active' : '' ?>" data-value="spare">เครื่องสำรอง</button>
         </div>
+        <p id="ma-spare-rent-hint" class="muted ma-field-hint"<?= $maMachineStatus === 'spare' ? '' : ' hidden' ?>>เครื่องสำรองบันทึกเฉพาะระบบผลิต — ไม่ปิดคิวรอ MA ในระบบเช่า</p>
       </div>
 
       <label id="rent_close_action_label" class="ma-lbl-top">ผลต่อระบบเช่า</label>
-      <div class="ma-field-stack">
+      <div class="ma-field-stack" id="ma-rent-close-stack">
         <div class="ma-choice-group" id="rent_close_action_group" role="group" aria-labelledby="rent_close_action_label">
           <input type="hidden" name="rent_close_action" id="rent_close_action" value="<?= h($maRentAction) ?>">
           <button type="button" class="ma-choice-btn<?= $maRentAction === 'close_fg' ? ' is-active' : '' ?>" data-value="close_fg">ซ่อมแล้ว</button>
@@ -1220,6 +1673,9 @@ $maFwMode = effective_fw_input_mode($productId);
           <li><strong>เสื่อมสภาพ</strong> — ปิดคิว Asset Retirement · กรอกแค่หมายเหตุ · ข้ามรายการตรวจ</li>
         </ul>
       </div>
+
+      <label id="ma-sd-label" hidden>SD image</label>
+      <div id="ma-sd-slot" class="ma-field-stack" hidden></div>
 
       <div id="ma-detail-fields" class="ma-detail-fields">
       <label class="ma-lbl-top">✅ ใช้งานได้ปกติ</label>
@@ -1279,7 +1735,7 @@ $maFwMode = effective_fw_input_mode($productId);
   </div>
 
   <?php if ($maShowSnippets) { ?>
-  <aside class="panel ma-snippets-panel" id="ma-snippets">
+  <aside class="panel ma-snippets-panel<?= $maMachineStatus === 'spare' ? ' ma-spare-mode' : '' ?>" id="ma-snippets">
     <?= ma_snippets_inner_html('ma-sn') ?>
   </aside>
   <?php } ?>
@@ -1295,6 +1751,7 @@ var BASE = '<?= BASE_URL ?>';
 var MA_FW_OPTS = <?= json_encode(array_values($maFwOpts), JSON_UNESCAPED_UNICODE) ?>;
 var MA_FW_MODE = <?= json_encode($maFwMode, JSON_UNESCAPED_UNICODE) ?>;
 var MA_SHOW_FW = <?= $maShowFw ? 'true' : 'false' ?>;
+var MA_SD_INIT = <?= json_encode($maSdInit, JSON_UNESCAPED_UNICODE) ?>;
 var itemPools = { ok: [], replace: [], repair: [] };
 function esc(s){ var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
 function normItem(s){ return (s == null ? '' : String(s)).trim(); }
@@ -1348,14 +1805,18 @@ function maFwValue(){
 }
 
 function updateMaSnippets(){
-  if (!maShowSnippets) return;
-  window.maFillSnippets('ma-sn', {
-    code: (document.getElementById('ma_code') || {}).value || '',
-    replace: chipValues('replace').join(' , '),
-    repair: chipValues('repair').join(' , '),
-    fw: maFwValue(),
-    remark: (document.getElementById('ma_remark') || {}).value || ''
-  });
+  if (maShowSnippets) {
+    window.maFillSnippets('ma-sn', {
+      code: (document.getElementById('ma_code') || {}).value || '',
+      replace: chipValues('replace').join(' , '),
+      repair: chipValues('repair').join(' , '),
+      fw: maFwValue(),
+      remark: (document.getElementById('ma_remark') || {}).value || '',
+      action: (document.getElementById('rent_close_action') || {}).value || ''
+    });
+  }
+  if (typeof syncMaSpareMode === 'function') syncMaSpareMode();
+  if (typeof refreshMaSdFromFw === 'function') refreshMaSdFromFw();
 }
 
 var fwFb = document.getElementById('ma_fw_input');
@@ -1583,6 +2044,7 @@ function initMaFwField(){
   slot.addEventListener('keyup', updateMaSnippets, true);
   var fwFilt = slot.querySelector('.chip-dd-filter');
   if (fwFilt) fwFilt.addEventListener('input', updateMaSnippets);
+  setTimeout(updateMaSnippets, 0);
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initMaFwField);
@@ -1629,6 +2091,11 @@ document.addEventListener('click', function(e){
       wrapT.querySelectorAll('.ma-pick-add[data-v]').forEach(function(row){
         addChip(keyT, row.dataset.v, true);
       });
+    } else if (tool.dataset.act === 'clear') {
+      var chipBox = document.getElementById('chips-' + keyT);
+      if (chipBox) chipBox.innerHTML = '';
+      refreshMaList(keyT);
+      updateMaSnippets();
     }
     return;
   }
@@ -1660,17 +2127,30 @@ function showList(wrap, filter, focusSearch){
     if (selectedHere[o]) return false;
     return !filter || o.toLowerCase().indexOf(filter) !== -1;
   });
+  var selectedN = Object.keys(selectedHere).length;
+  var tools = (function () {
+    var btns = '';
+    if (shown.length) {
+      btns += '<button type="button" class="btn-sm btn-line" data-act="all">เลือกทั้งหมดที่แสดง</button>';
+    }
+    if (selectedN) {
+      btns += '<button type="button" class="btn-sm btn-line" data-act="clear">เคลียร์ทั้งหมด</button>';
+    }
+    if (!btns) return '';
+    var hint = shown.length
+      ? 'ติ๊กเลือกทีละรายการ · เหลือ ' + shown.length
+      : 'เลือกครบแล้ว';
+    return '<div class="ma-pick-tools">' + btns
+      + '<span class="muted ma-pick-count">' + hint + '</span></div>';
+  })();
   if (!pool.length) {
-    list.innerHTML = '<div class="muted ma-pick-empty">ยังไม่มีรายการของรุ่นนี้ — พิมพ์แล้วกด Enter เพื่อเพิ่มเอง</div>';
+    list.innerHTML = tools + '<div class="muted ma-pick-empty">ยังไม่มีรายการของรุ่นนี้ — พิมพ์แล้วกด Enter เพื่อเพิ่มเอง</div>';
   } else if (!shown.length) {
-    var msg = Object.keys(selectedHere).length
-      ? 'เลือกครบแล้ว — ลบจากแท็กด้านบนเพื่อเลือกใหม่'
+    var msg = selectedN
+      ? 'เลือกครบแล้ว — กดเคลียร์ทั้งหมด หรือลบแท็กด้านบนเพื่อเลือกใหม่'
       : 'ไม่มีรายการที่เลือกได้ (ถูกใช้ในช่องอื่นแล้ว หรือไม่ตรงคำค้น)';
-    list.innerHTML = '<div class="muted ma-pick-empty">' + msg + '</div>';
+    list.innerHTML = tools + '<div class="muted ma-pick-empty">' + msg + '</div>';
   } else {
-    var tools = '<div class="ma-pick-tools">'
-      + '<button type="button" class="btn-sm btn-line" data-act="all">เลือกทั้งหมดที่แสดง</button>'
-      + '<span class="muted ma-pick-count">ติ๊กเลือกทีละรายการ · เหลือ ' + shown.length + '</span></div>';
     var rows = shown.map(function(o){
       return '<label class="ma-pick-row ma-pick-add dd-panel-check" data-v="' + esc(o) + '">'
         + '<input type="checkbox" tabindex="-1">'
@@ -1735,20 +2215,39 @@ window.addEventListener('pageshow', function(e) {
 
 document.getElementById('ma_remark').addEventListener('input', updateMaSnippets);
 
-// อายุเครื่องใต้ช่องรหัสเครื่อง — อัปเดตเมื่อเลือก S/N จากรายการค้นหา
+// อายุเครื่อง / อาการที่แจ้ง (คิวรอ MA) — อัปเดตเมื่อเลือก S/N จากค้นหาหรือตารางคิว
 (function(){
   var input = document.getElementById('ma_code');
-  var slot = document.getElementById('ma-age-hint');
-  if (!input || !slot) return;
+  var ageSlot = document.getElementById('ma-age-hint');
+  var symSlot = document.getElementById('ma-symptom-hint');
+  if (!input || !ageSlot) return;
   var pickedCode = input.value.trim(); // ค่าที่ server render มา (โหมดแก้ไข/มาจากหน้าเครื่อง)
+  function setMetaLine(el, labelHtml) {
+    if (!el) return;
+    if (labelHtml) {
+      el.innerHTML = labelHtml;
+      el.hidden = false;
+    } else {
+      el.innerHTML = '';
+      el.hidden = true;
+    }
+  }
+  function renderSymptom(sym) {
+    setMetaLine(symSlot, sym ? '<b>' + esc(sym) + '</b>' : '');
+  }
   input.addEventListener('asset-picked', function(e){
     var age = (e.detail && e.detail.age) ? e.detail.age : '';
+    var symptom = (e.detail && e.detail.symptom) ? e.detail.symptom : (input.dataset.pickedSymptom || '');
     pickedCode = (e.detail && e.detail.code) ? e.detail.code : input.value.trim();
-    slot.innerHTML = age ? ' · อายุเครื่อง <b>' + esc(age) + '</b>' : '';
+    setMetaLine(ageSlot, age ? 'อายุเครื่อง <b>' + esc(age) + '</b>' : '');
+    renderSymptom(symptom);
   });
   input.addEventListener('input', function(){
-    // พิมพ์แก้เองจนไม่ตรงกับเครื่องที่เลือกไว้ — ซ่อนอายุ กันแสดงค่าของเครื่องอื่น
-    if (input.value.trim() !== pickedCode) slot.innerHTML = '';
+    // พิมพ์แก้เองจนไม่ตรงกับเครื่องที่เลือกไว้ — ซ่อนอายุ/อาการ กันแสดงค่าของเครื่องอื่น
+    if (input.value.trim() !== pickedCode) {
+      setMetaLine(ageSlot, '');
+      renderSymptom('');
+    }
   });
 })();
 
@@ -1759,20 +2258,24 @@ document.getElementById('ma_remark').addEventListener('input', updateMaSnippets)
   function loadAll(){
     updateMaSnippets();
     var code = input.value.trim();
-    if (code.length < 4) { box.innerHTML = ''; return; }
+    if (code.length < 4) { box.innerHTML = ''; renderMaSdPanel({tracked: false}); return; }
     box.innerHTML = '<span class="muted">กำลังค้นหาประวัติ…</span>';
     fetch(BASE + '/ma.php?ajax=history&code=' + encodeURIComponent(code))
       .then(function(r){ return r.text(); }).then(function(html){ box.innerHTML = html; }).catch(function(){});
     fetch(BASE + '/ma.php?ajax=items&code=' + encodeURIComponent(code))
       .then(function(r){ return r.json(); })
       .then(function(d){
-        if (!d.found) return;
+        if (!d.found) { renderMaSdPanel({tracked: false}); return; }
         itemPools.ok = d.pool_ok || d.pool || [];
         itemPools.replace = d.pool_replace || d.pool || [];
         itemPools.repair = d.pool_repair || d.pool || [];
+        renderMaSdPanel(d.sd || {tracked: false});
         // โหมดแก้ไข — ใช้ข้อมูลจากรายการ MA ที่เลือกเท่านั้น ห้าม prefill จาก MA ล่าสุดของเครื่อง
         if (maEditMode) return;
-        if (d.status === 'spare' || d.status === 'rental') setMaChoiceValue('machine_status_group', d.status);
+        if (d.status === 'spare' || d.status === 'rental') {
+          setMaChoiceValue('machine_status_group', d.status);
+          syncMaSpareMode();
+        }
         if (document.getElementById('chips-ok').children.length === 0) {
           (d.prefill_ok || []).forEach(function(it){ addChip('ok', it, true); });
         }
@@ -1812,6 +2315,32 @@ function syncMaRetireMode(){
   if (spareBtn) spareBtn.disabled = isRetire;
 }
 
+function syncMaSpareMode(){
+  var form = document.getElementById('ma-form');
+  var status = document.getElementById('machine_status');
+  var rent = document.getElementById('rent_close_action');
+  if (!form || !status) return;
+  var isSpare = status.value === 'spare';
+  form.classList.toggle('ma-spare-mode', isSpare);
+  var panel = document.getElementById('ma-snippets');
+  if (panel) panel.classList.toggle('ma-spare-mode', isSpare);
+  var hint = document.getElementById('ma-spare-rent-hint');
+  if (hint) hint.hidden = !isSpare;
+  if (rent) {
+    if (isSpare) {
+      if (rent.value !== 'retire') rent.value = 'keep';
+    } else if (rent.value === 'keep') {
+      setMaChoiceValue('rent_close_action_group', 'close_fg');
+    }
+  }
+  var titleEl = document.querySelector('#ma-snippets .ma-snippets-title-text');
+  if (titleEl) {
+    var rentalTitle = titleEl.getAttribute('data-title-rental') || '';
+    var plainTitle = titleEl.getAttribute('data-title-plain') || '';
+    if (rentalTitle && plainTitle) titleEl.textContent = isSpare ? plainTitle : rentalTitle;
+  }
+}
+
 function setMaChoiceValue(groupId, value){
   var group = document.getElementById(groupId);
   if (!group) return;
@@ -1839,13 +2368,183 @@ function initMaChoiceGroup(groupId, onChange){
   });
 }
 
+function renderMaSdPanel(sd){
+  var slot = document.getElementById('ma-sd-slot');
+  var label = document.getElementById('ma-sd-label');
+  if (!slot) return;
+  if (!sd || !sd.tracked) {
+    slot.innerHTML = '';
+    slot.hidden = true;
+    if (label) label.hidden = true;
+    return;
+  }
+  slot.hidden = false;
+  if (label) label.hidden = false;
+  var files = sd.files || {};
+  var html = '<div class="ma-sd-panel" id="ma-sd-panel">';
+  if (sd.slug === 's') {
+    html += '<p class="ma-sd-hint muted" style="margin:0 0 8px">รุ่น S เป็น Pi3 อย่างเดียว</p>';
+    html += '<input type="hidden" name="sd_raspberry" id="sd_raspberry" value="Pi3">';
+  } else {
+    html += '<p class="ma-sd-hint muted" style="margin:0 0 8px">Plus / M ใช้ไฟล์คนละตัวตามบอร์ด — Pi2 ยังเป็นชุดปี 2023 · Pi3 ต้องเขียนชุด AL-26-10-14</p>';
+    if (!sd.raspberry && sd.pi_guess) {
+      html += '<p class="ma-sd-hint muted" style="margin:0 0 8px">จาก S/N น่าจะเป็น <b>' + esc(sd.pi_guess) + '</b>';
+      if (sd.pi3_cutoff) html += ' · เริ่มใช้ Pi3 ตั้งแต่ ' + esc(sd.pi3_cutoff);
+      html += ' — กดเลือกบอร์ดที่เห็นจริง</p>';
+    }
+    html += '<div class="ma-choice-group" id="sd_raspberry_group" role="group">';
+    html += '<input type="hidden" name="sd_raspberry" id="sd_raspberry" value="' + esc(sd.raspberry || '') + '">';
+    ['Pi2', 'Pi3'].forEach(function(opt){
+      html += '<button type="button" class="ma-choice-btn' + (sd.raspberry === opt ? ' is-active' : '') + '" data-value="' + opt + '">' + opt + '</button>';
+    });
+    html += '</div>';
+  }
+  html += '<p class="ma-sd-file" id="ma-sd-file"></p>';
+  html += '<p class="ma-sd-done" id="ma-sd-done" hidden>เขียนชุดปัจจุบันแล้ว</p>';
+  html += '<p class="ma-sd-hint muted" id="ma-sd-infer" hidden></p>';
+  if (sd.hints_html) html += '<div class="ma-sd-refs">' + sd.hints_html + '</div>';
+  html += '</div>';
+  slot.innerHTML = html;
+  slot._sd = { files: files, have: sd.have_file || '', campaign: sd.campaign_pis || ['Pi3'], slug: sd.slug || '', versions: sd.versions || {} };
+  if (sd.slug !== 's') {
+    initMaChoiceGroup('sd_raspberry_group', function(v){ updateMaSdHint(v); });
+  }
+  updateMaSdHint(sd.slug === 's' ? 'Pi3' : (sd.raspberry || ''));
+}
+
+function maSdFwNorm(fw){
+  return String(fw || '').replace(/\s+/g, '').toLowerCase();
+}
+function maSdFwParse(fw){
+  var t = maSdFwNorm(fw);
+  var m = t.match(/^(\d+)\.(\d+)(?:\.(\d+))?([a-z]*)(?:v(\d+))?$/);
+  if (!m) return null;
+  return [parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3] || '0', 10), m[4] || '', parseInt(m[5] || '0', 10)];
+}
+function maSdFwCmp(a, b){
+  if (maSdFwNorm(a) === maSdFwNorm(b)) return 0;
+  var pa = maSdFwParse(a), pb = maSdFwParse(b);
+  if (!pa || !pb) {
+    var na = maSdFwNorm(a), nb = maSdFwNorm(b);
+    return na < nb ? -1 : (na > nb ? 1 : 0);
+  }
+  var i;
+  for (i = 0; i < 3; i++) { if (pa[i] !== pb[i]) return pa[i] < pb[i] ? -1 : 1; }
+  if (pa[3] !== pb[3]) {
+    if (pa[3] === '') return -1;
+    if (pb[3] === '') return 1;
+    return pa[3] < pb[3] ? -1 : (pa[3] > pb[3] ? 1 : 0);
+  }
+  if (pa[4] !== pb[4]) return pa[4] < pb[4] ? -1 : 1;
+  return 0;
+}
+function maSdFwAtLeast(fw, start){
+  fw = String(fw || '').trim();
+  start = String(start || '').trim();
+  if (!fw || !start) return false;
+  if (maSdFwNorm(fw) === maSdFwNorm(start)) return true;
+  if (!maSdFwParse(fw) || !maSdFwParse(start)) return false;
+  return maSdFwCmp(fw, start) >= 0;
+}
+function maSdFileForFw(versions, fw){
+  var best = { file: '', fw_start: '' };
+  var bestStart = '';
+  (versions || []).forEach(function(row){
+    var file = row && row.file ? String(row.file) : '';
+    var start = row && row.fw_start ? String(row.fw_start).trim() : '';
+    if (!file || !start || !maSdFwAtLeast(fw, start)) return;
+    if (bestStart === '' || maSdFwCmp(start, bestStart) > 0) {
+      best = { file: file, fw_start: start };
+      bestStart = start;
+    }
+  });
+  return best;
+}
+function refreshMaSdFromFw(){
+  var piEl = document.getElementById('sd_raspberry');
+  updateMaSdHint(piEl ? piEl.value : '');
+}
+
+function updateMaSdHint(pi){
+  var slot = document.getElementById('ma-sd-slot');
+  var fileEl = document.getElementById('ma-sd-file');
+  var doneEl = document.getElementById('ma-sd-done');
+  var panel = document.getElementById('ma-sd-panel');
+  if (!slot || !fileEl || !slot._sd) return;
+  var files = slot._sd.files || {};
+  var have = slot._sd.have || '';
+  var campaign = slot._sd.campaign || [];
+  var versions = (slot._sd.versions && pi && slot._sd.versions[pi]) ? slot._sd.versions[pi] : [];
+  var inferEl = document.getElementById('ma-sd-infer');
+  var file = pi && files[pi] ? files[pi] : '';
+  var inCampaign = campaign.indexOf(pi) !== -1;
+  var fw = typeof maFwValue === 'function' ? maFwValue() : '';
+  var fromFw = maSdFileForFw(versions, fw);
+  var done = file !== '' && have === file;
+  var fwIsCurrent = file !== '' && fromFw.file === file;
+  var ok = done || fwIsCurrent;
+  if (panel) {
+    panel.classList.toggle('is-warn', !ok && (pi === '' || inCampaign));
+    panel.classList.toggle('is-ok', ok);
+  }
+  if (inferEl) {
+    inferEl.hidden = true;
+    inferEl.textContent = '';
+  }
+  if (doneEl) doneEl.hidden = true;
+  if (pi === '') {
+    fileEl.innerHTML = 'ยังไม่รู้ว่าเป็น Pi2 หรือ Pi3 — เปิดเครื่องดูบอร์ดแล้วกดเลือก';
+    return;
+  }
+  if (!inCampaign) {
+    var shownPi = (fromFw.file && fromFw.file !== file) ? fromFw.file : file;
+    fileEl.innerHTML = pi + ' ใช้ <b>' + esc(shownPi) + '</b> — ไม่ต้องเขียนชุดใหม่รอบนี้';
+    return;
+  }
+  if (done) {
+    fileEl.innerHTML = 'ชุดปัจจุบัน: <b>' + esc(file) + '</b>';
+    if (doneEl) doneEl.hidden = false;
+    return;
+  }
+  if (fwIsCurrent) {
+    fileEl.innerHTML = 'ตาม version FW ที่เลือก ใช้ชุดปัจจุบัน: <b>' + esc(file) + '</b>';
+    if (inferEl) {
+      inferEl.hidden = false;
+      inferEl.textContent = 'เริ่มที่ ' + fromFw.fw_start + ' — บันทึก MA แล้วจะยืนยันชุดนี้ให้';
+    }
+    return;
+  }
+  if (fromFw.file) {
+    fileEl.innerHTML = 'ตาม version FW ที่เลือก ใช้ไฟล์เก่า: <b>' + esc(fromFw.file) + '</b>';
+    if (inferEl) {
+      inferEl.hidden = false;
+      inferEl.textContent = 'ชุดปัจจุบันคือ ' + file + ' (เริ่มที่ FW ที่สูงกว่านี้)';
+    }
+    return;
+  }
+  fileEl.innerHTML = 'ชุดปัจจุบัน: <b>' + esc(file) + '</b>';
+  if (inferEl) {
+    inferEl.hidden = false;
+    inferEl.textContent = fw
+      ? 'version FW นี้ยังไม่ถึงจุดเริ่มชุดปัจจุบัน — เลือกเวอร์ชันที่เขียน image แล้วด้านล่าง'
+      : 'เลือก version FW ด้านล่าง ระบบจะเทียบไฟล์ image ให้เอง';
+  }
+}
+
 (function(){
-  initMaChoiceGroup('machine_status_group');
+  initMaChoiceGroup('machine_status_group', function(){
+    syncMaSpareMode();
+    if (typeof updateMaSnippets === 'function') updateMaSnippets();
+  });
   initMaChoiceGroup('rent_close_action_group', function(v){
     if (v === 'retire') setMaChoiceValue('machine_status_group', 'rental');
     syncMaRetireMode();
+    syncMaSpareMode();
+    if (typeof updateMaSnippets === 'function') updateMaSnippets();
   });
   syncMaRetireMode();
+  syncMaSpareMode();
+  if (MA_SD_INIT && MA_SD_INIT.tracked) renderMaSdPanel(MA_SD_INIT);
 })();
 
 populateMaEditChips();
@@ -1965,18 +2664,121 @@ if (document.readyState === 'loading') {
 <?php } ?>
 
 <h2>MA ของรุ่นนี้<?= $total ? ' (' . number_format($total) . ')' : '' ?></h2>
-<p class="muted ma-table-hint">คลิกแถวเพื่อดูรายละเอียด MA และคำสั่งตั้งค่าหมายเลขสินค้า · กดหัวคอลัมน์เพื่อจัดเรียง</p>
+<p class="muted ma-table-hint">คลิกแถวเพื่อดูรายละเอียด MA · คลิกหัวคอลัมน์เพื่อจัดเรียง · กรองจากแผงด้านล่าง (กดค้นหาเมื่อพร้อม)</p>
 <?php
-list_search_form([
-    ['name' => 'mq', 'placeholder' => 'รหัสเครื่อง', 'value' => $mq, 'width' => '140px'],
-    ['name' => 'mround', 'placeholder' => 'รอบ MA', 'value' => $mround, 'width' => '80px'],
-    ['name' => 'mby', 'placeholder' => 'ผู้บันทึก', 'value' => $mby, 'width' => '110px'],
-    ['name' => 'mr', 'placeholder' => 'รายละเอียด', 'value' => $mr, 'width' => '160px'],
-], $maClearUrl, ['product' => $productId, 'msort' => $msort !== 'date_desc' ? $msort : '']);
+$maListHasFilter = ma_list_filter_active($mq, $mby, $mround, $mkind, $mfrom, $mto, $mok, $mrepl, $mrepair, $mr);
+$maListPanelOpen = $maListHasFilter;
+$maListColspan = 9 + ($maListShowFw ? 1 : 0) + (can('ma') ? 1 : 0);
+$maListSymptoms = [];
+if (!empty($recentMA)) {
+    $maListSnBatch = [];
+    foreach ($recentMA as $maRowSym) {
+        $code = trim((string) ($maRowSym['asset_code'] ?? ''));
+        if ($code !== '') {
+            $maListSnBatch[] = $code;
+        }
+    }
+    if ($maListSnBatch) {
+        $maListSymptoms = rent_wait_ma_symptoms($maListSnBatch);
+    }
+}
+$maListFilterBits = [];
+if ($mfrom !== '' || $mto !== '') {
+    $maListFilterBits[] = ($mfrom !== '' ? dthai($mfrom) : '…') . ' – ' . ($mto !== '' ? dthai($mto) : '…');
+}
+if ($mq !== '') {
+    $maListFilterBits[] = 'S/N: ' . $mq;
+}
+if ($mround !== '') {
+    $maListFilterBits[] = 'รอบ: ' . $mround;
+}
+if ($mkind === 'rental') {
+    $maListFilterBits[] = 'เครื่องเช่า';
+} elseif ($mkind === 'spare') {
+    $maListFilterBits[] = 'เครื่องสำรอง';
+}
+if ($mok !== '') {
+    $maListFilterBits[] = 'ปกติ: ' . $mok;
+}
+if ($mrepl !== '') {
+    $maListFilterBits[] = 'เปลี่ยน: ' . $mrepl;
+}
+if ($mrepair !== '') {
+    $maListFilterBits[] = 'ซ่อม: ' . $mrepair;
+}
+if ($mr !== '' && $mok === '' && $mrepl === '' && $mrepair === '') {
+    $maListFilterBits[] = 'รายละเอียด: ' . $mr;
+}
+if ($mby !== '') {
+    $maListFilterBits[] = 'โดย: ' . $mby;
+}
 ?>
-<?php if ($total === 0) { ?>
-  <p class="muted">ยังไม่มีรายการ MA ของรุ่นนี้</p>
-<?php } else { ?>
+<div class="ma-list-filter-panel<?= $maListPanelOpen ? ' is-open' : '' ?>" id="ma-list-filter-panel">
+  <div class="ma-list-toolbar">
+    <button type="button" id="ma-list-filter-toggle" class="btn btn-primary btn-sm ma-list-filter-toggle" aria-expanded="<?= $maListPanelOpen ? 'true' : 'false' ?>" aria-controls="ma-list-filter-body">กรองรายการ</button>
+    <?php if ($maListHasFilter) { ?>
+    <span class="muted ma-list-filter-active">กำลังกรอง: <?= h(implode(' · ', $maListFilterBits)) ?></span>
+    <a href="<?= h($maClearUrl) ?>" class="btn btn-sm btn-line">ล้างเงื่อนไข</a>
+    <?php } ?>
+  </div>
+  <div class="ma-list-filter-body" id="ma-list-filter-body"<?= $maListPanelOpen ? '' : ' hidden' ?>>
+    <form class="filter ma-list-filter-form" method="get" data-live-search="0">
+      <input type="hidden" name="product" value="<?= (int) $productId ?>">
+      <?php if ($msort !== 'date_desc') { ?>
+      <input type="hidden" name="msort" value="<?= h($msort) ?>">
+      <?php } ?>
+      <?php if (isset($_GET['mrent']) && (string) $_GET['mrent'] === '0') { ?>
+      <input type="hidden" name="mrent" value="0">
+      <?php } ?>
+      <div class="ma-list-filter-cards">
+        <div class="ma-list-filter-top2">
+          <section class="ma-list-filter-card">
+            <h3 class="ma-list-filter-card-hd">วันเวลา MA <span class="ma-list-filter-card-note">ว่างทั้งคู่ = ไม่กรองวันที่</span></h3>
+            <div class="ma-list-filter-dates">
+              <label class="ma-list-filter-field"><span>ตั้งแต่</span>
+                <input type="date" name="mfrom" value="<?= h($mfrom) ?>"></label>
+              <label class="ma-list-filter-field"><span>ถึง</span>
+                <input type="date" name="mto" value="<?= h($mto) ?>"></label>
+            </div>
+          </section>
+          <section class="ma-list-filter-card">
+            <h3 class="ma-list-filter-card-hd">เครื่องและผู้บันทึก</h3>
+            <div class="ma-list-filter-grid4">
+              <label class="ma-list-filter-field"><span>รหัสเครื่อง (S/N)</span>
+                <input type="text" name="mq" value="<?= h($mq) ?>" placeholder="เช่น BM22050949" autocomplete="off"></label>
+              <label class="ma-list-filter-field"><span>รอบ MA</span>
+                <input type="text" name="mround" value="<?= h($mround) ?>" placeholder="เลขรอบ" autocomplete="off"></label>
+              <label class="ma-list-filter-field"><span>ประเภท</span>
+                <select name="mkind">
+                  <option value=""<?= $mkind === '' ? ' selected' : '' ?>>ทั้งหมด</option>
+                  <option value="rental"<?= $mkind === 'rental' ? ' selected' : '' ?>>เครื่องเช่า</option>
+                  <option value="spare"<?= $mkind === 'spare' ? ' selected' : '' ?>>เครื่องสำรอง</option>
+                </select></label>
+              <label class="ma-list-filter-field"><span>ผู้บันทึก</span>
+                <input type="text" name="mby" value="<?= h($mby) ?>" placeholder="ชื่อ" autocomplete="off"></label>
+            </div>
+          </section>
+        </div>
+        <section class="ma-list-filter-card ma-list-filter-card-wide">
+          <h3 class="ma-list-filter-card-hd">รายการตรวจ <span class="ma-list-filter-card-note">แยกตามคอลัมน์ในตาราง</span></h3>
+          <div class="ma-list-filter-items">
+            <label class="ma-list-filter-field ma-list-filter-ok"><span>✅ ปกติ</span>
+              <input type="text" name="mok" value="<?= h($mok) ?>" placeholder="เช่น HDMI, SD Card" autocomplete="off"></label>
+            <label class="ma-list-filter-field ma-list-filter-repl"><span>🔄 เปลี่ยน</span>
+              <input type="text" name="mrepl" value="<?= h($mrepl) ?>" placeholder="เช่น Battery" autocomplete="off"></label>
+            <label class="ma-list-filter-field ma-list-filter-repair"><span>🔧 ซ่อม</span>
+              <input type="text" name="mrepair" value="<?= h($mrepair) ?>" placeholder="เช่น RTC" autocomplete="off"></label>
+          </div>
+        </section>
+      </div>
+      <div class="ma-list-filter-ft">
+        <button type="submit" class="btn btn-primary btn-with-icon"><?= ui_btn_label('search', 'ค้นหา') ?></button>
+        <button type="reset" class="btn btn-line btn-sm">ล้างในฟอร์ม</button>
+        <span class="muted ma-list-filter-ft-note">กดค้นหาเมื่อพร้อม · แผงเปิดค้างหลังค้นหา</span>
+      </div>
+    </form>
+  </div>
+</div>
 <div class="table-wrap">
 <?php if ($rentTotal > 0 || !$maShowRent) { ?>
 <p class="muted ma-src-note">
@@ -1991,49 +2793,76 @@ list_search_form([
 </p>
 <?php } ?>
 <table class="list ma-list-table">
-  <tr>
+  <thead>
+  <tr class="ma-list-sort-row">
     <th><?= ma_sort_th('วันเวลา', 'date_asc', 'date_desc', $msort, $productId) ?></th>
     <th><?= ma_sort_th('รอบ', 'round_asc', 'round_desc', $msort, $productId) ?></th>
     <th><?= ma_sort_th('เครื่อง', 'asset_asc', 'asset_desc', $msort, $productId) ?></th>
+    <th title="จากระบบเช่า — ข้อความที่แจ้งตอนเข้า MA">ปัญหา / อาการที่แจ้ง</th>
     <th><?= ma_sort_th('✅ ปกติ', 'ok_asc', 'ok_desc', $msort, $productId) ?></th>
     <th><?= ma_sort_th('🔄 เปลี่ยน', 'replace_asc', 'replace_desc', $msort, $productId) ?></th>
     <th><?= ma_sort_th('🔧 ซ่อม', 'repair_asc', 'repair_desc', $msort, $productId) ?></th>
+    <th title="ผลต่อระบบเช่า: ซ่อมแล้ว หรือ เสื่อมสภาพ">ระบบเช่า</th>
     <?php if ($maListShowFw) { ?><th><?= ma_sort_th('FW', 'fw_asc', 'fw_desc', $msort, $productId) ?></th><?php } ?>
     <th><?= ma_sort_th('โดย', 'by_asc', 'by_desc', $msort, $productId) ?></th>
     <?= can('ma') ? '<th></th>' : '' ?>
   </tr>
-  <?php foreach ($recentMA as $m) { $isRent = ($m['src'] ?? '') === 'rent'; ?>
-  <tr class="ma-row-click" title="คลิกดูรายละเอียด MA และคำสั่งตั้งค่าหมายเลขสินค้า" <?= ma_row_data_attrs($m) ?>>
+  </thead>
+  <tbody>
+  <?php if ($total === 0) { ?>
+  <tr><td colspan="<?= (int) $maListColspan ?>" class="muted" style="padding:14px 10px"><?php
+      echo $maListHasFilter
+          ? 'ไม่พบรายการตามเงื่อนไข — แก้แผงกรองหรือล้างเงื่อนไข'
+          : 'ยังไม่มีรายการ MA ของรุ่นนี้';
+  ?></td></tr>
+  <?php } ?>
+  <?php foreach ($recentMA as $m) {
+      $isRent = ($m['src'] ?? '') === 'rent';
+      $machineKind = ma_list_machine_kind($m);
+      $maSymSn = rent_normalize_sn((string) ($m['asset_code'] ?? ''));
+      $maSymText = trim((string) ($maListSymptoms[$maSymSn] ?? ''));
+  ?>
+  <tr class="ma-row-click" title="คลิกดูรายละเอียด MA และคำสั่งตั้งค่าหมายเลขสินค้า · <?= h(status_th($machineKind)) ?>" <?= ma_row_data_attrs($m) ?>>
     <td style="white-space:nowrap"><?= dthai_full($m['visited_at']) ?>
       <?php if ($isRent) { ?><span class="ma-src-tag">ระบบเช่า</span><?php } ?></td>
     <td style="text-align:center"><?= $m['ma_round'] ? (int)$m['ma_round'] : '-' ?></td>
-    <td><a href="<?= BASE_URL ?>/asset.php?id=<?= (int)$m['asset_id'] ?>"><?= h($m['asset_code']) ?></a></td>
+    <td class="ma-list-asset-cell">
+      <a href="<?= BASE_URL ?>/asset.php?id=<?= (int)$m['asset_id'] ?>"><?= h($m['asset_code']) ?></a>
+      <?= ma_list_kind_chip_html($machineKind) ?>
+    </td>
+    <td class="ma-list-symptom"><?= $maSymText !== '' ? h($maSymText) : '<span class="muted">—</span>' ?></td>
     <?php if ($isRent) {
         // ฝั่งระบบเช่าบันทึกงานเป็นข้อความก้อนเดียว ไม่ได้แยก ปกติ/เปลี่ยน/ซ่อม
         // จึงกางข้อความคลุมสามช่องนั้นแทนการเดาว่าอะไรอยู่ช่องไหน
         $rentNote = trim((string) ($m['remark'] ?? ''));
-        $retire = ($m['ma_status'] ?? '') === 'Asset Retirement';
     ?>
     <td colspan="3" class="ma-rent-note">
-      <?php if ($retire) { ?><span class="ma-rent-retire">ปลดระวาง</span> <?php } ?>
       <?= $rentNote !== '' ? nl2br(h($rentNote)) : '<span class="muted">ไม่มีรายละเอียด</span>' ?>
     </td>
     <?php } else { ?>
-    <td style="max-width:200px; font-size:12.5px"><?= ma_items_cell($m, 'ok_items', 'OK') ?></td>
-    <td style="max-width:180px; font-size:12.5px"><?= ma_items_cell($m, 'replace_items', 'Replace') ?></td>
-    <td style="max-width:160px; font-size:12.5px"><?= ma_items_cell($m, 'repair_items', 'Repair') ?></td>
+    <td class="ma-list-ma-items"><?= ma_items_cell($m, 'ok_items', 'OK') ?></td>
+    <td class="ma-list-ma-items"><?= ma_items_cell($m, 'replace_items', 'Replace') ?></td>
+    <td class="ma-list-ma-items"><?= ma_items_cell($m, 'repair_items', 'Repair') ?></td>
     <?php } ?>
+    <td class="ma-rent-close"><?= ma_rent_close_cell($m) ?></td>
     <?php if ($maListShowFw) { ?><td><?= h($m['fw_version'] ?: '-') ?></td><?php } ?>
     <td><?= h($m['done_by'] ?: '-') ?></td>
     <?php if (can('ma')) { ?>
     <td class="ma-row-actions row-actions">
       <?php if ($isRent) {
-          // รายการนี้เป็นของทีมเช่า ระบบเราไม่แก้ให้ — ส่งไปแก้ที่ต้นทางแทน
           $rentUrl = function_exists('rent_leasing_record_url') ? rent_leasing_record_url((string) $m['asset_code'], (int) $m['id']) : '';
       ?>
         <?php if ($rentUrl !== '') { ?>
         <a class="btn btn-sm btn-line" href="<?= h($rentUrl) ?>" target="_blank" rel="noopener">เปิดในระบบเช่า ↗</a>
-        <?php } else { ?><span class="muted" style="font-size:11.5px">บันทึกที่ระบบเช่า</span><?php } ?>
+        <?php } ?>
+        <form method="post" style="display:inline" onsubmit="return confirm('ลบรายการ MA นี้จากระบบเช่า?\nลบแล้วสถานะเครื่องจะ sync ตาม MA ล่าสุด')">
+          <?= csrf_field() ?>
+          <input type="hidden" name="del_rent_ma" value="1">
+          <input type="hidden" name="rent_ma_id" value="<?= (int)$m['id'] ?>">
+          <input type="hidden" name="rent_sn" value="<?= h($m['asset_code'] ?? '') ?>">
+          <input type="hidden" name="back" value="<?= h($maListUrl) ?>">
+          <button class="btn-sm btn-danger" type="submit">ลบ</button>
+        </form>
       <?php } else { ?>
       <a class="btn btn-sm btn-line" href="<?= BASE_URL ?>/ma.php?product=<?= $productId ?>&edit=<?= (int)$m['id'] ?>">แก้ไข</a>
       <form method="post" onsubmit="return confirm('ลบรายการ MA นี้?')">
@@ -2045,12 +2874,14 @@ list_search_form([
     <?php } ?>
   </tr>
   <?php } ?>
+  </tbody>
 </table>
 </div>
 <?php
-echo page_pager_html($page, $pages, $per, $total, function ($n) use ($productId) {
-    return ma_list_qs($productId, ['page' => $n]);
-}, 'รายการ');
+if ($total > 0) {
+    echo page_pager_html($page, $pages, $per, $total, function ($n) use ($productId) {
+        return ma_list_qs($productId, ['page' => $n]);
+    }, 'รายการ');
 }
 ?>
 <div id="ma-detail-overlay" class="notif-overlay ma-sn-overlay" hidden>
@@ -2088,6 +2919,20 @@ document.addEventListener('keydown', function(e){
     if (overlay && !overlay.hidden) closeOverlay('ma-detail-overlay');
   }
 });
+(function(){
+  var panel = document.getElementById('ma-list-filter-panel');
+  var toggle = document.getElementById('ma-list-filter-toggle');
+  var body = document.getElementById('ma-list-filter-body');
+  if (!panel || !toggle || !body) return;
+  function setOpen(open){
+    panel.classList.toggle('is-open', open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    body.hidden = !open;
+  }
+  toggle.addEventListener('click', function(){
+    setOpen(body.hidden);
+  });
+})();
 </script>
 <?php
 page_footer();

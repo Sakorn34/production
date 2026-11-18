@@ -9,6 +9,13 @@ require_login();
 
 // สถานะ sync จาก cron/sync_asset_status.php หรือ database/tools/sync_asset_status.php
 // ไม่รัน full sync บนหน้า dashboard — 18k+ เครื่องใช้เวลานานและเสี่ยง timeout
+// เครื่องที่มีประวัติยืมสำรองมีหลักร้อย จึงไล่เทียบการใช้งานครั้งล่าสุดได้โดยไม่หน่วงหน้า
+try {
+    require_once __DIR__ . '/includes/asset_status_sync.php';
+    asset_status_sync_open_spares_if_stale(3600);
+} catch (Throwable $e) {
+    error_log('[asset_status_sync_open_spares] ' . $e->getMessage());
+}
 
 // ---- สรุปสถานะ ----
 $byStatus = array_fill_keys(status_list(), 0);
@@ -22,10 +29,10 @@ try {
     $pdo = dbParts();
     $row = $pdo->query('SELECT COUNT(*) c, COALESCE(SUM(quantity),0) q FROM products')->fetch();
     $stock['items'] = (int)$row['c'];
-    $stock['qty']   = (int)$row['q'];
+    $stock['qty']   = qty_norm($row['q']);
     $stock['low']   = (int)$pdo->query('SELECT COUNT(*) FROM products WHERE quantity <= min_stock AND is_active = 1')->fetchColumn();
-    $stock['in_today']  = (int)$pdo->query('SELECT COALESCE(SUM(quantity),0) FROM stock_in WHERE DATE(created_at) = CURDATE()')->fetchColumn();
-    $stock['out_today'] = (int)$pdo->query("SELECT COALESCE(SUM(soi.quantity),0) FROM stock_out_items soi JOIN stock_out so ON so.id = soi.stock_out_id WHERE DATE(so.created_at) = CURDATE()")->fetchColumn();
+    $stock['in_today']  = qty_norm($pdo->query('SELECT COALESCE(SUM(quantity),0) FROM stock_in WHERE DATE(created_at) = CURDATE()')->fetchColumn());
+    $stock['out_today'] = qty_norm($pdo->query("SELECT COALESCE(SUM(soi.quantity),0) FROM stock_out_items soi JOIN stock_out so ON so.id = soi.stock_out_id WHERE DATE(so.created_at) = CURDATE()")->fetchColumn());
     $stock['ok'] = true;
 } catch (Throwable $e) {
     // แสดง dashboard ฝั่งเครื่องต่อได้แม้ต่อ DB สต็อกไม่ได้
@@ -103,6 +110,85 @@ if ($dashProdYears) {
     }
 }
 
+// ---- MA รายปี (6 ปีล่าสุด) + รายเดือนต่อปี (drill จากกราฟ stacked) ----
+$dashMaYears = [];
+$res = qr(
+    'SELECT YEAR(visited_at) y, ' . ma_sql_chart_aggregate_select() . '
+     FROM ma_records WHERE visited_at IS NOT NULL GROUP BY y ORDER BY y DESC LIMIT 6'
+);
+while ($r = $res->fetch_assoc()) {
+    $dashMaYears[(int)$r['y']] = [
+        'ok'      => (int)$r['c_ok'],
+        'replace' => (int)$r['c_replace'],
+        'repair'  => (int)$r['c_repair'],
+        'retire'  => (int)$r['c_retire'],
+    ];
+}
+$dashMaYears = array_reverse($dashMaYears, true);
+
+$dashMaYearPoints = [];
+$dashMaMonthPointsByYear = [];
+$dashMaTrend = null;
+if ($dashMaYears) {
+    $maMinY = (int) min(array_keys($dashMaYears));
+    $maMaxY = (int) max(array_keys($dashMaYears));
+    foreach (array_keys($dashMaYears) as $y) {
+        $dashMaMonthPointsByYear[$y] = [];
+        for ($m = 1; $m <= 12; $m++) {
+            $dashMaMonthPointsByYear[$y][$m] = ['ok' => 0, 'replace' => 0, 'repair' => 0, 'retire' => 0];
+        }
+    }
+    $maStart = sprintf('%04d-01-01', $maMinY);
+    $maEnd   = sprintf('%04d-01-01', $maMaxY + 1);
+    $res = qr(
+        'SELECT YEAR(visited_at) y, MONTH(visited_at) m, ' . ma_sql_chart_aggregate_select() . '
+         FROM ma_records WHERE visited_at>=? AND visited_at<? GROUP BY y, m',
+        'ss', [$maStart, $maEnd]
+    );
+    while ($r = $res->fetch_assoc()) {
+        $yKey = (int)$r['y'];
+        if (isset($dashMaMonthPointsByYear[$yKey])) {
+            $dashMaMonthPointsByYear[$yKey][(int)$r['m']] = [
+                'ok'      => (int)$r['c_ok'],
+                'replace' => (int)$r['c_replace'],
+                'repair'  => (int)$r['c_repair'],
+                'retire'  => (int)$r['c_retire'],
+            ];
+        }
+    }
+
+    $dashMaTrend = dash_ma_month_trend($dashMaMonthPointsByYear);
+
+    foreach ($dashMaYears as $y => $counts) {
+        $y = (int)$y;
+        $label = (string) thai_buddhist_year($y);
+        $dashMaYearPoints[] = ma_chart_point(
+            $label,
+            'MA ปี ' . $label,
+            $counts,
+            'รายการ MA ปี ' . $label,
+            BASE_URL . '/dashboard_data.php?type=ma_year&v=' . $y,
+            $y
+        );
+
+        $monthPoints = [];
+        for ($m = 1; $m <= 12; $m++) {
+            $ym = sprintf('%04d-%02d', $y, $m);
+            $mCounts = $dashMaMonthPointsByYear[$y][$m];
+            $mp = ma_chart_point(
+                thai_month_short($ym),
+                'MA ' . thai_month_period_label($ym),
+                $mCounts,
+                'รายการ MA ' . thai_month_period_label($ym),
+                BASE_URL . '/dashboard_data.php?type=ma_month&v=' . rawurlencode($ym)
+            );
+            $mp['is_future'] = $ym > date('Y-m');
+            $monthPoints[] = $mp;
+        }
+        $dashMaMonthPointsByYear[$y] = $monthPoints;
+    }
+}
+
 // ---- จำนวนเครื่องรายรุ่น ----
 $perModel = [];
 $res = qr("SELECT p.id pid, p.name, p.icon_path, p.product_code, COUNT(*) c FROM assets a JOIN products p ON p.id=a.product_id
@@ -141,7 +227,7 @@ if ($stock['ok']) {
              FROM products WHERE is_active = 1 ORDER BY quantity DESC'
         )->fetchAll();
         foreach ($perPart as $p) {
-            $maxPart = max($maxPart, (int) $p['quantity']);
+            $maxPart = max($maxPart, qty_norm($p['quantity']));
         }
         if ($perPart) {
             $partCodes = array_map(function ($r) { return $r['code']; }, $perPart);
@@ -165,7 +251,7 @@ $partSupplierNoneCount = 0;
 foreach ($perPart as $p) {
     // นับตามสถานะจาก shared/stock_status.php — แท็บ "ควรสั่งเพิ่ม" รวม critical ด้วย
     // (ทั้งคู่อยู่ที่หรือต่ำกว่าขั้นต่ำ) ส่วน out แยกแท็บของตัวเอง สองแท็บจึงไม่ทับกัน
-    $status = stock_status_key((int) $p['quantity'], (int) $p['min_stock']);
+    $status = stock_status_key($p['quantity'], $p['min_stock']);
     if ($status === 'out') {
         $perPartOutCount++;
     } elseif ($status === 'critical' || $status === 'low') {
@@ -192,11 +278,11 @@ function pct($v, $t) { return $t > 0 ? round($v / $t * 100) : 0; }
  * เต็มแถบเมื่อมีของ 3 เท่าของขั้นต่ำ · ที่ขั้นต่ำพอดีได้ราว 33% · หมดจริงเหลือแถบบางพอเห็นสี
  * (ไม่ใช้ค่าต่ำสุดสูง ๆ เพราะจะทำให้ของที่หมดแล้วดูเหมือนยังมีเหลืออยู่)
  *
- * @param int $qty คงเหลือ
- * @param int $min ขั้นต่ำ
+ * @param float $qty คงเหลือ (ทศนิยมได้)
+ * @param float $min ขั้นต่ำ
  * @return int 0-100
  */
-function part_stock_bar_pct(int $qty, int $min): int {
+function part_stock_bar_pct(float $qty, float $min): int {
     if ($qty <= 0) {
         return 0;
     }
@@ -376,7 +462,7 @@ $partsBase = ui_parts_base_url();
             'อะไหล่', '', true, false, $partsBase . '/pages/products.php');
         kpi(0, 'รับเข้า / เบิกออก', 'history', 'info', 'ความเคลื่อนไหววันนี้',
             modal_js('รับเข้า / เบิกออกวันนี้', "$B/dashboard_data.php?type=stock_today", "$partsBase/pages/history.php"), 'วันนี้',
-            'รับเข้า ' . number_format($stock['in_today']) . ' ชิ้น · เบิกออก ' . number_format($stock['out_today']) . ' ชิ้น',
+            'รับเข้า ' . qty_fmt($stock['in_today']) . ' ชิ้น · เบิกออก ' . qty_fmt($stock['out_today']) . ' ชิ้น',
             false, true, $partsBase . '/pages/history.php');
     } else {
         echo '<div class="kpi kpi-warning"><div class="kpi-top"><span class="kpi-ic">' . ui_icon_html('alert', 14) . '</span> สต็อกอะไหล่</div><b class="kpi-num">—</b><div class="kpi-sub">เชื่อมต่อระบบสต็อกไม่ได้</div></div>';
@@ -384,6 +470,8 @@ $partsBase = ui_parts_base_url();
     ?>
   </div>
 </div>
+
+<div class="dash-charts-row">
 
 <div class="panel dash-prod-chart" id="dash-prod-chart">
   <div class="dash-prod-head">
@@ -395,8 +483,6 @@ $partsBase = ui_parts_base_url();
       </div>
     </div>
     <?php
-    // ทั้งหน้าไม่มีตัวเลขไหนบอกทิศทางเลย ตอบได้แค่ "ตอนนี้มีเท่าไหร่"
-    // ป้ายนี้อยู่ติดกราฟผลิตเพราะเป็นตัวเลขชุดเดียวกัน — เดือนนี้เทียบเดือนก่อน
     if ($dashProdTrend) {
         $tDiff = (int) $dashProdTrend['diff'];
         $tTone = $tDiff > 0 ? 'up' : ($tDiff < 0 ? 'down' : 'flat');
@@ -412,7 +498,6 @@ $partsBase = ui_parts_base_url();
       <span class="dash-trend-unit">เครื่อง</span>
       <span class="dash-trend-delta">
         <?= h($tSign . number_format(abs($tDiff))) ?><?php
-          // เดือนก่อนเป็น 0 คิดเปอร์เซ็นต์ไม่ได้ — แสดงแค่ส่วนต่าง
           if ($tPct !== null) { echo ' · ' . h(($tPct > 0 ? '+' : '') . $tPct . '%'); } ?>
         <span class="dash-trend-vs">เทียบ <?= h(thai_month_short($dashProdTrend['prev_ym'])) ?></span>
       </span>
@@ -426,7 +511,7 @@ $partsBase = ui_parts_base_url();
         true,
         null,
         '',
-        ['compact' => true, 'inline_drill' => true, 'root_class' => 'dash-prod-stacked', 'show_hint' => false, 'hide_legend' => true]
+        ['compact' => true, 'inline_drill' => true, 'root_class' => 'dash-prod-stacked', 'show_hint' => false]
     ); ?>
   </div>
   <div id="dash-prod-month-views" hidden>
@@ -437,7 +522,7 @@ $partsBase = ui_parts_base_url();
           true,
           null,
           'ปี ' . thai_buddhist_year((int) $y),
-          ['compact' => true, 'root_class' => 'dash-prod-stacked', 'show_hint' => false, 'hide_legend' => true]
+          ['compact' => true, 'root_class' => 'dash-prod-stacked', 'show_hint' => false]
       ); ?>
     </div>
     <?php } ?>
@@ -445,6 +530,62 @@ $partsBase = ui_parts_base_url();
   <?php } else { ?>
   <p class="muted">ยังไม่มีข้อมูลการผลิต</p>
   <?php } ?>
+</div>
+
+<?php // กราฟ MA — แยกผลลัพธ์ (ปกติ / เปลี่ยนอะไหล่ / ต้องซ่อม) ?>
+<div class="panel dash-ma-chart" id="dash-ma-chart">
+  <div class="dash-prod-head">
+    <div class="dash-prod-head-main">
+      <button type="button" class="dash-prod-back" id="dash-ma-back" hidden aria-label="กลับรายปี">‹</button>
+      <div class="dash-prod-head-text">
+        <h3 class="dash-prod-title" id="dash-ma-title">ภาพรวมการ MA รายปี</h3>
+        <p class="muted dash-prod-subtitle" id="dash-ma-subtitle"><?= count($dashMaYearPoints) ?> ปีล่าสุด · แยกตามผลลัพธ์</p>
+      </div>
+    </div>
+    <?php
+    if ($dashMaTrend) {
+        $mDiff = (int) $dashMaTrend['diff'];
+        $mTone = $mDiff > 0 ? 'up' : ($mDiff < 0 ? 'down' : 'flat');
+        $mSign = $mDiff > 0 ? '+' : ($mDiff < 0 ? '−' : '±');
+        $mPct  = $dashMaTrend['pct'];
+    ?>
+    <div class="dash-prod-trend dash-trend-<?= h($mTone) ?>"
+         title="<?= h(thai_month_period_label($dashMaTrend['now_ym']) . ' MA ' . number_format($dashMaTrend['now'])
+                    . ' ครั้ง · ' . thai_month_period_label($dashMaTrend['prev_ym']) . ' MA '
+                    . number_format($dashMaTrend['prev']) . ' ครั้ง') ?>">
+      <span class="dash-trend-label"><?= h(thai_month_short($dashMaTrend['now_ym'])) ?></span>
+      <b class="dash-trend-num"><?= number_format($dashMaTrend['now']) ?></b>
+      <span class="dash-trend-unit">ครั้ง</span>
+      <span class="dash-trend-delta">
+        <?= h($mSign . number_format(abs($mDiff))) ?><?php
+          if ($mPct !== null) { echo ' · ' . h(($mPct > 0 ? '+' : '') . $mPct . '%'); } ?>
+        <span class="dash-trend-vs">เทียบ <?= h(thai_month_short($dashMaTrend['prev_ym'])) ?></span>
+      </span>
+    </div>
+    <?php } ?>
+  </div>
+  <?php if ($dashMaYearPoints) { ?>
+  <div id="dash-ma-year-view">
+    <?php render_ma_stacked_chart(
+        $dashMaYearPoints,
+        ['compact' => true, 'inline_drill' => true, 'root_class' => 'dash-prod-stacked', 'show_hint' => false]
+    ); ?>
+  </div>
+  <div id="dash-ma-month-views" hidden>
+    <?php foreach ($dashMaMonthPointsByYear as $y => $monthPoints) { ?>
+    <div class="dash-ma-month-pane" data-year="<?= (int) $y ?>" data-be-label="<?= (int) thai_buddhist_year((int) $y) ?>" hidden>
+      <?php render_ma_stacked_chart(
+          $monthPoints,
+          ['compact' => true, 'root_class' => 'dash-prod-stacked', 'show_hint' => true]
+      ); ?>
+    </div>
+    <?php } ?>
+  </div>
+  <?php } else { ?>
+  <p class="muted">ยังไม่มีข้อมูล MA</p>
+  <?php } ?>
+</div>
+
 </div>
 
 <?php // ใบเบิกจากระบบ inventory (แบบ ก · 21 ก.ย. 2026) — โหลดทีหลังหน้า (dashboard_data ?type=inv_pickup_summary)
@@ -560,9 +701,11 @@ $partsBase = ui_parts_base_url();
         <th data-pri="1">รุ่น</th>
         <th data-pri="2" class="fg-bar-col" title="ทุกรุ่นใช้สเกลเดียวกัน — แถบยาวเท่ากันคือจำนวนเครื่องเท่ากัน · รางบนแถบคือยอดที่ต้องมี ท่อนเทา = ขั้นต่ำ ท่อนส้ม = PO ค้าง จบที่หมุด ▼ · ส่วนสีจาง = เกินจากที่ต้องมี"><span class="fg-legend"><i class="is-new"></i>เครื่องใหม่</span> <span class="fg-legend"><i class="is-pool"></i>คลังพร้อมเช่า</span> <span class="fg-legend"><b class="fg-legend-mark is-band-min"></b>ขั้นต่ำ</span> <span class="fg-legend"><b class="fg-legend-mark is-band"></b>PO ค้าง</span> <span class="fg-legend"><b class="fg-legend-mark is-po"></b>ต้องมี</span></th>
         <th data-pri="1" class="num-col">เครื่องใหม่</th>
-        <th data-pri="2" class="num-col" title="ระบบเช่าเป็น finished goods รอปล่อยเช่า — นับรวมในยอดที่มี">คลังพร้อมเช่า</th>
-        <th data-pri="2" class="num-col" title="ของที่ระบบ inventory จ่ายลงมาแล้ว ยังไม่ได้ลงทะเบียนเครื่อง — กำลังจะผลิตเพิ่ม">เบิกแล้ว รอผลิต</th>
-        <th data-pri="1">ผล</th>
+        <th data-pri="2" class="num-col dash-col-pool" title="ระบบเช่าเป็น finished goods รอปล่อยเช่า — นับรวมในยอดที่มี · ตัวเลขซ้าย = เช่าใหม่ (New) · ขวา = วนกลับจาก MA">
+          <span class="dash-col-head-main">คลังพร้อมเช่า</span>
+          <span class="dash-col-head-sub">New : MA</span>
+        </th>
+        <th data-pri="1" class="num-col">ผล</th>
       </tr>
     </thead>
     <tbody id="dash-models-grid">
@@ -591,7 +734,6 @@ $partsBase = ui_parts_base_url();
       </td>
       <td data-pri="1" class="num-col fg-cell fg-zone-stock" data-fg-cell="ours">—</td>
       <td data-pri="2" class="num-col fg-cell fg-zone-stock" data-fg-cell="pool">—</td>
-      <td data-pri="2" class="num-col fg-cell" data-fg-cell="pick"><span class="muted">—</span></td>
       <td data-pri="1" class="fg-cell fg-zone-stock" data-fg-cell="verdict"></td>
     </tr>
     <?php } ?>
@@ -606,13 +748,13 @@ $partsBase = ui_parts_base_url();
   <?php } else { ?>
   <div class="model-card-grid" id="dash-parts-grid">
     <?php foreach ($perPart as $p) {
-        $qty = (int) $p['quantity'];
-        $min = (int) $p['min_stock'];
+        $qty = qty_norm($p['quantity']);
+        $min = qty_norm($p['min_stock']);
         $stockStatus = stock_status_key($qty, $min);
         $stockMeta = stock_status_meta($stockStatus);
         $icon = isset($partIcons[$p['code']]) ? $partIcons[$p['code']] : '';
         $supplier = trim((string) ($p['supplier'] ?? ''));
-        $purchaseLink = trim((string) ($p['purchase_link'] ?? ''));
+        $purchaseLink = safe_http_url($p['purchase_link'] ?? '');
         $displayName = part_product_display_name($p, $partProdLabels);
         $displaySub = part_product_display_sub($p, $partProdLabels);
         $stockCode = trim((string) ($p['code'] ?? ''));
@@ -627,24 +769,24 @@ $partsBase = ui_parts_base_url();
     <?php // การ์ดนี้มีลิงก์ "สั่งซื้อ" อยู่ข้างใน จึงทำเป็น <a> ซ้อนไม่ได้
          // ใช้ role=button + tabindex เพื่อให้ Tab ถึงและกด Enter/Space ได้ ?>
     <div class="model-card clickable dash-part-card" role="button" tabindex="0"
-         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}"
          data-stock-status="<?= h($stockStatus) ?>" data-supplier="<?= h($supplier) ?>"
-         onclick="showListModal(<?= h(json_encode('โปรไฟล์: ' . $displayName, JSON_UNESCAPED_UNICODE)) ?>, '<?= h("$B/dashboard_data.php?type=part_profile&v=" . (int) $p['id']) ?>', '<?= h("$partsBase/pages/product-detail.php?id=" . (int) $p['id']) ?>')"
+         onkeydown="if(event.target.closest('a,button'))return;if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}"
+         onclick="if(event.target.closest('a,button'))return;showListModal(<?= h(json_encode('โปรไฟล์: ' . $displayName, JSON_UNESCAPED_UNICODE)) ?>, '<?= h("$B/dashboard_data.php?type=part_profile&v=" . (int) $p['id']) ?>', '<?= h("$partsBase/pages/product-detail.php?id=" . (int) $p['id']) ?>')"
          title="<?= h($cardTitle) ?>">
       <div class="model-card-img">
         <?php if ($icon) {
-            echo img_tag($icon, $displayName, 'model-thumb');
+            echo part_list_photo_btn($icon, $displayName, 'model-thumb');
         } else {
             echo '<span class="model-thumb model-thumb-ph">' . ui_icon_html('parts', 18) . '</span>';
         } ?>
       </div>
       <div class="model-card-body">
-        <div class="model-card-name" title="<?= h($displayName) ?>"><?= h($displayName) ?></div>
+        <div class="model-card-name"><?= part_list_name_link($displayName, (int) $p['id']) ?></div>
         <div class="model-card-sub muted"><?= h($displaySub) ?></div>
-        <div class="model-card-bar" title="คงเหลือ <?= number_format($qty) ?> · ขั้นต่ำ <?= number_format($min) ?> <?= h($p['unit'] ?: 'ชิ้น') ?>"><div class="model-card-fill" style="width:<?= $barPct ?>%; background:<?= $barColor ?>"></div></div>
+        <div class="model-card-bar" title="คงเหลือ <?= h(qty_fmt($qty)) ?> · ขั้นต่ำ <?= h(qty_fmt($min)) ?> <?= h($p['unit'] ?: 'ชิ้น') ?>"><div class="model-card-fill" style="width:<?= $barPct ?>%; background:<?= $barColor ?>"></div></div>
         <div class="model-card-foot">
           <?php // ป้ายสถานะมาจาก shared/stock_status.php ที่เดียว — ห้ามคำนวณเองที่นี่ ?>
-          <div class="model-card-num"><?= number_format($qty) ?> <?= h($p['unit'] ?: 'ชิ้น') ?> · <span class="<?= h($stockMeta['tone']) ?>"><?= h($stockMeta['label']) ?></span></div>
+          <div class="model-card-num"><?= h(qty_fmt($qty)) ?> <?= h($p['unit'] ?: 'ชิ้น') ?> · <span class="<?= h($stockMeta['tone']) ?>"><?= h($stockMeta['label']) ?></span></div>
           <?php if ($purchaseLink !== '') { ?>
           <a href="<?= h($purchaseLink) ?>" class="btn btn-sm btn-line dash-part-order-btn" target="_blank" rel="noopener noreferrer"
              onclick="event.stopPropagation();" title="เปิดลิงก์สั่งซื้อ"><?= ui_btn_label('external-link', 'สั่งซื้อ', 13) ?></a>
@@ -702,6 +844,24 @@ $partsBase = ui_parts_base_url();
 
 <script>
 (function(){
+  var pkList = document.getElementById('dash-pk-list');
+  if (pkList && !pkList._pkWheel) {
+    pkList._pkWheel = true;
+    document.addEventListener('wheel', function (e) {
+      if (!pkList.contains(e.target)) { return; }
+      if (pkList.scrollWidth <= pkList.clientWidth + 1) { return; }
+      var dx = e.deltaX, dy = e.deltaY;
+      if (e.deltaMode === 1) { dx *= 40; dy *= 40; }
+      if (e.deltaMode === 2) { dx *= pkList.clientWidth; dy *= pkList.clientHeight; }
+      var delta = Math.abs(dy) >= Math.abs(dx) ? dy : dx;
+      if (!delta) { return; }
+      var max = pkList.scrollWidth - pkList.clientWidth;
+      var next = Math.max(0, Math.min(max, pkList.scrollLeft + delta));
+      if (next === pkList.scrollLeft) { return; }
+      e.preventDefault();
+      pkList.scrollLeft = next;
+    }, { passive: false, capture: true });
+  }
   var panel = document.getElementById('dash-inventory-panel');
   if (!panel) return;
   var titleText = document.getElementById('dash-inventory-title-text');
@@ -743,7 +903,7 @@ $partsBase = ui_parts_base_url();
   function fgNum(n) { return Number(n).toLocaleString('en-US'); }
 
   // ตัวเลขคลังของแต่ละรุ่น — โหลดหลังหน้าขึ้น ไม่ให้ Dashboard รอ API ของระบบ Setup (เซิร์ฟเวอร์ cache 10 นาที)
-  // ใบเบิก inventory: การ์ดสรุป + คอลัมน์ "เบิกแล้ว รอผลิต" รายรุ่น
+  // ใบเบิก inventory: การ์ดสรุปด้านบน (ไม่มีคอลัมน์ในตารางรุ่น)
   fetch(fgBase + '?type=inv_pickup_summary', { credentials: 'same-origin' })
     .then(function (r) { return r.json(); })
     .then(function (d) {
@@ -763,10 +923,9 @@ $partsBase = ui_parts_base_url();
       set('dash-pk-pct', pctOf(d.done, d.qty) + '%');
       document.getElementById('dash-pk-bar').style.cssText = 'width:' + pctOf(d.done, d.qty) + '%;background:' + d.bar;
       document.getElementById('dash-pk-prog').hidden = !d.qty;
-      // รายรุ่น 5 อันดับแรก — กดแถวเปิด popup รายละเอียด (ใบเบิก · ของที่ยังไม่จ่าย · อะไหล่ที่จ่ายแล้ว)
+      // รายรุ่นทั้งหมดเรียงแถวเดียว เลื่อนตามแนวนอน (สกอร์ลเมาส์) — กดการ์ดเปิด popup รายละเอียด
       // ป้าย = ความขาดสต็อกของรุ่นนั้น (เกณฑ์เดียวกับตารางรุ่นด้านล่าง) · บรรทัดรองบอกว่าของค้างมากี่วัน
-      // 6 ใบลงตัวทั้งจอกว้าง (3 คอลัมน์ × 2 แถว) และจอแคบ (2 × 3)
-      var SHOW = 6, list = document.getElementById('dash-pk-list'), models = d.models || [];
+      var list = document.getElementById('dash-pk-list'), models = d.models || [];
       var stageLabel = ['ต่ำกว่าขั้นต่ำ', 'ไม่พอส่ง PO', ''];
       var pkSorters = {
         urgent: function (a, b) { return a.stage - b.stage || b.gap - a.gap || b.days - a.days || b.left - a.left; },
@@ -785,7 +944,7 @@ $partsBase = ui_parts_base_url();
           return;
         }
         var rows = models.slice().sort(pkSorters[pkSort]);
-        list.innerHTML = rows.slice(0, SHOW).map(function (m) {
+        list.innerHTML = rows.map(function (m) {
           var tag = m.gap > 0
             ? '<span class="dash-pk-tag is-st' + m.stage + '">ขาด ' + fgNum(m.gap) + '</span>'
             : '<span class="dash-pk-tag is-st2">สต็อกครบ</span>';
@@ -812,8 +971,7 @@ $partsBase = ui_parts_base_url();
             + '<span class="dash-pk-ratio">' + esc(ratio) + '</span></span>'
             + '<small class="dash-pk-sub">' + esc(sub.join(' · ')) + '</small></button>';
         }).join('');
-        more.hidden = models.length <= SHOW;
-        more.textContent = '+ อีก ' + (models.length - SHOW) + ' รุ่น ›';
+        more.hidden = true;
       }
       if (pkSortSel) {
         pkSortSel.value = pkSort;
@@ -831,14 +989,6 @@ $partsBase = ui_parts_base_url();
       };
       var box = document.getElementById('dash-pickup');
       if (box) { box.hidden = false; }
-      modelCards.forEach(function (row) {
-        var c = row.querySelector('[data-fg-cell="pick"]');
-        var v = d.by_pid[row.getAttribute('data-pid')];
-        if (!c) { return; }
-        c.innerHTML = v && v.left > 0
-          ? '<b>' + fgNum(v.left) + '</b>' + (v.shared ? '<div class="cell-sub muted" title="ใบเบิกนี้ใช้ได้หลายรุ่น — ยอดเดียวกันขึ้นทุกรุ่นในกลุ่ม">ใช้ร่วมหลายรุ่น</div>' : '')
-          : '<span class="muted">—</span>';
-      });
     })
     .catch(function () {});
 
@@ -871,9 +1021,12 @@ $partsBase = ui_parts_base_url();
       if (!row) { return; }
       // บอกให้ชัดว่า PO ค้างต้องใช้เครื่องกี่เครื่อง ไม่ใช่แค่ "+ PO 2" ที่อ่านแล้วไม่รู้ว่า 2 อะไร
       var base = 'ขั้นต่ำ ' + fgNum(row.min) + ' + PO ต้องใช้ ' + fgNum(row.po) + ' เครื่อง';
-      // have = เครื่องใหม่อย่างเดียว · pool = คลังพร้อมเช่า · ยอดที่มีใช้คิดขาด = ทั้งสองรวมกัน
+      // have = เครื่องใหม่ · pool = คลังพร้อมเช่า · รุ่น MA ไม่นับ pool ในขาด/เร่งด่วน (สอดคล้อง fg_model_shortage_from_stock)
       var have = Number(row.new) || 0;
-      var pool = Math.max(0, Number(row.rent) || 0);
+      var poolNew = Math.max(0, Number(row.rent) || 0);
+      var poolAllQty = Math.max(0, Number(row.rent_total) || (poolNew + maReuse));
+      var maReuse = Math.max(0, Number(row.ma_reuse) || 0);
+      var stockForNeed = have + poolNew;
       var req = Number(row.req) || 0;
       newTotal += have;
       var tag = '';
@@ -901,11 +1054,11 @@ $partsBase = ui_parts_base_url();
       row0.setAttribute('data-gap', String(gap));
       // สำหรับเรียงแบบกลุ่ม: 0 = ต่ำกว่าขั้นต่ำ · 1 = ถึงขั้นต่ำแต่ไม่พอส่ง PO · 2 = ครบ
       var minNum = Number(row.min) || 0;
-      row0.setAttribute('data-have', String(have + pool));
+      row0.setAttribute('data-have', String(stockForNeed));
       row0.setAttribute('data-new', String(have));
-      row0.setAttribute('data-pool', String(pool));
+      row0.setAttribute('data-pool', String(poolNew));
       row0.setAttribute('data-req', String(req));
-      row0.setAttribute('data-stage', row.state === 'over' ? '2' : (have + pool < minNum ? '0' : '1'));
+      row0.setAttribute('data-stage', row.state === 'over' ? '2' : (stockForNeed < minNum ? '0' : '1'));
 
       row0.setAttribute('data-over', row.state === 'over' ? String(Number(row.over) || 0) : '-1');
 
@@ -918,25 +1071,47 @@ $partsBase = ui_parts_base_url();
       };
       // จอมือถือซ่อนคอลัมน์ต้องมี/คลังพร้อมเช่า — สรุปไว้ใต้ตัวเลขแทน
       // สูตรอยู่ใต้แถบแล้ว — บนมือถือเหลือแค่คำกำกับตัวเลข
-      put('ours', have, '<span class="fg-m-only">เครื่องใหม่'
-        + (pool > 0 ? ' · คลังพร้อมเช่า ' + fgNum(pool) : '') + '</span>');
+      (function () {
+        var c = cell('ours');
+        if (!c) { return; }
+        c.innerHTML = '<div class="fg-ours-stack"><b class="fg-ours-new">' + fgNum(have) + '</b>'
+          + '<div class="cell-sub muted fg-m-only">เครื่องใหม่'
+          + (poolNew > 0 || maReuse > 0 ? ' · คลังพร้อมเช่า ' + fgNum(poolNew) : '')
+          + (maReuse > 0 ? ' · MA ' + fgNum(maReuse) : '') + '</div></div>';
+      })();
+      (function () {
+        var c = cell('pool');
+        if (!c) { return; }
+        var html = '<div class="fg-pool-stack fg-pool-inline">'
+          + '<b class="fg-pool-new">' + fgNum(poolNew) + '</b>'
+          + '<span class="fg-pool-sep" aria-hidden="true">:</span>'
+          + '<b class="fg-pool-ma-num">' + fgNum(maReuse) + '</b>'
+          + '</div>';
+        c.innerHTML = html;
+      })();
       // ขั้นต่ำ / PO / ต้องมี อยู่ในบรรทัดสูตรใต้แถบแล้ว ไม่แยกคอลัมน์ซ้ำ
-      poolTotal += pool;
-      put('pool', pool, '');
+      poolTotal += poolNew;
       // แถบแบ่งสีตามชนิด (สีสถานะ "ใหม่" / "เช่า") · เต็มแถบ = ยอดที่ต้องมี
       // มีเกินกว่าที่ต้องมี → ขยายสเกล แล้วส่วนที่เกินเป็นสีจาง
       var bar = cell('bar');
       if (bar) {
         var pc = function (n) { return Math.min(100, Math.round(n / fgScale * 1000) / 10); };
-        var newIn = Math.min(have, req);
-        var poolIn = Math.min(pool, Math.max(0, req - newIn));
+        // แถบสีนับเฉพาะเครื่องใหม่ + คลังเช่าใหม่ — ไม่รวมสต็อกวนกลับ MA (แสดงแยกใต้ตัวเลข)
+        var barPool = poolNew;
+        var barHave = have;
+        var newIn = Math.min(barHave, req);
+        var poolIn = Math.min(barPool, Math.max(0, req - newIn));
         var seg = function (cls, n) { return n > 0 ? '<i class="' + cls + '" style="width:' + pc(n) + '%"></i>' : ''; };
         bar.innerHTML = seg('is-new', newIn) + seg('is-pool', poolIn)
-          + seg('is-new is-extra', have - newIn) + seg('is-pool is-extra', pool - poolIn);
-        bar.title = 'เครื่องใหม่ ' + fgNum(have) + (pool > 0 ? ' · คลังพร้อมเช่า ' + fgNum(pool) : '')
-          + ' · ต้องมี ' + fgNum(req) + (pool > 0 ? ' (ยอดขาดนับเฉพาะเครื่องใหม่)' : '')
+          + seg('is-new is-extra', barHave - newIn) + seg('is-pool is-extra', barPool - poolIn);
+        bar.title = 'เครื่องใหม่ ' + fgNum(have)
+          + (maReuse > 0 ? ' · วนกลับ MA ' + fgNum(maReuse) : '')
+          + (poolNew > 0 ? ' · เช่าใหม่ ' + fgNum(poolNew) : '')
+          + (maReuse > 0 ? ' · MA ' + fgNum(maReuse) : '')
+          + (poolAllQty > poolNew + maReuse ? ' · คลังรวม ' + fgNum(poolAllQty) : '')
+          + ' · ต้องมี ' + fgNum(req) + (maReuse > 0 ? ' (ไม่นับ MA ในขาด)' : '')
           + ' · ทุกรุ่นใช้สเกลเดียวกัน (สุดแถบ = ' + fgNum(fgScale) + ' เครื่อง'
-          + (Math.max(req, have + pool) > fgScale ? ' — รุ่นนี้เกินสเกล' : '') + ')';
+          + (Math.max(req, barHave + barPool) > fgScale ? ' — รุ่นนี้เกินสเกล' : '') + ')';
 
         // หมุด ▼ เหนือแถบ: ดำ = ขั้นต่ำ · ส้ม = ขั้นต่ำ + PO (= ต้องมี) — PO เป็น 0 จะทับกัน เหลือหมุดเดียว
         var minQ = Number(row.min) || 0;
@@ -981,11 +1156,12 @@ $partsBase = ui_parts_base_url();
                  'PO ค้าง ' + fgNum(poQ) + ' เครื่อง — ส่วนที่ต้องผลิตเพิ่มจากขั้นต่ำ');
           }
           // เกินสเกล — บอกด้วย › ท้ายแถบ แทนหมุดที่จะไปกองอยู่ริมขวาแบบผิด ๆ
-          if (Math.max(req, have + pool) > fgScale) {
+          if (Math.max(req, barHave + barPool) > fgScale) {
             var ov = document.createElement('span');
             ov.className = 'fg-mark is-clip';
             ov.textContent = '›';
-            ov.title = 'เกินสเกลแถบ (สุดแถบ = ' + fgNum(fgScale) + ' เครื่อง) · มี ' + fgNum(have + pool) + ' · ต้องมี ' + fgNum(req);
+            ov.title = 'เกินสเกลแถบ (สุดแถบ = ' + fgNum(fgScale) + ' เครื่อง) · มี ' + fgNum(barHave + barPool)
+              + (maReuse > 0 ? ' (ไม่รวม MA ' + fgNum(maReuse) + ')' : '') + ' · ต้องมี ' + fgNum(req);
             marks.appendChild(ov);
           }
         }
@@ -1004,7 +1180,10 @@ $partsBase = ui_parts_base_url();
         // ปุ่ม "ดู S/N" ไม่มีแล้ว — ทั้งโซนตั้งแต่แถบสีถึงคอลัมน์นี้กดดูได้ มีลูกศรบอกไว้
         v.innerHTML = tag + '<span class="fg-go" aria-hidden="true">›</span>';
       }
-      var stockTip = 'เครื่องใหม่ ' + fgNum(have) + (pool > 0 ? ' · คลังพร้อมเช่า ' + fgNum(pool) + ' · รวม ' + fgNum(have + pool) : '')
+      var stockTip = 'เครื่องใหม่ ' + fgNum(have)
+        + (poolNew > 0 ? ' · เช่าใหม่ ' + fgNum(poolNew) : '')
+        + (maReuse > 0 ? ' · MA ' + fgNum(maReuse) + ' เครื่อง' : '')
+        + (poolAllQty > 0 ? ' · รวมใช้คิดขาด ' + fgNum(stockForNeed) + ' (ไม่รวม MA)' : '')
         + ' · ต้องมี ' + fgNum(req) + ' (' + base + ')'
         + (row.src === 'registry' ? '' : ' · ตัวเลขจากระบบ Setup (รุ่นนี้ไม่มีในทะเบียนเรา)')
         + ' — กดดูหมายเลขสินค้าในสต็อก';
@@ -1327,6 +1506,57 @@ $partsBase = ui_parts_base_url();
     var trigger = e.target.closest('[data-inline-year]');
     if (!trigger) return;
     var y = trigger.getAttribute('data-inline-year');
+    if (y) showMonthView(y);
+  });
+
+  if (backBtn) backBtn.addEventListener('click', showYearView);
+})();
+// ─── MA chart drill: ปี → เดือน ─── */
+(function(){
+  var chart = document.getElementById('dash-ma-chart');
+  var yearView = document.getElementById('dash-ma-year-view');
+  var monthViews = document.getElementById('dash-ma-month-views');
+  var backBtn = document.getElementById('dash-ma-back');
+  var titleEl = document.getElementById('dash-ma-title');
+  var subtitleEl = document.getElementById('dash-ma-subtitle');
+  if (!chart || !yearView) return;
+
+  function setHeadline(t, s) {
+    if (titleEl) titleEl.textContent = t;
+    if (subtitleEl) subtitleEl.textContent = s;
+  }
+
+  function showYearView() {
+    yearView.hidden = false;
+    if (monthViews) monthViews.hidden = true;
+    if (backBtn) backBtn.hidden = true;
+    if (monthViews) {
+      monthViews.querySelectorAll('.dash-ma-month-pane').forEach(function(p) { p.hidden = true; });
+    }
+    setHeadline('ภาพรวมการ MA รายปี', '<?= count($dashMaYearPoints) ?> ปีล่าสุด · แยกตามผลลัพธ์');
+  }
+
+  function showMonthView(y) {
+    yearView.hidden = true;
+    if (monthViews) monthViews.hidden = false;
+    if (backBtn) backBtn.hidden = false;
+    var beLabel = String(y);
+    if (monthViews) {
+      monthViews.querySelectorAll('.dash-ma-month-pane').forEach(function(p) {
+        var match = p.getAttribute('data-year') === String(y);
+        p.hidden = !match;
+        if (match) beLabel = p.getAttribute('data-be-label') || beLabel;
+      });
+    }
+    setHeadline('MA รายเดือน ปี ' + beLabel, '12 เดือน · แยกตามผลลัพธ์');
+  }
+
+  chart.addEventListener('click', function(e) {
+    if (!yearView.contains(e.target)) return;
+    if (e.target.closest('.dash-bar-seg')) return;
+    var trigger = e.target.closest('[data-ma-inline-year]');
+    if (!trigger) return;
+    var y = trigger.getAttribute('data-ma-inline-year');
     if (y) showMonthView(y);
   });
 

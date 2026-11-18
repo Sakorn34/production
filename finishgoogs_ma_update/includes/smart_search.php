@@ -502,7 +502,7 @@ function smart_search_query(string $q, int $limitPerKind = 5): array
                 'subtitle'   => smart_search_excerpt(implode(' · ', array_filter([
                     (string) ($r['part_code'] ?? ''),
                     (string) ($r['category'] ?? ''),
-                    'คงเหลือ ' . number_format((int) ($r['stock_qty'] ?? 0)) . ' ' . (string) ($r['unit'] ?? ''),
+                    'คงเหลือ ' . qty_fmt($r['stock_qty'] ?? 0) . ' ' . (string) ($r['unit'] ?? ''),
                 ]))),
                 'href'       => 'parts.php?q=' . rawurlencode($q),
             ];

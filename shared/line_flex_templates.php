@@ -248,7 +248,7 @@ function line_flex_low_stock_group_by_supplier(array $items): array
     // เรียงของน้อยสุดขึ้นก่อนในแต่ละกลุ่ม (เร่งด่วนสุดอยู่บน)
     foreach ($groups as $sup => $rows) {
         usort($rows, function ($a, $b) {
-            return ((int)($a['quantity'] ?? 0)) <=> ((int)($b['quantity'] ?? 0));
+            return ((float)($a['quantity'] ?? 0)) <=> ((float)($b['quantity'] ?? 0));
         });
         $groups[$sup] = $rows;
     }
@@ -653,8 +653,11 @@ function line_flex_problem_found(array $p): array
 function line_flex_low_stock_part_row(array $item): array
 {
     $namePart = line_flex_required_text((string)($item['name'] ?? $item['name_part'] ?? ''), 80);
-    $stock = (int)($item['quantity'] ?? $item['stock'] ?? 0);
-    $stockMin = (int)($item['min_stock'] ?? $item['stock_min'] ?? 0);
+    // ทศนิยมได้ (เช่น 0.5 ชิ้น) — ตัดเลข 0 ท้ายออกให้อ่านง่าย
+    $stock = round((float)($item['quantity'] ?? $item['stock'] ?? 0), 2);
+    $stockMin = round((float)($item['min_stock'] ?? $item['stock_min'] ?? 0), 2);
+    $stockTxt = rtrim(rtrim(number_format($stock, 2, '.', ''), '0'), '.');
+    $stockMinTxt = rtrim(rtrim(number_format($stockMin, 2, '.', ''), '0'), '.');
     $isLow = $stock < $stockMin;
     $stockColor = $isLow ? '#c0392b' : '#27ae60';
     $iconRaw = trim((string)($item['icon_url'] ?? ''));
@@ -704,8 +707,8 @@ function line_flex_low_stock_part_row(array $item): array
             [
                 'type' => 'box', 'layout' => 'vertical', 'flex' => 0, 'alignItems' => 'flex-end',
                 'contents' => [
-                    ['type' => 'text', 'text' => (string)$stock, 'size' => 'lg', 'color' => $stockColor, 'weight' => 'bold', 'align' => 'end'],
-                    ['type' => 'text', 'text' => 'ขั้นต่ำ ' . $stockMin, 'size' => 'xxs', 'color' => '#e67e22', 'align' => 'end', 'margin' => 'xs'],
+                    ['type' => 'text', 'text' => $stockTxt === '' ? '0' : $stockTxt, 'size' => 'lg', 'color' => $stockColor, 'weight' => 'bold', 'align' => 'end'],
+                    ['type' => 'text', 'text' => 'ขั้นต่ำ ' . ($stockMinTxt === '' ? '0' : $stockMinTxt), 'size' => 'xxs', 'color' => '#e67e22', 'align' => 'end', 'margin' => 'xs'],
                 ],
             ],
         ],

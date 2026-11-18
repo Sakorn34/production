@@ -89,6 +89,9 @@ function getDB(): PDO
         ]);
         $pdo->exec('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci');
         $pdo->exec('SET CHARACTER SET utf8mb4');
+        // จำนวนอะไหล่เป็นทศนิยมได้ (เช่น 0.5 ชิ้น/เครื่อง) — ต้องเป็น DECIMAL ก่อนเขียนค่าใด ๆ
+        require_once dirname(__DIR__, 2) . '/shared/qty_helpers.php';
+        tech_parts_ensure_decimal_qty_schema($pdo);
     }
     return $pdo;
 }

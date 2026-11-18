@@ -10,6 +10,7 @@
  */
 
 require_once __DIR__ . '/production_sync.php';
+require_once __DIR__ . '/production_asset_withdraw_sync.php';
 
 /**
  * ตรวจ URL ย้อนกลับ/redirect ว่าอยู่ในแอป parts
@@ -61,7 +62,7 @@ function parts_product_forms_handle_post(PDO $db, StockService $stock, string $d
         $name = trim((string) ($_POST['name'] ?? ''));
         $partCode = trim((string) ($_POST['part_code'] ?? ''));
         $unit = trim((string) ($_POST['unit'] ?? ''));
-        $minStock = (int) ($_POST['min_stock'] ?? 0);
+        $minStock = qty_post('min_stock');
         $priceRaw = trim((string) ($_POST['price'] ?? ''));
         $supplier = trim((string) ($_POST['supplier'] ?? ''));
         $purchaseLink = trim((string) ($_POST['purchase_link'] ?? ''));
@@ -169,7 +170,7 @@ function parts_product_edit_data_attrs(array $product, string $returnTo = ''): s
         . ' data-product-local-name="' . e((string) ($p['name'] ?? '')) . '"'
         . ' data-product-part-code="' . e(parts_product_part_code_raw($p)) . '"'
         . ' data-product-unit="' . e((string) ($p['unit'] ?? 'ชิ้น')) . '"'
-        . ' data-product-min-stock="' . (int) ($p['min_stock'] ?? 0) . '"'
+        . ' data-product-min-stock="' . e(qty_input_value($p['min_stock'] ?? 0)) . '"'
         . ' data-product-price="' . e($price) . '"'
         . ' data-product-supplier="' . e((string) ($p['supplier'] ?? '')) . '"'
         . ' data-product-purchase-link="' . e((string) ($p['purchase_link'] ?? '')) . '"'
@@ -223,7 +224,7 @@ function parts_stock_forms_handle_post(PDO $db, $stock, string $returnTo, ?strin
             ensureStockInColumns($db);
             $stock->stockIn(
                 (int) $_POST['product_id'],
-                (int) $_POST['quantity'],
+                qty_post('quantity'),
                 trim($_POST['note'] ?? '') ?: null,
                 $lineName
             );
@@ -232,7 +233,7 @@ function parts_stock_forms_handle_post(PDO $db, $stock, string $returnTo, ?strin
         } elseif ($action === 'stock_out_item') {
             $docNo = $stock->stockOutItem(
                 (int) $_POST['product_id'],
-                (int) $_POST['quantity'],
+                qty_post('quantity'),
                 validateStockOutNote($_POST['note'] ?? null),
                 trim((string) $lineName) ?: null,
                 trim($_POST['asset_code'] ?? '') ?: null
@@ -286,7 +287,7 @@ function parts_stock_modals_for_product(array $product): void
         <div class="form-row">
             <div class="form-group">
                 <label>จำนวนรับเข้า</label>
-                <input type="number" name="quantity" min="1" value="1" required data-autofocus>
+                <input type="number" name="quantity" min="0.01" step="0.01" value="1" required data-autofocus>
             </div>
             <div class="form-group">
                 <label>หมายเหตุ</label>
@@ -310,7 +311,7 @@ function parts_stock_modals_for_product(array $product): void
         <div class="form-row">
             <div class="form-group">
                 <label>จำนวนเบิก</label>
-                <input type="number" name="quantity" min="1" value="1" required data-autofocus>
+                <input type="number" name="quantity" min="0.01" step="0.01" value="1" required data-autofocus>
             </div>
             <div class="form-group">
                 <label>หมายเลขเครื่อง (S/N)</label>
@@ -373,7 +374,7 @@ function parts_product_edit_modals(): void
             </div>
             <div class="form-group">
                 <label for="edit-modal-min-stock">สต็อกขั้นต่ำ</label>
-                <input type="number" name="min_stock" id="edit-modal-min-stock" min="0" required>
+                <input type="number" name="min_stock" id="edit-modal-min-stock" min="0" step="0.01" required>
             </div>
         </div>
         <div class="form-row">

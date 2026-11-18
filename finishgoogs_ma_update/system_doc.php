@@ -283,7 +283,7 @@ $B = BASE_URL;
         <div class="tbl-item"><span class="tbl-name">inv_pickup_skip</span><div><div class="tbl-desc">เครื่องที่ "ไม่ต้องนับเข้าใบเบิก" (นับเข้าคลังใหม่ / ของค้างใบเบิกเก่า) — ตัดออกจากแท็บลงทะเบียนโดยไม่มีใบเบิก เอากลับมานับได้</div></div></div>
         <div class="tbl-item"><span class="tbl-name">stock_movements</span><div><div class="tbl-desc">ประวัติเปลี่ยนสถานะเครื่อง in/out (เก็บไว้เพื่อ audit)</div></div></div>
         <div class="tbl-item"><span class="tbl-name">spare_loans</span><div><div class="tbl-desc">บันทึกยืม-คืนเครื่องสำรอง (เชื่อมกับ repairs ถ้ายืมแทนเครื่องเสีย)</div></div></div>
-        <div class="tbl-item"><span class="tbl-name">product_field_config</span><div><div class="tbl-desc">config ฟิลด์ต่อรุ่น: production/ma/update + checklist + watch_alert (SD Card/RTC) + fw/lot/made_by</div></div></div>
+        <div class="tbl-item"><span class="tbl-name">product_field_config</span><div><div class="tbl-desc">config ฟิลด์ต่อรุ่น: production/ma/update + checklist + watch_alert (SD Card/RTC/Battery Power) + fw/lot/made_by</div></div></div>
         <div class="tbl-item"><span class="tbl-name">activity_logs</span><div><div class="tbl-desc">Activity log ร่วม Production + Parts: ผู้ใช้, action, สรุป, รายละเอียด POST (ดูที่ activity_logs.php)</div></div></div>
         <div class="tbl-item"><span class="tbl-name">site_settings</span><div><div class="tbl-desc">key-value: สีธีม, โลโก้, ชื่อแอป, เมนู, ฟอนต์ (ใช้ร่วม parts ผ่าน main_theme)</div></div></div>
         <div class="tbl-item"><span class="tbl-name">customers</span><div><div class="tbl-desc">ข้อมูล legacy (AppSheet) — ยังมี FK ใน assets/repairs แต่<strong>ไม่มีหน้ UI จัดการแล้ว</strong></div></div></div>
@@ -444,7 +444,7 @@ $B = BASE_URL;
     </div>
     <div class="page-card" style="border-top:3px solid #6366f1">
       <div class="pfile">settings.php</div>
-      <div class="pdesc">หลังบ้าน (PIN 9981): config ฟิลด์รายรุ่น, checklist ผลิต, watch alerts SD/RTC, input_mode, reset อัตโนมัติ</div>
+      <div class="pdesc">หลังบ้าน (PIN 9981): config ฟิลด์รายรุ่น, checklist ผลิต, watch alerts SD/RTC/Battery Power, input_mode, reset อัตโนมัติ</div>
       <div class="pread">อ่าน: product_field_config, products / เขียน: product_field_config</div>
     </div>
     <div class="page-card" style="border-top:3px solid #ec4899">
@@ -878,8 +878,8 @@ $B = BASE_URL;
       ['tech_parts_stock_out_by_part_id(...)', 'ตัดยอดอะไหล่ในคลังช่าง (includes/part_stock_bridge.php) — เขียนเข้า biton_tech_parts โดยตรง ครอบด้วย transaction และล็อกแถวไว้ กันสองคนเบิกพร้อมกันแล้วยอดเพี้ยน'],
       ['effective_fields($pid, $ctx)', 'คืนรายการฟิลด์ที่ต้องแสดงในฟอร์มของรุ่นนั้น — ใช้ค่าที่ตั้งไว้หลังบ้านก่อน ถ้ายังไม่เคยตั้งจึงเดาจากประวัติที่เคยบันทึกจริง'],
       ['effective_production_checklist($pid)', 'รายการที่ต้องติ๊กตรวจก่อนส่งมอบของรุ่นนั้น — ถ้าไม่ได้ตั้งไว้ จะดึงจากเครื่องล่าสุดของรุ่นเดียวกันมาให้'],
-      ['product_watch_alerts_enabled($pid)', 'เปิด/ปิด watch alert SD Card / Battery RTC ต่อรุ่น'],
-      ['part_watch_alerts($assetId, $producedAt)', 'คำนวณว่า SD Card / ถ่าน RTC ถึงเวลาเปลี่ยนหรือยัง — หาวันเปลี่ยนล่าสุดจาก 3 ที่แล้วเลือกอันที่ใหม่สุด: บันทึก MA, งานซ่อมในระบบซ่อม, และวันผลิต (ใช้เมื่อไม่เคยเปลี่ยนเลย) · ครบ 22 เดือนเตือนสีส้ม ครบ 24 เดือนเตือนสีแดง · ต้องเปิดใช้ต่อรุ่นก่อนถึงจะเตือน'],
+      ['product_watch_alerts_enabled($pid)', 'เปิด/ปิด watch alert ต่อรุ่น — ยังไม่ตั้งค่า: SD Card / RTC เปิด · Battery Power ปิดจนกว่าจะติ๊กเอง'],
+      ['part_watch_alerts($assetId, $producedAt)', 'คำนวณว่า SD Card / ถ่าน RTC / Battery Power ถึงเวลาเปลี่ยนหรือยัง — หาวันเปลี่ยนล่าสุดจาก 3 ที่แล้วเลือกอันที่ใหม่สุด: บันทึก MA, งานซ่อมในระบบซ่อม, และวันผลิต (ใช้เมื่อไม่เคยเปลี่ยนเลย) · ครบ 22 เดือนเตือนสีส้ม ครบ 24 เดือนเตือนสีแดง · ต้องเปิดใช้ต่อรุ่นก่อนถึงจะเตือน'],
       ['activity_log_write([...])', 'shared/activity_log_core.php — บันทึก activity_logs'],
       ['img_url($path)', 'แปลงที่อยู่ไฟล์รูปที่เก็บใน DB ให้เป็น URL ที่เปิดได้ — รองรับทั้งรูปที่อัปผ่านระบบนี้และรูปเก่าที่ย้ายมาจาก AppSheet ซึ่งเก็บคนละรูปแบบ'],
       ['save_upload($field,$subdir,$exts)', 'รับ upload ภาพ → uploads/{subdir}/'],

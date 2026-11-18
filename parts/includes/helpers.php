@@ -1,5 +1,7 @@
 <?php
 
+require_once dirname(__DIR__, 2) . '/shared/qty_helpers.php';
+
 function e(?string $str): string
 {
     return htmlspecialchars($str ?? '', ENT_QUOTES, 'UTF-8');
@@ -70,9 +72,15 @@ function formatDate(?string $datetime): string
     return dt_display_full($datetime);
 }
 
+/**
+ * แสดงตัวเลขจำนวน — จำนวนเต็มไม่มีจุด, มีเศษแสดงสูงสุด 2 ตำแหน่ง (0.5 ต้องไม่ถูกแสดงเป็น 1)
+ *
+ * @param mixed $num
+ * @return string
+ */
 function formatNumber($num): string
 {
-    return number_format($num ?? 0);
+    return qty_fmt($num ?? 0);
 }
 
 function formatCurrency($amount): string
@@ -392,10 +400,10 @@ function parts_product_picker_html(string $inputName, array $products, array $pa
             'code'     => $code,
             'name'     => parts_display_name($p),
             'label'    => parts_format_product_option($p),
-            'qty'      => (int) ($p['quantity'] ?? 0),
+            'qty'      => qty_norm($p['quantity'] ?? 0),
             'unit'     => (string) ($p['unit'] ?? 'ชิ้น'),
             'icon'     => parts_upload_img_url($partIcons[$code] ?? '') ?? '',
-            'disabled' => $disableZeroQty && (int) ($p['quantity'] ?? 0) <= 0,
+            'disabled' => $disableZeroQty && qty_norm($p['quantity'] ?? 0) <= 0,
         ];
     }
 
@@ -507,6 +515,145 @@ function parts_img_tag(?string $path, string $alt = '', string $class = 'parts-t
     }
     return '<img src="' . e($url) . '" alt="' . e($alt) . '" class="' . e($class) . '" loading="lazy"'
         . ' onerror="this.hidden=true">';
+}
+
+/**
+ * แผนที่ รหัสอะไหล่ → products.id (โหลดครั้งเดียวต่อ request)
+ *
+ * ใช้สร้างลิงก์จากรูปในตารางประวัติไปหน้าโปรไฟล์อะไหล่ โดยไม่ต้อง JOIN เพิ่มในทุก query
+ *
+ * @return array<string,int>
+ */
+function parts_product_id_map(): array
+{
+    static $map = null;
+    if ($map !== null) {
+        return $map;
+    }
+    $map = [];
+    try {
+        $stmt = getDB()->query('SELECT id, code FROM products');
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $code = trim((string) $r['code']);
+            if ($code !== '') {
+                $map[$code] = (int) $r['id'];
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('parts_product_id_map: ' . $e->getMessage());
+    }
+    return $map;
+}
+
+/**
+ * รูปอะไหล่ที่กดแล้วเปิด popup ขนาดเต็ม — โปรไฟล์เปิดจากชื่ออะไหล่
+ *
+ * ไม่มีรูปคืนค่าว่าง · ใช้ modal ตัวเดียวทั้งหน้า (parts_photo_modal_html)
+ * ไม่โหลดแผนที่ products ทั้งตาราง เพราะปุ่มดูรูปใช้แค่ชื่อกับรหัส
+ * stopPropagation กันแถวที่มี click handler ดักคลิกซ้ำ
+ *
+ * @param string|null $path  relative path ของรูป
+ * @param string      $alt
+ * @param string      $code  รหัสอะไหล่ (products.code)
+ * @return string HTML
+ */
+function parts_img_link_tag(?string $path, string $alt, string $code): string
+{
+    $img = parts_img_tag($path, $alt);
+    if ($img === '' || $path === null || $path === '') {
+        return $img;
+    }
+    // ปุ่มดูรูปใช้แค่ชื่อกับรหัส — ไม่ดึง products ทั้งตารางมาหา id
+    $product = ['code' => $code, 'display_name' => $alt];
+    return parts_photo_button_html($img, $path, $product, 'parts-photo-btn-cell', false);
+}
+
+/**
+ * ชื่ออะไหล่ที่กดแล้วเปิดโปรไฟล์ในแท็บใหม่
+ *
+ * @param string $code    รหัสอะไหล่ (products.code)
+ * @param string $name    ชื่อที่แสดง
+ * @param string $class   คลาสของ <a>
+ * @param int    $knownId products.id ถ้ามีแล้ว — จะได้ไม่ต้องโหลดแผนที่ทั้งตาราง
+ * @return string HTML ที่ escape แล้ว
+ */
+function parts_name_profile_link(string $code, string $name, string $class = 'detail-link', int $knownId = 0): string
+{
+    $name = trim($name);
+    if ($name === '') {
+        return '—';
+    }
+    $esc = e($name);
+    $id = $knownId > 0 ? $knownId : (parts_product_id_map()[trim($code)] ?? 0);
+    if ($id <= 0) {
+        return $esc;
+    }
+    return '<a href="' . e(url('/pages/product-detail.php?id=' . $id)) . '" class="' . e($class) . '"'
+        . ' target="_blank" rel="noopener noreferrer" title="เปิดโปรไฟล์อะไหล่ในแท็บใหม่"'
+        . ' onclick="event.stopPropagation()">' . $esc . '</a>';
+}
+
+/**
+ * สรุปรับเข้า/เบิกออก/ยอดคงเหลือปลายช่วง รายเดือนและรายปี สำหรับกราฟหน้ารายละเอียดอะไหล่
+ *
+ * ยอดคงเหลือย้อนจากยอดปัจจุบันลบผลรวมรายการเคลื่อนไหวทั้งหมด (ไม่มีตารางยอดรายวันให้อ่านตรงๆ)
+ * ช่วงที่ไม่มีรายการจะยกยอดเดิมต่อ เพื่อให้เส้นยอดคงเหลือต่อเนื่องไปถึงเดือน/ปีปัจจุบัน
+ * หมายเหตุ: ถ้าเคยแก้สต็อกด้วยมือโดยไม่มีรายการ ยอดย้อนหลังจะคลาดเคลื่อนเท่ากับส่วนที่แก้
+ *
+ * @param array<int,array<string,mixed>> $moves  ผลจาก StockService::getProductMovementHistory() (move_type, quantity, created_at)
+ * @param float                          $now    ยอดคงเหลือปัจจุบัน
+ * @return array{day:array<int,array<string,mixed>>,month:array<int,array<string,mixed>>,year:array<int,array<string,mixed>>} แต่ละช่วง: k, in, out, bal
+ */
+function parts_stock_balance_series(array $moves, float $now): array
+{
+    $result = ['day' => [], 'month' => [], 'year' => []];
+    if (!$moves) {
+        return $result;
+    }
+    usort($moves, function ($a, $b) {
+        return strcmp((string) $a['created_at'], (string) $b['created_at']);
+    });
+    $net = 0.0;
+    foreach ($moves as $m) {
+        $q = qty_norm($m['quantity']);
+        $net += $m['move_type'] === 'in' ? $q : -$q;
+    }
+    $start = $now - $net;
+    $firstTs = strtotime((string) $moves[0]['created_at']);
+    if ($firstTs === false) {
+        return $result;
+    }
+
+    foreach (['day' => 10, 'month' => 7, 'year' => 4] as $period => $len) {
+        $sum = [];
+        foreach ($moves as $m) {
+            $k = substr((string) $m['created_at'], 0, $len);
+            if (!isset($sum[$k])) {
+                $sum[$k] = ['in' => 0.0, 'out' => 0.0];
+            }
+            $sum[$k][$m['move_type'] === 'in' ? 'in' : 'out'] += qty_norm($m['quantity']);
+        }
+        // เดินทีละช่วงตั้งแต่รายการแรกถึงปัจจุบัน เติมช่วงว่างด้วยยอดยกมา
+        $fmtStart = ['day' => 'Y-m-d', 'month' => 'Y-m-01', 'year' => 'Y-01-01'][$period];
+        $keyFmt = ['day' => 'Y-m-d', 'month' => 'Y-m', 'year' => 'Y'][$period];
+        $cur = new DateTime(date($fmtStart, $firstTs));
+        $end = new DateTime(date($fmtStart));
+        $step = new DateInterval(['day' => 'P1D', 'month' => 'P1M', 'year' => 'P1Y'][$period]);
+        $bal = $start;
+        $rows = [];
+        while ($cur <= $end) {
+            $k = $cur->format($keyFmt);
+            $in = $sum[$k]['in'] ?? 0.0;
+            $out = $sum[$k]['out'] ?? 0.0;
+            $bal += $in - $out;
+            $rows[] = ['k' => $k, 'in' => qty_norm($in), 'out' => qty_norm($out), 'bal' => qty_norm($bal)];
+            $cur->add($step);
+        }
+        // วัน: ล่าสุด 60 วัน · เดือน: ล่าสุด 24 เดือน · ปี: ทุกปี — พอให้อ่านออก
+        $limits = ['day' => 60, 'month' => 24];
+        $result[$period] = isset($limits[$period]) ? array_slice($rows, -$limits[$period]) : $rows;
+    }
+    return $result;
 }
 
 /**
@@ -681,11 +828,11 @@ function parts_compare_products(array $a, array $b, string $sort): int
         case 'link':
             return strcasecmp(parts_product_link_sort_key($a), parts_product_link_sort_key($b));
         case 'quantity':
-            return ((int) ($a['quantity'] ?? 0)) <=> ((int) ($b['quantity'] ?? 0));
+            return qty_norm($a['quantity'] ?? 0) <=> qty_norm($b['quantity'] ?? 0);
         case 'unit':
             return strcasecmp((string) ($a['unit'] ?? ''), (string) ($b['unit'] ?? ''));
         case 'min_stock':
-            return ((int) ($a['min_stock'] ?? 0)) <=> ((int) ($b['min_stock'] ?? 0));
+            return qty_norm($a['min_stock'] ?? 0) <=> qty_norm($b['min_stock'] ?? 0);
         default:
             return 0;
     }
@@ -766,8 +913,9 @@ function parts_save_product_image(string $field): ?string
  * @param string              $iconPath path รูปในระบบ
  * @param array<string,mixed> $product
  * @param string              $extraCls คลาสเพิ่มของปุ่ม
+ * @param bool                $zoomBadge โชว์ไอคอนแว่นขยายมุมรูปไหม (รูปย่อในตารางเล็กเกินกว่าจะมีอะไรมาทับ)
  */
-function parts_photo_button_html(string $imgHtml, string $iconPath, array $product, string $extraCls = ''): string
+function parts_photo_button_html(string $imgHtml, string $iconPath, array $product, string $extraCls = '', bool $zoomBadge = true): string
 {
     $url = parts_upload_img_url($iconPath);
     if ($url === null || $imgHtml === '') {
@@ -781,7 +929,7 @@ function parts_photo_button_html(string $imgHtml, string $iconPath, array $produ
         . ' data-product-name="' . e($name) . '"'
         . ' data-product-code="' . e((string) ($product['code'] ?? '')) . '">'
         . $imgHtml
-        . '<span class="parts-photo-zoom" aria-hidden="true">' . ui_icon_html('search', 12) . '</span>'
+        . ($zoomBadge ? '<span class="parts-photo-zoom" aria-hidden="true">' . ui_icon_html('search', 12) . '</span>' : '')
         . '</button>';
 }
 
@@ -810,7 +958,7 @@ function parts_product_img_cell(?string $iconPath, array $product, string $retur
         // ช่องรูปกว้าง 34 จุด ใส่ปุ่มแก้ไขทับลงไปอีกจนดูรูปไม่ออก
         // เปลี่ยนรูปย้ายไปอยู่ในหน้าต่าง "แก้ไขรายละเอียด" ของคอลัมน์จัดการแทน
         return '<div class="col-img-wrap">'
-            . parts_photo_button_html(parts_img_tag($iconPath, $name), $iconPath, $product, 'parts-photo-btn-cell')
+            . parts_photo_button_html(parts_img_tag($iconPath, $name), $iconPath, $product, 'parts-photo-btn-cell', false)
             . '</div>';
     }
     return '<button type="button" class="btn btn-sm btn-outline btn-cell-action"'
@@ -899,12 +1047,13 @@ function actionIcon(string $type, string $href = '', string $title = '', bool $s
     if (!function_exists('ui_icon_html')) {
         require_once dirname(__DIR__, 2) . '/shared/ui_icons.php';
     }
-    $icons = ['view' => 'search', 'edit' => 'edit', 'delete' => 'trash', 'basket' => 'basket'];
+    $icons = ['view' => 'search', 'edit' => 'edit', 'delete' => 'trash', 'basket' => 'basket', 'set-basket' => 'basket'];
     $classes = [
-        'view'   => 'btn-icon btn-icon-view',
-        'edit'   => 'btn-icon btn-icon-edit',
-        'delete' => 'btn-icon btn-icon-delete',
-        'basket' => 'btn-icon btn-icon-basket',
+        'view'       => 'btn-icon btn-icon-view',
+        'edit'       => 'btn-icon btn-icon-edit',
+        'delete'     => 'btn-icon btn-icon-delete',
+        'basket'     => 'btn-icon btn-icon-basket',
+        'set-basket' => 'btn-icon btn-icon-basket',
     ];
     $iconHtml = ui_icon_html($icons[$type] ?? 'clipboard', 16, 'btn-svg');
     $cls = ($small ? 'btn btn-sm ' : 'btn ') . ($classes[$type] ?? 'btn-icon');
@@ -915,6 +1064,9 @@ function actionIcon(string $type, string $href = '', string $title = '', bool $s
     }
     if ($type === 'basket') {
         return '<button type="button" class="' . $cls . '"' . $titleAttr . ' data-sn-basket="' . e($href) . '">' . $iconHtml . '</button>';
+    }
+    if ($type === 'set-basket') {
+        return '<button type="button" class="' . $cls . '"' . $titleAttr . ' data-set-basket="' . e($href) . '">' . $iconHtml . '</button>';
     }
     return '<a href="' . e($href) . '" class="' . $cls . '"' . $titleAttr . '>' . $iconHtml . '</a>';
 }
@@ -960,7 +1112,7 @@ function parts_is_menu_page(?string $cur = null): bool
     // stock-in / stock-out / stock-out-item เป็น redirect แล้ว ไม่เคย render HTML จึงไม่ต้องมีที่นี่
     // ?tab= ไม่นับ — ทุกแท็บของ history ยังเป็นหน้าเมนู ไม่ต้องมีปุ่มย้อนกลับ
     static $menus = [
-        'products', 'history', 'sets', 'year-end-summary',
+        'products', 'purchase-check', 'history', 'sets', 'year-end-summary',
     ];
     return in_array($cur, $menus, true);
 }
@@ -1041,14 +1193,14 @@ function parts_stock_out_delete_impact(array $detail): array
 
     $impact = [];
     foreach ((array) ($detail['items'] ?? []) as $it) {
-        $cur = (int) ($it['current_quantity'] ?? $it['quantity_after'] ?? -1);
+        $cur = qty_norm($it['current_quantity'] ?? $it['quantity_after'] ?? -1);
         if ($cur < 0) {
             continue;   // ไม่รู้ยอดปัจจุบัน ก็อย่าเดา — ปล่อยให้กล่องแสดงแต่คำเตือน
         }
         $impact[] = [
             'name' => trim((string) ($it['name'] ?? $it['code'] ?? '-')),
             'from' => $cur,
-            'to'   => $deducted ? $cur + (int) $it['quantity'] : $cur,
+            'to'   => $deducted ? qty_norm($cur + qty_norm($it['quantity'])) : $cur,
         ];
     }
 

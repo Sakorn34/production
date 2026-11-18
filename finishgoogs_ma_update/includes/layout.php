@@ -156,6 +156,7 @@ function page_back_url_default() {
         case 'production_dedupe.php':
         case 'rent_retire_sync.php':
         case 'finishgood_shortage_preview.php':
+        case 'sd_image_check.php':
             return $b . '/settings.php';
         case 'share.php':
             return $b . '/settings.php';
@@ -198,7 +199,8 @@ function page_head_html($title) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= h($title) ?> — <?= h(setting('app_name', APP_NAME)) ?></title>
 <?php $fav = setting('favicon'); if ($fav) { ?><link rel="icon" href="<?= h(img_url($fav)) ?>"><?php } ?>
-<?php if (!empty($fontCfg['google'])) { ?><link rel="stylesheet" href="<?= h($fontCfg['google']) ?>"><?php } ?>
+<?php require_once dirname(__DIR__, 2) . '/shared/ui_tokens.php';
+      if (!empty($fontCfg['google'])) { echo ui_google_font_link_html((string) $fontCfg['google']); } ?>
 <?php if (!empty($fontCfg['custom_file'])) {
     $fontUrl = img_url($fontCfg['custom_file']);
     $ext = strtolower(pathinfo($fontCfg['custom_file'], PATHINFO_EXTENSION));
@@ -241,7 +243,7 @@ $dockClass = ($side === 'top') ? '' : ' nav-collapsed';
 $ubUser = ui_userbox_identity();
 $showName = $ubUser['name'] !== 'ผู้ใช้งาน' ? $ubUser['name'] : ($u ? $u['display_name'] : '-');
 $settingsActive = in_array($cur, ['settings.php', 'appearance.php', 'server_config.php', 'line_notify_settings.php', 'activity_logs.php', 'share_admin.php', 'system_doc.php', 'work_report.php', 'my_work.php',
-    'stock_scan.php', 'stock_check.php', 'unknown_assets.php', 'stock_movements.php', 'installation_history.php', 'production_dedupe.php', 'rent_retire_sync.php', 'share.php', 'support_reports.php', 'unused_images.php', 'inv_pickup_map.php', 'leasing_sn_fix.php', 'release_notes.php', 'integration.php', 'rent_idle_check.php', 'rent_sale_conflict.php', 'site_assets.php', 'parts_link_check.php'], true);
+    'stock_scan.php', 'stock_check.php', 'unknown_assets.php', 'stock_movements.php', 'installation_history.php', 'production_dedupe.php', 'rent_retire_sync.php', 'share.php', 'support_reports.php', 'unused_images.php', 'inv_pickup_map.php', 'leasing_sn_fix.php', 'leasing_registry.php', 'release_notes.php', 'integration.php', 'rent_idle_check.php', 'rent_sale_conflict.php', 'site_assets.php', 'parts_link_check.php'], true);
 ?>
 <div class="app<?= $sideClass . $dockClass ?>">
 <?php // ตั้ง class ให้ตรงกับที่ผู้ใช้เลือกไว้ ก่อนเบราว์เซอร์วาดเฟรมแรก
@@ -439,6 +441,20 @@ function page_footer() {
   </div>
 </div>
 
+<!-- popup ดูรูปขนาดเต็ม — อยู่หลัง list-overlay เพื่อให้ Esc / คลิกพื้นหลังปิดรูปก่อน ไม่ปิดรายการด้านล่าง -->
+<div id="img-preview-overlay" class="notif-overlay img-preview-overlay" hidden>
+  <div class="notif-box img-preview-box" role="dialog" aria-modal="true" aria-labelledby="img-preview-title">
+    <div class="img-preview-head">
+      <h2 id="img-preview-title">รูปอะไหล่</h2>
+      <button type="button" class="btn-sm btn-line btn-icon-only" onclick="closeOverlay('img-preview-overlay')" aria-label="ปิด"><?= ui_icon_html('close', 16, 'btn-svg') ?></button>
+    </div>
+    <div class="img-preview-body">
+      <img id="img-preview-pic" class="img-preview-pic" src="" alt="" hidden>
+      <p id="img-preview-missing" class="muted" hidden>ไม่พบไฟล์รูปบนเซิร์ฟเวอร์</p>
+    </div>
+  </div>
+</div>
+
 <script src="<?= BASE_URL ?>/assets/sidebar.js?v=<?= @filemtime(__DIR__ . '/../assets/sidebar.js') ?: time() ?>"></script>
 <script>
 /* ── หน้าโปรไฟล์เครื่อง (asset.php) เปิดในแท็บใหม่เสมอ ──
@@ -505,6 +521,36 @@ document.addEventListener('keydown', function(e){
 /* คลิกที่พื้นหลัง (ตัว overlay เอง) เท่านั้น — คลิกในกล่องต้องไม่ปิด */
 document.addEventListener('click', function(e){
   if (e.target.classList && e.target.classList.contains('notif-overlay')) closeOverlay(e.target.id);
+});
+
+/* รูปย่อในรายการสต็อกต่ำ (และปุ่ม .ls-photo-btn อื่น) — กดเปิด popup ขนาดเต็ม
+   จับที่ document เพราะรายการโหลดทีหลังผ่าน fetch เข้า #list-body */
+document.addEventListener('click', function(e){
+  var btn = e.target.closest ? e.target.closest('.ls-photo-btn') : null;
+  if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
+  var src = btn.getAttribute('data-photo-src') || '';
+  var alt = btn.getAttribute('data-photo-alt') || '';
+  var img = document.getElementById('img-preview-pic');
+  var miss = document.getElementById('img-preview-missing');
+  var title = document.getElementById('img-preview-title');
+  if (title) title.textContent = alt || 'รูปอะไหล่';
+  if (img) {
+    img.hidden = true;
+    if (miss) miss.hidden = true;
+    img.onload = function(){ img.hidden = false; if (miss) miss.hidden = true; };
+    img.onerror = function(){ img.hidden = true; if (miss) miss.hidden = false; };
+    img.alt = alt;
+    img.removeAttribute('src');
+    img.src = src;
+    if (img.complete && img.naturalWidth) {
+      img.hidden = false;
+      if (miss) miss.hidden = true;
+    }
+  }
+  var ov = document.getElementById('img-preview-overlay');
+  if (ov && ov.hidden) openOverlay('img-preview-overlay');
 });
 
 /*
@@ -635,6 +681,40 @@ function partCodeLineHtml(p){
 document.querySelectorAll('form.filter select').forEach(function(s){
   if (!s.hasAttribute('onchange')) s.addEventListener('change', function(){ if (s.form) s.form.submit(); });
 });
+
+// ฟอร์ม list-search-form (หน้า MA, อะไหล่ ฯลฯ) — พิมพ์แล้ว submit GET อัตโนมัติ
+(function(){
+  var delay = 450;
+  function listSearchControls(form) {
+    var list = Array.prototype.slice.call(form.querySelectorAll('input, select, textarea'));
+    if (form.id) {
+      document.querySelectorAll('[form="' + form.id + '"]').forEach(function(el) {
+        list.push(el);
+      });
+    }
+    return list;
+  }
+  document.querySelectorAll('form.list-search-form').forEach(function(form){
+    if (form.dataset.liveSearch === '0') return;
+    if (form.dataset.liveSearchReady) return;
+    form.dataset.liveSearchReady = '1';
+    var timer = null;
+    function queueSubmit(){
+      clearTimeout(timer);
+      timer = setTimeout(function(){
+        if (typeof form.requestSubmit === 'function') { form.requestSubmit(); }
+        else { form.submit(); }
+      }, delay);
+    }
+    listSearchControls(form).forEach(function(input){
+      if (input.type === 'hidden' || input.type === 'submit' || input.type === 'button') return;
+      input.addEventListener('input', queueSubmit);
+      if (input.type === 'date' || input.tagName === 'SELECT') {
+        input.addEventListener('change', queueSubmit);
+      }
+    });
+  });
+})();
 
 // ค้นหาในตารางรายการแบบพิมพ์ไปกรองไป (ใส่ class list-live-filter ที่ input)
 document.querySelectorAll('input.list-live-filter').forEach(function(input){

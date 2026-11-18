@@ -8,7 +8,7 @@
  * ข้อมูลเคลม: อ่านจาก stock_movements.notes + stock_old (S/N เก่า, ลูกค้า)
  * ขายแยกชิ้น: อ่านจาก stock_movements (PO, ลูกค้า, วันที่เบิก) เมื่อไม่มี po_order_parts
  * stock_old: ประวัติเครื่องที่ส่งมอบให้ลูกค้าสำเร็จแล้ว (ไซต์งาน, รปภ.) — ไม่ใช่ stock คงคลัง
- * S/N ในชุด: po_order_part_serials (ถ้ามี) หรือ stock_movements ลงทะเบียนอุปกรณ์
+ * S/N ในชุด: po_order_part_serials ที่ biton_setup (หลัก) หรือ stock ฝั่งเดียวกัน · fallback stock_movements ลงทะเบียน
  *
  * Flow ตัวอย่าง:
  *   $info = asset_stockparts_withdraw_info('AA626060436');
@@ -695,6 +695,64 @@ function stockparts_fetch_individual_sale_context($db, string $serial, string $s
 }
 
 /**
+ * แผนที่ S/N → URL หน้าโปรไฟล์เครื่อง (assets) สำหรับป้ายในตารางเบิกขาย
+ *
+ * @param array<int,string> $serials
+ * @return array<string,string> คีย์ S/N ตัวพิมพ์ใหญ่ → href
+ */
+function stockparts_asset_profile_url_map(array $serials): array
+{
+    $uniq = [];
+    $seen = [];
+    foreach ($serials as $s) {
+        $s = trim((string) $s);
+        if ($s === '') {
+            continue;
+        }
+        $k = mb_strtoupper($s);
+        if (isset($seen[$k])) {
+            continue;
+        }
+        $seen[$k] = true;
+        $uniq[] = $s;
+    }
+    if ($uniq === []) {
+        return [];
+    }
+    $out = [];
+    try {
+        $db = db();
+        $ph = implode(',', array_fill(0, count($uniq), '?'));
+        $types = str_repeat('s', count($uniq) * 2);
+        $st = $db->prepare(
+            "SELECT id, asset_code, factory_serial
+             FROM assets
+             WHERE factory_serial IN ($ph) OR asset_code IN ($ph)"
+        );
+        if (!$st) {
+            return [];
+        }
+        $st->bind_param($types, ...array_merge($uniq, $uniq));
+        $st->execute();
+        $res = $st->get_result();
+        $base = defined('BASE_URL') ? BASE_URL : '';
+        while ($row = $res->fetch_assoc()) {
+            $url = $base . '/asset.php?id=' . (int) ($row['id'] ?? 0);
+            foreach (['factory_serial', 'asset_code'] as $col) {
+                $sn = trim((string) ($row[$col] ?? ''));
+                if ($sn !== '') {
+                    $out[mb_strtoupper($sn)] = $url;
+                }
+            }
+        }
+        $st->close();
+    } catch (Throwable $e) {
+        error_log('[stockparts_asset_profile_url_map] ' . $e->getMessage());
+    }
+    return $out;
+}
+
+/**
  * อ่านชื่อรุ่นจาก production.assets เพื่อจับคู่รายการ order
  *
  * @param string $serial
@@ -774,17 +832,54 @@ function stockparts_order_reference_variants(string $orderId): array
 }
 
 /**
- * แยก S/N จาก notes ลงทะเบียนอุปกรณ์
+ * แยก S/N ทั้งหมดจาก notes ลงทะเบียนอุปกรณ์ (มักคั่นด้วย comma)
+ *
+ * @param string $notes
+ * @return array<int,string>
+ */
+function stockparts_parse_registration_serials(string $notes): array
+{
+    if (!preg_match('/Serial:\s*(.+)$/u', $notes, $m)) {
+        return [];
+    }
+    $parts = preg_split('/\s*,\s*/u', trim((string) $m[1]));
+    $out = [];
+    foreach ($parts as $p) {
+        $p = trim((string) $p, " \t\n\r\0\x0B(),");
+        if ($p !== '' && !in_array($p, $out, true)) {
+            $out[] = $p;
+        }
+    }
+    return $out;
+}
+
+/**
+ * แยก S/N ตัวแรกจาก notes ลงทะเบียนอุปกรณ์ (คงพฤติกรรมเดิมสำหรับ caller เก่า)
  *
  * @param string $notes
  * @return string|null
  */
 function stockparts_parse_registration_serial(string $notes): ?string
 {
-    if (preg_match('/Serial:\s*(\S+)/u', $notes, $m)) {
-        return trim($m[1], " \t\n\r\0\x0B(),");
+    $all = stockparts_parse_registration_serials($notes);
+    return $all !== [] ? $all[0] : null;
+}
+
+/**
+ * ฐานที่เก็บ po_order_part_serials — ปกติอยู่ biton_setup ไม่ใช่ biton_stockparts
+ *
+ * @param mysqli $stockDb
+ * @return mysqli|null
+ */
+function stockparts_db_for_order_part_serials($stockDb)
+{
+    if (function_exists('dbSetup')) {
+        $setup = dbSetup();
+        if ($setup) {
+            return $setup;
+        }
     }
-    return null;
+    return $stockDb ?: null;
 }
 
 /**
@@ -817,27 +912,154 @@ function stockparts_fetch_order_registration_serials($db, string $orderId): arra
     $out = [];
     $res = $st->get_result();
     while ($row = $res->fetch_assoc()) {
-        $sn = stockparts_parse_registration_serial((string) ($row['notes'] ?? ''));
-        if ($sn === null || $sn === '') {
-            continue;
-        }
-        $out[] = [
-            'serial' => $sn,
+        $meta = [
             'movement_date' => trim((string) ($row['movement_date'] ?? '')),
             'customer_name' => trim((string) ($row['customer_name'] ?? '')),
         ];
+        foreach (stockparts_parse_registration_serials((string) ($row['notes'] ?? '')) as $sn) {
+            $out[] = ['serial' => $sn] + $meta;
+        }
     }
     return $out;
 }
 
 /**
- * ดึง map line_id → S/N จาก po_order_part_serials (ข้อมูลลงทะเบียนชุด — ชัดที่สุด)
+ * แปลงค่า map รายการ → รายการ S/N (รองรับ string เดี่ยวหรือ array)
+ *
+ * @param mixed $entry
+ * @return array<int,string>
+ */
+function stockparts_line_serial_list($entry): array
+{
+    if (is_array($entry)) {
+        $out = [];
+        foreach ($entry as $sn) {
+            $sn = trim((string) $sn);
+            if ($sn !== '' && !in_array($sn, $out, true)) {
+                $out[] = $sn;
+            }
+        }
+        return $out;
+    }
+    $sn = trim((string) $entry);
+    return $sn !== '' ? [$sn] : [];
+}
+
+/**
+ * รวม S/N ทุกแถวใน line_serial_map เป็นชุดเดียว (ใช้เช็กซ้ำ)
+ *
+ * @param array<int,mixed> $map
+ * @return array<int,string>
+ */
+function stockparts_line_serial_map_flat(array $map): array
+{
+    $flat = [];
+    foreach ($map as $entry) {
+        foreach (stockparts_line_serial_list($entry) as $sn) {
+            if (!in_array($sn, $flat, true)) {
+                $flat[] = $sn;
+            }
+        }
+    }
+    return $flat;
+}
+
+/**
+ * เพิ่ม S/N ลง map ต่อ line_id (หลายตัวต่อแถวเมื่อ quantity > 1)
+ *
+ * @param array<int,mixed> $map
+ * @param int              $lineId
+ * @param string           $sn
+ */
+function stockparts_line_serial_map_add(array &$map, int $lineId, string $sn): void
+{
+    if ($lineId <= 0 || $sn === '') {
+        return;
+    }
+    $list = stockparts_line_serial_list($map[$lineId] ?? null);
+    if (!in_array($sn, $list, true)) {
+        $list[] = $sn;
+    }
+    $map[$lineId] = $list;
+}
+
+/**
+ * จับคู่ชื่อรายการในใบสั่งงานกับชื่อรุ่นจาก S/N
+ *
+ * @param string $partName ชื่อใน po_order_parts
+ * @param string $prodName ชื่อจาก stock / production
+ * @return bool
+ */
+function stockparts_part_name_matches(string $partName, string $prodName): bool
+{
+    $a = trim($partName);
+    $b = trim($prodName);
+    if ($a === '' || $b === '') {
+        return false;
+    }
+    if (strcasecmp($a, $b) === 0) {
+        return true;
+    }
+    $na = preg_replace('/\s+/u', ' ', mb_strtolower($a, 'UTF-8'));
+    $nb = preg_replace('/\s+/u', ' ', mb_strtolower($b, 'UTF-8'));
+    if ($na === $nb) {
+        return true;
+    }
+
+    return strpos($na, $nb) !== false || strpos($nb, $na) !== false;
+}
+
+/**
+ * รวบรวม S/N ในใบสั่งงาน → ชื่อรุ่น (ใช้จับคู่รายการ × n)
+ *
+ * @param mysqli                              $db
+ * @param string                              $orderId
+ * @param array<string,string>                $serialProducts  sn => ชื่อรุ่น (เติมเพิ่ม)
+ * @param array<int,string>                   $usedSerials     S/N ที่ผูกแถวแล้ว
+ */
+function stockparts_collect_order_serial_product_names($stockDb, string $orderId, array &$serialProducts, array $usedSerials): void
+{
+    $orderId = trim($orderId);
+    if ($orderId === '') {
+        return;
+    }
+    $dbs = [];
+    $setupDb = stockparts_db_for_order_part_serials($stockDb);
+    if ($setupDb) {
+        $dbs[] = $setupDb;
+    }
+    if ($stockDb && !in_array($stockDb, $dbs, true)) {
+        $dbs[] = $stockDb;
+    }
+    foreach ($dbs as $db) {
+        $st = $db->prepare(
+            'SELECT DISTINCT serial_number FROM po_order_part_serials
+             WHERE order_id = ? AND TRIM(IFNULL(serial_number, "")) <> ""'
+        );
+        if (!$st) {
+            continue;
+        }
+        $st->bind_param('s', $orderId);
+        $st->execute();
+        $res = $st->get_result();
+        while ($row = $res->fetch_assoc()) {
+            $sn = trim((string) ($row['serial_number'] ?? ''));
+            if ($sn === '' || in_array($sn, $usedSerials, true) || isset($serialProducts[$sn])) {
+                continue;
+            }
+            $serialProducts[$sn] = stockparts_resolve_serial_product_name($stockDb, $sn);
+        }
+    }
+}
+
+/**
+ * ดึง map line_id → S/N จาก po_order_part_serials บนฐานที่กำหนด
  *
  * @param mysqli $db
  * @param string $orderId
- * @return array<int,string>
+ * @return array<int,array<int,string>>
  */
-function stockparts_fetch_line_serials_from_po($db, string $orderId): array
+function stockparts_fetch_line_serials_from_po_conn($db, string $orderId): array
 {
     $orderId = trim($orderId);
     if ($orderId === '') {
@@ -845,11 +1067,9 @@ function stockparts_fetch_line_serials_from_po($db, string $orderId): array
     }
 
     $st = $db->prepare(
-        'SELECT p.id AS line_id, s.serial_number
-         FROM po_order_part_serials s
-         INNER JOIN po_order_parts p ON p.id = s.part_id
-         WHERE p.order_id = ?
-         ORDER BY p.part_name, s.id'
+        'SELECT part_id, serial_number FROM po_order_part_serials
+         WHERE order_id = ? AND TRIM(IFNULL(serial_number, "")) <> ""
+         ORDER BY id'
     );
     if (!$st) {
         return [];
@@ -860,34 +1080,39 @@ function stockparts_fetch_line_serials_from_po($db, string $orderId): array
     $map = [];
     $res = $st->get_result();
     while ($row = $res->fetch_assoc()) {
-        $lineId = (int) ($row['line_id'] ?? 0);
         $sn = trim((string) ($row['serial_number'] ?? ''));
-        if ($lineId > 0 && $sn !== '' && !isset($map[$lineId])) {
-            $map[$lineId] = $sn;
+        $lineId = (int) ($row['part_id'] ?? 0);
+        if ($sn !== '' && $lineId > 0) {
+            stockparts_line_serial_map_add($map, $lineId, $sn);
         }
     }
+    return $map;
+}
 
-    if ($map) {
-        return $map;
-    }
-
-    $st = $db->prepare(
-        'SELECT s.part_id, s.serial_number, p.id AS line_id
-         FROM po_order_part_serials s
-         LEFT JOIN po_order_parts p ON p.id = s.part_id
-         WHERE s.order_id = ?'
-    );
-    if (!$st) {
+/**
+ * ดึง map line_id → S/N จาก po_order_part_serials (biton_setup เป็นหลัก)
+ *
+ * @param mysqli $stockDb
+ * @param string $orderId
+ * @return array<int,array<int,string>>
+ */
+function stockparts_fetch_line_serials_from_po($stockDb, string $orderId): array
+{
+    $orderId = trim($orderId);
+    if ($orderId === '') {
         return [];
     }
-    $st->bind_param('s', $orderId);
-    $st->execute();
-    $res = $st->get_result();
-    while ($row = $res->fetch_assoc()) {
-        $lineId = (int) ($row['line_id'] ?? $row['part_id'] ?? 0);
-        $sn = trim((string) ($row['serial_number'] ?? ''));
-        if ($lineId > 0 && $sn !== '' && !isset($map[$lineId])) {
-            $map[$lineId] = $sn;
+    $map = [];
+    $setupDb = stockparts_db_for_order_part_serials($stockDb);
+    if ($setupDb) {
+        $map = stockparts_fetch_line_serials_from_po_conn($setupDb, $orderId);
+    }
+    if ($stockDb && $stockDb !== $setupDb) {
+        $extra = stockparts_fetch_line_serials_from_po_conn($stockDb, $orderId);
+        foreach ($extra as $lineId => $entry) {
+            foreach (stockparts_line_serial_list($entry) as $sn) {
+                stockparts_line_serial_map_add($map, (int) $lineId, $sn);
+            }
         }
     }
     return $map;
@@ -901,7 +1126,7 @@ function stockparts_fetch_line_serials_from_po($db, string $orderId): array
  * @param mysqli $db
  * @param string $orderId
  * @param array<int,array<string,mixed>> $lines
- * @return array<int,string> map line_id => serial_number
+ * @return array<int,array<int,string>> map line_id => รายการ serial_number
  */
 function stockparts_map_lines_to_registered_serials($db, string $orderId, array $lines): array
 {
@@ -911,15 +1136,27 @@ function stockparts_map_lines_to_registered_serials($db, string $orderId, array 
 
     $map = stockparts_fetch_line_serials_from_po($db, $orderId);
 
-    $registrations = stockparts_fetch_order_registration_serials($db, $orderId);
-    if (!$registrations) {
-        return $map;
+    $lineIds = [];
+    foreach ($lines as $line) {
+        $lid = (int) ($line['id'] ?? 0);
+        if ($lid > 0) {
+            $lineIds[$lid] = true;
+        }
+    }
+    foreach (array_keys($map) as $lid) {
+        if (!isset($lineIds[$lid])) {
+            unset($map[$lid]);
+        }
     }
 
+    $usedSerials = stockparts_line_serial_map_flat($map);
     $serialProducts = [];
+    stockparts_collect_order_serial_product_names($db, $orderId, $serialProducts, $usedSerials);
+
+    $registrations = stockparts_fetch_order_registration_serials($db, $orderId);
     foreach ($registrations as $reg) {
         $sn = $reg['serial'];
-        if (in_array($sn, $map, true)) {
+        if (in_array($sn, $usedSerials, true) || isset($serialProducts[$sn])) {
             continue;
         }
         $serialProducts[$sn] = stockparts_resolve_serial_product_name($db, $sn);
@@ -927,7 +1164,12 @@ function stockparts_map_lines_to_registered_serials($db, string $orderId, array 
 
     foreach ($lines as $line) {
         $lineId = (int) ($line['id'] ?? 0);
-        if ($lineId <= 0 || isset($map[$lineId])) {
+        if ($lineId <= 0) {
+            continue;
+        }
+        $needQty = max(1, (int) ($line['quantity'] ?? 1));
+        $have = count(stockparts_line_serial_list($map[$lineId] ?? null));
+        if ($have >= $needQty) {
             continue;
         }
         $partName = trim((string) ($line['part_name'] ?? ''));
@@ -935,25 +1177,33 @@ function stockparts_map_lines_to_registered_serials($db, string $orderId, array 
             continue;
         }
         foreach ($serialProducts as $sn => $prodName) {
-            if ($prodName !== '' && strcasecmp($partName, $prodName) === 0) {
-                $map[$lineId] = $sn;
+            if ($have >= $needQty) {
                 break;
+            }
+            if (in_array($sn, $usedSerials, true)) {
+                continue;
+            }
+            if ($prodName !== '' && stockparts_part_name_matches($partName, $prodName)) {
+                stockparts_line_serial_map_add($map, $lineId, $sn);
+                $usedSerials[] = $sn;
+                $have++;
             }
         }
     }
 
-    $unmappedSerials = array_values(array_filter(array_keys($serialProducts), function ($sn) use ($map) {
-        return !in_array($sn, $map, true);
+    $flat = stockparts_line_serial_map_flat($map);
+    $unmappedSerials = array_values(array_filter(array_keys($serialProducts), function ($sn) use ($flat) {
+        return !in_array($sn, $flat, true);
     }));
     $unmappedLineIds = [];
     foreach ($lines as $line) {
         $lid = (int) ($line['id'] ?? 0);
-        if ($lid > 0 && !isset($map[$lid])) {
+        if ($lid > 0 && stockparts_line_serial_list($map[$lid] ?? null) === []) {
             $unmappedLineIds[] = $lid;
         }
     }
     if (count($unmappedSerials) === 1 && count($unmappedLineIds) === 1) {
-        $map[$unmappedLineIds[0]] = $unmappedSerials[0];
+        stockparts_line_serial_map_add($map, $unmappedLineIds[0], $unmappedSerials[0]);
     } elseif (count($unmappedSerials) > 1 && count($unmappedSerials) === count($unmappedLineIds)) {
         $lineMeta = [];
         foreach ($lines as $line) {
@@ -967,7 +1217,7 @@ function stockparts_map_lines_to_registered_serials($db, string $orderId, array 
         });
         sort($unmappedSerials, SORT_STRING);
         foreach ($unmappedLineIds as $i => $lid) {
-            $map[$lid] = $unmappedSerials[$i];
+            stockparts_line_serial_map_add($map, $lid, $unmappedSerials[$i]);
         }
     }
 
@@ -1523,14 +1773,32 @@ function stockparts_withdraw_dl_row(string $label, string $value): string
  * @param array<int,array<string,mixed>> $lines
  * @param int                            $matchedId     id ของแถวที่เป็นเครื่องนี้
  * @param bool                           $serialDelivered
- * @param array<int,string>              $lineSerialMap id แถว => S/N
+ * @param array<int,array<int,string>|string> $lineSerialMap id แถว => S/N (หนึ่งหรือหลายตัว)
+ * @param string                              $pageSerial   S/N ของหน้าเครื่องที่เปิดอยู่ (ไฮไลต์ในตาราง)
  */
-function stockparts_withdraw_order_table_html(array $lines, int $matchedId = 0, bool $serialDelivered = false, array $lineSerialMap = []): string
-{
+function stockparts_withdraw_order_table_html(
+    array $lines,
+    int $matchedId = 0,
+    bool $serialDelivered = false,
+    array $lineSerialMap = [],
+    string $pageSerial = ''
+): string {
     if (!$lines) {
         return '';
     }
     $showSerial = !empty($lineSerialMap);
+    $pageSerial = trim($pageSerial);
+    $profileUrls = [];
+    if ($showSerial) {
+        $allSerials = [];
+        foreach ($lines as $ln) {
+            $lid = (int) ($ln['id'] ?? 0);
+            foreach (stockparts_line_serial_list($lineSerialMap[$lid] ?? null) as $s) {
+                $allSerials[] = $s;
+            }
+        }
+        $profileUrls = stockparts_asset_profile_url_map($allSerials);
+    }
 
     $out = '<div class="asset-sales-lines-wrap">';
     $out .= '<div class="asset-sales-lines-title">ในชุดนี้มี ' . count($lines) . ' รายการ';
@@ -1538,24 +1806,43 @@ function stockparts_withdraw_order_table_html(array $lines, int $matchedId = 0, 
         $out .= ' <span class="muted">· S/N จากลงทะเบียนอุปกรณ์</span>';
     }
     $out .= '</div>';
-    $out .= '<table class="asset-sales-lines"><tbody>';
+    $out .= '<table class="asset-sales-lines' . ($showSerial ? ' has-part-sn' : '') . '"><tbody>';
     foreach ($lines as $ln) {
         $id = (int) ($ln['id'] ?? 0);
         $isMe = $matchedId > 0 && $id === $matchedId;
-        $sn = trim((string) ($lineSerialMap[$id] ?? ''));
+        $snList = stockparts_line_serial_list($lineSerialMap[$id] ?? null);
+        $qty = (int) ($ln['quantity'] ?? 0);
         $out .= '<tr' . ($isMe ? ' class="is-matched"' : '') . '>';
         if ($showSerial) {
-            $out .= '<td class="asset-sales-line-sn">'
-                . ($sn !== '' ? '<span class="asset-sales-serial-tag">' . h($sn) . '</span>' : '<span class="muted">—</span>')
+            $out .= '<td class="asset-sales-line-name">' . h(stockparts_fmt_field($ln['part_name'] ?? ''))
+                . ($qty > 1 ? ' <span class="muted">×' . $qty . '</span>' : '')
+                . ($isMe ? ' <span class="asset-sales-match-tag">เครื่องนี้</span>' : '')
                 . '</td>';
+            if ($snList) {
+                $tags = '';
+                foreach ($snList as $oneSn) {
+                    $oneSn = trim((string) $oneSn);
+                    $snKey = mb_strtoupper($oneSn);
+                    $isPage = $pageSerial !== '' && $snKey === mb_strtoupper($pageSerial);
+                    $cls = 'asset-sales-serial-tag' . ($isPage ? ' is-page-serial' : '');
+                    $profileUrl = $profileUrls[$snKey] ?? '';
+                    if ($profileUrl !== '') {
+                        $tags .= '<a class="' . $cls . '" href="' . h($profileUrl) . '">' . h($oneSn) . '</a>';
+                    } else {
+                        $tags .= '<span class="' . $cls . '">' . h($oneSn) . '</span>';
+                    }
+                }
+                $out .= '<td class="asset-sales-line-sn"><span class="asset-sales-serial-tags">' . $tags . '</span></td>';
+            } else {
+                $out .= '<td class="asset-sales-line-sn"><span class="muted">—</span></td>';
+            }
         } else {
+            $out .= '<td class="asset-sales-line-name">' . h(stockparts_fmt_field($ln['part_name'] ?? ''))
+                . ($qty > 1 ? ' <span class="muted">×' . $qty . '</span>' : '')
+                . ($isMe ? ' <span class="asset-sales-match-tag">เครื่องนี้</span>' : '')
+                . '</td>';
             $out .= '<td class="asset-sales-line-sn">' . h(stockparts_fmt_field($ln['part_code'] ?? '')) . '</td>';
         }
-        $qty = (int) ($ln['quantity'] ?? 0);
-        $out .= '<td>' . h(stockparts_fmt_field($ln['part_name'] ?? ''))
-            . ($qty > 1 ? ' <span class="muted">×' . $qty . '</span>' : '')
-            . ($isMe ? ' <span class="asset-sales-match-tag">เครื่องนี้</span>' : '')
-            . '</td>';
         $out .= '</tr>';
     }
     $out .= '</tbody></table></div>';
@@ -1633,7 +1920,7 @@ function stockparts_withdraw_summary_fields(array $info): array
  * ทั้งที่คนอ่านสนใจก็ต่อเมื่อสงสัยว่าตัวเลขมาจากไหน
  *
  * @param  array<string,mixed> $info
- * @return string
+ * @return array<int,string>
  */
 function stockparts_withdraw_provenance_bits(array $info): array
 {
@@ -1644,13 +1931,13 @@ function stockparts_withdraw_provenance_bits(array $info): array
     }
     $stock = is_array($info['stock'] ?? null) ? $info['stock'] : [];
     if (!empty($stock['timestamp'])) {
-        $bits[] = 'บันทึกใน stock ' . dthai_full($stock['timestamp']);
+        $bits[] = 'บันทึก ' . dthai_full($stock['timestamp']);
     }
     if (!empty($info['stock_synthetic'])) {
         $bits[] = 'ไม่มีใน stock ปัจจุบัน';
     }
     if (isset($stock['active']) && (int) $stock['active'] !== 1) {
-        $bits[] = 'ไม่นับ stock';
+        $bits[] = 'ไม่นับสต็อก';
     }
     return $bits;
 }
@@ -1689,11 +1976,51 @@ function stockparts_withdraw_step_html(string $when, string $where, string $titl
 }
 
 /**
- * การ์ด "การเบิกใช้งานขาย" — เรียงเป็นไทม์ไลน์ตามลำดับที่เกิดจริง
+ * ค่าที่ไม่ซ้ำ — เทียบแบบไม่สนตัวพิมพ์ ข้ามค่าว่างกับ "-"
  *
- * ระบบขาย (ใบสั่งงาน/เคลม) → ทะเบียน stock (ใบเบิก/ลงทะเบียน) → ส่งมอบ + ชุดที่ไปด้วยกัน
- * แต่ละอย่างพูดครั้งเดียว: ชื่อสินค้าและจำนวนอยู่หัวการ์ด ลูกค้าอยู่ขั้นระบบขาย
- * S/N ของเครื่องนี้อยู่หัวหน้าจออยู่แล้วจึงไม่เขียนซ้ำในหมายเหตุ
+ * @param array<int,mixed> $vals
+ * @return array<int,string>
+ */
+function stockparts_withdraw_uniq(array $vals): array
+{
+    $out = [];
+    $seen = [];
+    foreach ($vals as $v) {
+        $v = trim((string) $v);
+        if ($v === '' || $v === '-') {
+            continue;
+        }
+        $k = mb_strtolower($v);
+        if (isset($seen[$k])) {
+            continue;
+        }
+        $seen[$k] = true;
+        $out[] = $v;
+    }
+    return $out;
+}
+
+/**
+ * แถวข้อเท็จจริงในการ์ดสรุป
+ *
+ * @param string $label
+ * @param string $valueHtml ว่าง = ไม่วาดแถว
+ * @param bool   $muted
+ * @return string HTML
+ */
+function stockparts_withdraw_fact_row(string $label, string $valueHtml, bool $muted = false): string
+{
+    if (trim(html_entity_decode(strip_tags($valueHtml), ENT_QUOTES, 'UTF-8')) === '') {
+        return '';
+    }
+    return '<dt>' . h($label) . '</dt><dd' . ($muted ? ' class="muted"' : '') . '>' . $valueHtml . '</dd>';
+}
+
+/**
+ * การ์ด "การเบิกใช้งานขาย" — สรุปเรื่องขายครั้งเดียว แล้วบอกที่มาแบบย่อ
+ *
+ * ไม่เล่าเรื่องเดียวกันซ้ำตามแหล่งข้อมูล (ระบบขาย / stock / ส่งมอบ)
+ * ลูกค้า PO Order อยู่บล็อกสรุป ที่มาอยู่ท้ายการ์ดเมื่ออยากไล่ว่าบันทึกที่ไหน
  *
  * @param array<string,mixed> $info     ผลจาก asset_stockparts_withdraw_info()
  * @param string              $footHtml บล็อกต่อท้ายการ์ด (เครื่องอื่นที่ไซต์งานเดียวกัน)
@@ -1704,13 +2031,12 @@ function asset_stockparts_withdraw_card_html(array $info, string $footHtml = '')
     $ok = !empty($info['ok']);
     $f = $ok ? stockparts_withdraw_summary_fields($info) : [];
 
-    // ── ขั้นที่ 1: ระบบขาย ──
-    $setupSteps = [];
     $setupErr = '';
-    if (function_exists('setup_sale_history_steps') && $serial !== '') {
-        $res = setup_sale_history_steps($serial, $f);
-        $setupSteps = $res['steps'];
-        $setupErr = (string) $res['error'];
+    $setupRows = [];
+    if (function_exists('setup_sale_history_for_serial') && $serial !== '') {
+        $hist = setup_sale_history_for_serial($serial);
+        $setupErr = (string) ($hist['error'] ?? '');
+        $setupRows = is_array($hist['rows'] ?? null) ? $hist['rows'] : [];
     }
     $installHtml = (function_exists('installation_history_html') && $serial !== '')
         ? installation_history_html($serial) : '';
@@ -1719,7 +2045,7 @@ function asset_stockparts_withdraw_card_html(array $info, string $footHtml = '')
     $hasStockOld = $ok && !empty($info['has_stock_old']) && !empty($info['stock_old']);
     $delivered = $hasStockOld || ($ok && !empty($info['serial_delivered']));
 
-    if (!$setupSteps && !$hasWithdraw && !$hasStockOld && $installHtml === '') {
+    if (!$setupRows && !$hasWithdraw && !$hasStockOld && $installHtml === '') {
         $msg = $setupErr !== '' ? $setupErr : (string) ($info['message'] ?? 'ยังไม่มีข้อมูลการเบิกใช้งานขาย');
         return '<div class="asset-sales-card"><div class="asset-sales-card-head">'
             . ui_icon_html('stock-out-set', 16) . '<b>การเบิกใช้งานขาย</b></div>'
@@ -1727,12 +2053,131 @@ function asset_stockparts_withdraw_card_html(array $info, string $footHtml = '')
             . $footHtml . '</div></div>';
     }
 
-    // ── หัวการ์ด: ชื่อชุดสินค้า จำนวนในชุด และสถานะส่งมอบ พูดที่เดียว ──
+    $pos = [];
+    $orderRefs = [];
+    $dates = [];
+    $bys = [];
+    $srcSale = [];
+    $extraHtml = '';
+    $conflictHtml = '';
+    foreach ($setupRows as $r) {
+        $v = function_exists('setup_sale_history_norm') ? setup_sale_history_norm($r) : [];
+        $pos[] = (string) ($v['po'] ?? '');
+        $orderRefs[] = (string) ($v['ref'] ?? '');
+        $dates[] = (string) ($v['date'] ?? '');
+        $bys[] = (string) ($v['by'] ?? '');
+        $kind = function_exists('setup_sale_history_kind_label')
+            ? setup_sale_history_kind_label($r) : '';
+        $ref = trim((string) ($v['ref'] ?? ''));
+        if ($kind !== '') {
+            $srcSale[] = $kind . ($ref !== '' ? ' #' . $ref : '');
+        }
+        $isClaim = ((string) ($r['issue_type'] ?? '')) === 'claim';
+        $role = (string) ($r['_role'] ?? 'new');
+        $other = trim((string) ($v['other_sn'] ?? ''));
+        if ($isClaim && $other !== '') {
+            $verb = $role === 'new' ? 'เปลี่ยนมาจากเครื่อง' : 'ถูกเปลี่ยนเป็นเครื่อง';
+            $extraHtml .= '<p class="asset-sales-claim-pair">' . h($verb) . ' <b>' . h($other) . '</b></p>';
+        }
+        if (function_exists('setup_sale_history_conflicts')) {
+            foreach (setup_sale_history_conflicts($r, $f) as $c) {
+                $conflictHtml .= '<p class="asset-sales-conflict">' . ui_icon_html('alert', 13, 'h-svg') . ' ' . h($c) . '</p>';
+            }
+        }
+    }
+    $pos[] = (string) ($f['po'] ?? '');
+    $orderRefs[] = (string) ($f['ref'] ?? '');
+    $dates[] = (string) ($f['date'] ?? '');
+    $bys[] = (string) ($f['by'] ?? '');
+
+    $custDisplay = function_exists('setup_sale_history_card_customer_fields')
+        ? setup_sale_history_card_customer_fields($setupRows, $f)
+        : ['head' => '', 'contact' => ''];
+    $customer = (string) ($custDisplay['head'] ?? '');
+    if ($customer === '' && trim((string) ($f['customer'] ?? '')) !== '') {
+        $customer = trim((string) $f['customer']);
+    }
+    $customerContact = (string) ($custDisplay['contact'] ?? '');
+    $poList = stockparts_withdraw_uniq($pos);
+    $refList = [];
+    $poKeys = [];
+    foreach ($poList as $po) {
+        $poKeys[mb_strtolower(preg_replace('/^po\s*/iu', '', $po))] = true;
+        $refList[] = 'PO ' . preg_replace('/^po\s*/iu', '', $po);
+    }
+    foreach (stockparts_withdraw_uniq($orderRefs) as $ref) {
+        $key = mb_strtolower(preg_replace('/^(order\s+|#)/iu', '', $ref));
+        if (isset($poKeys[$key])) {
+            continue;
+        }
+        $refList[] = preg_match('/^OPS-/i', $ref) ? 'Order ' . $ref : $ref;
+    }
+    $saleDate = '';
+    foreach ($dates as $d) {
+        $d = trim((string) $d);
+        if ($d !== '') {
+            $saleDate = (strlen($d) > 10 && substr($d, 11) !== '00:00:00') ? dthai_full($d) : dthai($d);
+            break;
+        }
+    }
+    $by = stockparts_withdraw_uniq($bys);
+    $by = $by ? $by[0] : '';
+
+    $note = trim((string) ($f['notes'] ?? ''));
+    if ($note !== '' && $serial !== '' && mb_stripos($note, $serial) !== false) {
+        $note = trim(preg_replace('/\s*[-·]?\s*Serial\s*:\s*' . preg_quote($serial, '/') . '/iu', '', $note), " -·");
+    }
+    foreach (array_merge($poList, $orderRefs) as $known) {
+        $known = trim((string) $known);
+        if ($known === '') {
+            continue;
+        }
+        $note = preg_replace('/\(?\s*(?:PO\s*:?\s*)?' . preg_quote($known, '/') . '\s*\)?/iu', ' ', $note);
+    }
+    $note = trim(preg_replace('/\s+/u', ' ', (string) $note), " -·,;");
+    $kindExtra = $note;
+    if ($kindExtra === '' || $kindExtra === (string) ($f['kind'] ?? '')) {
+        $k = (string) ($f['kind'] ?? '');
+        $kindExtra = in_array($k, ['เคลม', 'ขายแยกรายการ', 'ลงทะเบียนอุปกรณ์'], true) ? $k : '';
+    }
+    foreach ($setupRows as $r) {
+        if (((string) ($r['issue_type'] ?? '')) === 'claim') {
+            $kindExtra = $kindExtra !== '' ? $kindExtra : 'เคลม';
+            break;
+        }
+    }
+
+    $siteHtml = '';
+    $siteMuted = true;
+    if ($hasStockOld) {
+        $old = $info['stock_old'];
+        $siteBits = [];
+        $site = trim((string) ($old['setup_id'] ?? ''));
+        $sec = trim((string) ($old['security_company'] ?? ''));
+        if ($site !== '') {
+            $siteBits[] = $site;
+        }
+        if ($sec !== '') {
+            $siteBits[] = 'รปภ. ' . $sec;
+        }
+        if ($siteBits) {
+            $siteHtml = h(implode(' · ', $siteBits));
+            $siteMuted = false;
+        }
+    }
+    if ($siteHtml === '' && function_exists('setup_sale_history_card_site_line')) {
+        $siteFromSetup = setup_sale_history_card_site_line($setupRows);
+        if ($siteFromSetup !== '') {
+            $siteHtml = h($siteFromSetup);
+            $siteMuted = false;
+        }
+    }
+    if ($siteHtml === '' && $delivered) {
+        $siteHtml = 'ไม่มีบันทึก';
+    }
+
     $lines = (is_array($info['order_lines'] ?? null)) ? $info['order_lines'] : [];
     $setName = (string) ($f['set_name'] ?? '');
-    if ($setName === '' && $setupSteps) {
-        $setName = '';
-    }
     $headBits = [];
     if ($setName !== '' && $setName !== '-') {
         $headBits[] = '<b>' . h($setName) . '</b>';
@@ -1751,71 +2196,29 @@ function asset_stockparts_withdraw_card_html(array $info, string $footHtml = '')
     }
     $out .= '</div><div class="asset-sales-card-body">';
 
-    $out .= '<div class="asset-sales-timeline">';
+    $dateLine = $saleDate;
+    if ($by !== '') {
+        $dateLine = trim($dateLine . ($dateLine !== '' ? ' · ' : '') . 'ผู้บันทึก ' . $by);
+    }
+    $lineSerialMap = is_array($info['line_serial_map'] ?? null) ? $info['line_serial_map'] : [];
+    $hideKindFact = $hasWithdraw && !empty($info['has_order_detail']) && $lines && $lineSerialMap !== [];
+    $factsHtml = '';
+    $factsHtml .= stockparts_withdraw_fact_row('ลูกค้า', $customer !== '' ? h($customer) : '');
+    $refFactsHtml = function_exists('setup_sale_history_ref_facts_html')
+        ? setup_sale_history_ref_facts_html($poList, $orderRefs)
+        : ($refList ? h(implode(' · ', $refList)) : '');
+    $factsHtml .= stockparts_withdraw_fact_row('อ้างอิง', $refFactsHtml);
+    $factsHtml .= stockparts_withdraw_fact_row('ผู้ติดต่อ', $customerContact !== '' ? h($customerContact) : '');
+    $factsHtml .= stockparts_withdraw_fact_row('วันที่ขาย', $dateLine !== '' ? h($dateLine) : '');
+    if (!$hideKindFact) {
+        $factsHtml .= stockparts_withdraw_fact_row('ลักษณะ', $kindExtra !== '' ? h($kindExtra) : '');
+    }
+    $factsHtml .= stockparts_withdraw_fact_row('ไซต์งาน', $siteHtml, $siteMuted);
+    if ($factsHtml !== '') {
+        $out .= '<dl class="asset-sales-facts">' . $factsHtml . '</dl>';
+    }
+    $out .= $extraHtml . $conflictHtml;
 
-    foreach ($setupSteps as $st) {
-        $out .= stockparts_withdraw_step_html(
-            (string) $st['date'], (string) $st['where'], (string) $st['title'],
-            (string) $st['meta'], (string) $st['extra']
-        );
-    }
-    if ($setupErr !== '') {
-        $out .= stockparts_withdraw_step_html('', 'ระบบขาย', '<span class="muted">' . h($setupErr) . '</span>');
-    }
-
-    // ── ขั้นที่ 2: ทะเบียน stock ──
-    if ($hasWithdraw) {
-        $title = '<span class="asset-sales-badge asset-sales-badge-' . h((string) $f['kind_class']) . '">'
-            . h((string) $f['kind']) . '</span>';
-        if ((string) $f['ref'] !== '') {
-            $title .= ' <b class="asset-sales-setup-id">#' . h((string) $f['ref']) . '</b>';
-        }
-        // ลูกค้าเขียนซ้ำเฉพาะตอนที่ขั้นระบบขายไม่ได้บอกไว้
-        if ((string) $f['customer'] !== '' && !$setupSteps) {
-            $title .= ' <b class="asset-sales-cust">' . h(stockparts_fmt_field((string) $f['customer'])) . '</b>';
-        }
-        $bits = [];
-        $add = function ($label, $val) use (&$bits) {
-            $val = trim((string) $val);
-            if ($val !== '' && $val !== '-') {
-                $bits[] = $label . ' ' . $val;
-            }
-        };
-        if (!$setupSteps) {
-            $add('PO', (string) $f['po']);
-        }
-        $add('เปลี่ยนจาก S/N', (string) $f['old_serial']);
-        $add('ผู้บันทึก', stockparts_fmt_field((string) $f['by']));
-        // หมายเหตุมักเขียนว่า "ลงทะเบียนอุปกรณ์ - Serial: xxx" ซึ่งซ้ำกับหัวหน้าจอทั้งบรรทัด
-        $note = trim((string) $f['notes']);
-        if ($note !== '' && $serial !== '' && mb_stripos($note, $serial) !== false) {
-            $note = trim(preg_replace('/\s*[-·]?\s*Serial\s*:\s*' . preg_quote($serial, '/') . '/iu', '', $note), " -·");
-        }
-        $add('หมายเหตุ', $note);
-        $prov = stockparts_withdraw_provenance_bits($info);
-        $out .= stockparts_withdraw_step_html(
-            (string) $f['date'], 'ทะเบียน stock', $title,
-            implode(' <span class="asset-sales-sep">·</span> ', array_map('h', array_merge($bits, $prov)))
-        );
-    }
-
-    // ── ขั้นที่ 3: ส่งมอบ + ชุดที่ไปด้วยกัน ──
-    $deliveryMeta = '';
-    $deliveryWhen = '';
-    if ($hasStockOld) {
-        $old = $info['stock_old'];
-        $deliveryWhen = trim((string) ($old['timestamp'] ?? ''));
-        $bits = [];
-        $site = trim((string) ($old['setup_id'] ?? ''));
-        $sec = trim((string) ($old['security_company'] ?? ''));
-        $by = trim((string) ($old['create_name'] ?? ''));
-        if ($site !== '') { $bits[] = $site; }
-        if ($sec !== '') { $bits[] = 'รปภ. ' . $sec; }
-        if ($by !== '') { $bits[] = 'บันทึกโดย ' . $by; }
-        $deliveryMeta = implode(' <span class="asset-sales-sep">·</span> ', array_map('h', $bits));
-    } elseif ($delivered) {
-        $deliveryMeta = '<span class="muted">ไม่มีบันทึกไซต์งาน</span>';
-    }
     $setTable = '';
     if ($hasWithdraw && !empty($info['has_order_detail']) && $lines) {
         $matched = is_array($info['matched_line'] ?? null) ? $info['matched_line'] : null;
@@ -1823,28 +2226,33 @@ function asset_stockparts_withdraw_card_html(array $info, string $footHtml = '')
             $lines,
             (int) ($matched['id'] ?? 0),
             !empty($info['serial_delivered']),
-            is_array($info['line_serial_map'] ?? null) ? $info['line_serial_map'] : []
+            $lineSerialMap,
+            $serial
         );
     }
-    if ($delivered || $setTable !== '') {
-        $out .= stockparts_withdraw_step_html(
-            $deliveryWhen,
-            $delivered ? 'ส่งมอบ' : 'ชุดที่ขายพร้อมกัน',
-            '', $deliveryMeta, $setTable
-        );
+    if ($setTable !== '') {
+        $out .= $setTable;
     }
-
-    $out .= '</div>';   // timeline
-
     if ($installHtml !== '') {
         $out .= $installHtml;
     }
 
-    $links = [];
-    if ($setupSteps && defined('SETUP_SALE_HISTORY_URL')) {
-        $links[] = '<a href="' . h(SETUP_SALE_HISTORY_URL . '?serial=' . rawurlencode($serial))
-            . '" target="_blank" rel="noopener">ดูในระบบขาย ↗</a>';
+    $srcLines = [];
+    $saleSrc = stockparts_withdraw_uniq($srcSale);
+    if ($saleSrc) {
+        $srcLines[] = 'ระบบขาย · ' . h(implode(' และ', $saleSrc));
+    } elseif ($setupErr !== '') {
+        $srcLines[] = 'ระบบขาย · ' . h($setupErr);
     }
+    $prov = $hasWithdraw || !empty($info['stock']) ? stockparts_withdraw_provenance_bits($info) : [];
+    if ($prov) {
+        $srcLines[] = 'ทะเบียน stock · ' . h(implode(' · ', $prov));
+    }
+    if ($srcLines) {
+        $out .= '<div class="asset-sales-src">' . implode('<br>', $srcLines) . '</div>';
+    }
+
+    $links = [];
     if ($serial !== '') {
         $links[] = '<a href="' . h(BASE_URL . '/share.php?q=' . rawurlencode($serial)) . '">ดูในทะเบียน stock →</a>';
     }

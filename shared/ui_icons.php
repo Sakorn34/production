@@ -269,8 +269,11 @@ function ui_nav_items_parts(): array
     // งานรับเข้า/เบิกออกทั้งหมดเป็น modal อยู่ที่ products.php แล้ว และประวัติทั้ง 4 ชุด
     // ยุบเป็น history.php แบบแท็บ (?tab=move|sn) — stock-in.php, stock-out.php,
     // stock-out-item.php เหลือเป็น redirect ไม่ต้องมีในเมนู
+    // purchase-check.php = เช็คยอดเบิกผลิตต่อรุ่น เทียบคงเหลือก่อนสั่งซื้อ
     return [
         ['file' => 'pages/products.php',         'icon' => 'products', 'label' => 'อะไหล่'],
+        ['file' => 'pages/purchase-check.php',   'icon' => 'basket',   'label' => 'เช็คสั่งซื้อ'],
+        ['file' => 'pages/key-parts-order.php',  'icon' => 'chart',    'label' => 'อะไหล่สั่งต่างประเทศ'],
         ['file' => 'pages/history.php',          'icon' => 'history',  'label' => 'ประวัติ'],
         ['file' => 'pages/sets.php',             'icon' => 'sets',     'label' => 'จัดการ Set'],
         ['file' => 'pages/year-end-summary.php', 'icon' => 'chart',    'label' => 'สรุปยอดสิ้นปี'],

@@ -243,6 +243,29 @@ img.broken { visibility: hidden; }
   display: block;
 }
 .asset-head dd.asset-dd-span { grid-column: 2 / -1; word-break: break-word; }
+.asset-sd-fn {
+  display: inline;
+  line-height: 1.35;
+}
+.asset-sd-fn-part {
+  display: inline-block;
+  max-width: 100%;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+.asset-pi-hint { font-size: calc(12px * var(--font-scale, 1)); margin-top: 2px; line-height: 1.4; }
+.asset-edit-pi { min-width: 0; }
+.asset-edit-pi select { max-width: 100%; }
+.asset-sd-mark { margin: 6px 0 0; }
+.asset-sd-check { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: calc(14px * var(--font-scale, 1)); }
+.asset-sd-check input { width: 18px; height: 18px; }
+.asset-sd-hints {
+  list-style: none; margin: 8px 0 0; padding: 0;
+  font-size: calc(12px * var(--font-scale, 1));
+  color: var(--text-muted, #6b6480); line-height: 1.55;
+}
+.asset-sd-hints li { margin: 0; }
+.asset-sd-hit { color: var(--primary, #9d174d); font-weight: 600; }
 .asset-head dd.asset-dd-full { grid-column: 1 / -1; padding-top: 0; }
 .asset-dl-section {
   grid-column: 1 / -1; color: var(--text); font-weight: 600; font-size: calc(13.5px * var(--font-scale, 1));
@@ -549,6 +572,7 @@ img.broken { visibility: hidden; }
 .dash-swatch-spare { background: #fde68a; }
 .dash-swatch-retired { background: #cbd5e1; }
 .dash-swatch-lost { background: #fca5a5; }
+.dash-swatch-unknown { background: #d8b4fe; }
 /* ตัวเลขยอดรวมวางอยู่เหนือหัวแท่งใน .dash-bar-slot ปีที่สูงสุดจึงเป็น 100% พอดี
    แล้วตัวเลขไม่มีที่ยืน โดนตัดหายไปทั้งตัว (เจอที่ปี 2568 = 3,339 ซึ่งเท่ากับ
    ค่าสูงสุดของแกน Y เป๊ะ) · กันแถบไว้ด้านบนหนึ่งบรรทัด แล้วเลื่อนทั้งเส้นกริดและ
@@ -688,6 +712,72 @@ span.thumb-sm { display: inline-flex; align-items: center; justify-content: cent
 .ma-formgrid textarea.full { min-height: 56px; max-height: 120px; }
 .ma-lbl-top { align-self: start; padding-top: 8px; }
 .ma-field-hint { font-size: calc(12px * var(--font-scale, 1)); margin-top: 4px; }
+/* กล่องอายุ/อาการ อยู่ใต้ช่อง S/N (ไม่ชิดขวาข้าง scan-field) */
+.ma-formgrid > div:has(#ma_code) {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  align-self: stretch;
+}
+.ma-formgrid > div:has(#ma_code) > .scan-field {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  align-self: stretch;
+  box-sizing: border-box;
+}
+.ma-formgrid > div:has(#ma_code) .scan-field > .ac-wrap {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+.ma-formgrid > div:has(#ma_code) #ma_code {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.muted.ma-field-hint.ma-asset-meta-hint,
+.ma-field-hint.ma-asset-meta-hint {
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.65rem;
+  line-height: 1.45;
+  margin-top: 6px;
+  font-size: calc(14px * var(--font-scale, 1));
+  color: var(--primary-dark, #c01862);
+  font-weight: 600;
+  background: var(--primary-soft, #fce7f3);
+  border: 1px solid color-mix(in srgb, var(--primary, #e11d74) 18%, transparent);
+  border-radius: var(--radius-sm, 8px);
+  padding: 0.3rem 0.55rem;
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: 100%;
+}
+.ma-field-hint.ma-asset-meta-hint:not(:has(#ma-age-hint:not([hidden]), #ma-symptom-hint:not([hidden]))) {
+  display: none;
+}
+.ma-asset-meta-hint .ma-asset-meta-age,
+.ma-asset-meta-hint .ma-asset-meta-symptom {
+  flex: 0 1 auto;
+  font: inherit;
+  color: inherit;
+  max-width: 100%;
+}
+.ma-asset-meta-hint .ma-asset-meta-age {
+  white-space: nowrap;
+}
+.ma-asset-meta-hint .ma-asset-meta-age b,
+.ma-asset-meta-hint .ma-asset-meta-symptom b {
+  font-weight: 700;
+  color: inherit;
+}
 .ma-form-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .ma-field-stack { min-width: 0; width: 100%; align-self: start; }
 .ma-rent-hint { margin: 6px 0 0; padding-left: 1.15em; font-size: calc(12px * var(--font-scale, 1)); line-height: 1.5; color: var(--text-muted, #64748b); list-style: disc; }
@@ -708,7 +798,22 @@ span.thumb-sm { display: inline-flex; align-items: center; justify-content: cent
   box-shadow: 0 0 0 2px rgba(146,64,14,.15); }
 .ma-detail-fields { display: contents; }
 #ma-form.ma-retire-mode #ma-detail-fields { display: none; }
+#ma-form.ma-spare-mode #rent_close_action_label,
+#ma-form.ma-spare-mode #ma-rent-close-stack { display: none; }
+.ma-snippets-panel.ma-spare-mode .ma-snippet-rental { display: none; }
 .ma-choice-btn:disabled { opacity: .45; cursor: not-allowed; }
+.ma-sd-banner { margin: 0 0 12px; padding: 10px 12px; border-radius: 8px; background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; line-height: 1.5; }
+.ma-sd-banner a { font-weight: 600; }
+.ma-sd-panel { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-muted, #f8fafc); }
+.ma-sd-panel.is-warn { background: #fff7ed; border-color: #fed7aa; }
+.ma-sd-panel.is-ok { background: #f0fdf4; border-color: #bbf7d0; }
+.ma-sd-file { margin: 8px 0 0; font-size: calc(13px * var(--font-scale, 1)); line-height: 1.45; word-break: break-all; }
+.ma-sd-done { margin: 8px 0 0; color: #166534; font-weight: 600; }
+.ma-sd-write { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; font-size: calc(14px * var(--font-scale, 1)); cursor: pointer; }
+.ma-sd-write input { width: 18px; height: 18px; }
+.ma-sd-refs { margin-top: 8px; }
+.ma-sd-refs .asset-sd-hints { margin-top: 0; }
+#ma-sd-label[hidden], #ma-sd-slot[hidden] { display: none !important; }
 .ma-page-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; max-width: none; margin-bottom: 20px; }
 .ma-form-col { min-width: 0; }
 .ma-form-col .panel, .ma-form-col form { width: 100%; }
@@ -1448,3 +1553,10 @@ html.fgs-open, html.fgs-open body { overflow: hidden; }
 .fps-zoom-pic.is-big img { width: 250%; max-width: none; }
 .fps-zoom-code { font-family: ui-monospace, monospace; font-size: calc(18px * var(--font-scale, 1)); padding: 10px 12px; letter-spacing: .5px; }
 .fps-zoom-btns { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* ปุ่มสแกน QR / ถ่ายรูปหลายเครื่อง ใช้กล้อง — แสดงเฉพาะมือถือ (จอแคบ หรืออุปกรณ์แตะหน้าจอ)
+   คอมพิวเตอร์ที่มีเมาส์และจอกว้างจะซ่อน; ยังให้ JS สลับ [hidden] ตามโหมดรหัสเครื่องได้ตามเดิม */
+@media (min-width: 641px) and (pointer: fine) {
+  .scan-mobile-only { display: none !important; }
+}
+

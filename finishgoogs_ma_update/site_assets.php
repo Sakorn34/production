@@ -47,7 +47,10 @@ page_header('ทะเบียนตามไซต์งาน', true,
 <div class="sa-sitehead">
   <span class="asset-site-src"><?= h($srcs[$src]['th']) ?></span>
   <b><?= h($site) ?></b>
-  <span class="muted">· <?= h($srcs[$src]['sub']) ?> · <?= number_format(count($rows)) ?> เครื่อง</span>
+  <span class="muted">· <?= h($srcs[$src]['sub']) ?> · <?= number_format(count($rows)) ?> เครื่อง
+  <?php if ($src === 'lease') { $nOn = count(array_filter($rows, function ($r) { return $r['active'] === true; })); ?>
+  (ใช้งานอยู่ <?= number_format($nOn) ?> · จบงานแล้ว <?= number_format(count($rows) - $nOn) ?>)
+  <?php } ?></span>
 </div>
 
 <div class="table-wrap table-wrap-fold">
@@ -63,8 +66,24 @@ page_header('ทะเบียนตามไซต์งาน', true,
   <?php if (!$rows) { ?>
   <tr><td colspan="5" class="muted" style="text-align:center;padding:20px">ไม่พบเครื่องที่ไซต์งานนี้</td></tr>
   <?php } ?>
-  <?php foreach ($rows as $r) { ?>
-  <tr>
+  <?php
+  // แยกกลุ่ม: ใช้งานอยู่ / จบงานแล้ว / ไม่มีข้อมูลสถานะ (ทะเบียนเก่า · ใบสั่งงาน)
+  $groups = [
+      'on'  => ['title' => 'กำลังใช้งานอยู่', 'rows' => []],
+      'off' => ['title' => 'จบงานแล้ว', 'rows' => []],
+      'na'  => ['title' => 'ไม่มีข้อมูลสถานะการใช้งาน', 'rows' => []],
+  ];
+  foreach ($rows as $r) {
+      $k = $r['active'] === true ? 'on' : ($r['active'] === false ? 'off' : 'na');
+      $groups[$k]['rows'][] = $r;
+  }
+  foreach ($groups as $gk => $g) {
+      if (!$g['rows']) {
+          continue;
+      } ?>
+  <tr class="sa-group sa-group-<?= h($gk) ?>"><td colspan="5"><b><?= h($g['title']) ?></b> <span class="muted">· <?= number_format(count($g['rows'])) ?> เครื่อง</span></td></tr>
+  <?php foreach ($g['rows'] as $r) { ?>
+  <tr<?= $gk === 'off' ? ' class="sa-ended"' : '' ?>>
     <td data-pri="1"><?php if ($r['asset_id'] > 0) { ?><a href="<?= $B ?>/asset.php?id=<?= (int) $r['asset_id'] ?>"><b><?= h($r['sn']) ?></b></a><?php } else { ?><b><?= h($r['sn']) ?></b><?php } ?></td>
     <td data-pri="1"><?= h($r['pname'] !== '' ? $r['pname'] : '—') ?></td>
     <td data-pri="2"><?php if ($r['status'] !== '') { ?>
@@ -73,6 +92,7 @@ page_header('ทะเบียนตามไซต์งาน', true,
     <td data-pri="1"><?= h(trim(implode(' · ', array_filter([(string) $r['tag'], (string) $r['note']])))) ?></td>
     <td data-pri="2" class="muted"><?= h($r['date'] !== '' ? dthai($r['date']) : '—') ?></td>
   </tr>
+  <?php } ?>
   <?php } ?>
   </tbody>
 </table>
@@ -119,6 +139,10 @@ page_header('ทะเบียนตามไซต์งาน', true,
 .sa-sitehead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 10px;
   padding: 10px 14px; background: var(--surface-2, #faf9fd); border: 1px solid var(--border, #dde3ec);
   border-left: 3px solid var(--primary); border-radius: 8px; }
+.sa-group td { background: var(--surface-2, #faf9fd); padding: 8px 12px; border-top: 2px solid var(--border, #dde3ec); }
+.sa-group-on td { border-left: 3px solid #16a34a; }
+.sa-group-off td { border-left: 3px solid #94a3b8; }
+.sa-ended td { opacity: .72; }
 .sa-foot { margin-top: 12px; font-size: calc(12.5px * var(--font-scale, 1)); line-height: 1.8; }
 </style>
 <?php page_footer(); ?>

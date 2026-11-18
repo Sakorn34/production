@@ -314,6 +314,9 @@ function fg_shortage_registry_rows(?array $codes = null): array
         //    ชุดเดียวกับคอลัมน์ "คลังพร้อมเช่า" บนการ์ด Dashboard
         $poolReady = fg_shortage_leasing_ready_serials();
         $poolQty = [];
+        $poolMaQty = [];
+        $poolNewQty = [];
+        $everRented = fg_shortage_leasing_ever_rented_serials();
         if ($poolReady) {
             $res = qr(
                 "SELECT UPPER(TRIM(p.product_code)) AS code, UPPER(TRIM(a.asset_code)) AS sn,
@@ -323,8 +326,17 @@ function fg_shortage_registry_rows(?array $codes = null): array
             );
             while ($r = $res->fetch_assoc()) {
                 $code = (string) $r['code'];
-                if (isset($ours[$code]) && (isset($poolReady[(string) $r['sn']]) || ((string) $r['fs'] !== '' && isset($poolReady[(string) $r['fs']])))) {
-                    $poolQty[$code] = ($poolQty[$code] ?? 0) + 1;
+                $sn = (string) $r['sn'];
+                $fs = (string) $r['fs'];
+                if (!isset($ours[$code]) || (!isset($poolReady[$sn]) && ($fs === '' || !isset($poolReady[$fs])))) {
+                    continue;
+                }
+                $poolQty[$code] = ($poolQty[$code] ?? 0) + 1;
+                $wasRented = isset($everRented[$sn]) || ($fs !== '' && isset($everRented[$fs]));
+                if ($wasRented) {
+                    $poolMaQty[$code] = ($poolMaQty[$code] ?? 0) + 1;
+                } else {
+                    $poolNewQty[$code] = ($poolNewQty[$code] ?? 0) + 1;
                 }
             }
         }
@@ -364,7 +376,17 @@ function fg_shortage_registry_rows(?array $codes = null): array
         $leaseStuck = (int) ($rentReady[$code] ?? 0);
         $newQty = max(0, (int) $o['new'] - $leaseStuck);
         // คลังพร้อมเช่าใช้ส่งงานแทนเครื่องผลิตใหม่ได้ — นับรวมในยอดที่มี (ตกลงกันเมื่อ 17 ก.ย. 2026)
+        $maPoolQty = (int) ($poolMaQty[$code] ?? 0);
+        $rentNewPoolQty = (int) ($poolNewQty[$code] ?? 0);
         $rentQty = (int) ($poolQty[$code] ?? 0);
+        $short = function_exists('fg_model_shortage_from_stock')
+            ? fg_model_shortage_from_stock($newQty, $rentQty, $required, $code, $maPoolQty)
+            : [
+                'available' => $newQty + $rentQty,
+                'gap'       => max(0, $required - ($newQty + $rentQty)),
+                'over'      => max(0, ($newQty + $rentQty) - $required),
+                'state'     => ($newQty + $rentQty) >= $required ? 'over' : 'short',
+            ];
 
         $rows[$code] = [
             'product_id'     => isset($sp[$code]) ? $sp[$code]['ids'][0] : 0,
@@ -374,13 +396,15 @@ function fg_shortage_registry_rows(?array $codes = null): array
             'registry_name'  => $o['name'],
             'registry_total' => $o['all'],
             'stock_qty'      => $newQty,
-            'leasing_qty'    => $rentQty,
-            'pool_qty'       => (int) ($poolQty[$code] ?? 0),
+            'leasing_qty'         => $rentQty,
+            'leasing_ma_qty'      => $maPoolQty,
+            'leasing_rent_new_qty'=> $rentNewPoolQty,
+            'pool_qty'            => (int) ($poolQty[$code] ?? 0),
             'minimum_stock'  => $min,
             'po_qty'         => $poQty,
-            'available'      => $newQty + $rentQty,
+            'available'      => (int) $short['available'],
             'required'       => $required,
-            'need'           => $newQty + $rentQty - $required,
+            'need'           => (int) $short['available'] - $required,
             'detail_url'     => $url,
             'stock_source'   => 'production_registry',
         ];
@@ -398,10 +422,83 @@ function fg_shortage_registry_rows(?array $codes = null): array
 }
 
 /**
+ * S/N ที่เคยอยู่ในสัญญาเช่า (มีแถวใน tbl_rent_product) — ใช้แยกคลังพร้อมเช่าใหม่ vs วนกลับ MA
+ *
+ * @return array<string,bool> S/N ตัวใหญ่ => true
+ */
+function fg_shortage_leasing_ever_rented_serials(): array
+{
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+    $cache = [];
+    if (!function_exists('dbLeasing')) {
+        return $cache;
+    }
+    try {
+        $lease = dbLeasing();
+    } catch (\Throwable $e) {
+        return $cache;
+    }
+    if (!$lease) {
+        return $cache;
+    }
+    $res = $lease->query(
+        "SELECT DISTINCT UPPER(TRIM(p_sn)) AS sn FROM tbl_rent_product
+         WHERE p_sn IS NOT NULL AND TRIM(p_sn) <> ''"
+    );
+    while ($res && ($r = $res->fetch_row())) {
+        if ((string) $r[0] !== '') {
+            $cache[(string) $r[0]] = true;
+        }
+    }
+    return $cache;
+}
+
+/**
+ * S/N ที่ยังผูกสัญญาเช่าอยู่ — ใช้ตัดออกจากคลังพร้อมเช่า
+ *
+ * @return array<string,bool> S/N ตัวใหญ่ => true
+ */
+function fg_shortage_leasing_busy_serials(): array
+{
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+    $cache = [];
+    if (!function_exists('dbLeasing')) {
+        return $cache;
+    }
+    try {
+        $lease = dbLeasing();
+    } catch (\Throwable $e) {
+        return $cache;
+    }
+    if (!$lease) {
+        return $cache;
+    }
+    $res = $lease->query(
+        "SELECT DISTINCT UPPER(TRIM(p_sn)) AS sn FROM tbl_rent_product
+         WHERE p_status IN ('active', 'MA', 'claim')
+           AND p_sn IS NOT NULL AND TRIM(p_sn) <> ''"
+    );
+    while ($res && ($r = $res->fetch_row())) {
+        if ((string) $r[0] !== '') {
+            $cache[(string) $r[0]] = true;
+        }
+    }
+    return $cache;
+}
+
+/**
  * S/N ของเครื่องเช่าที่รับคืนเข้าคลังแล้ว รอปล่อยเช่ารอบใหม่
  *
  * เครื่องพวกนี้ผ่าน MA แล้ววนกลับมาใช้ใหม่ ไม่ใช่ของที่เพิ่งผลิต — ทะเบียนเราตั้งเป็น
  * สถานะ "ใหม่" เหมือนกันหมดเพราะ cron sync อ่านจากระบบเช่า จึงต้องมีตัวแยกไว้ตรงนี้
+ *
+ * ตัดเครื่องที่สัญญายัง active / MA / claim ออก แม้ทะเบียนจะค้างเป็น finished goods
  *
  * ต่อระบบเช่าไม่ได้ = คืนค่าว่าง แล้วยอดจะรวมกันเหมือนเดิม ไม่ทำให้ทั้งหน้าล้ม
  *
@@ -425,12 +522,16 @@ function fg_shortage_leasing_ready_serials(): array
     if (!$lease) {
         return $cache;
     }
+    $busy = fg_shortage_leasing_busy_serials();
     $res = $lease->query(
         "SELECT UPPER(TRIM(pro_sn)) AS sn FROM tbl_product
          WHERE TRIM(pro_status) = 'finished goods' AND pro_sn IS NOT NULL AND TRIM(pro_sn) <> ''"
     );
     while ($res && ($r = $res->fetch_row())) {
-        $cache[(string) $r[0]] = true;
+        $sn = (string) $r[0];
+        if ($sn !== '' && !isset($busy[$sn])) {
+            $cache[$sn] = true;
+        }
     }
     return $cache;
 }

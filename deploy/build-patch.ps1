@@ -48,6 +48,15 @@ if (Test-Path -LiteralPath $ConfigFile) {
         Write-Warning 'APP_RELEASE_VERSION not found in config.php - version badge will be stale'
     }
 }
+
+$KpoVerify = Join-Path $DeployDir 'verify-kpo-page.ps1'
+if (Test-Path -LiteralPath $KpoVerify) {
+    & $KpoVerify
+    if ($LASTEXITCODE -ne 0) {
+        throw 'KPO verify failed — แก้ก่อน build patch (deploy/verify-kpo-page.ps1)'
+    }
+}
+
 $VersionDir = Join-Path $VersionsRoot $VersionId
 
 $baseline = Read-DeployBaseline -BaselineFile $BaselineFile

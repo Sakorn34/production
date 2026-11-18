@@ -168,7 +168,7 @@ $docNames = inv_pickup_line_names($doc['lines']);
 foreach ($doc['lines'] as $pid => $ln) {
     if (inv_pickup_line_other_machine((int) $pid, $item['grp'], $pkMaps, $item['set'], $ln['name'], $docNames)) {
         $og = inv_pickup_set_companion_grp($item['set'], $ln['name'], $docNames);
-        if ($og === '') {
+        if ($og === '' && inv_pickup_set_allows_companion_machine($item['set'])) {
             $og = $pkMaps['parts'][(int) $pid]['grp'] ?? '';
         }
         $onames = array_map(function ($id) use ($prodNames) { return $prodNames[$id] ?? ('#' . $id); }, inv_pickup_grp_ids($og));

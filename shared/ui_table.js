@@ -24,6 +24,21 @@
   /* ความสูงต่ำสุดของกรอบนี้ — คิดจากแถวจริง ไม่ใช่ค่าคงที่
      หน้าไหนหัวยาว (การ์ดสถิติ ตัวกรอง ชิป) ที่ว่างจะเหลือน้อยจนเห็นแค่ 3-4 แถว
      กรณีนั้นยอมให้หน้าเลื่อนเอง ดีกว่าเปิดมาแล้วเห็นรายการไม่กี่บรรทัด */
+  /* หน้าเลื่อนจริงแค่ไหน — อย่าใช้ documentElement.scrollHeight ตอน html ถูก lock
+     overflow:hidden เพราะค่ายังนับความสูงตารางในกรอบ overflow:auto แล้วหดกรอบลงเหลือ
+     MIN_H ทั้งที่หน้าเลื่อนไม่ได้แล้ว */
+  function pageScrollOverflow() {
+    var html = document.documentElement;
+    var htmlOy = window.getComputedStyle(html).overflowY;
+    if (htmlOy === 'hidden') {
+      var main = document.querySelector('main.content');
+      if (!main) { return 0; }
+      return main.scrollHeight - main.clientHeight;
+    }
+    var se = document.scrollingElement || html;
+    return se.scrollHeight - window.innerHeight;
+  }
+
   function minHeightFor(w) {
     var th = w.querySelector('thead th');
     var tr = w.querySelector('tbody tr');
@@ -42,16 +57,21 @@
       if (window.innerWidth <= CARD_MODE_MAX) {
         // โหมดการ์ดบนมือถือ — ให้หน้าเลื่อนตามปกติ กรอบซ้อนบนจอเล็กใช้ยากกว่า
         w.style.maxHeight = '';
+        w.style.height = '';
         w.style.overflowY = '';
         w.style.scrollPaddingTop = '';
         continue;
       }
       // ระยะจากขอบบน viewport ถึงหัวกรอบ + เผื่อขอบล่างไว้หายใจ
+      var fill = w.classList.contains('table-wrap-fold-fill');
       var top = w.getBoundingClientRect().top + (window.pageYOffset || 0)
               - (document.documentElement.getBoundingClientRect().top + (window.pageYOffset || 0));
       var avail = window.innerHeight - top - 14;
-      var floorH = minHeightFor(w);
-      w.style.maxHeight = Math.max(floorH, avail) + 'px';
+      var floorH = fill ? MIN_H : minHeightFor(w);
+      var h = Math.max(floorH, avail);
+      w.style.maxHeight = h + 'px';
+      // กรอบ fill ต้องสูงเท่าที่เหลือบนจอ (แม้แถวน้อย) — ใช้ height ไม่ใช่แค่ maxHeight
+      w.style.height = fill ? h + 'px' : '';
       w.style.overflowY = 'auto';
 
       // กันไม่ให้แถวที่เบราว์เซอร์เลื่อนมาหาเอง (กด Tab, Ctrl+F, scrollIntoView)
@@ -72,10 +92,12 @@
       // ปล่อยเศษไม่เกิน SLACK ไว้: หน้าฝั่งทะเบียนเครื่องมีป้ายเวอร์ชันวางแบบ absolute
       // ล้ำขอบล่างราว 8px ซึ่งหดกรอบเท่าไหร่ก็ไม่หาย ถ้าไล่ตามจะหดฟรีไปเรื่อย ๆ
       for (var pass = 0; pass < 3; pass++) {
-        var over = document.documentElement.scrollHeight - window.innerHeight;
+        var over = pageScrollOverflow();
         if (over <= SLACK) { break; }
         avail -= over;
-        w.style.maxHeight = Math.max(floorH, avail) + 'px';
+        h = Math.max(floorH, avail);
+        w.style.maxHeight = h + 'px';
+        if (fill) { w.style.height = h + 'px'; }
       }
     }
   }

@@ -68,6 +68,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $setup  = trim($_POST['setup_id'] ?? '');
         $setup  = $setup !== '' ? (int)$setup : null;
         $active = (int)($_POST['active'] ?? 1) === 1 ? 1 : 0;
+        // มี Setup ID แล้ว = ส่งมอบแล้ว ไม่นับเป็นสต๊อก
+        if ($setup !== null && $setup !== 0) {
+            $active = 0;
+        }
         // ปล่อยช่อง id ชุด ว่างไว้ = ไม่แตะค่าเดิม (ตอนเพิ่มใหม่จะออกเลขให้เอง)
         $batchRaw = trim((string) ($_POST['batch_id'] ?? ''));
         $batch  = $batchRaw !== '' ? (int) $batchRaw : null;
@@ -201,6 +205,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash_set('ตั้ง Active ตามสถานะเครื่องแล้ว — เป็น 1 (เครื่องใหม่) ' . number_format($r['to1'])
             . ' · เป็น 0 (เบิกใช้งานแล้ว) ' . number_format($r['to0'])
             . ' · เปลี่ยนจริง ' . number_format($r['changed']) . ' รายการ');
+    } elseif ($act === 'active_from_setup') {
+        $r = stock_active_from_setup_apply();
+        if ($r['changed'] > 0) {
+            flash_set('ตั้ง Active = 0 ให้รายการที่มี Setup ID แล้ว — เปลี่ยน ' . number_format($r['changed']) . ' รายการ');
+        } else {
+            flash_set('ไม่มีรายการที่ต้องแก้ — รายการที่มี Setup ID เป็น Active 0 อยู่แล้ว');
+        }
     } elseif ($act === 'refresh_meta') {
         $n = share_refresh_meta_from_production();
         flash_set('อัปเดตรุ่น/เวลา/ผู้ผลิตจากระบบผลิตแล้ว — แก้ไข ' . number_format($n) . ' รายการ');
@@ -298,6 +309,13 @@ try {
     $activeDiff = null;
 }
 
+try {
+    $setupActivePending = stock_active_from_setup_count();
+} catch (Throwable $e) {
+    error_log('[share.php stock_active_from_setup_count] ' . $e->getMessage());
+    $setupActivePending = 0;
+}
+
 // ---------- รายการ + ฟิลเตอร์ ----------
 $search = trim($_GET['q'] ?? '');
 $model  = $_GET['model'] ?? '';
@@ -335,6 +353,7 @@ switch ($flt) {
     case 'incomplete': $where[] = "(`timestamp` IS NULL OR model='' OR model IS NULL OR create_name='' OR create_name IS NULL)"; break;
     case 'no_name':    $where[] = "(create_name='' OR create_name IS NULL)"; break;
     case 'no_ts':      $where[] = '`timestamp` IS NULL'; break;
+    case 'setup_live': $where[] = stock_active_setup_mismatch_sql(); break;
 }
 $w = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
@@ -383,7 +402,7 @@ page_header('ทะเบียนสินค้า (stock)');
 <p class="muted stock-intro">
   ทะเบียนสินค้า <code>stock</code> ·
   <?= stock_active_badge(1) ?> เครื่องใหม่ที่ยังอยู่ในสต๊อก ·
-  <?= stock_active_badge(0) ?> เบิกใช้งานแล้ว (ขาย · เช่า · สำรอง · เสื่อมสภาพ · สูญหาย · ไม่มีสถานะ)
+  <?= stock_active_badge(0) ?> เบิกใช้งานแล้ว (ขาย · เช่า · สำรอง · เสื่อมสภาพ · สูญหาย · ไม่มีสถานะ · มี Setup ID)
   <?php if (settings_admin_unlocked()) { ?>
   · <a href="<?= BASE_URL ?>/share_admin.php" class="muted"><?= ui_icon_html('settings', 13, 'h-svg') ?> เครื่องมือหลังบ้าน (Import / Sync)</a>
   <?php } ?>
@@ -435,6 +454,19 @@ page_header('ทะเบียนสินค้า (stock)');
 </div>
 <?php } ?>
 
+<?php if ($setupActivePending > 0) { ?>
+<div class="stock-fix">
+  <div class="stock-fix-txt">
+    <b><?= number_format($setupActivePending) ?> รายการ</b> มี Setup ID แล้วยังเป็น Active 1
+    <div class="muted stock-fix-sub">มี Setup ID = ส่งมอบหรือติดตั้งแล้ว จึงไม่นับเป็นสต๊อก — กดซิงค์แล้ว Active จะเป็น 0</div>
+  </div>
+  <form method="post" onsubmit="return confirm('ตั้ง Active = 0 ให้ <?= number_format($setupActivePending) ?> รายการที่มี Setup ID แล้ว?')">
+    <?= csrf_field() ?><input type="hidden" name="act" value="active_from_setup"><input type="hidden" name="back" value="<?= h($qs) ?>">
+    <button type="submit" class="btn btn-sm btn-with-icon"><?= ui_btn_label('refresh', 'ซิงค์ Active จาก Setup ID') ?></button>
+  </form>
+</div>
+<?php } ?>
+
 <div class="stock-actions">
   <details class="panel stock-add-panel">
     <summary><?= ui_icon_html('plus', 14, 'h-svg') ?> เพิ่มรายการ</summary>
@@ -451,6 +483,14 @@ page_header('ทะเบียนสินค้า (stock)');
       <div class="stock-add-submit"><button type="submit">บันทึก</button></div>
     </form>
   </details>
+  <form method="post" class="stock-setup-sync"<?php if ($setupActivePending > 0) { ?> onsubmit="return confirm('ตั้ง Active = 0 ให้ <?= number_format($setupActivePending) ?> รายการที่มี Setup ID แล้ว?')"<?php } ?>>
+    <?= csrf_field() ?><input type="hidden" name="act" value="active_from_setup"><input type="hidden" name="back" value="<?= h($qs) ?>">
+    <button type="submit" class="btn btn-sm btn-line btn-with-icon"><?= ui_btn_label('refresh', 'ซิงค์ Active จาก Setup ID') ?><?php
+      if ($setupActivePending > 0) {
+          echo ' (' . number_format($setupActivePending) . ')';
+      }
+    ?></button>
+  </form>
 </div>
 
 <datalist id="model-list"><?php while ($m = $modelList->fetch_assoc()) { ?><option value="<?= h($m['model']) ?>"><?php } ?></datalist>
@@ -485,6 +525,7 @@ page_header('ทะเบียนสินค้า (stock)');
   <?= stflink('incomplete', ui_icon_html('alert', 13, 'h-svg') . ' ข้อมูลไม่ครบ (' . number_format($stat['inc']) . ')', $flt, $qsKeep) ?>
   <?= stflink('no_name',    'ไม่มีชื่อผู้บันทึก (' . number_format($stat['nn']) . ')', $flt, $qsKeep) ?>
   <?= stflink('no_ts',      'ไม่มีเวลา (' . number_format($stat['nt']) . ')', $flt, $qsKeep) ?>
+  <?= stflink('setup_live', 'มี Setup ID แต่ยัง Active 1 (' . number_format($setupActivePending) . ')', $flt, $qsKeep) ?>
 </div>
 
 <div class="stock-list-meta muted">
@@ -595,7 +636,8 @@ page_header('ทะเบียนสินค้า (stock)');
   border-radius:10px; background:var(--surface,#fff); }
 .stock-fix-txt { min-width:0; }
 .stock-fix-sub { font-size:calc(12px * var(--font-scale,1)); margin-top:3px; line-height:1.7; }
-.stock-actions { margin-bottom:12px; }
+.stock-actions { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-start; margin-bottom:12px; }
+.stock-setup-sync { margin:0; }
 .stock-add-panel { padding:10px 14px; }
 .stock-add-panel summary { cursor:pointer; font-weight:600; color:var(--primary); }
 .stock-add-form { margin-top:12px; display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; align-items:end; }

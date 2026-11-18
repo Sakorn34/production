@@ -185,7 +185,7 @@ foreach ($rows as $x) {
     if ($code === '') {
         $code = trim((string) ($x['part_code'] ?? ''));
     }
-    $qty = ($code !== '' && array_key_exists($code, $qtyMap)) ? (int) $qtyMap[$code] : null;
+    $qty = ($code !== '' && array_key_exists($code, $qtyMap)) ? (float) $qtyMap[$code] : null;
     $state = $qty === null ? 'missing' : ($qty <= 0 ? 'empty' : 'ok');
     if ($state === 'missing') {
         $bad++;
@@ -285,12 +285,12 @@ page_header('ตรวจการจับคู่อะไหล่กับ�
         <?php if ($x['state'] === 'missing') { ?><span class="plc-badge is-bad">ไม่มีในคลังช่าง</span>
           <?php if (!empty($x['deleted'])) { ?><div class="muted" style="font-size:12px">ถูกลบ <?= h(substr((string) $x['deleted']['at'], 0, 16)) ?><?= $x['deleted']['by'] !== '' ? ' โดย ' . h((string) $x['deleted']['by']) : '' ?></div><?php } ?>
         <?php } elseif ($x['state'] === 'empty') { ?><span class="plc-badge is-warn">ของหมด (0)</span>
-        <?php } else { ?><span class="plc-badge is-ok">เหลือ <?= number_format((int) $x['qty']) ?></span><?php } ?>
-      </td>
+        <?php } else { ?><span class="plc-badge is-ok">เหลือ <?= h(qty_fmt($x['qty'])) ?></span><?php } ?>
+              </td>
       <td data-pri="1">
         <?php $g = $x['guess'] ?? null; if ($g) { ?>
         <b class="plc-code"><?= h((string) $g['row']['code']) ?></b> · <?= h((string) $g['row']['name']) ?>
-        <div class="muted" style="font-size:12px">เหลือ <?= number_format((int) $g['row']['quantity']) ?> · <?= h($g['why']) ?></div>
+        <div class="muted" style="font-size:12px">เหลือ <?= h(qty_fmt($g['row']['quantity'])) ?> · <?= h($g['why']) ?></div>
         <form method="post" style="margin-top:4px">
           <?= csrf_field() ?><input type="hidden" name="fix_part" value="<?= (int) $x['id'] ?>">
           <input type="hidden" name="new_code" value="<?= h((string) $g['row']['code']) ?>">
@@ -333,7 +333,7 @@ page_header('ตรวจการจับคู่อะไหล่กับ�
         <td data-pri="2" class="plc-code"><?= h((string) ($x['part_code'] !== '' ? $x['part_code'] : '—')) ?> / <?= h((string) ($x['code'] !== '' ? $x['code'] : '—')) ?></td>
         <td data-pri="1"><?php if ($x['state'] === 'missing') { ?><span class="plc-badge is-bad">ไม่มี</span>
           <?php } elseif ($x['state'] === 'empty') { ?><span class="plc-badge is-warn">ของหมด</span>
-          <?php } else { ?><span class="plc-badge is-ok">เหลือ <?= number_format((int) $x['qty']) ?></span><?php } ?></td>
+          <?php } else { ?><span class="plc-badge is-ok">เหลือ <?= h(qty_fmt($x['qty'])) ?></span><?php } ?></td>
         <td data-pri="2"><?= $x['bom'] > 0 ? number_format($x['bom']) . ' รุ่น' : '<span class="muted">ไม่อยู่ในชุดเบิก</span>' ?><?= $x['used'] > 0 ? ' · เบิก ' . number_format($x['used']) . ' ครั้ง' : '' ?></td>
         <td data-pri="1">
           <form method="post">
@@ -353,7 +353,7 @@ page_header('ตรวจการจับคู่อะไหล่กับ�
 
 <datalist id="plc-stock-codes">
   <?php foreach ($stockList as $s) { ?>
-  <option value="<?= h((string) $s['code']) ?>"><?= h((string) $s['name']) ?> · เหลือ <?= number_format((int) $s['quantity']) ?></option>
+  <option value="<?= h((string) $s['code']) ?>"><?= h((string) $s['name']) ?> · เหลือ <?= h(qty_fmt($s['quantity'])) ?></option>
   <?php } ?>
 </datalist>
 

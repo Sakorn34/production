@@ -41,6 +41,7 @@
     /* ─ Modal S/N basket ─ */
     var snModal = document.getElementById('sn-basket-modal');
     var snModalBody = document.getElementById('sn-basket-body');
+    var withdrawBasketTitle = document.getElementById('withdraw-basket-modal-title');
 
     /* ─ กรองประเภทการเบิก (หน้า history) ─ */
     var historyFilters = document.querySelectorAll('[data-history-filter]');
@@ -71,12 +72,15 @@
         });
     });
 
-    function openBasket(sn) {
-        if (!snModal || !snModalBody || !sn) return;
+    function openWithdrawBasket(title, fetchUrl) {
+        if (!snModal || !snModalBody || !fetchUrl) return;
+        if (withdrawBasketTitle && title) {
+            withdrawBasketTitle.textContent = title;
+        }
         snModalBody.innerHTML = '<p class="text-muted text-center" style="padding:2rem">กำลังโหลด…</p>';
         openModal('sn-basket-modal');
 
-        fetch(partsBase + '/pages/history.php?ajax=sn_basket&sn=' + encodeURIComponent(sn))
+        fetch(fetchUrl)
             .then(function (r) { return r.text(); })
             .then(function (html) {
                 snModalBody.innerHTML = html;
@@ -84,6 +88,22 @@
             .catch(function () {
                 snModalBody.innerHTML = '<p class="text-danger">โหลดข้อมูลไม่สำเร็จ</p>';
             });
+    }
+
+    function openBasket(sn) {
+        if (!sn) return;
+        openWithdrawBasket(
+            'อะไหล่ที่เบิกตาม S/N',
+            partsBase + '/pages/history.php?ajax=sn_basket&sn=' + encodeURIComponent(sn)
+        );
+    }
+
+    function openSetBasket(outId) {
+        if (!outId) return;
+        openWithdrawBasket(
+            'อะไหล่ในใบเบิก Set',
+            partsBase + '/pages/history.php?ajax=set_basket&id=' + encodeURIComponent(outId)
+        );
     }
 
     /* ─ ค้นหา/กรองแถวในตาราง (หน้ารายการอะไหล่) ─ */
@@ -128,6 +148,53 @@
                 picker.addEventListener('change', apply);
             }
             apply();
+        });
+    }
+
+    /* ─ ค้นหาในรายการประวัติ — กรองจากข้อความของแถวทั้งแถว (ไม่ต้องมี data-search)
+         ซ่อนด้วย data-q-hidden แยกจาก row.hidden ของปุ่มกรองประเภท จึงใช้ร่วมกันได้ ─ */
+    function initRowFilters() {
+        document.querySelectorAll('[data-row-filter]').forEach(function (input) {
+            var tbody = document.getElementById(input.getAttribute('data-row-filter'));
+            if (!tbody || input.dataset.bound === '1') return;
+            input.dataset.bound = '1';
+            var emptyEl = document.getElementById(input.getAttribute('data-filter-empty') || '');
+            var timer = null;
+            var fullLink = document.getElementById('history-search-full');
+            var fullUrl = input.getAttribute('data-full-url');
+
+            function apply() {
+                var q = input.value.trim().toLowerCase();
+                var shown = 0;
+                // ลิงก์ "ค้นหาในรายการทั้งหมด" พาคำค้นไปด้วย — โหลดรายการเต็มแล้วค้นต่อได้ทันที
+                if (fullLink && fullUrl) {
+                    fullLink.href = fullUrl + '&q=' + encodeURIComponent(input.value.trim());
+                }
+                tbody.querySelectorAll('tr').forEach(function (row) {
+                    if (row.id === 'history-filter-empty') return;
+                    // เก็บข้อความครั้งเดียวต่อแถว — ตารางยาวหลายพันแถวจะได้ไม่ช้า
+                    if (row.dataset.qText === undefined) row.dataset.qText = row.textContent.toLowerCase();
+                    var hit = !q || row.dataset.qText.indexOf(q) !== -1;
+                    if (hit) row.removeAttribute('data-q-hidden');
+                    else row.setAttribute('data-q-hidden', '1');
+                    if (hit && !row.hidden) shown++;
+                });
+                if (emptyEl) emptyEl.hidden = !q || shown > 0;
+            }
+
+            input.addEventListener('input', function () {
+                clearTimeout(timer);
+                timer = setTimeout(apply, 150);
+            });
+
+            // กลับมาจากลิงก์ "ค้นหาในรายการทั้งหมด" — เติมคำค้นจาก ?q= (ใช้เป็นข้อความกรองเท่านั้น ไม่ลง HTML)
+            try {
+                var preset = new URLSearchParams(window.location.search).get('q');
+                if (preset) {
+                    input.value = preset.slice(0, 100);
+                    apply();
+                }
+            } catch (err) { /* เบราว์เซอร์เก่าไม่รองรับ URLSearchParams — ข้ามได้ */ }
         });
     }
 
@@ -440,6 +507,19 @@
             return;
         }
 
+        var setBtn = e.target.closest('[data-set-basket]');
+        if (setBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            openSetBasket(setBtn.getAttribute('data-set-basket'));
+            return;
+        }
+        var setRow = e.target.closest('[data-set-basket-row]');
+        if (setRow && !e.target.closest('.table-actions, a, button, form')) {
+            openSetBasket(setRow.getAttribute('data-set-basket-row'));
+            return;
+        }
+
         var overlay = e.target.closest('.modal-overlay');
         if (overlay && (e.target === overlay || e.target.closest('.modal-close, .modal-close-btn'))) {
             closeModal(overlay);
@@ -482,7 +562,7 @@
                 }
                 var mult = Math.max(1, parseInt(countInput && countInput.value, 10) || 1);
                 list.innerHTML = items.map(function (it) {
-                    var need = it.qty * mult;
+                    var need = Math.round(it.qty * mult * 100) / 100; // กัน float เพี้ยน เช่น 0.1*3
                     var short = need > it.stock;
                     var thumb = it.icon
                         ? '<img src="' + it.icon + '" alt="" loading="lazy">'
@@ -516,6 +596,7 @@
 
     initProductPickers(document);
     initTableFilters(document);
+    initRowFilters();
     initSetItemsPreview(document);
 
     document.querySelectorAll('.product-active-switch').forEach(function (input) {

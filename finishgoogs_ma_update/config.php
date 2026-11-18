@@ -2,11 +2,15 @@
 /**
  * config.php — แกนกลางของระบบ: DB, session, สิทธิ์, helper
  */
+if (!defined('APP_REQUEST_START')) {
+    define('APP_REQUEST_START', microtime(true));
+}
 session_start();
 mb_internal_encoding('UTF-8');
 date_default_timezone_set('Asia/Bangkok');
 error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
 require_once dirname(__DIR__) . '/shared/app_paths.php';
+require_once dirname(__DIR__) . '/shared/qty_helpers.php';
 ini_set('error_log', app_error_log_path());
 
 /**
@@ -33,7 +37,7 @@ function app_base_url() {
 define('BASE_URL', app_base_url());
 define('APP_NAME', 'ระบบทะเบียนเครื่องและซ่อมบำรุง');
 /** รหัสชุด deploy — อัปเมื่อ build patch แล้วเทียบกับ server ว่าอัปครบหรือยัง */
-define('APP_RELEASE_VERSION', '2026-09-25_103131');
+define('APP_RELEASE_VERSION', '2026-11-11_145342');
 
 /**
  * โหลด secrets แบบ cache ต่อ request
@@ -120,6 +124,9 @@ function dbParts() {
             PDO::ATTR_EMULATE_PREPARES   => false,
         ]);
         $pdo->exec('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci');
+        // จำนวนอะไหล่เป็นทศนิยมได้ (เช่น 0.5 ชิ้น/เครื่อง) — ต้องเป็น DECIMAL ก่อนเขียนค่าใด ๆ
+        require_once dirname(__DIR__) . '/shared/qty_helpers.php';
+        tech_parts_ensure_decimal_qty_schema($pdo);
     }
     return $pdo;
 }
@@ -512,6 +519,10 @@ function ensure_asset_status_sold_schema()
         return;
     }
     $done = true;
+    require_once dirname(__DIR__) . '/shared/schema_once.php';
+    if (schema_once_skip('asset_status_sold')) {
+        return;
+    }
     try {
         $res = db()->query("SHOW COLUMNS FROM assets LIKE 'status'");
         if ($res && ($row = $res->fetch_assoc())) {
@@ -531,6 +542,7 @@ function ensure_asset_status_sold_schema()
                 );
             }
         }
+        schema_once_mark('asset_status_sold');
     } catch (\mysqli_sql_exception $e) {
         error_log('[ensure_asset_status_sold_schema] ' . $e->getMessage());
     }
@@ -728,10 +740,39 @@ function qr($sql, $types = '', $params = [], $conn = null)
 
 function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
+/**
+ * ตรวจลิงก์ที่ผู้ใช้กรอกไว้ (เช่น ลิงก์สั่งซื้ออะไหล่) ก่อนนำไปใส่ href
+ *
+ * ยอมรับเฉพาะ http/https ที่มี host และไม่มีอักขระควบคุม — กัน javascript: / data: ที่เป็นช่อง XSS
+ * ผลลัพธ์ยังต้องผ่าน h() ตอน echo เสมอ
+ *
+ * @param mixed $url ค่าจากฐานข้อมูล/ฟอร์ม
+ * @return string URL ที่ปลอดภัย หรือ '' ถ้าไม่ผ่าน
+ */
+function safe_http_url($url): string
+{
+    $url = trim((string) $url);
+    if ($url === '' || strlen($url) > 2048 || preg_match('/[\x00-\x1F\x7F]/', $url)) {
+        return '';
+    }
+    $parts = parse_url($url);
+    if (!$parts || empty($parts['host']) || empty($parts['scheme'])
+        || !in_array(strtolower($parts['scheme']), ['http', 'https'], true)) {
+        return '';
+    }
+    return $url;
+}
+
 // ---------- ตั้งค่าระบบ / ปรับแต่งหน้าตา ----------
-function settings() {
+/**
+ * อ่าน site_settings ทั้งก้อน — cache ใน request
+ *
+ * @param bool $reload true = โหลดใหม่จากฐาน
+ * @return array<string,string>
+ */
+function settings($reload = false) {
     static $s = null;
-    if ($s === null) {
+    if ($reload || $s === null) {
         $s = [];
         $res = @db()->query("SELECT skey, sval FROM site_settings");
         if ($res) while ($r = $res->fetch_assoc()) $s[$r['skey']] = $r['sval'];
@@ -742,8 +783,16 @@ function setting($k, $default = null) {
     $s = settings();
     return (isset($s[$k]) && $s[$k] !== '') ? $s[$k] : $default;
 }
+/**
+ * บันทึกค่า site_settings แล้วรีเฟรช cache ใน request นี้
+ *
+ * @param string $k
+ * @param mixed  $v
+ * @return void
+ */
 function set_setting($k, $v) {
     q("INSERT INTO site_settings (skey,sval) VALUES (?,?) ON DUPLICATE KEY UPDATE sval=VALUES(sval)", 'ss', [$k, (string)$v]);
+    settings(true);
 }
 /** สีธีม (ตรวจ hex) — คืนค่าปลอดภัยสำหรับใส่ใน CSS */
 function theme_color($k, $default) {
@@ -1145,6 +1194,18 @@ function status_th($s) {
     $e = status_palette_entry((string) $s);
     return $e['th'];
 }
+
+/**
+ * ชื่อสั้นสถานะเครื่อง (chip) — ใช้ legend กราฟและตาราง MA
+ *
+ * @param string $s คีย์สถานะ
+ * @return string
+ */
+function status_th_chip($s) {
+    $e = status_palette_entry((string) $s);
+    return $e['chip'];
+}
+
 function status_list() { return array_keys(status_palette()); }
 function status_badge($s) {
     // คง class st-<key> ไว้ให้ของเดิมที่ hook สีจากคลาสนี้ยังทำงาน — สีจริงมาจาก
@@ -1169,10 +1230,13 @@ function dthai_full($d) {
     return dt_display_full($d);
 }
 
-// ---------- แจ้งเตือนอะไหล่ครบกำหนดเปลี่ยน (SD Card / Battery Backup RTC) ----------
+// ---------- แจ้งเตือนอะไหล่ครบกำหนดเปลี่ยน (SD Card / Battery Backup RTC / Battery Power) ----------
 
 /**
  * รายการแจ้งเตือนที่ระบบรองรับ — key = ชื่อแสดง, value = alias สำหรับค้นใน MA
+ *
+ * Battery Power ห้ามใช้คำว่า Battery ล้วน ๆ ใน LIKE — จะไปโดน Battery Backup RTC
+ * รายการ MA เก่าที่เขียนว่า Battery อย่างเดียว ใช้ part_watch_exact_tokens() แทน
  *
  * @return array<string,array<int,string>>
  */
@@ -1180,7 +1244,31 @@ function part_watch_catalog() {
     return [
         'SD Card'            => ['SD Card', 'SD-card', 'SDcard'],
         'Battery Backup RTC' => ['Battery Backup RTC', 'Battery RTC', 'RTC Battery', 'CR2032'],
+        'Battery Power'      => [
+            'Battery Power', 'Power Battery', 'แบต Power', 'แบตหลัก',
+            'battery 3.7', 'Battery 3.7', 'Battery Li-ion', 'Li-ion 3.7',
+        ],
     ];
+}
+
+/**
+ * token ที่ต้องตรงทั้งชิ้นใน replace_items (คั่นด้วย comma) ไม่ใช่ LIKE กลางข้อความ
+ *
+ * @return array<string,array<int,string>>
+ */
+function part_watch_exact_tokens() {
+    return [
+        'Battery Power' => ['Battery'],
+    ];
+}
+
+/**
+ * รายการที่ค่าเริ่มเป็นปิดทุกรุ่น — ต้องติ๊กเองใน settings ถึงจะเตือน
+ *
+ * @return array<int,string>
+ */
+function part_watch_opt_in_names() {
+    return ['Battery Power'];
 }
 
 /**
@@ -1203,7 +1291,10 @@ function product_watch_alerts_configured($productId) {
 }
 
 /**
- * อ่านว่ารุ่นนี้เปิดแจ้งเตือนอะไรบ้าง — ยังไม่ตั้งค่า = เปิดทั้งหมด (backward compatible)
+ * อ่านว่ารุ่นนี้เปิดแจ้งเตือนอะไรบ้าง
+ *
+ * ยังไม่ตั้งค่า: SD Card / Battery Backup RTC เปิดไว้แบบเดิม
+ * รายการใน part_watch_opt_in_names() (Battery Power) ปิดจนกว่าจะติ๊กเอง
  *
  * @param int $productId
  * @return array<string,bool>
@@ -1212,15 +1303,10 @@ function product_watch_alerts_enabled($productId) {
     $productId = (int)$productId;
     $catalog = part_watch_catalog();
     $enabled = [];
-    if ($productId <= 0) {
-        foreach (array_keys($catalog) as $k) {
-            $enabled[$k] = true;
-        }
-        return $enabled;
-    }
     if (!product_watch_alerts_configured($productId)) {
+        $optIn = array_flip(part_watch_opt_in_names());
         foreach (array_keys($catalog) as $k) {
-            $enabled[$k] = true;
+            $enabled[$k] = !isset($optIn[$k]);
         }
         return $enabled;
     }
@@ -1278,8 +1364,9 @@ function effective_production_checklist($productId) {
 
 /**
  * เกณฑ์: อายุใช้งาน ≥ 2 ปี = ถึงกำหนด, ≥ 1 ปี 10 เดือน = ใกล้ถึงกำหนด
- * เคยเปลี่ยนอะไหล่นั้น (จาก MA) → นับจากครั้งล่าสุด · ไม่เคย → นับจากวันผลิต
+ * เคยเปลี่ยนอะไหล่นั้น (จาก MA หรืองานซ่อม) → นับจากครั้งล่าสุด · ไม่เคย → นับจากวันผลิต
  * เช็คทั้งคอลัมน์ replace_items (ระบบใหม่) และ versions_json.Replace (ข้อมูลเก่า AppSheet)
+ * รายการ: SD Card, Battery Backup RTC, Battery Power — เปิด/ปิดต่อรุ่นที่ settings
  *
  * @param int         $assetId
  * @param string|null $producedAt
@@ -1294,6 +1381,7 @@ function part_watch_alerts($assetId, $producedAt, $productId = null) {
     }
     $enabled = product_watch_alerts_enabled((int)$productId);
     $watch = part_watch_catalog();
+    $exactTokens = part_watch_exact_tokens();
     $out = [];
 
     // วันเปลี่ยนอะไหล่จากงานซ่อมของระบบ MA — เครื่องที่เข้าศูนย์ซ่อมแล้วเปลี่ยนไป
@@ -1322,6 +1410,20 @@ function part_watch_alerts($assetId, $producedAt, $productId = null) {
             $conds[] = 'replace_items LIKE ?';
             $conds[] = 'JSON_UNQUOTE(JSON_EXTRACT(versions_json, \'$.Replace\')) LIKE ?';
             $types .= 'ss'; $params[] = "%$p%"; $params[] = "%$p%";
+        }
+        if (!empty($exactTokens[$name])) {
+            foreach ($exactTokens[$name] as $tok) {
+                $tok = trim((string)$tok);
+                if ($tok === '' || !preg_match('/^[A-Za-z0-9 ._\\-]{1,80}$/', $tok)) {
+                    continue;
+                }
+                $re = '(^|,[[:space:]]*)' . $tok . '([[:space:]]*,|$)';
+                $conds[] = 'replace_items REGEXP ?';
+                $conds[] = 'JSON_UNQUOTE(JSON_EXTRACT(versions_json, \'$.Replace\')) REGEXP ?';
+                $types .= 'ss';
+                $params[] = $re;
+                $params[] = $re;
+            }
         }
         $r = qr("SELECT MAX(visited_at) d FROM ma_records WHERE asset_id=? AND (" . implode(' OR ', $conds) . ")",
                 $types, $params)->fetch_assoc();
@@ -2259,6 +2361,10 @@ function ensure_ma_datetime_schema() {
         return;
     }
     $done = true;
+    require_once dirname(__DIR__) . '/shared/schema_once.php';
+    if (schema_once_skip('ma_datetime')) {
+        return;
+    }
 
     try {
         $res = db()->query("SHOW COLUMNS FROM ma_records LIKE 'visited_at'");
@@ -2273,6 +2379,7 @@ function ensure_ma_datetime_schema() {
         if (strpos($type, 'datetime') === false) {
             db()->query('ALTER TABLE ma_records MODIFY visited_at DATETIME NOT NULL');
         }
+        schema_once_mark('ma_datetime');
     } catch (\mysqli_sql_exception $e) {
         error_log('[ensure_ma_datetime_schema] ' . $e->getMessage());
     }
@@ -2289,6 +2396,10 @@ function ensure_ma_status_schema() {
         return;
     }
     $done = true;
+    require_once dirname(__DIR__) . '/shared/schema_once.php';
+    if (schema_once_skip('ma_status')) {
+        return;
+    }
 
     try {
         $res = db()->query("SHOW COLUMNS FROM ma_records LIKE 'machine_status'");
@@ -2297,6 +2408,7 @@ function ensure_ma_status_schema() {
                 "ALTER TABLE ma_records ADD COLUMN machine_status VARCHAR(16) NULL DEFAULT NULL AFTER fw_version"
             );
         }
+        schema_once_mark('ma_status');
     } catch (\mysqli_sql_exception $e) {
         error_log('[ensure_ma_status_schema] ' . $e->getMessage());
     }
@@ -2957,7 +3069,7 @@ function effective_fields($productId, $context) {
         // ข้ามชนิดที่ไม่ได้เป็นช่องกรอกในฟอร์ม:
         // - fw/lot/made_by (+ สถานะปิด) จัดการแยกด้วยสวิตช์หลังบ้าน
         // - checklist โหลดผ่าน effective_production_checklist()
-        // - watch_alert / watch_alert_cfg เป็นแค่สวิตช์แจ้งเตือน MA (SD Card / RTC)
+        // - watch_alert / watch_alert_cfg เป็นแค่สวิตช์แจ้งเตือน MA (SD Card / RTC / Battery Power)
         //   ไม่ใช่ฟิลด์กรอก — เก็บใต้ context=production ใน settings แต่ห้ามโผล่ในฟอร์มผลิต
         if (in_array($c['kind'], [
             'fw', 'lot', 'fw_off', 'lot_off', 'made_by', 'made_by_off',
@@ -3147,6 +3259,7 @@ function effective_ma_form_fields($productId) {
 }
 
 require_once __DIR__ . '/includes/part_stock_bridge.php';
+require_once __DIR__ . '/includes/part_list_ui.php';
 require_once __DIR__ . '/includes/stock_active_sync.php';
 
 require_once dirname(__DIR__) . '/shared/activity_log_core.php';

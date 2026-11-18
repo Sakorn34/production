@@ -67,6 +67,10 @@ function activity_log_db_connect() {
  * @return void
  */
 function activity_log_ensure_schema($db = null) {
+    require_once __DIR__ . '/schema_once.php';
+    if (schema_once_skip('activity_logs')) {
+        return;
+    }
     $db = $db ?: activity_log_db_connect();
     if (!$db) {
         return;
@@ -88,6 +92,7 @@ function activity_log_ensure_schema($db = null) {
         KEY idx_actor (actor_name(50)),
         KEY idx_action (action_key)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    schema_once_mark('activity_logs');
 }
 
 // ─ Write ─────────────────────────────────────────────────────────────────────
@@ -336,6 +341,7 @@ function activity_log_script_label($script) {
         // เลิกใช้แล้ว 2026-08-05 (ลบไฟล์ทิ้ง) — คง label ไว้ให้ log เก่าที่บันทึกไปแล้วยังอ่านออก
         'vendor-import.php'  => 'นำเข้าจาก vendor',
         'year-end-summary.php' => 'สรุปปลายปี',
+        'purchase-check.php'  => 'เช็คสั่งซื้อ',
         'webhook-stockout.php' => 'Webhook เบิกอะไหล่',
     ];
     $script = basename((string)$script);

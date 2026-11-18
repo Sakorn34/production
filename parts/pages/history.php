@@ -16,6 +16,91 @@
 
 $pageTitle = 'ประวัติ';
 
+/**
+ * Popup basket แบบสองคอลัมน์ (D2) — ใบงานซ้าย · รายการอะไหล่ขวา
+ *
+ * @param array<int,array<string,mixed>> $basket
+ * @param array<string,string> $partProdLabels
+ * @param array<string,string> $partIcons
+ * @param string $backQuery query ต่อท้ายลิงก์ดู/แก้ไข เช่น &tab=sn หรือ &tab=move&kind=set
+ * @return string HTML
+ */
+function history_withdraw_basket_cards_html(array $basket, array $partProdLabels, array $partIcons, string $backQuery): string
+{
+    ob_start();
+    ?>
+    <div class="withdraw-basket-stack">
+        <?php foreach ($basket as $doc):
+            $items = $doc['items'] ?? [];
+            $itemCount = count($items);
+            $totalQty = 0;
+            foreach ($items as $it) {
+                $totalQty += (int) ($it['quantity'] ?? 0);
+            }
+            $isSet = !empty($doc['set_id']);
+            $assetCode = trim((string) ($doc['asset_code'] ?? ''));
+            $editUrl = $isSet
+                ? url('/pages/history.php?tab=set&edit_out=' . (int) $doc['id'])
+                : url('/pages/history.php?tab=item&edit_out=' . (int) $doc['id']);
+            ?>
+        <article class="withdraw-split">
+            <aside class="withdraw-split-side">
+                <?php if ($isSet): ?>
+                <span class="move-tag move-set">เบิก Set</span>
+                <?php elseif ($itemCount > 1): ?>
+                <span class="badge badge-info withdraw-split-kind">เบิกชุด</span>
+                <?php else: ?>
+                <span class="move-tag move-item">เบิกรายชิ้น</span>
+                <?php endif; ?>
+                <p class="withdraw-split-doc"><?= e((string) $doc['doc_no']) ?></p>
+                <?php if ($isSet && !empty($doc['set_name'])): ?>
+                <p class="withdraw-split-set-name"><?= e((string) $doc['set_name']) ?></p>
+                <?php endif; ?>
+                <dl class="withdraw-split-meta">
+                    <dt>ผู้เบิก</dt>
+                    <dd><?= e($doc['issued_by'] ?: '-') ?></dd>
+                    <dt>วันเวลา</dt>
+                    <dd><?= formatDate($doc['created_at']) ?></dd>
+                    <dt>สรุป</dt>
+                    <dd><?= number_format($itemCount) ?> ชนิด · <?= formatNumber($totalQty) ?> ชิ้น</dd>
+                    <?php if ($assetCode !== ''): ?>
+                    <dt>S/N</dt>
+                    <dd><strong><?= e($assetCode) ?></strong></dd>
+                    <?php endif; ?>
+                </dl>
+                <div class="withdraw-split-actions table-actions">
+                    <?= actionIcon('view', url('/pages/history.php?id=' . (int) $doc['id'] . $backQuery), 'ดูรายละเอียด') ?>
+                    <?= actionIcon('edit', $editUrl, 'แก้ไข') ?>
+                </div>
+            </aside>
+            <section class="withdraw-split-list">
+                <div class="withdraw-split-list-head">
+                    <span>รายการอะไหล่</span>
+                    <span><?= number_format($itemCount) ?> ชนิด · <?= formatNumber($totalQty) ?> ชิ้น</span>
+                </div>
+                <div class="withdraw-split-scroll">
+                    <?php foreach ($items as $item):
+                        $label = parts_label_for_code((string) $item['code'], (string) $item['name'], $partProdLabels);
+                        $unit = (string) ($item['unit'] ?? 'ชิ้น');
+                        ?>
+                    <div class="withdraw-split-row">
+                        <div class="withdraw-split-row-img"><?= parts_img_link_tag($partIcons[$item['code']] ?? '', $label, (string) $item['code']) ?></div>
+                        <div class="withdraw-split-row-name">
+                            <?= parts_name_profile_link((string) $item['code'], $label) ?>
+                        </div>
+                        <div class="withdraw-split-row-qty text-danger">-<?= formatNumber($item['quantity']) ?> <?= e($unit) ?></div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+                <p class="withdraw-split-list-foot">รวมเบิก <?= formatNumber($totalQty) ?> ชิ้น</p>
+            </section>
+        </article>
+        <?php endforeach; ?>
+    </div>
+    <?php
+    return (string) ob_get_clean();
+}
+
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'sn_basket') {
     ob_start();
     session_start();
@@ -59,58 +144,73 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'sn_basket') {
     }, array_unique($codes));
     $partIcons = parts_product_icon_map($iconProducts);
     ?>
-    <p class="text-muted" style="margin-bottom:0.75rem">S/N: <strong><?= e($sn) ?></strong> — <?= count($basket) ?> ใบเบิก</p>
-    <div class="table-wrap table-wrap-fold">
-    <table class="parts-table">
-        <thead>
-            <tr>
-                <th class="col-img">รูป</th>
-                <th>อะไหล่</th>
-                <th class="text-right">จำนวน</th>
-                <th>เลขที่</th>
-                <th>ผู้เบิก</th>
-                <th>วันเวลา</th>
-                <th class="col-actions">จัดการ</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($basket as $doc): ?>
-                <?php foreach ($doc['items'] as $idx => $item): ?>
-                <tr>
-                    <td class="col-img"><?= parts_img_tag($partIcons[$item['code']] ?? '', parts_label_for_code((string) $item['code'], (string) $item['name'], $partProdLabels)) ?></td>
-                    <td>
-                        <?php if ($doc['set_id'] && $idx === 0): ?>
-                        <span class="text-muted">[<?= e($doc['set_code']) ?>] </span>
-                        <?php endif; ?>
-                        <?= e(parts_format_product_line((string) $item['code'], (string) $item['name'], $partProdLabels)) ?>
-                    </td>
-                    <td class="text-right text-danger">-<?= formatNumber($item['quantity']) ?> <?= e($item['unit']) ?></td>
-                    <?php if ($idx === 0): ?>
-                    <td rowspan="<?= count($doc['items']) ?>"><strong><?= e($doc['doc_no']) ?></strong>
-                        <?php if ($doc['set_id']): ?>
-                        <br><span class="badge badge-info">Set</span>
-                        <?php endif; ?>
-                    </td>
-                    <td rowspan="<?= count($doc['items']) ?>"><?= e($doc['issued_by'] ?: '-') ?></td>
-                    <td rowspan="<?= count($doc['items']) ?>" class="text-muted"><?= formatDate($doc['created_at']) ?></td>
-                    <td rowspan="<?= count($doc['items']) ?>" class="col-actions">
-                        <div class="table-actions">
-                            <?php // &tab=sn เพื่อให้ปุ่มกลับในหน้ารายละเอียดพากลับมาแท็บนี้ ?>
-                            <?= actionIcon('view', url('/pages/history.php?id=' . (int) $doc['id'] . '&tab=sn'), 'ดูรายละเอียด') ?>
-                            <?php if (empty($doc['set_id'])): ?>
-                            <?= actionIcon('edit', url('/pages/history.php?tab=item&edit_out=' . (int) $doc['id']), 'แก้ไข') ?>
-                            <?php else: ?>
-                            <?= actionIcon('edit', url('/pages/history.php?tab=set&edit_out=' . (int) $doc['id']), 'แก้ไข') ?>
-                            <?php endif; ?>
-                        </div>
-                    </td>
-                    <?php endif; ?>
-                </tr>
-                <?php endforeach; ?>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
-    </div>
+    <p class="withdraw-basket-sn-lead">S/N: <strong><?= e($sn) ?></strong> — <?= count($basket) ?> ใบเบิก</p>
+    <?= history_withdraw_basket_cards_html($basket, $partProdLabels, $partIcons, '&tab=sn') ?>
+    <?php
+    exit;
+}
+
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'set_basket') {
+    ob_start();
+    session_start();
+    require_once __DIR__ . '/../config/database.php';
+    require_once __DIR__ . '/../includes/helpers.php';
+    require_once dirname(__DIR__, 2) . '/shared/ui_icons.php';
+    parts_localhost_bootstrap_session();
+    if (!isset($_SESSION['profile'])) {
+        http_response_code(403);
+        exit('Unauthorized');
+    }
+    require_once __DIR__ . '/../includes/StockService.php';
+    require_once __DIR__ . '/../includes/production_sync.php';
+    $db = getDB();
+    ensure_stock_production_sync_schema($db);
+    $stock = new StockService($db);
+    ob_end_clean();
+
+    header('Content-Type: text/html; charset=utf-8');
+    $outId = (int) ($_GET['id'] ?? 0);
+    if ($outId <= 0) {
+        echo '<p class="text-muted">ไม่ระบุใบเบิก</p>';
+        exit;
+    }
+    $detail = $stock->getStockOutDetail($outId);
+    if (!$detail || empty($detail['set_id'])) {
+        echo '<p class="text-muted">ไม่พบใบเบิก Set นี้</p>';
+        exit;
+    }
+    $items = [];
+    foreach ($detail['items'] as $row) {
+        $items[] = [
+            'code'     => $row['code'],
+            'name'     => $row['name'],
+            'quantity' => $row['quantity'],
+            'unit'     => $row['unit'] ?: 'ชิ้น',
+        ];
+    }
+    if ($items === []) {
+        echo '<p class="text-muted">ไม่มีรายการอะไหล่ในใบเบิกนี้</p>';
+        exit;
+    }
+    $basket = [[
+        'id'         => (int) $detail['id'],
+        'doc_no'     => $detail['doc_no'],
+        'set_id'     => (int) $detail['set_id'],
+        'set_code'   => $detail['set_code'],
+        'set_name'   => $detail['set_name'],
+        'issued_by'  => $detail['issued_by'],
+        'created_at'  => $detail['created_at'],
+        'asset_code'  => $detail['asset_code'] ?? '',
+        'items'       => $items,
+    ]];
+    $codes = array_column($items, 'code');
+    $partProdLabels = production_part_labels_by_stock_codes(array_unique(array_filter($codes)));
+    $iconProducts = array_map(static function ($c) {
+        return ['code' => $c];
+    }, array_unique(array_filter($codes)));
+    $partIcons = parts_product_icon_map($iconProducts);
+    ?>
+    <?= history_withdraw_basket_cards_html($basket, $partProdLabels, $partIcons, '&tab=move&kind=set') ?>
     <?php
     exit;
 }
@@ -191,7 +291,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (isset($_POST['update_stock_in'])) {
             $stock->updateStockIn(
                 (int) $_POST['id'],
-                (int) $_POST['quantity'],
+                qty_post('quantity'),
                 trim($_POST['note'] ?? '') ?: null
             );
             flash('success', 'แก้ไขรายการรับเข้าแล้ว');
@@ -201,7 +301,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (isset($_POST['update_stock_out'])) {
             $stock->updateStockOutSingle(
                 (int) $_POST['id'],
-                (int) $_POST['quantity'],
+                qty_post('quantity'),
                 validateStockOutNote($_POST['note'] ?? null),
                 trim($_POST['asset_code'] ?? '') ?: null,
                 $line_name
@@ -330,7 +430,7 @@ function history_row_label(array $h): string
     }
     $code = (string) ($h['single_product_code'] ?? '');
     $name = parts_label_for_code($code, (string) ($h['single_product_name'] ?? ''), $partProdLabels ?? []);
-    return '<span class="badge badge-info">รายชิ้น</span> [' . e($code) . '] ' . e($name);
+    return '<span class="badge badge-info">รายชิ้น</span> ' . parts_name_profile_link($code, $name) . '<span class="sr-only"> ' . e($code) . '</span>';
 }
 
 /**
@@ -359,6 +459,165 @@ function history_row_actions(array $h): string
         . actionIcon('delete', '', 'ลบ')
         . '</form>';
     return '<div class="table-actions">' . $view . $edit . $delete . '</div>';
+}
+
+/**
+ * วัตถุประสงค์จากหมายเหตุที่ส่งมาจาก inventory pickup (ส่วนก่อน | )
+ *
+ * @param string $note หมายเหตุใน stock_out.note
+ * @return string
+ */
+function history_inventory_purpose_head(string $note): string
+{
+    $note = trim($note);
+    if ($note === '') {
+        return '';
+    }
+    $pipe = strpos($note, '|');
+    if ($pipe === false) {
+        return $note;
+    }
+
+    return trim(substr($note, 0, $pipe));
+}
+
+/**
+ * ข้อความหมายเหตุที่แสดง — ส่วนหลังวัตถุประสงค์ (เช่น ชื่อลูกค้า)
+ *
+ * @param string $note
+ * @return string
+ */
+function history_inventory_note_body(string $note): string
+{
+    $note = trim($note);
+    if ($note === '') {
+        return '';
+    }
+    $parts = array_map('trim', explode('|', $note));
+    $head = $parts[0] ?? '';
+    if (history_inventory_purpose_is_known($head)) {
+        $count = count($parts);
+        for ($i = 1; $i < $count; $i++) {
+            $seg = $parts[$i];
+            if ($seg === '' || preg_match('/^SN:/i', $seg)) {
+                continue;
+            }
+
+            return $seg;
+        }
+
+        return '';
+    }
+    if (strpos($note, '|') === false) {
+        return $note;
+    }
+
+    return trim(implode(' | ', array_slice($parts, 1)));
+}
+
+/**
+ * ข้อความคอลัมน์หมายเหตุในแท็บความเคลื่อนไหว
+ *
+ * @param array<string,mixed> $h
+ * @return string
+ */
+function history_move_note_cell(array $h): string
+{
+    $raw = trim((string) ($h['note'] ?? ''));
+    if ($raw === '') {
+        return '-';
+    }
+    $head = history_inventory_purpose_head($raw);
+    $body = history_inventory_note_body($raw);
+    if ($head === 'เบิกซ่อมลูกค้า') {
+        return $body !== '' ? $body : '';
+    }
+    if ($body !== '') {
+        return $body;
+    }
+    if (history_inventory_purpose_is_known($head)) {
+        return '-';
+    }
+
+    return $raw;
+}
+
+/**
+ * HTML คอลัมน์หมายเหตุแท็บ move — เบิกซ่อมจาก inventory แสดง「เบิกงานซ่อม」กับชื่อลูกค้าคนละบรรทัด
+ *
+ * @param array<string,mixed> $h
+ * @return string HTML ที่ escape แล้ว (ยกเว้นแท็กโครงสร้างที่กำหนด)
+ */
+function history_move_note_cell_html(array $h): string
+{
+    $raw = trim((string) ($h['note'] ?? ''));
+    if ($raw === '') {
+        return e('-');
+    }
+    $head = history_inventory_purpose_head($raw);
+    $body = history_inventory_note_body($raw);
+    if ($head === 'เบิกซ่อมลูกค้า') {
+        $html = '<span class="history-move-note-stack">';
+        $html .= '<span class="history-move-note-purpose">' . e('เบิกงานซ่อม') . '</span>';
+        if ($body !== '') {
+            $html .= '<span class="history-move-note-company">' . e($body) . '</span>';
+        }
+
+        return $html . '</span>';
+    }
+
+    return e(history_move_note_cell($h));
+}
+
+/**
+ * @param string $text
+ * @return bool
+ */
+function history_inventory_purpose_is_known(string $text): bool
+{
+    static $known = [
+        'เบิกผลิต',
+        'เบิกตาม PO',
+        'เบิกซ่อมลูกค้า',
+        'เบิกเสียระหว่างผลิต',
+        'เบิกเสียระหว่างขนส่ง',
+        'เบิก MA',
+        'เบิกอื่นๆ',
+    ];
+
+    return in_array(trim($text), $known, true);
+}
+
+/**
+ * ป้ายประเภทในตาราง move — วัตถุประสงค์จาก inventory (ยกเว้นเบิกซ่อมลูกค้า ยังเป็นเบิกรายชิ้น)
+ *
+ * @param array<string,mixed> $h
+ * @return array{label:string,class:string}
+ */
+function history_move_type_chip(array $h): array
+{
+    $kind = (string) ($h['kind'] ?? '');
+    if ($kind === 'in') {
+        return ['label' => 'รับเข้า', 'class' => 'move-in'];
+    }
+    if ($kind === 'set') {
+        return ['label' => 'เบิก Set', 'class' => 'move-set'];
+    }
+
+    $purpose = history_inventory_purpose_head((string) ($h['note'] ?? ''));
+    $map = [
+        'เบิก MA' => ['label' => 'เบิก MA', 'class' => 'move-ma'],
+        'เบิกผลิต' => ['label' => 'เบิกผลิต', 'class' => 'move-prod'],
+        'เบิกตาม PO' => ['label' => 'เบิกตาม PO', 'class' => 'move-po'],
+        'เบิกเสียระหว่างผลิต' => ['label' => 'เสียระหว่างผลิต', 'class' => 'move-scrap'],
+        'เบิกเสียระหว่างขนส่ง' => ['label' => 'เสียระหว่างขนส่ง', 'class' => 'move-scrap'],
+        'เบิกอื่นๆ' => ['label' => 'เบิกอื่นๆ', 'class' => 'move-other'],
+    ];
+    if ($purpose !== '' && isset($map[$purpose])) {
+        return $map[$purpose];
+    }
+
+    return ['label' => 'เบิกรายชิ้น', 'class' => 'move-item'];
 }
 
 /**
@@ -440,7 +699,33 @@ function history_row_thumb(array $h, array $partIcons): string
     }
     $code = (string) ($h['single_product_code'] ?? '');
     $name = parts_label_for_code($code, (string) ($h['single_product_name'] ?? ''), $partProdLabels ?? []);
-    return parts_img_tag($partIcons[$code] ?? '', $name);
+    return parts_img_link_tag($partIcons[$code] ?? '', $name, $code);
+}
+
+/**
+ * ช่องค้นหาในรายการประวัติ (กรองฝั่งเบราว์เซอร์ด้วย app.js: [data-row-filter])
+ *
+ * ใช้หน้าตาเดียวกับช่องค้นหาของหน้ารายการอะไหล่ เพื่อให้ทั้งระบบใช้งานเหมือนกัน
+ *
+ * @param string $tbodyId     id ของ tbody ที่จะกรอง
+ * @param string $placeholder ข้อความอธิบายในช่อง
+ * @return string HTML
+ */
+function history_search_bar_html(string $tbodyId, string $placeholder, ?string $fullUrl = null): string
+{
+    // $fullUrl = ลิงก์โหลดรายการทั้งหมด (เมื่อหน้านี้โหลดแค่ 100 รายการล่าสุด) — ถ้าไม่เจอในที่โหลดมา
+    // app.js จะเสนอลิงก์นี้พร้อมคำค้นเดิม (?q=) แล้วเติมคำค้นกลับเข้าช่องให้หลังโหลดใหม่
+    $fullAttr = $fullUrl !== null ? ' data-full-url="' . e($fullUrl) . '"' : '';
+    $moreLink = $fullUrl !== null
+        ? ' <a id="history-search-full" href="' . e($fullUrl) . '">ค้นหาในรายการทั้งหมด</a>'
+        : '';
+    return '<div class="products-search-bar history-search-bar">'
+        . '<label for="history-search" class="sr-only">ค้นหาในประวัติ</label>'
+        . '<input type="search" id="history-search" class="products-search-input"'
+        . ' data-row-filter="' . e($tbodyId) . '" data-filter-empty="history-search-empty"' . $fullAttr
+        . ' placeholder="' . e($placeholder) . '" autocomplete="off">'
+        . '</div>'
+        . '<p id="history-search-empty" class="empty-state" hidden>ไม่พบรายการที่ตรงกับคำค้นหา' . $moreLink . '</p>';
 }
 
 /**
@@ -553,9 +838,9 @@ parts_page_header($historyTabs[$tab]['icon'], 'ประวัติ — ' . $he
         <tbody>
             <?php foreach ($detail['items'] as $item): ?>
             <tr>
-                <td class="col-img"><?= parts_img_tag($partIcons[$item['code']] ?? '', parts_label_for_code((string) $item['code'], (string) $item['name'], $partProdLabels)) ?></td>
+                <td class="col-img"><?= parts_img_link_tag($partIcons[$item['code']] ?? '', parts_label_for_code((string) $item['code'], (string) $item['name'], $partProdLabels), (string) $item['code']) ?></td>
                 <td><?= e($item['code']) ?></td>
-                <td><?= e(parts_label_for_code((string) $item['code'], (string) $item['name'], $partProdLabels)) ?></td>
+                <td><?= parts_name_profile_link((string) $item['code'], parts_label_for_code((string) $item['code'], (string) $item['name'], $partProdLabels)) ?></td>
                 <td class="text-right text-danger">-<?= formatNumber($item['quantity']) ?></td>
                 <td><?= e($item['unit']) ?></td>
             </tr>
@@ -581,12 +866,14 @@ parts_page_header($historyTabs[$tab]['icon'], 'ประวัติ — ' . $he
 </div>
 <?php elseif ($tab === 'move'): ?>
 
-<div class="card parts-list-card">
+<div class="card parts-list-card history-list-card">
     <?php if (empty($history)): ?>
         <p class="empty-state">ยังไม่มีรายการในชนิดที่เลือก</p>
     <?php else: ?>
-    <div class="table-wrap table-wrap-fold">
-        <table class="parts-table">
+    <?= history_search_bar_html('history-move-rows', 'ค้นหา — เลขที่ / อะไหล่ / S/N',
+        (!$allFull && count($history) < $allTotal) ? $moveUrl($moveKind) . '&full=1' : null) ?>
+    <div class="table-wrap table-wrap-fold table-wrap-fold-fill">
+        <table class="parts-table history-move-table">
             <thead>
                 <tr>
                     <th>วันเวลา</th>
@@ -600,33 +887,38 @@ parts_page_header($historyTabs[$tab]['icon'], 'ประวัติ — ' . $he
                     <th class="col-actions">จัดการ</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="history-move-rows">
                 <?php foreach ($history as $h):
                     $kind = (string) $h['kind'];
                     $isIn = $kind === 'in';
+                    $moveChip = history_move_type_chip($h);
                     $code = (string) ($h['code'] ?? '');
                     $icon = $code !== '' ? ($partIcons[$code] ?? '') : '';
                     // เบิก Set แสดงเป็นชื่อชุด ส่วนอีกสองชนิดแสดงชื่ออะไหล่
                     $label = $kind === 'set'
-                        ? '[' . (string) $h['set_code'] . '] ' . (string) $h['set_name']
-                        : parts_format_product_line($code, (string) ($h['name'] ?? ''), $partProdLabels);
+                        ? (string) $h['set_name']
+                        : parts_label_for_code($code, (string) ($h['name'] ?? ''), $partProdLabels);
                     $editUrl = $isIn
                         ? url('/pages/history.php?tab=in&edit_in=' . (int) $h['row_id'])
                         : url('/pages/history.php?tab=' . ($kind === 'set' ? 'set' : 'item') . '&edit_out=' . (int) $h['stock_out_id']);
                 ?>
-                <tr>
+                <tr<?= $kind === 'set' ? ' class="history-set-row" data-set-basket-row="' . (int) $h['stock_out_id'] . '" title="คลิกดูรายการอะไหล่ใน Set นี้"' : '' ?>>
                     <td class="text-muted" style="white-space:nowrap"><?= formatDate($h['created_at']) ?></td>
-                    <td><span class="move-tag move-<?= e($kind) ?>"><?= $isIn ? 'รับเข้า' : ($kind === 'set' ? 'เบิก Set' : 'เบิกรายชิ้น') ?></span></td>
-                    <td class="col-img"><?= $kind === 'set' ? '' : parts_img_tag($icon, $label) ?></td>
-                    <td><?= e($label) ?><?= !empty($h['doc_no']) ? '<br><span class="text-muted" style="font-size:11px">' . e($h['doc_no']) . '</span>' : '' ?></td>
+                    <td><span class="move-tag <?= e($moveChip['class']) ?>"><?= e($moveChip['label']) ?></span></td>
+                    <td class="col-img"><?= $kind === 'set' ? '' : parts_img_link_tag($icon, $label, $code) ?></td>
+                    <?php // รหัสอะไหล่ไม่แสดงบนจอ แต่คงไว้ใน DOM (sr-only) เพื่อให้ช่องค้นหาพิมพ์รหัสแล้วยังเจอ ?>
+                    <td><?php if ($kind === 'set'): ?><?= e($label) ?><?php if (!empty($h['set_code'])): ?><span class="sr-only"> <?= e((string) $h['set_code']) ?></span><?php endif; ?><?php if (!empty($h['doc_no'])): ?><br><span class="text-muted history-set-hint" style="font-size:11px"><?= e($h['doc_no']) ?> — คลิกดูรายละเอียด</span><?php endif; ?><?php else: ?><?= parts_name_profile_link($code, $label) ?><?= ($code !== '') ? '<span class="sr-only"> ' . e($code) . '</span>' : '' ?><?= !empty($h['doc_no']) ? '<br><span class="text-muted" style="font-size:11px">' . e($h['doc_no']) . '</span>' : '' ?><?php endif; ?></td>
                     <td class="text-right <?= $isIn ? 'text-success' : 'text-danger' ?>" style="white-space:nowrap">
                         <?= $isIn ? '+' : '-' ?><?= formatNumber($h['qty']) ?> <?= e($h['unit'] ?: 'ชิ้น') ?>
                     </td>
                     <td><?= e($h['asset_code'] ?: '-') ?></td>
-                    <td class="text-muted"><?= e($h['note'] ?: '-') ?></td>
+                    <td class="text-muted"><?= history_move_note_cell_html($h) ?></td>
                     <td><?= e($h['actor'] ?: '-') ?></td>
                     <td class="col-actions">
                         <div class="table-actions">
+                            <?php if ($kind === 'set'): ?>
+                            <?= actionIcon('set-basket', (string) (int) $h['stock_out_id'], 'ดูรายการอะไหล่ใน Set') ?>
+                            <?php endif; ?>
                             <?= actionIcon('edit', $editUrl, 'แก้ไข') ?>
                             <form method="POST"<?= $isIn
                                 ? parts_confirm_attrs('ลบรายการรับเข้านี้?', 'ลบรายการรับเข้า',
@@ -644,7 +936,7 @@ parts_page_header($historyTabs[$tab]['icon'], 'ประวัติ — ' . $he
             </tbody>
         </table>
     </div>
-    <p class="text-muted" style="margin:10px 0 0;font-size:12px">
+    <p class="text-muted history-list-foot" style="margin:10px 0 0;font-size:12px">
         แสดง <?= number_format(count($history)) ?> จาก <?= number_format($allTotal) ?> รายการ
         <?php if (!$allFull && count($history) < $allTotal): ?>
             · <a href="<?= $moveUrl($moveKind) . '&full=1' ?>">แสดงทั้งหมด</a>
@@ -670,7 +962,7 @@ parts_page_header($historyTabs[$tab]['icon'], 'ประวัติ — ' . $he
     <div class="form-row">
         <div class="form-group">
             <label>จำนวนรับเข้า</label>
-            <input type="number" name="quantity" min="1" value="<?= (int) $editInRow['quantity'] ?>" required data-autofocus>
+            <input type="number" name="quantity" min="0.01" step="0.01" value="<?= e(qty_input_value($editInRow['quantity'])) ?>" required data-autofocus>
         </div>
         <div class="form-group">
             <label>หมายเหตุ</label>
@@ -700,7 +992,7 @@ parts_page_header($historyTabs[$tab]['icon'], 'ประวัติ — ' . $he
     <div class="form-row">
         <div class="form-group">
             <label>จำนวนเบิก</label>
-            <input type="number" name="quantity" min="1" value="<?= (int) $ei['quantity'] ?>" required data-autofocus>
+            <input type="number" name="quantity" min="0.01" step="0.01" value="<?= e(qty_input_value($ei['quantity'])) ?>" required data-autofocus>
         </div>
         <div class="form-group">
             <label>หมายเลขเครื่อง (S/N)</label>
@@ -757,9 +1049,10 @@ parts_page_header($historyTabs[$tab]['icon'], 'ประวัติ — ' . $he
 
 <?php elseif ($tab === 'sn'): ?>
 
-<div class="card parts-list-card">
-    <div class="table-wrap table-wrap-fold">
-    <table class="parts-table">
+<div class="card parts-list-card history-list-card">
+    <?= history_search_bar_html('history-list-body', 'ค้นหา — S/N / เลขที่ / อะไหล่') ?>
+    <div class="table-wrap table-wrap-fold table-wrap-fold-fill">
+    <table class="parts-table history-sn-table">
         <thead>
             <tr>
                 <th class="col-img">รูป</th>
@@ -822,17 +1115,19 @@ parts_page_header($historyTabs[$tab]['icon'], 'ประวัติ — ' . $he
     </div>
 </div>
 
-<div id="sn-basket-modal" class="modal-overlay" hidden>
-    <div class="modal-box">
+<?php endif; ?>
+
+<?php if (!$detail && ($tab === 'sn' || $tab === 'move')): ?>
+<div id="sn-basket-modal" class="modal-overlay withdraw-basket-modal" hidden>
+    <div class="modal-box modal-box-withdraw-split">
         <div class="modal-header">
-            <h3 class="h-with-icon"><?= ui_icon_html('basket', 18, 'h-svg') ?><span>อะไหล่ที่เบิกตาม S/N</span></h3>
+            <h3 class="h-with-icon"><?= ui_icon_html('basket', 18, 'h-svg') ?><span id="withdraw-basket-modal-title">อะไหล่ที่เบิกตาม S/N</span></h3>
             <button type="button" class="modal-close" aria-label="ปิด">&times;</button>
         </div>
         <div id="sn-basket-body" class="modal-body"></div>
     </div>
 </div>
-
-
 <?php endif; ?>
 
+<?php parts_photo_modal_html(); ?>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

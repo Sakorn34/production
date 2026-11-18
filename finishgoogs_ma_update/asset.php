@@ -3,6 +3,7 @@ require __DIR__ . '/config.php';
 require __DIR__ . '/includes/asset_production_edit.php';
 require __DIR__ . '/includes/layout.php';
 require_once __DIR__ . '/includes/rent_retire_sync.php';
+require_once __DIR__ . '/includes/sd_image.php';
 require_login();
 
 // เปิดด้วย id หรือ code (จากการสแกน QR)
@@ -86,8 +87,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_asset'])) {
     }
     asset_production_edit_save($id, $newPid, $_POST);
     share_upsert_asset($id, $a['asset_code']); // sync ตารางแชร์ (ถ้าเปลี่ยนรหัส แถว serial เดิมจะถูกแทนที่)
+    if (array_key_exists('sd_raspberry', $_POST) && sd_image_slug_for_product($newPid) === 'plus_m') {
+        $rawPi = trim((string) $_POST['sd_raspberry']);
+        if ($rawPi === '') {
+            q('DELETE FROM asset_components WHERE asset_id=? AND component_name=?', 'is', [$id, SD_IMAGE_RASPBERRY_KEY]);
+        } else {
+            sd_image_set_raspberry($id, $newPid, $rawPi);
+        }
+    }
+    if (!empty($_POST['sd_image_write'])) {
+        $sdWrite = sd_image_mark_written($id, $newPid, (string) ($_POST['sd_raspberry'] ?? ''), $newCode);
+        if (empty($sdWrite['ok'])) {
+            flash_set('แก้ไขข้อมูลเครื่อง ' . $newCode . ' แล้ว · ' . $sdWrite['message'], 'err');
+            header('Location: ' . BASE_URL . '/asset.php?id=' . $id);
+            exit;
+        }
+    }
     flash_set('แก้ไขข้อมูลเครื่อง ' . $newCode . ' เรียบร้อยแล้ว');
     header('Location: ' . BASE_URL . '/asset.php?id=' . $id); exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_sd_image'])) {
+    csrf_check();
+    $sdWrite = sd_image_mark_written($id, (int) $a['product_id'], '', (string) $a['asset_code']);
+    flash_set($sdWrite['message'], !empty($sdWrite['ok']) ? 'ok' : 'err');
+    header('Location: ' . BASE_URL . '/asset.php?id=' . $id);
+    exit;
 }
 
 // แก้ไข/ลบชิ้นส่วนฮาร์ดแวร์
@@ -160,10 +185,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_ma_asset'])) {
             exit;
         }
     }
+    // ถ้ารายการ MA ที่ลบเป็นเสื่อมสภาพ ย้อนสถานะระบบเช่ากลับเป็น finished goods
+    $delRec = qr("SELECT m.remark, a.status ast_status, a.asset_code, a.factory_serial
+                  FROM ma_records m JOIN assets a ON a.id = m.asset_id WHERE m.id=? AND m.asset_id=?", 'ii', [$mid, $id])->fetch_assoc();
+    $delRetireReverted = false;
+    if ($delRec) {
+        $wasRetire = (string)($delRec['ast_status'] ?? '') === 'retired'
+            || mb_strpos(trim((string)($delRec['remark'] ?? '')), 'เสื่อมสภาพ') === 0;
+        if ($wasRetire) {
+            $revertRes = rent_apply_after_ma_save_for_asset(
+                ['asset_code' => (string)$delRec['asset_code'], 'factory_serial' => (string)($delRec['factory_serial'] ?? '')],
+                'close_fg', null, null, '', ''
+            );
+            if (!empty($revertRes['ok']) && (string)($revertRes['code'] ?? '') === 'closed') {
+                $delRetireReverted = true;
+            }
+        }
+    }
     q("DELETE FROM ma_records WHERE id=? AND asset_id=?", 'ii', [$mid, $id]);
     recompute_asset_status_from_ma($id);
     recompute_asset_fw($id);
-    flash_set('ลบรายการ MA แล้ว');
+    $delFlash = 'ลบรายการ MA แล้ว';
+    if ($delRetireReverted) {
+        $delFlash .= ' · ย้อนสถานะระบบเช่ากลับเป็นคลังพร้อมเช่าแล้ว';
+    }
+    flash_set($delFlash);
+    header('Location: ' . BASE_URL . '/asset.php?id=' . $id); exit;
+}
+
+// ลบรายการ MA ที่บันทึกจากระบบเช่า (tbl_product_ma)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['del_rent_ma_asset'])) {
+    csrf_check();
+    $rentMaId = (int)$_POST['rent_ma_id'];
+    $rentSn   = trim((string)($a['asset_code'] ?? ''));
+
+    $rentDel = rent_delete_ma_record($rentMaId, $rentSn);
+    if ($rentDel['ok']) {
+        asset_status_sync_one($id, true);
+        flash_set($rentDel['message']);
+    } else {
+        flash_set($rentDel['message'], 'err');
+    }
     header('Location: ' . BASE_URL . '/asset.php?id=' . $id); exit;
 }
 
@@ -259,8 +321,6 @@ $addWithdrawModalUrl = BASE_URL . '/parts.php?ajax=add_move_form&asset_id=' . (i
 $hasPartsRows = $showPartsWithdraw
     && (((int)($partsSummary['out_count'] ?? 0) > 0) || !empty($partsUsed));
 
-$assetBackHref = page_back_url('');
-
 $assetShowSnippets = product_show_snippets((int)$a['product_id']);
 $assetSnippetPayload = [
     'code' => (string)$a['asset_code'],
@@ -342,11 +402,11 @@ document.addEventListener('click', function (ev) {
 });
 </script>
 <?php // หัวหน้าเครื่อง — ชื่อ/รุ่น/สถานะ บรรทัดบน · ปุ่มคำสั่งบรรทัดล่าง
+      // ไม่ใส่ปุ่มย้อนกลับ: เมนูซ้ายกับปุ่ม Back ของเบราว์เซอร์พอแล้ว ปุ่มซ้ำกินที่ชื่อเครื่อง
       // ที่ว่างข้างชื่อเดิมไม่ได้ใช้ เอามาบอกรุ่นกับสถานะซึ่งเป็นสองอย่างที่ดูบ่อยสุด
       // ปุ่มอยู่บรรทัดของตัวเองแล้ว จึงไม่ต้องยุบเข้าเมนู "อื่นๆ" บนมือถืออีก ?>
 <div class="asset-toolbar">
   <div class="asset-toolbar-head">
-    <?= page_back_button_html($assetBackHref) ?>
     <h1 class="asset-toolbar-title">เครื่อง <?= h($a['asset_code']) ?></h1>
     <span class="asset-toolbar-model"><?= h($a['pname']) ?></span>
     <?= status_badge($a['status']) ?>
@@ -478,13 +538,14 @@ if ($invAlloc) { ?>
       <?php // รูปอะไหล่ช่วยให้กวาดตาหาของที่ต้องการได้เร็วกว่าอ่านชื่อทีละบรรทัด
            // อะไหล่ 79 จาก 146 รายการมีรูป ตัวที่ไม่มีก็เว้นช่องไว้ให้คอลัมน์ตรงกัน ?>
       <div class="part-row-name">
-        <?php $mvIcon = img_url($mv['icon_path'] ?? null); ?>
-        <?php if ($mvIcon) { ?>
-          <img src="<?= h($mvIcon) ?>" alt="" class="thumb-sm" loading="lazy"
-            onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'thumb-sm part-row-noimg'}))">
-        <?php } else { ?>
-          <span class="thumb-sm part-row-noimg" aria-hidden="true"></span>
-        <?php } ?>
+        <?php
+        $mvPhoto = part_list_photo_btn((string) ($mv['icon_path'] ?? ''), (string) ($mv['pname'] ?? ''), 'thumb-sm');
+        if ($mvPhoto !== '') {
+            echo $mvPhoto;
+        } else {
+            echo '<span class="thumb-sm part-row-noimg" aria-hidden="true"></span>';
+        }
+        ?>
         <?php // ชื่ออะไหล่กดเปิดหน้ารายละเอียดในแอปอะไหล่ — แท็บใหม่ เพราะคนกำลังไล่ดูเครื่องอยู่
              // ตัวที่ยังจับคู่รหัสกับแอปนั้นไม่ได้ ก็เป็นข้อความเฉย ๆ ไม่ใช่ลิงก์ตาย
              $mvAppId = (int) ($mv['app_id'] ?? 0);

@@ -6,6 +6,9 @@
  *   list_search_form([
  *     ['name' => 'q', 'placeholder' => 'หมายเลขเครื่อง', 'value' => $q, 'width' => '160px'],
  *   ], BASE_URL . '/ma.php?product=1');
+ *
+ * ช่องข้อความ/วันที่ — layout.php จะ submit ฟอร์มอัตโนมัติเมื่อพิมพ์ (debounce)
+ * ปุ่ม «ค้นหา» ยังใช้ได้เหมือนเดิม
  */
 
 /**
@@ -14,14 +17,23 @@
  * @param array<int, array{name:string, placeholder?:string, value?:string, width?:string, type?:string}> $fields
  * @param string $clearUrl URL สำหรับปุ่มล้าง (ว่าง = ไม่แสดง)
  * @param array<string, scalar|null> $hidden ค่า hidden อื่นๆ
+ * @param array<int, array{name:string, value?:string, width?:string, options:array<string,string>}> $selects dropdown
  * @return void
  */
-function list_search_form(array $fields, $clearUrl = '', array $hidden = []) {
+function list_search_form(array $fields, $clearUrl = '', array $hidden = [], array $selects = []) {
     $hasValue = false;
     foreach ($fields as $f) {
         if (trim((string)(isset($f['value']) ? $f['value'] : '')) !== '') {
             $hasValue = true;
             break;
+        }
+    }
+    if (!$hasValue) {
+        foreach ($selects as $s) {
+            if (trim((string)(isset($s['value']) ? $s['value'] : '')) !== '') {
+                $hasValue = true;
+                break;
+            }
         }
     }
     echo '<form class="filter list-search-form" method="get" style="flex-wrap:wrap; gap:6px; margin-bottom:12px">';
@@ -36,6 +48,18 @@ function list_search_form(array $fields, $clearUrl = '', array $hidden = []) {
         echo '<input type="' . h($type) . '" name="' . h($f['name']) . '" value="' . h($val) . '"'
            . ' placeholder="' . h(isset($f['placeholder']) ? $f['placeholder'] : '') . '"'
            . ' style="width:' . h($w) . '">';
+    }
+    foreach ($selects as $s) {
+        $name = (string) $s['name'];
+        $w = isset($s['width']) ? $s['width'] : 'min(160px, 100%)';
+        $val = isset($s['value']) ? (string) $s['value'] : '';
+        $opts = isset($s['options']) && is_array($s['options']) ? $s['options'] : [];
+        echo '<select name="' . h($name) . '" style="width:' . h($w) . '; height:34px">';
+        foreach ($opts as $ov => $ol) {
+            echo '<option value="' . h((string) $ov) . '"' . ((string) $ov === $val ? ' selected' : '') . '>'
+                . h((string) $ol) . '</option>';
+        }
+        echo '</select>';
     }
     echo '<button type="submit" class="btn-with-icon">' . ui_btn_label('search', 'ค้นหา') . '</button>';
     if ($hasValue && $clearUrl !== '') {

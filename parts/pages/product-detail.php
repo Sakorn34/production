@@ -1,6 +1,6 @@
 <?php
 /**
- * pages/product-detail.php — รายละเอียดอะไหล่ + แก้ไขข้อมูลพื้นฐาน
+ * pages/product-detail.php — รายละเอียดอะไหล่ + แก้ไขข้อมูลพื้นฐาน + ประวัติรับเข้า/เบิกออก
  */
 
 $pageTitle = 'รายละเอียดอะไหล่';
@@ -8,15 +8,19 @@ require_once __DIR__ . '/../includes/parts_bootstrap.php';
 require_once __DIR__ . '/../includes/product_edit.php';
 
 $productId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
-$histView = ($_GET['view'] ?? '') === 'time' ? 'time' : 'model';
+// ค่าเริ่มต้น: เรียงตามเวลาล่าสุด — จัดกลุ่มตามรุ่นใช้เมื่อกดสลับ (?view=model)
+$histView = ($_GET['view'] ?? '') === 'model' ? 'model' : 'time';
 $returnTo = url('/pages/product-detail.php' . ($productId ? '?id=' . $productId : '')
-    . ($productId && $histView === 'time' ? '&view=time' : ''));
+    . ($productId && $histView === 'model' ? '&view=model' : ''));
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST'
     && parts_stock_forms_handle_post($db, $stock, $returnTo, $line_name ?? null)) {
     exit;
 }
 if (parts_product_forms_handle_post($db, $stock, $returnTo)) {
+    exit;
+}
+if (parts_withdraw_sync_handle_post($db, $stock, $returnTo, $line_name ?? null)) {
     exit;
 }
 
@@ -27,22 +31,26 @@ $product = $rawProduct ? parts_enrich_product($rawProduct) : null;
 // ดึงมากพอให้สรุปรายรุ่นเป็นยอดจริง ไม่ใช่ยอดของ 50 รายการล่าสุด
 $HIST_MAX = 400;
 $history = $product ? $stock->getProductStockOutHistory($productId, $HIST_MAX) : [];
+$HIST_IN_MAX = 100;
+$stockInHistory = $product ? $stock->getProductStockInHistory($productId, $HIST_IN_MAX) : [];
 $icon = '';
 if ($product) {
     $icons = parts_product_icon_map([$product]);
     $icon = $icons[$product['code']] ?? '';
 }
 
-// ปุ่มบนหัวหน้า: ย้อนกลับ + งานที่ทำต่อกับอะไหล่ชิ้นนี้บ่อยที่สุด
+// ปุ่มบนหัวหน้า: งานที่ทำต่อกับอะไหล่ชิ้นนี้บ่อยที่สุด
+// ไม่ใส่ปุ่มกลับหน้ารวม — เมนูซ้ายพอแล้ว ปุ่มซ้ำกินที่งานรับเข้า/เบิกออก
 // รับเข้า/เบิกออก เปิด modal บนหน้านี้เลย — เดิมเด้งไปหน้าอะไหล่รวม คนที่กำลังอ่าน
 // ประวัติของชิ้นนี้อยู่จึงหลุดออกจากหน้าไปทุกครั้ง ตัวจัดการ POST ใช้ตัวเดียวกับหน้านั้น
-$detailActions = '<a href="' . e(url('/pages/products.php')) . '" class="btn btn-outline btn-with-icon">← กลับไปหน้าอะไหล่รวม</a>';
+$detailActions = '';
 if ($product) {
-    $detailActions .= '<span class="parts-actions-sep" aria-hidden="true"></span>'
-        . '<button type="button" class="btn btn-success btn-with-icon" data-open-modal="stock-in-add-modal">'
+    $detailActions = '<button type="button" class="btn btn-success btn-with-icon" data-open-modal="stock-in-add-modal">'
         . ui_icon_html('stock-in', 16, 'btn-svg') . ' รับเข้า</button>'
         . '<button type="button" class="btn btn-danger btn-with-icon" data-open-modal="stock-out-item-add-modal">'
-        . ui_icon_html('stock-out-item', 16, 'btn-svg') . ' เบิกออก</button>';
+        . ui_icon_html('stock-out-item', 16, 'btn-svg') . ' เบิกออก</button>'
+        . '<span class="parts-actions-sep" aria-hidden="true"></span>'
+        . parts_withdraw_sync_button((int) $product['id'], $returnTo);
 }
 parts_page_header('products', 'รายละเอียดอะไหล่', 'ข้อมูลอะไหล่ ราคา ลิงก์สั่งซื้อ และประวัติการเบิกของชิ้นนี้', $detailActions);
 ?>
@@ -83,7 +91,7 @@ parts_page_header('products', 'รายละเอียดอะไหล่'
                     <strong><?= formatNumber($product['quantity']) ?></strong> <?= e($product['unit']) ?> คงเหลือ
                     <?php
                     // สถานะเดียวกับแดชบอร์ด มาจาก shared/stock_status.php
-                    $pdStatus = stock_status_key((int) $product['quantity'], (int) $product['min_stock']);
+                    $pdStatus = stock_status_key($product['quantity'], $product['min_stock']);
                     $pdBadge = ['out' => 'badge-danger', 'critical' => 'badge-danger', 'low' => 'badge-warning', 'near' => 'badge-near', 'ok' => 'badge-success'];
                     ?>
                     <span class="badge <?= e($pdBadge[$pdStatus] ?? 'badge-success') ?>"><?= e(stock_status_meta($pdStatus)['label']) ?></span>
@@ -116,6 +124,64 @@ parts_page_header('products', 'รายละเอียดอะไหล่'
                     </tbody>
                 </table>
             </div>
+            <?php
+            // กราฟยอดคงเหลือย้อนหลัง (เส้นเดียว + เส้นสต็อกขั้นต่ำ) สลับรายเดือน/รายปี — วาดด้วย assets/stock-chart.js
+            $chartSeries = parts_stock_balance_series(
+                $stock->getProductMovementHistory($productId, null),
+                qty_norm($product['quantity'])
+            );
+            ?>
+            <div class="stock-chart-card">
+                <div class="section-hd-row">
+                    <h3 style="margin:0;font-size:1rem">ยอดคงเหลือย้อนหลัง</h3>
+                    <div class="stock-chart-seg" role="group" aria-label="ช่วงเวลา">
+                        <button type="button" data-period="day">รายวัน</button>
+                        <button type="button" data-period="month" class="is-on">รายเดือน</button>
+                        <button type="button" data-period="year">รายปี</button>
+                    </div>
+                </div>
+                <div class="stock-chart-legend">
+                    <span><i class="lg-bal"></i>ยอดคงเหลือ</span>
+                    <span><i class="lg-min"></i>สต็อกขั้นต่ำ (<?= e(formatNumber($product['min_stock'])) ?>)</span>
+                </div>
+                <div id="stock-chart" class="stock-chart"
+                     data-series="<?= e(json_encode($chartSeries, JSON_UNESCAPED_UNICODE)) ?>"
+                     data-min="<?= e(qty_input_value($product['min_stock'])) ?>"
+                     data-unit="<?= e($product['unit']) ?>"></div>
+            </div>
+        </div>
+
+        <h3 style="margin-bottom:0.75rem;font-size:1rem">ประวัติรับเข้า</h3>
+        <div class="part-hist-wrap" style="margin-bottom:1.5rem">
+            <?php if (!$stockInHistory): ?>
+            <p class="text-muted">ยังไม่มีรายการรับเข้าสำหรับอะไหล่ชิ้นนี้</p>
+            <?php else: ?>
+            <p class="text-muted part-hist-count" style="margin:0 0 0.5rem"><?= formatNumber(count($stockInHistory)) ?> รายการ<?= count($stockInHistory) >= $HIST_IN_MAX ? ' ล่าสุด (มีมากกว่านี้)' : '' ?></p>
+            <div class="table-wrap">
+            <table class="parts-table part-hist-table">
+                <thead>
+                <tr>
+                    <th class="col-date">วันเวลา</th>
+                    <th class="col-type">ประเภท</th>
+                    <th class="col-qty">จำนวน</th>
+                    <th class="col-actor">ผู้บันทึก</th>
+                    <th class="col-note">หมายเหตุ</th>
+                </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($stockInHistory as $inRow): ?>
+                <tr>
+                    <td class="col-date text-muted"><?= formatDate($inRow['created_at'] ?? '') ?></td>
+                    <td class="col-type"><span class="badge badge-success">รับเข้า</span></td>
+                    <td class="col-qty text-success">+<?= formatNumber($inRow['quantity'] ?? 0) ?></td>
+                    <td class="col-actor"><?= e(trim((string) ($inRow['received_by'] ?? '')) !== '' ? $inRow['received_by'] : '-') ?></td>
+                    <td class="col-note text-muted"><?= e(trim((string) ($inRow['note'] ?? '')) !== '' ? $inRow['note'] : '-') ?></td>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+            </div>
+            <?php endif; ?>
         </div>
 
         <h3 style="margin-bottom:0.75rem;font-size:1rem">ประวัติการเบิกของอะไหล่ชิ้นนี้</h3>
@@ -129,14 +195,14 @@ parts_page_header('products', 'รายละเอียดอะไหล่'
             $histFlat = $histView === 'time' ? parts_history_with_model($history) : [];
             $prodBase = production_app_base_url();
             $histUrl = function (string $v) use ($productId) {
-                return url('/pages/product-detail.php?id=' . (int) $productId . ($v === 'time' ? '&view=time' : ''));
+                return url('/pages/product-detail.php?id=' . (int) $productId . ($v === 'model' ? '&view=model' : ''));
             };
         ?>
         <div class="part-hist-bar">
             <span class="text-muted part-hist-count"><?= formatNumber(count($history)) ?> รายการ<?= count($history) >= $HIST_MAX ? ' ล่าสุด (มีมากกว่านี้)' : '' ?></span>
             <span class="part-hist-views">
-                <a href="<?= e($histUrl('model')) ?>" class="part-hist-view<?= $histView === 'model' ? ' is-on' : '' ?>">จัดกลุ่มตามรุ่น</a>
                 <a href="<?= e($histUrl('time')) ?>" class="part-hist-view<?= $histView === 'time' ? ' is-on' : '' ?>">เรียงตามเวลาล่าสุด</a>
+                <a href="<?= e($histUrl('model')) ?>" class="part-hist-view<?= $histView === 'model' ? ' is-on' : '' ?>">จัดกลุ่มตามรุ่น</a>
             </span>
         </div>
         <?php if ($histView === 'time'): ?>
@@ -144,16 +210,20 @@ parts_page_header('products', 'รายละเอียดอะไหล่'
             <table class="parts-table part-hist-table">
                 <thead>
                     <tr>
-                        <th>วันเวลา</th><th>รุ่นสินค้า</th><th>หมายเลขเครื่อง</th>
-                        <th>ใบงาน</th><th>ประเภท</th><th class="text-right">จำนวน</th><th>ผู้เบิก / หมายเหตุ</th>
+                        <th class="col-date">วันเวลา</th>
+                        <th class="col-model">รุ่นสินค้า</th>
+                        <th class="col-sn">หมายเลขเครื่อง</th>
+                        <th class="col-doc">ใบงาน</th>
+                        <th class="col-type">ประเภท</th>
+                        <th class="col-qty">จำนวน</th><th class="col-note">ผู้เบิก / หมายเหตุ</th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php foreach ($histFlat as $row): ?>
                     <tr>
-                        <td class="text-muted" style="white-space:nowrap"><?= formatDate($row['created_at']) ?></td>
-                        <td><?= $row['_model'] !== '' ? e($row['_model']) : '<span class="text-muted">—</span>' ?></td>
-                        <td style="white-space:nowrap">
+                        <td class="col-date text-muted"><?= formatDate($row['created_at']) ?></td>
+                        <td class="col-model"><?= $row['_model'] !== '' ? e($row['_model']) : '<span class="text-muted">—</span>' ?></td>
+                        <td class="col-sn">
                             <?php if ($row['_asset_id'] > 0): ?>
                             <a href="<?= e($prodBase . '/asset.php?id=' . (int) $row['_asset_id']) ?>" target="_blank" rel="noopener" class="detail-link"><?= e($row['asset_code']) ?></a>
                             <?php elseif (trim((string) $row['asset_code']) !== ''): ?>
@@ -162,8 +232,8 @@ parts_page_header('products', 'รายละเอียดอะไหล่'
                             <span class="text-muted">—</span>
                             <?php endif; ?>
                         </td>
-                        <td style="white-space:nowrap"><a href="<?= url('/pages/history.php?id=' . (int) $row['id']) ?>" class="detail-link"><?= e($row['doc_no']) ?></a></td>
-                        <td>
+                        <td class="col-doc"><a href="<?= url('/pages/history.php?id=' . (int) $row['id']) ?>" class="detail-link"><?= e($row['doc_no']) ?></a></td>
+                        <td class="col-type">
                             <?php if ($row['set_id']): ?>
                             <span class="badge badge-info">ชุดเบิก</span>
                             <span class="text-muted">[<?= e($row['set_code']) ?>] <?= e($row['set_name']) ?></span>
@@ -171,8 +241,8 @@ parts_page_header('products', 'รายละเอียดอะไหล่'
                             <span class="badge badge-info">เบิกรายชิ้น</span>
                             <?php endif; ?>
                         </td>
-                        <td class="text-right text-danger">-<?= formatNumber($row['quantity']) ?></td>
-                        <td class="text-muted"><?= e($row['issued_by'] ?: '-') ?><?= $row['note'] ? ' · ' . e($row['note']) : '' ?></td>
+                        <td class="col-qty text-danger">-<?= formatNumber($row['quantity']) ?></td>
+                        <td class="col-note text-muted"><?= e($row['issued_by'] ?: '-') ?><?= $row['note'] ? ' · ' . e($row['note']) : '' ?></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -189,36 +259,50 @@ parts_page_header('products', 'รายละเอียดอะไหล่'
                 </span>
             </summary>
             <div class="part-hist-body">
-                <?php foreach ($g['sns'] as $sn): ?>
-                <div class="part-hist-sn">
-                    <?php if ($sn['sn'] !== ''): ?>
-                    <div class="part-hist-sn-head">
-                        <?php if ($sn['asset_id'] > 0): ?>
-                        <a href="<?= e($prodBase . '/asset.php?id=' . (int) $sn['asset_id']) ?>" target="_blank" rel="noopener"
-                           class="detail-link" title="เปิดหน้าเครื่องนี้ในระบบทะเบียนเครื่อง"><?= e($sn['sn']) ?></a>
-                        <?php else: ?>
-                        <b><?= e($sn['sn']) ?></b>
-                        <?php endif; ?>
-                    </div>
-                    <?php endif; ?>
+                <div class="table-wrap">
+                <table class="parts-table part-hist-table part-hist-model-table">
+                    <thead>
+                    <tr>
+                        <th class="col-sn">รหัสเครื่อง</th>
+                        <th class="col-doc">เลขที่ใบ</th>
+                        <th class="col-type">ประเภท</th>
+                        <th class="col-actor">ผู้เบิก</th>
+                        <th class="col-qty">จำนวน</th>
+                        <th class="col-date">วันเวลา</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($g['sns'] as $sn): ?>
                     <?php foreach ($sn['rows'] as $row): ?>
-                    <div class="part-hist-doc">
-                        <a href="<?= url('/pages/history.php?id=' . (int) $row['id']) ?>" class="detail-link part-hist-doc-no"><?= e($row['doc_no']) ?></a>
-                        <span class="part-hist-kind">
+                    <tr>
+                        <td class="col-sn part-hist-sn-cell">
+                            <?php if ($sn['sn'] !== '' && $sn['asset_id'] > 0): ?>
+                            <a href="<?= e($prodBase . '/asset.php?id=' . (int) $sn['asset_id']) ?>" target="_blank" rel="noopener"
+                               class="detail-link" title="เปิดหน้าเครื่องนี้ในระบบทะเบียนเครื่อง"><?= e($sn['sn']) ?></a>
+                            <?php elseif ($sn['sn'] !== ''): ?>
+                            <b><?= e($sn['sn']) ?></b>
+                            <?php else: ?>
+                            <span class="text-muted">—</span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="col-doc part-hist-doc-cell"><a href="<?= url('/pages/history.php?id=' . (int) $row['id']) ?>" class="detail-link"><?= e($row['doc_no']) ?></a></td>
+                        <td class="col-type">
                             <?php if ($row['set_id']): ?>
                             <span class="badge badge-info">ชุดเบิก</span>
                             <span class="text-muted">[<?= e($row['set_code']) ?>] <?= e($row['set_name']) ?></span>
                             <?php else: ?>
                             <span class="badge badge-info">เบิกรายชิ้น</span>
                             <?php endif; ?>
-                        </span>
-                        <span class="text-muted part-hist-who"><?= e($row['issued_by'] ?: '-') ?><?= $row['note'] ? ' · ' . e($row['note']) : '' ?></span>
-                        <span class="text-danger part-hist-qty">-<?= formatNumber($row['quantity']) ?></span>
-                        <span class="text-muted part-hist-when"><?= formatDate($row['created_at']) ?></span>
-                    </div>
+                        </td>
+                        <td class="col-actor text-muted"><?= e($row['issued_by'] ?: '-') ?><?= $row['note'] ? ' · ' . e($row['note']) : '' ?></td>
+                        <td class="col-qty text-danger">-<?= formatNumber($row['quantity']) ?></td>
+                        <td class="col-date text-muted"><?= formatDate($row['created_at']) ?></td>
+                    </tr>
                     <?php endforeach; ?>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
                 </div>
-                <?php endforeach; ?>
             </div>
         </details>
         <?php endforeach; ?>
@@ -233,4 +317,5 @@ parts_page_header('products', 'รายละเอียดอะไหล่'
 <?php if ($product) { parts_stock_modals_for_product($product); } ?>
 <?php if ($product && $icon) { parts_photo_modal_html(); } ?>
 
+<script src="<?= url('/assets/stock-chart.js') ?>?v=<?= @filemtime(__DIR__ . '/../assets/stock-chart.js') ?: 1 ?>"></script>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

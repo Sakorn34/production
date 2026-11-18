@@ -23,6 +23,88 @@
 const SETUP_SALE_HISTORY_URL = 'https://bit-online.net/setupsystem/claim_history.php';
 
 /**
+ * URL ค้นหาในหน้า claim_history — ช่อง «เลขที่/PO/Order» ใช้พารามิเตอร์ claim_no
+ *
+ * @param string $term เลข PO · OPS-xxx · เลข order
+ * @return string
+ */
+function setup_sale_history_search_url(string $term): string
+{
+    $term = trim($term);
+    if ($term === '') {
+        return '';
+    }
+    return SETUP_SALE_HISTORY_URL . '?claim_no=' . rawurlencode($term);
+}
+
+/**
+ * แถวอ้างอิงในการ์ด — ปุ่มลิงก์ไปค้นหาระบบขายทีละรายการ
+ *
+ * @param array<int,string> $poList      เลข PO ดิบจาก setup/stock
+ * @param array<int,string> $orderRefs   เลข Order / claim / setup_id
+ * @return string HTML (ยังไม่ครอบ dd ทั้งก้อน)
+ */
+function setup_sale_history_ref_facts_html(array $poList, array $orderRefs): string
+{
+    $bits = [];
+    $sep = ' <span class="asset-sales-sep">·</span> ';
+    $seenLabels = [];
+    $poKeys = [];
+    $add = function (string $label, string $searchTerm) use (&$bits, &$seenLabels) {
+        $label = trim($label);
+        $searchTerm = trim($searchTerm);
+        if ($label === '') {
+            return;
+        }
+        $lk = mb_strtolower($label);
+        if (isset($seenLabels[$lk])) {
+            return;
+        }
+        $seenLabels[$lk] = true;
+        $url = setup_sale_history_search_url($searchTerm);
+        if ($url !== '') {
+            $bits[] = '<a class="asset-sales-ref-link" href="' . h($url) . '" target="_blank" rel="noopener">'
+                . h($label) . '</a>';
+        } else {
+            $bits[] = h($label);
+        }
+    };
+    foreach ($poList as $po) {
+        $po = trim((string) $po);
+        if ($po === '' || $po === '-') {
+            continue;
+        }
+        $num = preg_replace('/^po\s*/iu', '', $po);
+        if ($num === '') {
+            continue;
+        }
+        $poKeys[mb_strtolower($num)] = true;
+        $add('PO ' . $num, $num);
+    }
+    foreach ($orderRefs as $ref) {
+        $ref = trim((string) $ref);
+        if ($ref === '' || $ref === '-') {
+            continue;
+        }
+        $key = mb_strtolower(preg_replace('/^(order\s+|#)/iu', '', $ref));
+        if (isset($poKeys[$key])) {
+            continue;
+        }
+        // OPS-xxx เป็นป้ายใบส่งมอบ — ใช้เลข order ตัวเลขในแถวเดียวกันค้นหาได้แล้ว ไม่โชว์ซ้ำ
+        if (preg_match('/^OPS-/i', $ref)) {
+            continue;
+        }
+        $term = preg_replace('/^(order\s+|#)/iu', '', $ref);
+        $label = preg_match('/^order\s+/iu', $ref) ? $ref : $ref;
+        if (preg_match('/^\d+$/', $term)) {
+            $label = $term;
+        }
+        $add($label, $term);
+    }
+    return implode($sep, $bits);
+}
+
+/**
  * ประวัติขาย/เคลมของ S/N หนึ่งตัว
  *
  * คืนทั้งรายการที่ S/N นี้เป็น "ตัวใหม่" (ขาย/เคลมเข้ามา) และที่เป็น "ตัวเก่า"
@@ -107,7 +189,24 @@ function setup_sale_history_for_serial(string $serial): array
 }
 
 /**
- * ป้ายประเภทรายการ
+ * ป้ายประเภทรายการแบบข้อความ — ใช้ทั้ง badge และการ์ดสรุป
+ *
+ * @param array<string,mixed> $row
+ * @return string
+ */
+function setup_sale_history_kind_label(array $row): string
+{
+    $isClaim = ((string) ($row['issue_type'] ?? '')) === 'claim';
+    $role = (string) ($row['_role'] ?? 'new');
+    $fromOrder = ((string) ($row['_src'] ?? '')) === 'order';
+    if ($isClaim) {
+        return $role === 'old' ? 'เคลมเปลี่ยนออก' : 'เคลมเปลี่ยนเข้า';
+    }
+    return $fromOrder ? 'ส่งมอบตาม Order' : 'ขาย';
+}
+
+/**
+ * ป้ายประเภทรายการเป็น HTML badge
  *
  * @param array<string,mixed> $row
  * @return string HTML
@@ -115,15 +214,8 @@ function setup_sale_history_for_serial(string $serial): array
 function setup_sale_history_badge(array $row): string
 {
     $isClaim = ((string) ($row['issue_type'] ?? '')) === 'claim';
-    $role = (string) ($row['_role'] ?? 'new');
-    $fromOrder = ((string) ($row['_src'] ?? '')) === 'order';
-    if ($isClaim) {
-        $label = $role === 'old' ? 'เคลมเปลี่ยนออก' : 'เคลมเปลี่ยนเข้า';
-        $cls = 'asset-sales-badge-claim';
-    } else {
-        $label = $fromOrder ? 'ส่งมอบตาม Order' : 'ขาย';
-        $cls = 'asset-sales-badge-sale';
-    }
+    $label = setup_sale_history_kind_label($row);
+    $cls = $isClaim ? 'asset-sales-badge-claim' : 'asset-sales-badge-sale';
     return '<span class="asset-sales-badge ' . $cls . '">' . h($label) . '</span>';
 }
 
@@ -181,20 +273,206 @@ function setup_sale_history_norm(array $r): array
 }
 
 /**
+ * เทียบชื่อแบบไม่สนตัวพิมพ์และช่องว่างเกิน
+ *
+ * @param string $a
+ * @param string $b
+ * @return bool
+ */
+function setup_sale_history_names_equal(string $a, string $b): bool
+{
+    $a = mb_strtolower(trim(preg_replace('/\s+/u', ' ', $a)));
+    $b = mb_strtolower(trim(preg_replace('/\s+/u', ' ', $b)));
+    return $a !== '' && $a === $b;
+}
+
+/**
+ * ชื่อที่น่าจะเป็นบุคคล (คำนำหน้าไทย/อังกฤษ) ไม่ใช่ชื่อหน่วยงานเต็ม ๆ
+ *
+ * @param string $name
+ * @return bool
+ */
+function setup_sale_history_looks_like_person_name(string $name): bool
+{
+    $name = trim($name);
+    if ($name === '') {
+        return false;
+    }
+    if (preg_match('/^(คุณ|นาย|นาง|นางสาว|ด\.?ช\.?|ด\.?ญ\.?|Mr\.?|Mrs\.?|Ms\.?)\s/iu', $name)) {
+        return true;
+    }
+    if (preg_match('/บริษัท|บจก|บจ\.|จำกัด|มหาชน|ห้างหุ้นส่วน|\bCo\.|\bLtd|\bLimited|Factory|โรงงาน/iu', $name)) {
+        return false;
+    }
+    return mb_strlen($name) <= 40;
+}
+
+/**
+ * ชื่อในใบเบิก stock กับหน่วยงานจากระบบขาย — เข้ากันได้ (ไม่ถือว่าขัด)
+ *
+ * เช่น หน่วยงาน "ไทยโคะอิโท …" กับใบเบิก "คุณ…" หรือตรงกับผู้ติดต่อในใบ Order
+ *
+ * @param string              $org
+ * @param string              $stockCustomer
+ * @param array<string,string> $norm ผลจาก setup_sale_history_norm()
+ * @return bool
+ */
+function setup_sale_history_customer_stock_complements_org(string $org, string $stockCustomer, array $norm): bool
+{
+    $org = trim($org);
+    $stockCustomer = trim($stockCustomer);
+    if ($stockCustomer === '' || $org === '') {
+        return true;
+    }
+    if (setup_sale_history_names_equal($org, $stockCustomer)) {
+        return true;
+    }
+    foreach (['person', 'contact'] as $k) {
+        $p = trim((string) ($norm[$k] ?? ''));
+        if ($p === '') {
+            continue;
+        }
+        if (setup_sale_history_names_equal($p, $stockCustomer)) {
+            return true;
+        }
+        if (mb_stripos($p, $stockCustomer) !== false || mb_stripos($stockCustomer, $p) !== false) {
+            return true;
+        }
+    }
+    if (setup_sale_history_looks_like_person_name($stockCustomer)
+        && !setup_sale_history_looks_like_person_name($org)) {
+        return true;
+    }
+    return false;
+}
+
+/**
+ * ฟิลด์ลูกค้าสำหรับการ์ดเบิกขาย — หัวการ์ดเป็นหน่วยงาน แถว facts เป็นผู้ติดต่อ
+ *
+ * @param array<int,array<string,mixed>> $setupRows
+ * @param array<string,mixed>            $summary ผลจาก stockparts_withdraw_summary_fields()
+ * @return array{head:string,contact:string}
+ */
+function setup_sale_history_card_customer_fields(array $setupRows, array $summary): array
+{
+    $orgs = [];
+    $people = [];
+    foreach ($setupRows as $r) {
+        if (!is_array($r)) {
+            continue;
+        }
+        $v = setup_sale_history_norm($r);
+        $o = trim((string) ($v['org'] ?? ''));
+        if ($o !== '' && $o !== '-') {
+            $orgs[] = $o;
+        }
+        foreach (['person', 'contact'] as $k) {
+            $p = trim((string) ($v[$k] ?? ''));
+            if ($p !== '' && $p !== '-') {
+                $people[] = $p;
+            }
+        }
+    }
+    $uniq = static function (array $vals): array {
+        $out = [];
+        $seen = [];
+        foreach ($vals as $v) {
+            $v = trim((string) $v);
+            if ($v === '' || $v === '-') {
+                continue;
+            }
+            $k = mb_strtolower($v);
+            if (isset($seen[$k])) {
+                continue;
+            }
+            $seen[$k] = true;
+            $out[] = $v;
+        }
+        return $out;
+    };
+    $headList = $uniq($orgs);
+    $head = $headList ? $headList[0] : '';
+    $stock = trim((string) ($summary['customer'] ?? ''));
+    if ($head === '' && $stock !== '') {
+        return ['head' => $stock, 'contact' => ''];
+    }
+    if ($stock !== '' && !setup_sale_history_names_equal($stock, $head)) {
+        $inPeople = false;
+        foreach ($people as $p) {
+            if (setup_sale_history_names_equal($p, $stock)) {
+                $inPeople = true;
+                break;
+            }
+        }
+        $complements = false;
+        foreach ($setupRows as $r) {
+            if (!is_array($r)) {
+                continue;
+            }
+            $v = setup_sale_history_norm($r);
+            if (setup_sale_history_customer_stock_complements_org($head, $stock, $v)) {
+                $complements = true;
+                break;
+            }
+        }
+        if (!$inPeople && ($complements || setup_sale_history_looks_like_person_name($stock))) {
+            $people[] = $stock;
+        }
+    }
+    $contact = implode(' · ', $uniq($people));
+    return ['head' => $head, 'contact' => $contact];
+}
+
+/**
+ * ไซต์งานสำหรับการ์ดเบิกขาย — จาก site_name / department ในระบบขาย
+ *
+ * ใช้เมื่อ stock_old ไม่มีชื่อไซต์ แทนการขึ้น «ไม่มีบันทึก» ทันที
+ *
+ * @param array<int,array<string,mixed>> $setupRows
+ * @return string ข้อความรวม (ยังไม่ escape HTML)
+ */
+function setup_sale_history_card_site_line(array $setupRows): string
+{
+    $sites = [];
+    foreach ($setupRows as $r) {
+        if (!is_array($r)) {
+            continue;
+        }
+        $v = setup_sale_history_norm($r);
+        $dept = trim((string) ($v['dept'] ?? ''));
+        if ($dept !== '' && $dept !== '-') {
+            $sites[] = $dept;
+        }
+    }
+    $seen = [];
+    $uniq = [];
+    foreach ($sites as $s) {
+        $k = mb_strtolower($s);
+        if (isset($seen[$k])) {
+            continue;
+        }
+        $seen[$k] = true;
+        $uniq[] = $s;
+    }
+    return implode(' · ', $uniq);
+}
+
+/**
  * เทียบข้อมูลจากระบบขายกับที่การ์ดแสดงอยู่ — คืนเฉพาะจุดที่ไม่ตรงกัน
  *
- * ไม่ตัดสินว่าฝั่งไหนถูก แค่บอกว่ามีสองค่า เพราะคนที่รู้ว่าอันไหนจริงคือผู้ใช้
+ * ชื่อลูกค้า: ถ้า stock เป็นผู้ติดต่อหรือชื่อคนต่อหน่วยงาน ไม่ถือว่าขัด (ดู complements)
  *
  * @param array<string,mixed> $row  แถวจาก equipment_claim_history
- * @param array<string,mixed> $info ผลจาก asset_stockparts_withdraw_info()
+ * @param array<string,mixed> $info ผลจาก stockparts_withdraw_summary_fields()
  * @return array<int,string>
  */
 function setup_sale_history_conflicts(array $row, array $info): array
 {
     $diff = [];
     $v = setup_sale_history_norm($row);
+    $stockCustomer = (string) ($info['customer'] ?? '');
     $pairs = [
-        ['ลูกค้า', $v['org'], (string) ($info['customer'] ?? '')],
+        ['ลูกค้า', $v['org'], $stockCustomer],
         ['PO', $v['po'], (string) ($info['po'] ?? '')],
     ];
     foreach ($pairs as $p) {
@@ -204,7 +482,11 @@ function setup_sale_history_conflicts(array $row, array $info): array
         if ($fromSetup === '' || $fromStock === '') {
             continue;
         }
-        if (mb_strtolower($fromSetup) !== mb_strtolower($fromStock)) {
+        if ($label === 'ลูกค้า'
+            && setup_sale_history_customer_stock_complements_org($fromSetup, $fromStock, $v)) {
+            continue;
+        }
+        if (!setup_sale_history_names_equal($fromSetup, $fromStock)) {
             $diff[] = $label . ': ระบบขายว่า "' . $fromSetup . '" · ทะเบียน stock ว่า "' . $fromStock . '"';
         }
     }

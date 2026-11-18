@@ -183,19 +183,6 @@ function dash_linechart_point($label, $title, array $counts, $titlePrefix, $base
 }
 
 /**
- * ชื่อสั้นสำหรับ legend / เมนูกรaph
- *
- * @param string $st
- * @return string
- */
-function status_th_chip($st)
-{
-    // ชื่อสั้นสำหรับกราฟ — มาจาก palette ชุดเดียวกับสี ไม่เก็บ map ซ้ำที่นี่
-    $e = status_palette_entry((string) $st);
-    return $e['chip'];
-}
-
-/**
  * สีเส้นกรaph ตาม status
  *
  * @param string $st
@@ -292,9 +279,8 @@ function render_dashboard_stacked_chart(array $points, $multiSeries = true, $fil
     }
 
     echo '<div class="' . $rootClass . '">';
-    // hide_legend: หน้า dashboard หลักมีการ์ด "เครื่องทั้งหมด" ที่เป็นคีย์สีอยู่แล้ว (มีตัวเลข
-    // กับ % ด้วย) legend ตรงนี้จะซ้ำชื่อสถานะชุดเดิมอีกรอบโดยไม่เพิ่มข้อมูลอะไร · ส่วนกราฟที่
-    // เปิดใน modal ไม่มีการ์ดนั้นให้ดู จึงยังต้องมี legend ของตัวเอง — ผู้เรียกเป็นคนบอก
+    // hide_legend: มุมมองรายเดือน (drill) หรือที่ต้องการประหยัดพื้นที่ — กราฟรายปีคู่ MA
+    // บนแดชบอร์ดควรแสดง legend เพื่ออ่านสีแท่งได้โดยไม่ต้องมองขึ้นไปที่การ์ด KPI
     $hideLegend = !empty($opts['hide_legend']);
     if (!$compact || !$hideLegend) {
         echo '<div class="dash-chart-top">';
@@ -404,4 +390,326 @@ function render_dashboard_stacked_chart(array $points, $multiSeries = true, $fil
 function render_dashboard_linechart(array $points, $multiSeries = true, $filterSt = null)
 {
     render_dashboard_stacked_chart($points, $multiSeries, $filterSt);
+}
+
+// ────────────────────────────────────────────────────────────────────────────────
+// MA stacked chart — ภาพรวม MA แยกตามผลลัพธ์ (ปกติ / เปลี่ยน / ซ่อม / เสื่อมสภาพ)
+// ────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * เงื่อนไข SQL ว่าแถว ma_records เป็นรายการเสื่อมสภาพ (บันทึกผ่าน rent_close retire / bulk retire)
+ *
+ * @param string $remarkCol ชื่อคอลัมน์ remark เช่น remark หรือ m.remark
+ */
+function ma_sql_row_is_retire(string $remarkCol = 'remark'): string
+{
+    return "({$remarkCol} IS NOT NULL AND TRIM({$remarkCol}) LIKE 'เสื่อมสภาพ%')";
+}
+
+/**
+ * ชุด SUM(CASE...) สำหรับ aggregate กราฟ MA — เสื่อมสภาพไม่นับซ้ำใน ok/replace/repair
+ */
+function ma_sql_chart_aggregate_select(): string
+{
+    $ret = ma_sql_row_is_retire('remark');
+    return "SUM(CASE WHEN {$ret} THEN 1 ELSE 0 END) c_retire,
+     SUM(CASE WHEN NOT {$ret} AND result='repair' THEN 1 ELSE 0 END) c_repair,
+     SUM(CASE WHEN NOT {$ret} AND result='replace' THEN 1 ELSE 0 END) c_replace,
+     SUM(CASE WHEN NOT {$ret} AND (result='ok' OR result IS NULL) THEN 1 ELSE 0 END) c_ok";
+}
+
+/**
+ * ตรวจจากหมายเหตุว่าเป็น MA เสื่อมสภาพ (สอดคล้อง ma.php / rent_ensure_retire_remark)
+ *
+ * @param string|null $remark
+ */
+function ma_remark_indicates_retire($remark): bool
+{
+    $rm = trim((string) $remark);
+    return $rm !== '' && mb_strpos($rm, 'เสื่อมสภาพ') === 0;
+}
+
+/** @return array<string,array{th:string,chip:string,bar:string}> */
+function ma_result_palette(): array
+{
+    return [
+        'ok'      => ['th' => 'ปกติ',           'chip' => 'ปกติ',       'bar' => '#6ee7b7'],
+        'replace' => ['th' => 'เปลี่ยนอะไหล่',  'chip' => 'เปลี่ยน',     'bar' => '#fde68a'],
+        'repair'  => ['th' => 'ต้องซ่อม',       'chip' => 'ซ่อม',        'bar' => '#fca5a5'],
+        'retire'  => ['th' => 'เสื่อมสภาพ',     'chip' => 'เสื่อมสภาพ', 'bar' => '#cbd5e1'],
+    ];
+}
+
+/** @return string[] */
+function ma_result_list(): array { return array_keys(ma_result_palette()); }
+
+/** @return string */
+function ma_result_th(string $r): string
+{
+    $p = ma_result_palette();
+    return isset($p[$r]) ? $p[$r]['th'] : $r;
+}
+
+/** @return string */
+function ma_result_bar_color(string $r): string
+{
+    $p = ma_result_palette();
+    return isset($p[$r]) ? $p[$r]['bar'] : '#94a3b8';
+}
+
+/** จำนวนรวมจาก counts array */
+function ma_result_counts_total(array $counts): int
+{
+    return (int) array_sum($counts);
+}
+
+/** tooltip ข้อความ hover */
+function ma_result_tooltip(string $label, array $counts): string
+{
+    $bits = [];
+    foreach (ma_result_list() as $r) {
+        $c = (int) ($counts[$r] ?? 0);
+        if ($c > 0) { $bits[] = ma_result_th($r) . ' ' . number_format($c); }
+    }
+    return $label . ($bits ? ': ' . implode(' · ', $bits) : '');
+}
+
+/**
+ * ตรวจผลการตรวจ MA ที่ใช้ drill จากกราฟได้
+ *
+ * @param string $result ok|replace|repair|retire
+ * @return bool
+ */
+function ma_result_valid(string $result): bool
+{
+    return in_array($result, ma_result_list(), true);
+}
+
+/**
+ * เงื่อนไข SQL กรองผลการตรวจ MA
+ *
+ * @param string $result all|ok|replace|repair|retire
+ * @param string $alias alias ตาราง ma_records
+ * @return array{sql:string, types:string, params:array<int,mixed>}
+ */
+function ma_result_filter_sql(string $result, string $alias = 'm'): array
+{
+    if ($result === '' || $result === 'all') {
+        return ['sql' => '', 'types' => '', 'params' => []];
+    }
+    if (!ma_result_valid($result)) {
+        return ['sql' => ' AND 1=0', 'types' => '', 'params' => []];
+    }
+    $notRetire = 'NOT ' . ma_sql_row_is_retire($alias . '.remark');
+    if ($result === 'retire') {
+        return [
+            'sql'    => ' AND ' . ma_sql_row_is_retire($alias . '.remark'),
+            'types'  => '',
+            'params' => [],
+        ];
+    }
+    if ($result === 'ok') {
+        return [
+            'sql'    => " AND {$notRetire} AND ({$alias}.result='ok' OR {$alias}.result IS NULL)",
+            'types'  => '',
+            'params' => [],
+        ];
+    }
+    return [
+        'sql'    => " AND {$notRetire} AND {$alias}.result=?",
+        'types'  => 's',
+        'params' => [$result],
+    ];
+}
+
+/**
+ * onclick เปิด modal รายการ MA — กดตัวเลข = ทั้งหมด · กดสี = แยกผลการตรวจ
+ *
+ * @param string            $titlePrefix
+ * @param string            $baseUrl
+ * @param array<string,int> $counts
+ * @return array{all:string, by_result:array<string,string>}
+ */
+function ma_drill_onclicks(string $titlePrefix, string $baseUrl, array $counts): array
+{
+    $all = drill_onclick($titlePrefix, $baseUrl);
+    $byResult = [];
+    foreach (ma_result_list() as $r) {
+        if ((int) ($counts[$r] ?? 0) <= 0) {
+            continue;
+        }
+        $byResult[$r] = drill_onclick(
+            $titlePrefix . ' — ' . ma_result_th($r),
+            $baseUrl . '&result=' . rawurlencode($r)
+        );
+    }
+    return ['all' => $all, 'by_result' => $byResult];
+}
+
+/**
+ * จุดข้อมูลกราฟ MA พร้อม drill
+ *
+ * @param array<string,int> $counts
+ * @return array<string,mixed>
+ */
+function ma_chart_point(string $label, string $title, array $counts, string $titlePrefix, string $baseUrl, int $inlineYear = 0): array
+{
+    $pt = [
+        'label'  => $label,
+        'title'  => $title,
+        'counts' => $counts,
+        'drill'  => ma_drill_onclicks($titlePrefix, $baseUrl, $counts),
+    ];
+    if ($inlineYear > 0) {
+        $pt['inline_year'] = $inlineYear;
+    }
+    return $pt;
+}
+
+/**
+ * Trend เดือนนี้ vs เดือนก่อนสำหรับข้อมูล MA
+ *
+ * @param array<int,array<int,array<string,int>>> $monthCountsByYear [year][month] => counts
+ * @return array{now:int,prev:int,diff:int,pct:int|null,now_ym:string,prev_ym:string}|null
+ */
+function dash_ma_month_trend(array $monthCountsByYear, $today = null)
+{
+    $today = $today === null ? date('Y-m-d') : $today;
+    $ts = strtotime($today);
+    if ($ts === false) { return null; }
+
+    $nowY  = (int) date('Y', $ts);
+    $nowM  = (int) date('n', $ts);
+    $prevY = $nowM === 1 ? $nowY - 1 : $nowY;
+    $prevM = $nowM === 1 ? 12 : $nowM - 1;
+
+    if (!isset($monthCountsByYear[$prevY][$prevM])) { return null; }
+
+    $now  = isset($monthCountsByYear[$nowY][$nowM])
+          ? ma_result_counts_total($monthCountsByYear[$nowY][$nowM]) : 0;
+    $prev = ma_result_counts_total($monthCountsByYear[$prevY][$prevM]);
+
+    return [
+        'now'     => $now,
+        'prev'    => $prev,
+        'diff'    => $now - $prev,
+        'pct'     => $prev > 0 ? (int) round(($now - $prev) / $prev * 100) : null,
+        'now_ym'  => sprintf('%04d-%02d', $nowY, $nowM),
+        'prev_ym' => sprintf('%04d-%02d', $prevY, $prevM),
+    ];
+}
+
+/**
+ * Render stacked bar chart สำหรับข้อมูล MA (ปกติ / เปลี่ยน / ซ่อม)
+ *
+ * โครงสร้าง HTML/CSS ใช้คลาสชุดเดียวกับกราฟผลิต (dash-stacked-chart, dash-bar-*)
+ * ต่างกันที่สีแท่งและ tooltip ใช้ ma_result_palette แทน status_palette
+ *
+ * @param array $points [{label, title, counts, drill?, inline_year?:int}]
+ * @param array $opts   compact, inline_drill, root_class, hide_legend, show_hint
+ */
+function render_ma_stacked_chart(array $points, array $opts = []): void
+{
+    if (!$points) { echo '<p class="muted">ยังไม่มีข้อมูล MA</p>'; return; }
+
+    $compact     = !empty($opts['compact']);
+    $inlineDrill = !empty($opts['inline_drill']);
+    $showHint    = array_key_exists('show_hint', $opts) ? (bool) $opts['show_hint'] : !$compact;
+    $rootClass   = 'dash-stacked-chart' . ($compact ? ' dash-stacked-chart-compact' : '');
+    if (!empty($opts['root_class'])) { $rootClass .= ' ' . h((string) $opts['root_class']); }
+
+    $maxTotal = 0;
+    foreach ($points as $pt) {
+        $maxTotal = max($maxTotal, ma_result_counts_total($pt['counts']));
+    }
+    $yTicks = dash_chart_y_ticks($maxTotal);
+    $yMax   = $yTicks[0];
+
+    $hideLegend = !empty($opts['hide_legend']);
+    echo '<div class="' . $rootClass . '">';
+
+    // legend
+    if (!$hideLegend) {
+        echo '<div class="dash-chart-top"><div class="dash-status-legend dash-status-legend-top">';
+        foreach (ma_result_palette() as $r => $info) {
+            echo '<span class="dash-status-legend-item">'
+               . '<i class="dash-status-swatch" style="background:' . h($info['bar']) . '"></i>'
+               . h($info['chip']) . '</span>';
+        }
+        echo '</div></div>';
+    }
+
+    // chart body
+    echo '<div class="dash-chart-body">';
+    echo '<div class="dash-chart-yaxis" aria-hidden="true">';
+    foreach ($yTicks as $tick) { echo '<span>' . number_format($tick) . '</span>'; }
+    echo '</div>';
+
+    echo '<div class="dash-chart-plot">';
+    echo '<div class="dash-chart-grid" aria-hidden="true">';
+    foreach ($yTicks as $_) { echo '<div class="dash-chart-grid-line"></div>'; }
+    echo '</div>';
+
+    echo '<div class="dash-chart-bars" style="--dash-bar-count:' . count($points) . '">';
+    foreach ($points as $pt) {
+        $total   = ma_result_counts_total($pt['counts']);
+        $tooltip = ma_result_tooltip($pt['title'], $pt['counts']);
+        $barH    = $yMax > 0 ? max(0, min(100, ($total / $yMax) * 100)) : 0;
+        $inlineYear = (int) ($pt['inline_year'] ?? 0);
+        $useInline  = $inlineDrill && $inlineYear > 0;
+        $drill      = is_array($pt['drill'] ?? null) ? $pt['drill'] : ['all' => '', 'by_result' => []];
+        $drillAll   = (string) ($drill['all'] ?? '');
+        $drillBy    = is_array($drill['by_result'] ?? null) ? $drill['by_result'] : [];
+
+        echo '<div class="dash-bar-col" title="' . h($tooltip) . '"';
+        if ($useInline) { echo ' data-ma-inline-year="' . $inlineYear . '"'; }
+        echo '>';
+
+        echo '<div class="dash-bar-slot">';
+        if ($total > 0) {
+            if ($useInline) {
+                echo '<button type="button" class="dash-bar-total dash-bar-total-inline" data-ma-inline-year="'
+                   . $inlineYear . '" title="ดูรายเดือนปี ' . h($pt['label']) . '">'
+                   . number_format($total) . '</button>';
+            } elseif ($drillAll !== '') {
+                echo '<button type="button" class="dash-bar-total" onclick="' . $drillAll
+                   . '" title="ดูรายการทั้งหมด">' . number_format($total) . '</button>';
+            } else {
+                echo '<span class="dash-bar-total">' . number_format($total) . '</span>';
+            }
+        } else {
+            $future = !empty($pt['is_future']);
+            echo '<span class="dash-bar-total dash-bar-total-empty' . ($future ? ' is-future' : '') . '">'
+               . ($future ? '–' : '0') . '</span>';
+        }
+
+        echo '<div class="dash-bar-area" style="height:' . round($barH, 2) . '%">';
+        if ($total > 0) {
+            echo '<div class="dash-bar-stack">';
+            foreach (ma_result_list() as $r) {
+                $c = (int) ($pt['counts'][$r] ?? 0);
+                if ($c <= 0) { continue; }
+                $segOn = (string) ($drillBy[$r] ?? '');
+                echo '<div class="dash-bar-seg dash-bar-seg-ma-' . h($r) . '" data-ma-result="' . h($r)
+                   . '" style="flex:' . $c . ' 1 0;background:' . h(ma_result_bar_color($r)) . '" title="'
+                   . h(ma_result_th($r) . ' ' . number_format($c)) . '"';
+                if ($segOn !== '') {
+                    echo ' onclick="' . $segOn . '" role="button" tabindex="0"';
+                }
+                echo '></div>';
+            }
+            echo '</div>';
+        }
+        echo '</div></div>';
+        echo '<span class="dash-bar-label">' . h($pt['label']) . '</span>';
+        echo '</div>';
+    }
+    echo '</div></div></div>';
+    if ($showHint) {
+        $hint = $inlineDrill
+            ? 'กดสีในแท่ง = เฉพาะผลการตรวจ · กดตัวเลข = ดูรายเดือน'
+            : 'กดสีในแท่ง = เฉพาะผลการตรวจ · กดตัวเลข = รายการทั้งหมด';
+        echo '<p class="dash-chart-hint muted">' . h($hint) . '</p>';
+    }
+    echo '</div>';
 }

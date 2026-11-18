@@ -40,8 +40,8 @@ table tbody tr:hover td { background: #faf8fe; }
 
 /* ── ปุ่ม ── */
 .btn-primary:hover { background: var(--primary-dark); box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 35%, transparent); }
-.btn-outline { color: var(--primary-ink, var(--primary)); border-color: var(--primary); }
-.btn-outline:hover { background: var(--primary-soft); }
+.btn-outline, .btn-line { color: var(--primary-ink, var(--primary)); border-color: var(--primary); }
+.btn-outline:hover, .btn-line:hover { background: var(--primary-soft); }
 
 /* ── ฟอร์ม ── */
 .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
@@ -85,11 +85,25 @@ table tbody tr:hover td { background: #faf8fe; }
 .alert.h-with-icon { align-items: flex-start; }
 .alert.h-with-icon .h-svg { margin-top: 2px; }
 
-/* ── ประวัติการเบิกของอะไหล่: รุ่นสินค้า → หมายเลขเครื่อง → ใบงาน ──
-   เดิมเป็นตารางเรียงตามเวลาล้วน อ่านแล้วไม่รู้ว่าอะไหล่ชิ้นนี้ลงไปกับรุ่นไหนบ้าง
-   แถวใบงานเป็นกริดคอลัมน์ตายตัว ไม่ใช่ flex ที่ดันตัวเลขไปสุดขอบจอกว้าง ๆ
+/* ── ประวัติการเบิกของอะไหล่: รุ่นสินค้า → ตารางแถวต่อใบ (แบบ A) ──
+   รหัสเครื่องเป็นคอลัมน์แรก คอลัมน์อื่นชิดแนวเดียวกันทั้งกลุ่ม
    หมายเหตุ: .part-hist-body ต้องไม่เป็น grid/flex ตอน details ปิด ไม่งั้นจองความสูงไว้ */
-.part-hist-wrap { max-width: 1040px; }
+.part-hist-wrap {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+.part-hist-wrap .table-wrap {
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+.part-hist-wrap .part-hist-table {
+  width: 100%;
+  table-layout: auto;
+}
 .part-hist-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 0.6rem; }
 .part-hist-count { font-size: 0.82rem; }
 .part-hist-views { display: inline-flex; gap: 2px; margin-left: auto; padding: 2px;
@@ -105,29 +119,49 @@ table tbody tr:hover td { background: #faf8fe; }
 .part-hist-sum::before { content: "▸"; color: var(--text-muted, #6b6480); font-size: 0.8em; }
 .part-hist-grp[open] > .part-hist-sum::before { content: "▾"; }
 .part-hist-sum-meta { margin-left: auto; font-size: 0.82rem; white-space: nowrap; }
-.part-hist-body { padding: 0 0 10px 20px; }
-.part-hist-sn { margin-top: 12px; }
-.part-hist-sn-head { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem;
-  font-weight: 600; padding-bottom: 2px; }
-/* คอลัมน์ตายตัว แถวมีเส้นคั่น — กวาดตาตามบรรทัดได้ว่าฝั่งขวาเป็นของแถวไหน */
-.part-hist-doc { display: grid; grid-template-columns: 172px minmax(150px, 1fr) minmax(0, 1.2fr) 52px 128px;
-  align-items: baseline; gap: 10px; padding: 6px 0 6px 2px; font-size: 0.85rem;
-  border-top: 1px solid var(--border, #e8e4f2); }
-.part-hist-doc:hover { background: var(--surface-2, #f8f6fd); }
-.part-hist-doc-no { white-space: nowrap; }
-.part-hist-kind { min-width: 0; overflow-wrap: anywhere; }
-.part-hist-who { min-width: 0; overflow-wrap: anywhere; }
-.part-hist-qty { text-align: right; white-space: nowrap; font-weight: 600; }
-.part-hist-when { white-space: nowrap; }
-.part-hist-table td, .part-hist-table th { vertical-align: top; }
-@media (max-width: 860px) {
-  .part-hist-doc { grid-template-columns: 1fr auto; gap: 4px 10px; }
-  .part-hist-doc-no { grid-column: 1; }
-  .part-hist-qty { grid-column: 2; grid-row: 1; }
-  .part-hist-kind, .part-hist-who { grid-column: 1 / -1; }
-  .part-hist-when { grid-column: 1 / -1; }
-  .part-hist-body { padding-left: 10px; }
+.part-hist-body { padding: 0 0 12px; overflow-x: auto; }
+.part-hist-model-table { margin: 0; }
+.part-hist-sn-cell, .part-hist-doc-cell { white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.part-hist-table td, .part-hist-table th { vertical-align: middle; }
+/* จัดแนวคอลัมน์ประวัติรับเข้า/เบิก — หัวกับข้อมูลตรงกัน */
+.part-hist-table th,
+.part-hist-table td {
+  text-align: left;
+}
+.part-hist-table .col-qty {
+  text-align: right;
+  white-space: nowrap;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.part-hist-table thead .col-qty {
+  font-weight: 700;
+}
+.part-hist-table .col-date {
+  white-space: nowrap;
+}
+.part-hist-table .col-sn,
+.part-hist-table .col-doc,
+.part-hist-table .part-hist-sn-cell,
+.part-hist-table .part-hist-doc-cell {
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: calc(13px * var(--font-scale, 1));
+}
+.part-hist-table .col-type .badge {
+  vertical-align: middle;
+}
+.part-hist-table .col-note,
+.part-hist-table .col-actor {
+  line-height: 1.4;
+}
+@media (max-width: 720px) {
   .part-hist-views { margin-left: 0; }
+  /* จอแคบเหลือรหัส · ใบ · จำนวน · วัน — ประเภท/ผู้เบิกไปดูในเดสก์ท็อปหรือเปิดใบงาน */
+  .part-hist-model-table th:nth-child(3),
+  .part-hist-model-table td:nth-child(3),
+  .part-hist-model-table th:nth-child(4),
+  .part-hist-model-table td:nth-child(4) { display: none; }
 }
 /* ── รูปอะไหล่กดดูขนาดเต็ม ──
    รูปย่อ 80px ดูขาอะไหล่หรือตัวพิมพ์บนตัวถังไม่ออก ต้องเปิดรูปเต็มดู */
@@ -145,3 +179,10 @@ table tbody tr:hover td { background: #faf8fe; }
 /* รูปในตารางอะไหล่รวม — ปุ่มดูรูปเต็มต้องไม่ดันแถวให้สูงขึ้น และอยู่ร่วมกับปุ่มเปลี่ยนรูปเดิม */
 .parts-photo-btn-cell { display: inline-block; }
 .parts-photo-btn-cell .parts-photo-zoom { width: 16px; height: 16px; border-radius: 5px; right: 1px; bottom: 1px; }
+
+.flash-toast-host { position: fixed; top: 16px; right: 16px; z-index: 120; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; max-width: min(380px, 92vw); }
+.flash-toast { pointer-events: auto; padding: 11px 16px; border-radius: 8px; font-size: calc(14px * var(--font-scale, 1)); line-height: 1.4; box-shadow: 0 6px 20px rgba(15,23,42,.14); opacity: 0; transform: translateY(-8px); transition: opacity .2s, transform .2s; }
+.flash-toast-show { opacity: 1; transform: translateY(0); }
+.flash-toast-hide { opacity: 0; transform: translateY(-8px); }
+.flash-toast-ok { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+.flash-toast-err { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }

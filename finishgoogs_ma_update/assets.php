@@ -1,4 +1,10 @@
 <?php
+/**
+ * assets.php — ทะเบียนเครื่องผลิตใหม่ (รายการ + ค้นหา + กรองสถานะ)
+ *
+ * ตัวกรอง "การเบิกใช้งาน" จัดประเภทตามป้ายคอลัมน์ท้ายตาราง (ระบบเช่า / ใบเบิกขาย)
+ * ไม่ใช่ assets.status ซึ่งกรองในช่อง "สถานะ" คนละช่อง
+ */
 require __DIR__ . '/config.php';
 require_login();
 
@@ -6,17 +12,24 @@ require_login();
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'suggest') {
     header('Content-Type: application/json; charset=utf-8');
     $qq = trim(isset($_GET['q']) ? $_GET['q'] : '');
-    $productId = (int)(isset($_GET['product']) ? $_GET['product'] : 0);
+    $productFilter = trim((string) (isset($_GET['product']) ? $_GET['product'] : ''));
     $out = [];
     if (mb_strlen($qq) >= 1) {
         $like = "%$qq%";
         $w = '(a.asset_code LIKE ? OR a.factory_serial LIKE ?)';
         $types = 'ss';
         $params = [$like, $like];
-        if ($productId > 0) {
-            $w .= ' AND a.product_id=?';
-            $types .= 'i';
-            $params[] = $productId;
+        // หน้า MA ส่ง product เป็น id · ตารางทะเบียนส่งชื่อรุ่น — รองรับทั้งสองแบบ
+        if ($productFilter !== '') {
+            if (ctype_digit($productFilter)) {
+                $w .= ' AND a.product_id=?';
+                $types .= 'i';
+                $params[] = (int) $productFilter;
+            } else {
+                $w .= ' AND p.name=?';
+                $types .= 's';
+                $params[] = $productFilter;
+            }
         }
         $res = qr("SELECT a.id, a.asset_code, a.factory_serial, a.status, a.produced_at, p.name pname
                    FROM assets a JOIN products p ON p.id=a.product_id
@@ -40,10 +53,48 @@ require __DIR__ . '/includes/layout.php';
 $search  = trim(isset($_GET['q']) ? $_GET['q'] : '');
 $status  = isset($_GET['status']) ? $_GET['status'] : '';
 $product = isset($_GET['product']) ? $_GET['product'] : '';
+$recorder = trim((string) (isset($_GET['recorder']) ? $_GET['recorder'] : ''));
+if (mb_strlen($recorder) > 100) {
+    $recorder = mb_substr($recorder, 0, 100);
+}
+$fw = trim((string) (isset($_GET['fw']) ? $_GET['fw'] : ''));
+if (mb_strlen($fw) > 40) {
+    $fw = mb_substr($fw, 0, 40);
+}
 // ตัวกรองการเบิกอะไหล่ — ปกติไม่แสดงในตาราง (ดูรายละเอียดที่หน้าโปรไฟล์เครื่อง)
 // ไว้เรียกดูเฉพาะตอนอยากตรวจว่ามีเครื่องไหนตกหล่น
 $pw      = isset($_GET['pw']) ? (string) $_GET['pw'] : '';
 if (!in_array($pw, ['none', 'partial'], true)) { $pw = ''; }
+// ตัวกรอง "การเบิกใช้งาน" — ตรงกับป้ายในคอลัมน์ท้ายตาราง (คำนวณใน PHP ไม่ใช่ SQL เพราะข้อมูลอยู่ 3 ระบบ)
+// แยกสถานะระบบเช่าตามป้ายจริง ไม่กอง MA / คลังพร้อมเช่า / รับคืนไว้ช่องเดียว
+$wdGroups = [
+    'ระบบเช่า' => [
+        'lease_active'   => 'ใช้งานอยู่กับลูกค้า',
+        'lease_fg'       => 'คลังพร้อมเช่า',
+        'lease_ma'       => 'รอซ่อม MA',
+        'lease_claim'    => 'เคลม',
+        'lease_await'    => 'รอส่งคืน',
+        'lease_received' => 'รับคืนแล้ว',
+        'lease_other'    => 'สถานะอื่นในระบบเช่า',
+    ],
+    'ขาย / คลังผลิต' => [
+        'sold'    => 'เบิกขาย / ส่งมอบแล้ว',
+        'instock' => 'อยู่ในคลัง',
+        'nodoc'   => 'ขายแล้วแต่ไม่มีใบเบิก',
+    ],
+];
+$wdOptions = [];
+foreach ($wdGroups as $wdOpts) {
+    foreach ($wdOpts as $wk => $wl) {
+        $wdOptions[$wk] = $wl;
+    }
+}
+$wd = isset($_GET['wd']) ? (string) $_GET['wd'] : '';
+if ($wd === 'unknown') {
+    $wd = 'instock';
+}
+if (!isset($wdOptions[$wd])) { $wd = ''; }
+$wsync = isset($_GET['wsync']) && (string) $_GET['wsync'] === '1';
 $page    = max(1, (int)(isset($_GET['page']) ? $_GET['page'] : 1));
 $per     = 50;
 // ค่าเริ่มต้น: เวลาบันทึกล่าสุด → รหัสเครื่องมากสุด
@@ -58,28 +109,78 @@ $sortSql = [
 ];
 if (!isset($sortSql[$sort])) $sort = 'time_code';
 
-$hasActiveFilter = ($search !== '' || $product !== '' || $status !== '' || $pw !== '' || $sort !== 'time_code');
+$hasActiveFilter = ($search !== '' || $product !== '' || $status !== '' || $recorder !== '' || $fw !== '' || $pw !== '' || $wd !== '' || $sort !== 'time_code' || $wsync);
 
 /**
- * สร้าง WHERE สำหรับ filter หน้า assets.php
+ * จัดประเภท "การเบิกใช้งาน" ของเครื่องหนึ่งเครื่อง — ลำดับเดียวกับป้ายในคอลัมน์ท้ายตาราง
  *
- * @param string $search
- * @param string $status
- * @param string $product
- * @param string $pw      '' ทั้งหมด · none ยังไม่เบิกเลย · partial เบิกไม่ครบชุด
+ * สถานะระบบเช่าใช้ลำดับเดียวกับ rent_leasing_status_label() เพื่อให้ตัวกรองกับป้ายตรงกัน
+ * (เช่น active ชนะ finished goods ที่ค้างในทะเบียน)
+ *
+ * @param array<string,mixed>|null $lease   จาก asset_leasing_status_by_assets()
+ * @param array<string,mixed>|null $sale    จาก asset_stockparts_sale_status_by_sn() (null = ไม่พบใน stock)
+ * @param array<string,mixed>|null $saleSu  จาก asset_status_setup_sold_map()
+ * @param string                   $status  assets.status
+ * @return string lease_active|lease_fg|lease_ma|lease_claim|lease_await|lease_received|lease_other|sold|instock|nodoc
+ */
+function assets_page_withdraw_class($lease, $sale, $saleSu, string $status): string
+{
+    if (!empty($lease['found'])) {
+        $p = trim((string) ($lease['p_status'] ?? ''));
+        $pro = trim((string) ($lease['pro_status'] ?? ''));
+        if ($p === 'active' || ($lease['badge_class'] ?? '') === 'asset-rent-badge-active') {
+            return 'lease_active';
+        }
+        if ($pro === 'MA' || $p === 'MA') {
+            return 'lease_ma';
+        }
+        if ($pro === 'claim' || $p === 'claim') {
+            return 'lease_claim';
+        }
+        if ($pro === 'Awaiting Return') {
+            return 'lease_await';
+        }
+        if ($pro === 'finished goods') {
+            return 'lease_fg';
+        }
+        if ($p === 'received') {
+            return 'lease_received';
+        }
+        return 'lease_other';
+    }
+    if (!empty($sale['sold']) || $saleSu) {
+        return 'sold';
+    }
+    return $status === 'sold' ? 'nodoc' : 'instock';
+}
+
+/**
+ * สร้าง WHERE สำหรับ filter หน้า assets.php — ช่องละคอลัมน์ตามหัวตาราง
+ *
+ * @param string $search   รหัสเครื่อง / factory_serial
+ * @param string $status   สถานะเครื่อง
+ * @param string $product  ชื่อรุ่น
+ * @param string $pw       '' ทั้งหมด · none ยังไม่เบิกเลย · partial เบิกไม่ครบชุด
+ * @param string $recorder ผู้บันทึกรายการ (made_by / assembly_by)
+ * @param string $fw       เวอร์ชัน FW
  * @return array{w:string,types:string,params:array<int|string>}
  */
-function assets_page_build_where(string $search, string $status, string $product, string $pw = ''): array
-{
+function assets_page_build_where(
+    string $search,
+    string $status,
+    string $product,
+    string $pw = '',
+    string $recorder = '',
+    string $fw = ''
+): array {
     $where = [];
     $types = '';
     $params = [];
     if ($search !== '') {
         $like = "%{$search}%";
-        $where[] = '(a.asset_code LIKE ? OR a.factory_serial LIKE ? OR p.name LIKE ? OR a.current_fw_version LIKE ?
-                OR EXISTS (SELECT 1 FROM production_records pr WHERE pr.asset_id=a.id AND (pr.made_by LIKE ? OR pr.assembly_by LIKE ?)))';
-        $types .= 'ssssss';
-        array_push($params, $like, $like, $like, $like, $like, $like);
+        $where[] = '(a.asset_code LIKE ? OR a.factory_serial LIKE ?)';
+        $types .= 'ss';
+        array_push($params, $like, $like);
     }
     if ($status !== '' && in_array($status, status_list(), true)) {
         $where[] = 'a.status = ?';
@@ -90,6 +191,19 @@ function assets_page_build_where(string $search, string $status, string $product
         $where[] = 'p.name = ?';
         $types .= 's';
         $params[] = $product;
+    }
+    if ($recorder !== '') {
+        $like = "%{$recorder}%";
+        $where[] = 'EXISTS (SELECT 1 FROM production_records pr
+                WHERE pr.asset_id = a.id AND (pr.made_by LIKE ? OR pr.assembly_by LIKE ?))';
+        $types .= 'ss';
+        array_push($params, $like, $like);
+    }
+    if ($fw !== '') {
+        $like = "%{$fw}%";
+        $where[] = 'a.current_fw_version LIKE ?';
+        $types .= 's';
+        $params[] = $like;
     }
     // เทียบจำนวนอะไหล่ที่เบิกจริง (นับชนิด ไม่ใช่จำนวนชิ้น) กับชุดเบิกของรุ่น
     // เครื่องของรุ่นที่ยังไม่ได้ตั้งชุดเบิกไม่นับว่าตกหล่น
@@ -106,7 +220,54 @@ function assets_page_build_where(string $search, string $status, string $product
     return ['w' => $w, 'types' => $types, 'params' => $params];
 }
 
-$filter = assets_page_build_where($search, $status, $product, $pw);
+/**
+ * URL หน้าทะเบียนเครื่องตามตัวกรองปัจจุบัน
+ *
+ * @param array<string,mixed> $over ค่าที่ทับ ว่าง/null = ลบคีย์
+ * @return string
+ */
+function assets_page_url(array $over = []): string
+{
+    global $search, $status, $product, $recorder, $fw, $pw, $wd, $sort, $wsync;
+    $qs = [];
+    if ($search !== '') {
+        $qs['q'] = $search;
+    }
+    if ($product !== '') {
+        $qs['product'] = $product;
+    }
+    if ($status !== '') {
+        $qs['status'] = $status;
+    }
+    if ($recorder !== '') {
+        $qs['recorder'] = $recorder;
+    }
+    if ($fw !== '') {
+        $qs['fw'] = $fw;
+    }
+    if ($pw !== '') {
+        $qs['pw'] = $pw;
+    }
+    if ($wd !== '') {
+        $qs['wd'] = $wd;
+    }
+    if ($sort !== 'time_code') {
+        $qs['sort'] = $sort;
+    }
+    if ($wsync) {
+        $qs['wsync'] = '1';
+    }
+    foreach ($over as $k => $v) {
+        if ($v === null || $v === '') {
+            unset($qs[$k]);
+        } else {
+            $qs[$k] = $v;
+        }
+    }
+    return BASE_URL . '/assets.php' . ($qs ? '?' . http_build_query($qs) : '');
+}
+
+$filter = assets_page_build_where($search, $status, $product, $pw, $recorder, $fw);
 $w = $filter['w'];
 $types = $filter['types'];
 $params = $filter['params'];
@@ -117,13 +278,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sync_withdraw_list_bu
         $search = trim((string) ($_POST['filter_q'] ?? ''));
         $status = trim((string) ($_POST['filter_status'] ?? ''));
         $product = trim((string) ($_POST['filter_product'] ?? ''));
+        $recorder = trim((string) ($_POST['filter_recorder'] ?? ''));
+        if (mb_strlen($recorder) > 100) {
+            $recorder = mb_substr($recorder, 0, 100);
+        }
+        $fw = trim((string) ($_POST['filter_fw'] ?? ''));
+        if (mb_strlen($fw) > 40) {
+            $fw = mb_substr($fw, 0, 40);
+        }
         $pw = trim((string) ($_POST['filter_pw'] ?? ''));
         if (!in_array($pw, ['none', 'partial'], true)) { $pw = ''; }
+        $wd = trim((string) ($_POST['filter_wd'] ?? ''));
+        if ($wd === 'unknown') {
+            $wd = 'instock';
+        }
+        if (!isset($wdOptions[$wd])) { $wd = ''; }
         $sort = trim((string) ($_POST['filter_sort'] ?? 'time_code'));
         if (!isset($sortSql[$sort])) {
             $sort = 'time_code';
         }
-        $filter = assets_page_build_where($search, $status, $product, $pw);
+        $filter = assets_page_build_where($search, $status, $product, $pw, $recorder, $fw);
         $w = $filter['w'];
         $types = $filter['types'];
         $params = $filter['params'];
@@ -145,11 +319,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sync_withdraw_list_bu
         }
     }
     $redirectQs = array_filter([
-        'q'       => $search,
-        'product' => $product,
-        'status'  => $status,
-        'pw'      => $pw,
-        'sort'    => $sort,
+        'q'        => $search,
+        'product'  => $product,
+        'status'   => $status,
+        'recorder' => $recorder,
+        'fw'       => $fw,
+        'pw'       => $pw,
+        'wd'       => $wd,
+        'sort'     => $sort,
     ], static function ($v) {
         return $v !== '';
     });
@@ -157,11 +334,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sync_withdraw_list_bu
     exit;
 }
 
-$withdrawSyncPendingCount = asset_withdraw_list_sync_pending_count_cached($w, $types, $params);
+$syncPendingIds = asset_withdraw_list_sync_pending_ids_cached($w, $types, $params);
+$withdrawSyncPendingCount = count($syncPendingIds);
+$syncPendingSet = array_fill_keys($syncPendingIds, true);
+if ($wsync) {
+    if ($syncPendingIds === []) {
+        $w .= ($w === '' ? 'WHERE ' : ' AND ') . '0=1';
+    } else {
+        $ph = implode(',', array_fill(0, count($syncPendingIds), '?'));
+        $w .= ($w === '' ? 'WHERE ' : ' AND ') . 'a.id IN (' . $ph . ')';
+        $types .= str_repeat('i', count($syncPendingIds));
+        $params = array_merge($params, $syncPendingIds);
+    }
+}
+
+require_once __DIR__ . '/includes/stockparts_withdraw.php';
+require_once __DIR__ . '/includes/rent_ma_bridge.php';
+require_once __DIR__ . '/includes/asset_status_sync.php';
 
 $totalRows = qr("SELECT COUNT(*) c FROM assets a JOIN products p ON p.id=a.product_id $w", $types, $params)->fetch_assoc()['c'];
-$pages = max(1, (int)ceil($totalRows / $per));
 $off = ($page - 1) * $per;
+$rowLimitSql = ' LIMIT ' . (int) $per . ' OFFSET ' . (int) $off;
+
+if ($wd !== '') {
+    // กรอง "การเบิกใช้งาน" ต้องรู้ประเภทของทุกเครื่องที่ผ่านตัวกรองอื่นก่อน (หลักพันแถว — เบา)
+    // แล้วค่อยแบ่งหน้าเอง ด้วยการเติม a.id IN (...) เข้า WHERE ของคิวรีหลัก
+    $cand = [];
+    $cr = qr("SELECT a.id, a.asset_code, a.factory_serial, a.status
+              FROM assets a JOIN products p ON p.id=a.product_id
+              $w ORDER BY {$sortSql[$sort]}", $types, $params);
+    while ($x = $cr->fetch_assoc()) {
+        $cand[] = $x;
+    }
+    // แคชประเภทของ "ทุกเครื่อง" 2 นาที ในไฟล์ชั่วคราว — การคำนวณข้าม 3 ระบบหลักหมื่นเครื่องใช้เวลาหลายวินาที
+    $clsFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'assets_wd_class_v3_' . md5(__DIR__) . '.json';
+    $clsMap = null;
+    if (is_file($clsFile) && (time() - (int) @filemtime($clsFile)) < 120) {
+        $clsMap = json_decode((string) @file_get_contents($clsFile), true);
+        if (!is_array($clsMap)) {
+            $clsMap = null;
+        }
+    }
+    $needBuild = $clsMap === null;
+    if (!$needBuild) {
+        foreach ($cand as $x) {
+            if (!isset($clsMap[$x['asset_code']])) { // มีเครื่องใหม่หลังสร้างแคช
+                $needBuild = true;
+                break;
+            }
+        }
+    }
+    if ($needBuild) {
+        $all = [];
+        $ar = qr('SELECT a.id, a.asset_code, a.factory_serial, a.status FROM assets a');
+        while ($x = $ar->fetch_assoc()) {
+            $all[] = $x;
+        }
+        $codes = array_column($all, 'asset_code');
+        $cLease = asset_leasing_status_by_assets($all);
+        $cSale  = asset_stockparts_sale_status_by_sn($codes);
+        $cSetup = asset_status_setup_sold_map($codes);
+        $clsMap = [];
+        foreach ($all as $x) {
+            $code = $x['asset_code'];
+            $clsMap[$code] = assets_page_withdraw_class(
+                $cLease[$code] ?? null,
+                $cSale[$code] ?? null,
+                $cSetup[strtoupper((string) $code)] ?? null,
+                (string) $x['status']
+            );
+        }
+        @file_put_contents($clsFile, json_encode($clsMap, JSON_UNESCAPED_UNICODE), LOCK_EX);
+    }
+    $matchIds = [];
+    foreach ($cand as $x) {
+        $cls = $clsMap[$x['asset_code']] ?? '';
+        if ($cls === $wd) {
+            $matchIds[] = (int) $x['id'];
+        }
+    }
+    $totalRows = count($matchIds);
+    $pageIds = array_slice($matchIds, $off, $per);
+    $w = ($w === '' ? 'WHERE' : $w . ' AND')
+       . ' a.id IN (' . ($pageIds ? implode(',', $pageIds) : '0') . ')';
+    $rowLimitSql = ''; // จำกัดด้วย id แล้ว
+}
+$pages = max(1, (int)ceil($totalRows / $per));
 
 $rows = qr("SELECT a.id, a.asset_code, a.factory_serial, a.status, a.produced_at, a.current_fw_version,
                    p.name pname, p.icon_path, p.id product_id,
@@ -169,7 +427,7 @@ $rows = qr("SELECT a.id, a.asset_code, a.factory_serial, a.status, a.produced_at
                     WHERE pr.asset_id=a.id AND pr.made_by IS NOT NULL AND pr.made_by<>''
                     ORDER BY pr.recorded_at ASC, pr.id ASC LIMIT 1) recorder
             FROM assets a JOIN products p ON p.id=a.product_id
-            $w ORDER BY {$sortSql[$sort]} LIMIT $per OFFSET $off", $types, $params);
+            $w ORDER BY {$sortSql[$sort]}{$rowLimitSql}", $types, $params);
 
 $assetRows = [];
 while ($r = $rows->fetch_assoc()) {
@@ -177,9 +435,6 @@ while ($r = $rows->fetch_assoc()) {
 }
 // สถานะการเบิกขาย — อ่านจากระบบ stock ที่เดียวกับการ์ดในหน้าโปรไฟล์เครื่อง
 // เดิมคอลัมน์นี้อ่าน stock_movements ซึ่งนับ "เบิกผลิต" เป็นเบิกออกด้วย จึงไม่ใช่การขาย
-require_once __DIR__ . '/includes/stockparts_withdraw.php';
-require_once __DIR__ . '/includes/rent_ma_bridge.php';
-require_once __DIR__ . '/includes/asset_status_sync.php';
 $saleStatus = asset_stockparts_sale_status_by_sn(array_column($assetRows, 'asset_code'));
 // ใบสั่งงาน/ประวัติขายฝั่งระบบ setup — บางเครื่องคลังจ่ายออกทางนั้นโดยไม่มีใบเบิกใน stock
 // ถ้าไม่อ่านด้วย คอลัมน์นี้จะขึ้นว่า "อยู่ในคลัง" ทั้งที่ของส่งถึงลูกค้าแล้ว
@@ -202,79 +457,157 @@ $productList = qr("SELECT DISTINCT p.name FROM products p JOIN assets a ON a.pro
 
 $assetsCta = '<a class="btn" href="' . BASE_URL . '/asset_new.php">'
     . ui_btn_label('assets', ' ลงทะเบียนเครื่องผลิตใหม่') . '</a>'
-    . '<a class="btn btn-line" href="' . BASE_URL . '/inv_pickups.php" data-same-tab>'
-    . ui_btn_label('download', ' ใบเบิกรอผลิต') . '</a>'
     . '<a class="btn btn-line" href="' . BASE_URL . '/leasing_move.php" data-same-tab>'
     . ui_btn_label('upload', ' ย้ายไประบบเช่า') . '</a>';
 page_header('ทะเบียนเครื่องผลิตใหม่', true, number_format($totalRows) . ' เครื่อง', '', $assetsCta);
 ?>
 <div class="filter assets-filter">
-<form method="get" style="display:contents">
-  <span class="livesearch-wrap">
-    <input type="text" name="q" id="live-q" data-scan="submit" value="<?= h($search) ?>" placeholder="ค้นหา รหัสเครื่อง / รุ่น / ผู้ผลิต / FW" style="width:min(360px,100%)" autocomplete="off">
-    <div id="live-results" class="combo-list" hidden></div>
-  </span>
-  <select name="product" onchange="this.form.submit()">
-    <option value="">ทุกรุ่น</option>
-    <?php while ($p = $productList->fetch_assoc()) { ?>
-      <option value="<?= h($p['name']) ?>" <?= $product === $p['name'] ? 'selected' : '' ?>><?= h($p['name']) ?></option>
+<form method="get" class="assets-filter-form">
+  <?php if ($wsync) { ?><input type="hidden" name="wsync" value="1"><?php } ?>
+  <?php // ลำดับช่อง = ลำดับหัวตาราง (ข้ามคอลัมน์รูป) ?>
+  <label class="assets-ff">
+    <span>ผลิตเมื่อ</span>
+    <select name="sort" onchange="this.form.submit()">
+      <option value="time_code" <?= $sort === 'time_code' ? 'selected' : '' ?>>บันทึกล่าสุด</option>
+      <option value="date_desc" <?= $sort === 'date_desc' ? 'selected' : '' ?>>ใหม่ → เก่า</option>
+      <option value="date_asc" <?= $sort === 'date_asc' ? 'selected' : '' ?>>เก่า → ใหม่</option>
+      <?php if ($sort === 'code') { ?><option value="code" selected>รหัสเครื่อง</option><?php } ?>
+      <?php if ($sort === 'recent') { ?><option value="recent" selected>เพิ่มเข้าระบบล่าสุด</option><?php } ?>
+    </select>
+  </label>
+  <label class="assets-ff assets-ff-code">
+    <span>รหัสเครื่อง</span>
+    <span class="livesearch-wrap">
+      <input type="text" name="q" id="live-q" data-scan="submit" value="<?= h($search) ?>" placeholder="ค้นหารหัสเครื่อง" autocomplete="off">
+      <div id="live-results" class="combo-list" hidden></div>
+    </span>
+  </label>
+  <label class="assets-ff">
+    <span>รุ่น</span>
+    <select name="product" onchange="this.form.submit()">
+      <option value="">ทั้งหมด</option>
+      <?php while ($p = $productList->fetch_assoc()) { ?>
+        <option value="<?= h($p['name']) ?>" <?= $product === $p['name'] ? 'selected' : '' ?>><?= h($p['name']) ?></option>
+      <?php } ?>
+    </select>
+  </label>
+  <label class="assets-ff">
+    <span>สถานะ</span>
+    <select name="status" onchange="this.form.submit()">
+      <option value="">ทั้งหมด</option>
+      <?php foreach (status_list() as $s) { ?>
+        <option value="<?= $s ?>" <?= $status === $s ? 'selected' : '' ?>><?= h(status_th($s)) ?></option>
+      <?php } ?>
+    </select>
+  </label>
+  <label class="assets-ff">
+    <span>ผู้บันทึกรายการ</span>
+    <input type="text" name="recorder" value="<?= h($recorder) ?>" placeholder="ชื่อคนบันทึก" maxlength="100" autocomplete="off">
+  </label>
+  <label class="assets-ff assets-ff-fw">
+    <span>FW</span>
+    <input type="text" name="fw" value="<?= h($fw) ?>" placeholder="เวอร์ชัน" maxlength="40" autocomplete="off">
+  </label>
+  <label class="assets-ff assets-ff-wd">
+    <span>การเบิกใช้งาน</span>
+    <select name="wd" onchange="this.form.submit()">
+      <option value="">ทั้งหมด</option>
+      <?php foreach ($wdGroups as $wgLabel => $wdOpts) { ?>
+      <optgroup label="<?= h($wgLabel) ?>">
+        <?php foreach ($wdOpts as $wk => $wl) { ?>
+        <option value="<?= h($wk) ?>" <?= $wd === $wk ? 'selected' : '' ?>><?= h($wl) ?></option>
+        <?php } ?>
+      </optgroup>
+      <?php } ?>
+    </select>
+  </label>
+  <?php // ตัวกรอง pw (เบิกอะไหล่ตกหล่น) ถอดออกจากหน้าจอแล้ว — ลิงก์เก่า ?pw= ยังทำงาน ?>
+  <?php if ($pw !== '') { ?><input type="hidden" name="pw" value="<?= h($pw) ?>"><?php } ?>
+  <div class="assets-ff-actions">
+    <button type="submit">ค้นหา</button>
+    <?php if ($hasActiveFilter) { ?>
+    <a href="<?= BASE_URL ?>/assets.php" class="btn btn-line btn-sm">ล้างการค้นหา</a>
     <?php } ?>
-  </select>
-  <select name="status" onchange="this.form.submit()">
-    <option value="">ทุกสถานะ</option>
-    <?php foreach (status_list() as $s) { ?>
-      <option value="<?= $s ?>" <?= $status === $s ? 'selected' : '' ?>><?= h(status_th($s)) ?></option>
-    <?php } ?>
-  </select>
-  <select name="pw" onchange="this.form.submit()" title="ตรวจหาเครื่องที่เบิกอะไหล่ตกหล่น">
-    <option value="">เบิกอะไหล่: ทั้งหมด</option>
-    <option value="none" <?= $pw === 'none' ? 'selected' : '' ?>>ยังไม่เบิกเลย</option>
-    <option value="partial" <?= $pw === 'partial' ? 'selected' : '' ?>>เบิกไม่ครบชุด</option>
-  </select>
-  <select name="sort" onchange="this.form.submit()">
-    <option value="time_code" <?= $sort === 'time_code' ? 'selected' : '' ?>>บันทึกล่าสุด</option>
-    <option value="date_desc" <?= $sort === 'date_desc' ? 'selected' : '' ?>>ผลิต ใหม่ → เก่า</option>
-    <option value="date_asc" <?= $sort === 'date_asc' ? 'selected' : '' ?>>ผลิต เก่า → ใหม่</option>
-    <option value="code" <?= $sort === 'code' ? 'selected' : '' ?>>รหัสเครื่อง</option>
-    <option value="recent" <?= $sort === 'recent' ? 'selected' : '' ?>>เพิ่มเข้าระบบล่าสุด</option>
-  </select>
-  <button type="submit">ค้นหา</button>
-  <?php if ($hasActiveFilter) { ?>
-  <a href="<?= BASE_URL ?>/assets.php" class="btn btn-line btn-sm">ล้างการค้นหา</a>
-  <?php } ?>
+  </div>
 </form>
   <?php if ($withdrawSyncPendingCount > 0) { ?>
-  <form method="post" style="display:inline-flex" onsubmit="return confirm('จับคู่ยอดเบิกกับสต็อกให้ตรงกัน สำหรับ <?= (int)$withdrawSyncPendingCount ?> เครื่อง (ตามตัวกรองที่เลือกอยู่)?\n\nระบบจะจับคู่ยอดเบิกกับสต็อก และลบใบเบิกที่ซ้ำ/เกินออก (คืนสต็อกให้)')">
+  <div class="assets-filter-sync">
+    <?php if ($wsync) { ?>
+    <span class="muted assets-wsync-note">กำลังแสดงเฉพาะ <?= number_format($withdrawSyncPendingCount) ?> เครื่องที่รายการเบิกยังไม่ตรงสต็อก</span>
+    <a href="<?= h(assets_page_url(['wsync' => null, 'page' => null])) ?>" class="btn btn-line btn-sm">แสดงทั้งหมด</a>
+    <?php } else { ?>
+    <a href="<?= h(assets_page_url(['wsync' => '1', 'page' => null])) ?>" class="btn btn-line btn-sm" title="เปิดเฉพาะเครื่องที่รายการเบิกยังไม่ตรงสต็อกอะไหล่">ดู <?= number_format($withdrawSyncPendingCount) ?> เครื่องนี้</a>
+    <?php } ?>
+  <form method="post" onsubmit="return confirm('จับคู่ยอดเบิกกับสต็อกให้ตรงกัน สำหรับ <?= (int)$withdrawSyncPendingCount ?> เครื่อง (ตามตัวกรองที่เลือกอยู่)?\n\nระบบจะจับคู่ยอดเบิกกับสต็อก และลบใบเบิกที่ซ้ำ/เกินออก (คืนสต็อกให้)')">
     <?= csrf_field() ?>
     <input type="hidden" name="sync_withdraw_list_bulk" value="1">
     <input type="hidden" name="filter_q" value="<?= h($search) ?>">
     <input type="hidden" name="filter_product" value="<?= h($product) ?>">
     <input type="hidden" name="filter_status" value="<?= h($status) ?>">
+    <input type="hidden" name="filter_recorder" value="<?= h($recorder) ?>">
+    <input type="hidden" name="filter_fw" value="<?= h($fw) ?>">
     <input type="hidden" name="filter_pw" value="<?= h($pw) ?>">
+    <input type="hidden" name="filter_wd" value="<?= h($wd) ?>">
     <input type="hidden" name="filter_sort" value="<?= h($sort) ?>">
     <button type="submit" class="btn btn-sm btn-line btn-with-icon"><?= ui_btn_label('refresh', 'Sync รายการเบิก (' . number_format($withdrawSyncPendingCount) . ')') ?></button>
   </form>
+  </div>
   <?php } ?>
 </div>
 
 <style>
-/* แถบตัวกรอง — จัดให้ช่องกรอกสูงเท่ากันและเว้นระยะกับตารางด้านล่างให้หายใจ */
+/* แถบค้นหา — ป้ายช่องตรงหัวตาราง และเรียงลำดับเดียวกับคอลัมน์ */
 .assets-filter {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  align-items: center;
+  align-items: flex-end;
   margin-bottom: 10px;
 }
-.assets-filter > form { display: contents; }
-.assets-filter input[type=text],
-.assets-filter select,
-.assets-filter button,
-.assets-filter .btn { min-height: var(--input-h, 40px); }
-.assets-filter select { min-width: 150px; }
-/* ปุ่มลงทะเบียนดันไปชิดขวาสุด แยกจากกลุ่มค้นหาอย่างชัดเจน */
+.assets-filter-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  align-items: flex-end;
+  flex: 1 1 auto;
+}
+.assets-ff {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.assets-ff > span:first-child {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted, #6b6480);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.assets-ff input[type=text],
+.assets-ff select,
+.assets-ff-actions button,
+.assets-ff-actions .btn { min-height: var(--input-h, 40px); }
+.assets-ff select { min-width: 132px; max-width: 220px; }
+.assets-ff-code { flex: 1 1 170px; min-width: 150px; max-width: 240px; }
+.assets-ff-code .livesearch-wrap { display: block; width: 100%; position: relative; }
+.assets-ff-code input { width: 100%; }
+.assets-ff-fw { width: 108px; flex: 0 0 108px; }
+.assets-ff-fw input { width: 100%; }
+.assets-ff-wd select { min-width: 170px; max-width: 260px; }
+.assets-ff-actions { display: flex; gap: 8px; align-items: center; padding-bottom: 0; }
+.assets-filter-sync { display: inline-flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+.assets-wsync-note { font-size: calc(12.5px * var(--font-scale, 1)); align-self: center; }
+.assets-wsync-flag {
+  display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px;
+  font-size: calc(11px * var(--font-scale, 1)); font-weight: 600; white-space: nowrap;
+  background: var(--warning-soft, #fef9c3); color: var(--warning, #a16207);
+}
 
 @media (max-width: 780px) {
+  .assets-ff, .assets-ff-code, .assets-ff-fw, .assets-ff-wd { flex: 1 1 calc(50% - 8px); max-width: none; width: auto; }
+  .assets-ff select { min-width: 0; max-width: none; width: 100%; }
+  .assets-ff-actions { flex: 1 1 100%; }
 }
 /* ป้ายสถานะการเบิกขาย */
 .sale-tag {
@@ -304,7 +637,10 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
     var q = input.value.trim();
     if (q.length < 2) { box.hidden = true; return; }
     timer = setTimeout(function(){
-      fetch('<?= BASE_URL ?>/assets.php?ajax=suggest&q=' + encodeURIComponent(q))
+      var prod = document.querySelector('.assets-filter-form select[name="product"]');
+      var url = '<?= BASE_URL ?>/assets.php?ajax=suggest&q=' + encodeURIComponent(q);
+      if (prod && prod.value) { url += '&product=' + encodeURIComponent(prod.value); }
+      fetch(url)
         .then(function(r){ return r.json(); })
         .then(function(items){
           if (!items.length) { box.innerHTML = '<div class="muted" style="padding:6px 10px">ไม่พบเครื่องที่ตรง</div>'; box.hidden = false; return; }
@@ -343,6 +679,9 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
     <td data-pri="2" style="width:56px"><?= img_tag($r['icon_path'], $r['pname']) ?></td>
     <td data-pri="1">
       <a href="<?= BASE_URL ?>/asset.php?id=<?= $r['id'] ?>"><b><?= h($r['asset_code']) ?></b></a>
+      <?php if (isset($syncPendingSet[(int) $r['id']])) { ?>
+      <span class="assets-wsync-flag" title="รายการเบิกบนเครื่องนี้ยังไม่ตรงกับสต็อกอะไหล่">ต้อง Sync</span>
+      <?php } ?>
       <?php // บรรทัดรอง — โผล่เองเมื่อคอลัมน์ระดับ 2 ถูกยุบที่จอแคบ ?>
       <span class="cell-sub"><?= h($r['pname']) ?> · <?= dthai($r['produced_at']) ?></span>
     </td>
@@ -359,7 +698,7 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
       <?php if (!empty($lease['found'])) { ?>
         <?= rent_leasing_list_status_html($lease) ?>
       <?php } elseif ($sale === null) { ?>
-        <span class="sale-tag sale-unknown" title="ไม่พบ S/N นี้ในทะเบียน stock">—</span>
+        <span class="sale-tag sale-in" title="ไม่พบ S/N นี้ในทะเบียน stock — นับว่าอยู่ในคลังฝั่งผลิต">อยู่ในคลัง</span>
       <?php } elseif ($sale['sold']) {
           $saleSrc = (string) ($sale['resolve_source'] ?? '');
           if ($saleSrc === 'stock_old') {

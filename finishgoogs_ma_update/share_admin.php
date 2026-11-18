@@ -160,6 +160,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $setup = trim($_POST['setup_id'] ?? '');
             $setup = $setup !== '' ? (int)$setup : null;
             $active = (int)($_POST['active'] ?? 1) === 1 ? 1 : 0;
+            if ($setup !== null && $setup !== 0) {
+                $active = 0;
+            }
             if ($cname === '') {
                 flash_set('ต้องกรอกชื่อผู้บันทึก', 'err');
             } elseif ($sn !== $oldSn && qr('SELECT serial_number FROM stock WHERE serial_number=?', 's', [$sn], $DB)->fetch_assoc()) {

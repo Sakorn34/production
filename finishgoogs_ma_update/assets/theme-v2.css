@@ -301,6 +301,26 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .low-stock-list .ls-bar i { display: block; height: 100%; border-radius: 999px; }
 .ls-thumb { width: 34px; height: 34px; border-radius: var(--radius-sm, 8px); object-fit: contain; background: var(--surface-muted); border: 1px solid var(--border); }
 .ls-thumb-ph { display: inline-flex; align-items: center; justify-content: center; color: #8b5fb8; width: 34px; height: 34px; }
+.ls-photo-btn {
+  display: block; padding: 0; border: 0; background: none; cursor: zoom-in; line-height: 0;
+  border-radius: var(--radius-sm, 8px);
+}
+.part-row-name .ls-photo-btn,
+.model-card-img .ls-photo-btn { flex-shrink: 0; }
+.ls-photo-btn:hover img { filter: brightness(.94); }
+.ls-photo-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+a.ls-name-link { color: inherit; text-decoration: none; }
+a.ls-name-link:hover { color: var(--primary); text-decoration: underline; }
+.img-preview-overlay { z-index: 100; }
+.img-preview-box { width: min(720px, 94vw); max-height: 92vh; padding: 14px 18px 16px; overflow: auto; }
+.img-preview-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; min-height: 36px; }
+.img-preview-head h2 { margin: 0; flex: 1; min-width: 0; font-size: calc(16px * var(--font-scale, 1)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.img-preview-body { text-align: center; }
+.img-preview-pic {
+  display: block; width: min(100%, 420px); height: auto; max-height: 72vh;
+  min-height: 200px; object-fit: contain; margin: 0 auto;
+  border-radius: 8px; background: var(--surface-muted, #f4f1fb);
+}
 .badge-pill { display: inline-block; font-size: calc(11.5px * var(--font-scale, 1)); font-weight: 700; padding: 2.5px 11px; border-radius: 999px; white-space: nowrap; }
 .bp-success { background: var(--success-soft); color: var(--success); }
 .bp-info { background: var(--info-soft); color: var(--info); }
@@ -320,14 +340,70 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 /* ── Dashboard v2 layout ── */
 .content > .panel,
 .content > .dash-prod-chart,
+.content > .dash-charts-row,
 .content > .kpi-grid, .content > .dash-top-row { margin-bottom: 20px; }
 .content > .panel:last-child { margin-bottom: 0; }
+
+/* ── กราฟผลิต + กราฟ MA อยู่ข้างกัน ── */
+.dash-charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.dash-charts-row > .panel { margin-bottom: 0; }
+.dash-charts-row .dash-prod-stacked .dash-chart-body { overflow-x: auto; }
+/* กราฟรายปีคู่กัน — legend บนแท่ง + พื้นที่ plot สูงเท่ากัน */
+.dash-charts-row #dash-prod-year-view .dash-prod-stacked,
+.dash-charts-row #dash-ma-year-view .dash-prod-stacked,
+.dash-charts-row #dash-prod-month-views .dash-prod-stacked,
+.dash-charts-row #dash-ma-month-views .dash-prod-stacked {
+  display: flex;
+  flex-direction: column;
+}
+.dash-charts-row #dash-prod-year-view .dash-prod-stacked .dash-chart-top,
+.dash-charts-row #dash-ma-year-view .dash-prod-stacked .dash-chart-top,
+.dash-charts-row #dash-prod-month-views .dash-prod-stacked .dash-chart-top,
+.dash-charts-row #dash-ma-month-views .dash-prod-stacked .dash-chart-top {
+  min-height: 29px;
+  flex-shrink: 0;
+}
+.dash-charts-row #dash-prod-year-view .dash-prod-stacked .dash-chart-body,
+.dash-charts-row #dash-ma-year-view .dash-prod-stacked .dash-chart-body,
+.dash-charts-row #dash-prod-month-views .dash-prod-stacked .dash-chart-body,
+.dash-charts-row #dash-ma-month-views .dash-prod-stacked .dash-chart-body {
+  flex: 1 1 auto;
+  min-height: 240px;
+}
+/* กราฟรายปีในแถวคู่ — แท่งแคบลง แต่ต้องไม่บีบป้ายตัวเลข (style.css ตั้ง max-width:100% ไว้) */
+.dash-charts-row #dash-prod-year-view .dash-prod-stacked {
+  --dash-bar-max-w: 88px;
+  --dash-bar-min-w: 48px;
+  --dash-bar-gap: clamp(10px, 1.6vw, 22px);
+}
+.dash-charts-row #dash-ma-year-view .dash-prod-stacked {
+  --dash-bar-max-w: 88px;
+  --dash-bar-min-w: 48px;
+  --dash-bar-gap: clamp(10px, 1.6vw, 22px);
+}
+.dash-charts-row .dash-ma-month-pane .dash-prod-stacked,
+.dash-charts-row .dash-prod-month-pane .dash-prod-stacked {
+  --dash-bar-max-w: 56px;
+  --dash-bar-min-w: 32px;
+  --dash-bar-gap: clamp(5px, 0.7vw, 10px);
+}
+@media (max-width: 900px) { .dash-charts-row { grid-template-columns: 1fr; } }
 
 /* ── Dashboard production chart (stacked bar — year drill → month) ── */
 .dash-prod-chart {
   position: relative;
   padding-bottom: 8px;
 }
+/* ── MA chart — ใช้โครงสร้างเดียวกับ production chart ── */
+.dash-ma-chart {
+  position: relative;
+  padding-bottom: 8px;
+}
+.dash-ma-back {
+  all: unset; cursor: pointer; font-size: 20px; font-weight: 700; line-height: 1;
+  padding: 0 6px; border-radius: 4px; color: var(--text-muted);
+}
+.dash-ma-back:hover { color: var(--text); background: var(--surface-soft); }
 .dash-prod-head {
   display: flex;
   flex-wrap: wrap;
@@ -473,13 +549,32 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   max-width: var(--dash-bar-max-w, 96px);
   margin: 0;
 }
+/* ยอดรวมชิดหัวแต่ละแท่ง (flex ก่อนแท่ง) — กัน segment min-height ล้นทับด้วย overflow + min ต่ำ */
+.dash-prod-stacked .dash-bar-total,
+.dash-prod-stacked .dash-bar-total-inline,
+.dash-prod-stacked .dash-bar-total-empty {
+  max-width: none;
+  width: max-content;
+  align-self: center;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+  line-height: 1.15;
+}
 .dash-prod-stacked .dash-bar-area {
   width: 100%;
   max-width: none;
+  overflow: hidden;
+  flex-shrink: 1;
+  min-height: 0;
+}
+.dash-prod-stacked .dash-bar-stack {
+  min-height: 0;
+  max-height: 100%;
 }
 .dash-prod-stacked .dash-bar-seg {
   border-radius: var(--radius-sm, 8px);
-  min-height: 8px;
+  min-height: 4px;
 }
 .dash-prod-stacked .dash-bar-area[data-inline-year] {
   cursor: pointer;
@@ -522,7 +617,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 }
 .model-card[hidden] { display: none !important; }
 .dash-view-pane[hidden] { display: none !important; }
-.model-card:hover { box-shadow: var(--shadow-md); border-color: var(--border-strong); }
+/* ระบุ background/color ด้วย — กฎกลาง button:hover ใน style.css ทา --primary-dark
+   การ์ดรุ่นที่เป็น <button> จะพื้นชมพูเข้ม ตัวหนังสือมืดอ่านไม่ออก */
+.model-card:hover {
+  box-shadow: var(--shadow-md); border-color: var(--border-strong);
+  background: var(--surface, #fff); color: inherit;
+}
 .model-card-img { flex-shrink: 0; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: var(--surface-muted); border-radius: var(--radius-sm, 8px); overflow: hidden; }
 .model-thumb { width: 40px; height: 40px; object-fit: contain; }
 /* การ์ดอะไหล่ — รูปใหญ่กว่าการ์ดรุ่นเครื่อง เพราะอะไหล่หน้าตาใกล้เคียงกัน ต้องดูออกจากรูป */
@@ -531,6 +631,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .dash-part-card .model-thumb-ph { width: 58px; height: 58px; }
 .model-card-body { min-width: 0; flex: 1; }
 .model-card-name { font-size: calc(13px * var(--font-scale, 1)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px; }
+.model-card-name .ls-name-link { display: block; overflow: hidden; text-overflow: ellipsis; }
 .model-card-bar { height: 6px; background: var(--surface-soft); border-radius: 999px; overflow: hidden; margin-bottom: 4px; }
 /* แถบในการ์ดรุ่นเป็น stack แยกสถานะ ใช้สีชุดเดียวกับกราฟผลิตด้านบน
    เดิมเป็นสีเดียวสุ่มจาก palette ซึ่งไม่ได้สื่ออะไร
@@ -619,6 +720,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   overflow-wrap: break-word;
   word-break: normal;
 }
+.asset-head-main .asset-head-dl .asset-sd-fn-part {
+  display: inline-block;
+  max-width: 100%;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
 .asset-status-form select {
   font-size: calc(13px * var(--font-scale, 1)); padding: 4px 8px; min-width: 140px; max-width: 100%;
   height: 29px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm, 8px); background: #fff;
@@ -651,6 +758,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   font-size: calc(14px * var(--font-scale, 1)); color: var(--text-muted, #4b5563);
   flex-shrink: 0;
 }
+.asset-sales-card-head b { color: var(--text); }
 .asset-sales-ref-row {
   margin: 0 0 10px; padding: 8px 10px; background: #eef4ff; border-radius: var(--radius-sm, 8px);
   border-left: 3px solid var(--primary, #e11d74);
@@ -700,10 +808,40 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .asset-sales-stock-old-table td:nth-child(5),
 .asset-sales-stock-old-table th:nth-child(6),
 .asset-sales-stock-old-table td:nth-child(6) { word-break: break-word; white-space: normal; }
+.asset-sales-serial-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+}
+.asset-sales-lines.has-part-sn .asset-sales-serial-tags {
+  flex-wrap: nowrap;
+  max-width: none;
+}
 .asset-sales-serial-tag {
   display: inline-block; font-size: calc(10px * var(--font-scale, 1)); font-weight: 600;
   padding: 2px 8px; border-radius: 999px; background: #dcfce7; color: #15803d;
   border: 1px solid #86efac; white-space: nowrap;
+}
+a.asset-sales-serial-tag {
+  text-decoration: none;
+  cursor: pointer;
+  transition: filter 0.12s ease, box-shadow 0.12s ease;
+}
+a.asset-sales-serial-tag:hover {
+  filter: brightness(0.96);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+a.asset-sales-serial-tag.is-page-serial:hover {
+  filter: brightness(1.08);
+}
+/* S/N ของเครื่องที่กำลังเปิดหน้านี้อยู่ — ตัดจากป้ายเขียวในแถวเดียวกัน */
+.asset-sales-serial-tag.is-page-serial {
+  background: var(--primary, #e11d74);
+  color: #fff;
+  border-color: var(--primary, #e11d74);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35) inset;
 }
 .asset-sales-lines.has-serial-col { table-layout: auto; }
 .asset-sales-lines.has-serial-col th:nth-child(5),
@@ -714,7 +852,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   font-size: calc(12px * var(--font-scale, 1)); font-weight: 700;
   color: var(--text-muted, #4b5563); margin-bottom: 8px; letter-spacing: .01em;
 }
-.asset-sales-lines-wrap { margin-top: 12px; overflow-x: visible; }
+.asset-sales-lines-wrap { margin-top: 12px; overflow-x: auto; }
 .asset-sales-lines-title {
   font-size: calc(12px * var(--font-scale, 1)); font-weight: 600;
   color: var(--text-muted, #6b6480); margin-bottom: 6px;
@@ -745,11 +883,30 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .asset-sales-lines td:nth-child(5) { width: 14%; }
 .asset-sales-lines th:nth-child(6),
 .asset-sales-lines td:nth-child(6) { width: 12%; }
-.asset-sales-lines td:nth-child(1),
 .asset-sales-lines td:nth-child(3),
 .asset-sales-lines td:nth-child(4),
 .asset-sales-lines td:nth-child(5),
 .asset-sales-lines td:nth-child(6) { white-space: nowrap; }
+.asset-sales-lines td.asset-sales-line-sn { white-space: normal; vertical-align: middle; }
+.asset-sales-lines.has-part-sn { table-layout: auto; min-width: 100%; }
+.asset-sales-lines.has-part-sn td:nth-child(1),
+.asset-sales-lines.has-part-sn td.asset-sales-line-name {
+  width: 28%;
+  min-width: 120px;
+  max-width: 220px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.asset-sales-lines.has-part-sn td:nth-child(2),
+.asset-sales-lines.has-part-sn td.asset-sales-line-sn {
+  width: auto;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.asset-sales-lines.has-part-sn .asset-sales-line-name {
+  font-weight: 600;
+  color: var(--text);
+}
 .asset-sales-lines .asset-sales-badge { white-space: nowrap; }
 .asset-sales-lines tr:last-child td { border-bottom: 0; }
 .asset-sales-lines tr.is-matched { background: #fdf4ff; }
@@ -961,11 +1118,35 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .dash-pk-stats { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 8px; }
 .dash-pk-stat { font-size: calc(12.5px * var(--font-scale, 1)); padding: 4px 12px; border-radius: 999px; background: var(--surface-2, #f6f4fb); color: inherit; text-decoration: none; }
 .dash-pk-stat.is-warn { background: #fffbeb; color: #854d0e; }
-/* แต่ละรุ่นเป็นการ์ดเรียงเป็นตาราง — เดิมเป็นแถวเต็มความกว้าง ชื่อชิดซ้าย ตัวเลขชิดขวา
-   บนจอคอมกลางแถวจึงโล่งยาว และ 5 รุ่นก็ไล่ลงไปเรื่อย ๆ จนการ์ดสูงเกินจำเป็น */
-.dash-pk-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin-top: 10px; }
-.dash-pk-row { display: block; width: 100%; padding: 10px 11px; border: 1px solid var(--border, #eee); border-radius: var(--radius-sm, 8px); background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
-.dash-pk-row:hover { background: var(--surface-2, #f6f4fb); border-color: var(--primary); }
+/* รุ่นเรียงแถวเดียว เลื่อนตามแนวนอน — ดูครบโดยไม่ต้องเปิดหน้าใหม่ */
+.dash-pk-list {
+  display: flex; flex-wrap: nowrap; gap: 10px; margin-top: 10px;
+  overflow-x: auto; overflow-y: hidden; padding: 2px 2px 10px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #c4b5e0 transparent;
+  touch-action: pan-x;
+}
+.dash-pk-list::-webkit-scrollbar { height: 4px; }
+.dash-pk-list::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+.dash-pk-list::-webkit-scrollbar-track {
+  background: var(--surface-2, #f6f4fb);
+  border-radius: 999px;
+}
+.dash-pk-list::-webkit-scrollbar-thumb {
+  background: #c4b5e0;
+  border-radius: 999px;
+}
+.dash-pk-list::-webkit-scrollbar-thumb:hover {
+  background: var(--primary, #7c3aed);
+}
+.dash-pk-row {
+  display: block; flex: 0 0 230px; width: 230px; max-width: 230px;
+  padding: 10px 11px; border: 1px solid var(--border, #eee);
+  border-radius: var(--radius-sm, 8px); background: #fff;
+  text-align: left; font: inherit; color: inherit; cursor: pointer;
+}
+.dash-pk-row:hover { background: var(--surface-2, #f6f4fb); border-color: var(--primary); color: inherit; }
 .dash-pk-head { display: flex; gap: 8px; align-items: flex-start; }
 .dash-pk-img { width: 30px; height: 30px; border-radius: 6px; object-fit: contain; background: var(--surface-2, #f6f4fb); flex: 0 0 auto; }
 .dash-pk-nm { flex: 1; min-width: 0; overflow-wrap: anywhere; }
@@ -973,15 +1154,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .dash-pk-prog-row { display: flex; align-items: center; gap: 7px; margin-top: 8px; }
 .dash-pk-ratio { font-size: calc(11px * var(--font-scale, 1)); color: var(--muted, #6b7280); white-space: nowrap; }
 .dash-pk-sub { display: block; margin-top: 5px; color: var(--muted, #6b7280); font-size: calc(11.5px * var(--font-scale, 1)); }
-/* จอแคบมีคอลัมน์เดียวอยู่แล้ว ชื่อกับป้ายจึงอยู่บรรทัดเดียวกันได้ ไม่ต้องเสียอีกบรรทัด */
 @media (max-width: 560px) {
-  .dash-pk-list { grid-template-columns: 1fr; gap: 0; }
-  .dash-pk-row { padding: 8px 4px; border: 0; border-top: 1px solid var(--border, #eee); border-radius: 0; }
-  .dash-pk-row:hover { border-color: var(--border, #eee); }
-  .dash-pk-nm b { display: inline; }
-  .dash-pk-nm .dash-pk-tag { margin-left: 6px; }
-  .dash-pk-prog-row { margin-top: 4px; }
-  .dash-pk-sub { margin-top: 3px; }
+  .dash-pk-row { flex-basis: 200px; width: 200px; max-width: 200px; }
 }
 .dash-pk-miss { display: inline-block; font-size: 11.5px; background: #fef3c7; color: #854d0e; border-radius: 6px; padding: 0 6px; font-weight: 400; }
 /* ป้ายความขาดสต็อกของรุ่นนั้น — สี 3 ระดับเดียวกับหัวกลุ่มในตารางรุ่น */
@@ -1051,7 +1225,6 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .dash-fg-tile-num { font-size: calc(22px * var(--font-scale, 1)); font-weight: 800; font-variant-numeric: tabular-nums; }
 .dash-fg-tile-num.is-short { color: var(--danger, #dc2626); }
 .dash-fg-tile-num.is-pool { color: var(--st-rental-fg, #1e40af); }
-.dash-models-table td[data-fg-cell="pool"] b { color: var(--st-rental-fg, #1e40af); }
 .dash-models-table .fg-bar-col { width: 46%; }
 .fg-bar { height: 12px; border-radius: 6px; background: var(--surface-soft, #efedf5); overflow: hidden; min-width: 90px; }
 .fg-bar i { display: block; height: 100%; width: 0; border-radius: 6px; transition: width .3s; }
@@ -1061,6 +1234,47 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .fg-bar i.is-new, .fg-legend i.is-new { background: var(--st-new-bar, #6ee7b7); }
 .fg-bar i.is-pool, .fg-legend i.is-pool { background: var(--st-rental-bar, #93c5fd); }
 .fg-bar i.is-extra { opacity: .38; }
+.fg-bar i.is-ma-reuse, .fg-legend i.is-ma-reuse { background: #a78bfa; }
+.dash-models-table td[data-fg-cell="ours"] .fg-ours-stack,
+.dash-models-table td[data-fg-cell="pool"] .fg-pool-stack { display: flex; flex-direction: column; align-items: center; gap: 1px; text-align: center; }
+.dash-models-table td[data-fg-cell="pool"] .fg-pool-stack.fg-pool-inline {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.dash-models-table td[data-fg-cell="pool"] .fg-pool-inline .fg-pool-new,
+.dash-models-table td[data-fg-cell="pool"] .fg-pool-inline .fg-pool-ma-num {
+  font-weight: 700;
+  font-size: calc(14px * var(--font-scale, 1));
+}
+.dash-models-table td[data-fg-cell="pool"] .fg-pool-inline .fg-pool-new {
+  color: var(--st-new-fg, #065f46);
+}
+.dash-models-table td[data-fg-cell="pool"] .fg-pool-inline .fg-pool-ma-num {
+  color: var(--st-rental-fg, #1e40af);
+}
+.dash-models-table td[data-fg-cell="pool"] .fg-pool-sep {
+  color: var(--text-muted, #6b6480);
+  font-weight: 700;
+  font-size: calc(14px * var(--font-scale, 1));
+}
+.dash-models-table th.dash-col-pool { white-space: normal; line-height: 1.25; vertical-align: bottom; }
+.dash-models-table .dash-col-head-main { display: block; font-weight: inherit; }
+.dash-models-table .dash-col-head-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: calc(10px * var(--font-scale, 1));
+  font-weight: 500;
+  color: var(--text-muted, #6b6480);
+  letter-spacing: 0.01em;
+}
+.dash-models-table td[data-fg-cell="ours"] .fg-ours-new { color: var(--st-new-fg, #065f46); }
+.dash-models-table td[data-fg-cell="ours"] .fg-ma-reuse-sub { line-height: 1.3; color: #6d28d9; font-size: calc(12px * var(--font-scale, 1)); white-space: nowrap; }
+.dash-models-table td[data-fg-cell="ours"] .fg-ma-reuse-sub b { color: #5b21b6; font-size: calc(14px * var(--font-scale, 1)); font-variant-numeric: tabular-nums; }
 /* หมุดขั้นต่ำ / ขั้นต่ำ+PO เหนือแถบ (สีส้มไม่ใช่สีสถานะเครื่อง) */
 .fg-bar-wrap { position: relative; padding-top: 11px; }
 .fg-mark { position: absolute; top: 0; transform: translateX(-50%); font-size: 10px; line-height: 1; color: var(--text, #2a2440); pointer-events: auto; }
@@ -1114,7 +1328,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
    35 รุ่นเป็นการ์ดเรียงลงมาต้องเลื่อนยาวมาก ตารางเทียบตัวเลขข้ามรุ่นได้ในจอเดียว
    คอลัมน์ยุบเองตามความกว้างด้วย data-pri (shared/ui_table.css) */
 .dash-models-table { margin: 0; }
-.dash-models-table .num-col { text-align: right; white-space: nowrap; }
+.dash-models-table th.num-col,
+.dash-models-table .num-col { text-align: center; white-space: nowrap; }
+.dash-models-table td[data-fg-cell="verdict"] { text-align: center; }
+.dash-models-table td[data-fg-cell="pick"] { text-align: center; }
+.dash-models-table .fg-bar-wrap { margin-left: auto; margin-right: auto; }
 .dash-models-table td.num-col b { font-size: calc(14px * var(--font-scale, 1)); font-variant-numeric: tabular-nums; }
 .dash-models-table tr.dash-model-row { cursor: pointer; }
 .dash-models-table tr.dash-model-row { cursor: default; }
@@ -1334,6 +1552,27 @@ a.kpi:hover { text-decoration: none; }
 .ma-chev { color: var(--text-faint); justify-self: end; transition: transform .18s; }
 .ma-jobrow[open] .ma-chev { transform: rotate(90deg); }
 
+/* ประวัติการเช่า: กดแถวเพื่อกางรายละเอียดสัญญา (โครงเดียวกับงานซ่อม) */
+.ma-rent-tbl { min-width: 820px; }
+.ma-rent-thead {
+  display: grid; grid-template-columns: 118px 88px 88px 88px minmax(140px, 1.4fr) 108px 18px;
+  gap: 10px; padding: 9px 10px; border-bottom: 1px solid var(--border);
+  font-size: calc(12px * var(--font-scale, 1)); font-weight: 600; color: var(--text-muted);
+}
+.ma-rentrow { border-top: 1px solid var(--border); }
+.ma-rentrow:first-of-type { border-top: 0; }
+.ma-rentrow > summary {
+  display: grid; grid-template-columns: 118px 88px 88px 88px minmax(140px, 1.4fr) 108px 18px;
+  gap: 10px; align-items: baseline; padding: 10px; cursor: pointer;
+  list-style: none; font-size: calc(13.5px * var(--font-scale, 1));
+}
+.ma-rentrow > summary::-webkit-details-marker { display: none; }
+.ma-rentrow > summary:hover,
+.ma-rentrow[open] > summary { background: var(--surface-soft); }
+.ma-rentrow > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.ma-rentrow[open] .ma-chev { transform: rotate(90deg); }
+.ma-facts-solo { border-left: 0; padding-left: 0; }
+
 .ma-jobdetail {
   padding: 18px 16px 22px 20px; background: var(--surface-soft);
   border-left: 3px solid var(--primary);
@@ -1465,23 +1704,58 @@ a.kpi:hover { text-decoration: none; }
 .ma-more > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
 .ma-more .ma-tblscroll { border-top: 1px solid var(--border); }
 
-/* ── พับ/กางคิวรอ MA จากระบบเช่า (รายการยาวมากจนฟอร์ม MA ตกจอ) ───────────── */
-.rent-q { border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft, #f8fafc); margin: 0 0 12px; }
+/* ── คิวรอ MA จากระบบเช่า: กรอบเดียวกับ .panel ไม่ซ้อนกล่องพับในกล่อง ───── */
+.rent-q-panel { padding-top: 12px; padding-bottom: 12px; }
+.rent-q { border: 0; background: transparent; margin: 0; border-radius: 0; }
 .rent-q > summary {
-  padding: 10px 14px; cursor: pointer; font-size: calc(13px * var(--font-scale, 1)); font-weight: 600;
-  color: var(--primary); list-style: none; display: flex; align-items: center; gap: 8px; border-radius: 10px;
+  padding: 0 0 8px; cursor: pointer; font-size: calc(14px * var(--font-scale, 1)); font-weight: 600;
+  color: var(--primary); list-style: none; display: flex; align-items: center; gap: 8px; border-radius: 0;
 }
 .rent-q > summary::-webkit-details-marker { display: none; }
-.rent-q > summary::before { content: "\25B8"; font-size: 11px; transition: transform .15s ease; }
+.rent-q > summary::before { content: "\25B8"; font-size: 11px; transition: transform .15s ease; flex-shrink: 0; }
 .rent-q[open] > summary::before { transform: rotate(90deg); }
-.rent-q > summary:hover { background: var(--surface, #fff); }
-.rent-q > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
-.rent-q[open] > summary { border-bottom: 1px solid var(--border); border-radius: 10px 10px 0 0; }
-.rent-q > *:not(summary) { margin-left: 14px; margin-right: 14px; }
-.rent-q > .table-wrap { max-height: 60vh; overflow: auto; }
+.rent-q > summary:hover { background: transparent; color: var(--primary-dark, #6d28d9); }
+.rent-q > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 6px; }
+.rent-q[open] > summary { border-bottom: 0; border-radius: 0; }
+.rent-q > *:not(summary) { margin-left: 0; margin-right: 0; }
+.rent-q-title { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.rent-q-title .h-svg { flex-shrink: 0; }
+.rent-q-meta {
+  margin-left: auto; font-weight: 500; white-space: nowrap;
+  font-size: calc(12.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480);
+}
+.rent-q-hint { margin: 0 0 8px; }
+.rent-q-tablewrap {
+  max-height: 42vh; overflow: auto; margin: 0 -4px;
+  scrollbar-width: thin; scrollbar-color: #c4b5e0 transparent;
+}
+.rent-q-tablewrap::-webkit-scrollbar { height: 4px; width: 4px; }
+.rent-q-tablewrap::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+.rent-q-tablewrap::-webkit-scrollbar-track { background: transparent; }
+.rent-q-tablewrap::-webkit-scrollbar-thumb { background: #c4b5e0; border-radius: 999px; }
+.rent-q-tablewrap::-webkit-scrollbar-thumb:hover { background: var(--primary, #7c3aed); }
+.rent-q-panel table.list {
+  border: 0; box-shadow: none; border-radius: 0; background: transparent;
+}
+.rent-q-panel table.list th {
+  background: transparent; border-bottom: 1px solid var(--border); padding-top: 8px; padding-bottom: 8px;
+}
+.rent-q-panel table.list td { padding-top: 9px; padding-bottom: 9px; }
+.rent-q-panel table.list tr:first-child th { border-top: 0; }
+.rent-q-panel table.list th.rent-q-num,
+.rent-q-panel table.list td.rent-q-num {
+  text-align: center; white-space: nowrap; width: 1%;
+  font-variant-numeric: tabular-nums;
+}
+.rent-q-row { cursor: pointer; }
+.rent-q-row.is-picked td { background: var(--primary-soft, #fce7f3); }
+.rent-q-sn { color: var(--primary); text-decoration: none; font-weight: 700; }
+.rent-q-sn:hover, .rent-q-sn:focus-visible { text-decoration: underline; }
+.rent-q + .rent-q { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
 .rent-q .rent-q-hide { display: none; }
 .rent-q[open] .rent-q-show { display: none; }
 .rent-q[open] .rent-q-hide { display: inline; }
+#ma-form-wrap { scroll-margin-top: 16px; }
 
 @media (max-width: 900px) {
   .ma-jobbody { grid-template-columns: 1fr; gap: 20px; }
@@ -1953,15 +2227,32 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
 .fg-po-group {
   margin: 12px 0 6px; font-size: calc(13px * var(--font-scale, 1)); font-weight: 600;
 }
+.fg-sn-list.is-pool-new .fg-sn b { color: var(--st-rental-fg, #1e40af); }
+.fg-sn-list.is-pool-ma .fg-sn { border-color: #c4b5fd; background: #faf5ff; }
+.fg-sn-list.is-pool-ma .fg-sn b { color: #5b21b6; }
 .fg-po-group:first-of-type { margin-top: 2px; }
 .fg-po-group .muted { font-weight: 400; font-size: calc(12px * var(--font-scale, 1)); }
 
 /* การ์ดรายการ "อะไหล่ควรสั่งเพิ่ม" บนจอมือถือ — 4 คอลัมน์ในแถวเดียวไม่พอให้ชื่อยาว ๆ ขึ้น:
    ย้ายตัวเลขลงไปบรรทัดใต้ชื่อ ให้คอลัมน์ชื่อกว้างเต็มที่ */
 .low-stock-card .ls-name { overflow-wrap: anywhere; }
+.low-stock-card .ls-name-link { color: inherit; text-decoration: none; }
+.low-stock-card .ls-name-link:hover { color: var(--primary); text-decoration: underline; }
+/* คอลัมน์ปุ่มสั่งซื้อ (ขวาสุด) — กว้างคงที่ให้ปุ่ม/ข้อความ "ไม่มีลิงก์" ตรงแนวกันทุกแถว */
+.low-stock-card { grid-template-columns: auto 1fr auto auto 92px; }
+.low-stock-card .ls-order { display: flex; justify-content: flex-end; align-items: center; }
+/* ชิปชื่อผู้จำหน่ายต่อท้ายชื่ออะไหล่ — ชื่อยาวตัดด้วย … ไม่ให้ดันเลย์เอาต์ */
+.low-stock-card .ls-sup-chip {
+  display: inline-block; vertical-align: middle; max-width: 100%; margin-left: 6px;
+  padding: 1px 8px; border-radius: 999px; background: #eef2ff; color: #3730a3;
+  font-size: calc(11px * var(--font-scale, 1)); font-weight: 600; line-height: 1.5;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.low-stock-card .ls-no-link { font-size: calc(11px * var(--font-scale, 1)); white-space: nowrap; }
 @media (max-width: 640px) {
   .low-stock-card { grid-template-columns: auto minmax(0, 1fr) auto; row-gap: 6px; }
-  .low-stock-card .ls-qty { grid-column: 2 / 4; grid-row: 2; text-align: left; }
+  .low-stock-card .ls-qty { grid-column: 2; grid-row: 2; text-align: left; }
+  .low-stock-card .ls-order { grid-column: 3; grid-row: 2; }
 }
 
 /* กรอบตารางรุ่นบน Dashboard — เลื่อนขึ้นลงเฉพาะรายการ หัวตารางติดขอบบนของกรอบ
@@ -2001,11 +2292,11 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
   .dash-m-tab[hidden] { display: none; }
 
   [data-dash-tab="stock"] .dash-top-row,
-  [data-dash-tab="stock"] #dash-prod-chart,
+  [data-dash-tab="stock"] .dash-charts-row,
   [data-dash-tab="prod"] #dash-inventory-panel,
   [data-dash-tab="prod"] .dash-side-kpis,
   [data-dash-tab="parts"] .kpi-status-overview,
-  [data-dash-tab="parts"] #dash-prod-chart,
+  [data-dash-tab="parts"] .dash-charts-row,
   [data-dash-tab="parts"] #dash-pickup { display: none !important; }
   [data-dash-tab="parts"] .dash-top-row, [data-dash-tab="prod"] .dash-top-row { display: block; }
   [data-dash-tab="parts"] .dash-side-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
@@ -2019,7 +2310,7 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
   }
   .dash-models-table tr.dash-model-row > td.fg-bar-col,
   .dash-models-table tr.dash-model-row > td[data-fg-cell="ours"] { display: none !important; }
-  .dash-models-table tr.dash-model-row > td[data-fg-cell="verdict"] { text-align: right; }
+  .dash-models-table tr.dash-model-row > td[data-fg-cell="verdict"] { text-align: center; }
   .dash-models-table .fg-model-name { display: block; }
   .dash-models-table .mc-code { font-size: calc(11.5px * var(--font-scale, 1)); }
 }
@@ -2066,6 +2357,170 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
 .ma-rent-note { font-size: calc(12.5px * var(--font-scale, 1)); line-height: 1.6; color: var(--text-muted, #5f5e5a); }
 .ma-rent-retire { display: inline-block; font-size: calc(10.5px * var(--font-scale, 1)); font-weight: 600;
   background: var(--danger-soft, #fee2e2); color: var(--danger, #b91c1c); border-radius: 999px; padding: 1px 7px; }
+.ma-rent-close { white-space: nowrap; }
+.ma-list-table .ma-rent-close .ma-pill { font-size: calc(11px * var(--font-scale, 1)); }
+/* ป้ายประเภทเครื่อง + ชิปรายการตรวจ MA ในตาราง */
+.ma-list-table .ma-list-symptom {
+  max-width: min(320px, 28vw);
+  line-height: 1.35;
+  font-size: calc(13px * var(--font-scale, 1));
+  vertical-align: middle;
+}
+.ma-list-table .ma-list-asset-cell .ma-kind-chip {
+  display: block;
+  margin-top: 4px;
+  width: fit-content;
+  font-size: calc(10.5px * var(--font-scale, 1));
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+.ma-list-filter-panel { margin: 0 0 12px; }
+.ma-list-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 0 0 0;
+}
+.ma-list-filter-toggle::before { content: "▸ "; }
+.ma-list-filter-panel.is-open .ma-list-filter-toggle::before { content: "▾ "; }
+.ma-list-filter-active { font-size: calc(12px * var(--font-scale, 1)); line-height: 1.5; }
+.ma-list-filter-body {
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: var(--card, #fff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+}
+.ma-list-filter-form {
+  display: block;
+  width: 100%;
+  max-width: none;
+  margin-bottom: 0;
+  flex-wrap: unset;
+  gap: 0;
+}
+.ma-list-filter-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+.ma-list-filter-top2 {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.6fr);
+  gap: 10px;
+  width: 100%;
+}
+.ma-list-filter-card {
+  padding: 12px 14px;
+  background: var(--bg-soft, #faf9fd);
+  border: 1px solid var(--border, #e8e4f2);
+  border-radius: 10px;
+  height: 100%;
+  box-sizing: border-box;
+}
+.ma-list-filter-card-wide {
+  width: 100%;
+}
+.ma-list-filter-card-hd {
+  margin: 0 0 10px;
+  font-size: calc(12.5px * var(--font-scale, 1));
+  font-weight: 700;
+  color: var(--text, #374151);
+  line-height: 1.35;
+}
+.ma-list-filter-card-note {
+  font-weight: 400;
+  font-size: calc(11px * var(--font-scale, 1));
+  color: var(--muted, #9ca3af);
+}
+.ma-list-filter-grid4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+.ma-list-filter-dates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+  width: 100%;
+}
+.ma-list-filter-items {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+.ma-list-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: calc(13px * var(--font-scale, 1));
+}
+.ma-list-filter-field > span { font-weight: 600; color: var(--text); }
+.ma-list-filter-field input,
+.ma-list-filter-field select {
+  width: 100%;
+  box-sizing: border-box;
+  height: 36px;
+  font-size: calc(13px * var(--font-scale, 1));
+}
+.ma-list-filter-ok > span:first-child { color: #15803d; }
+.ma-list-filter-repl > span:first-child { color: #1d4ed8; }
+.ma-list-filter-repair > span:first-child { color: #b45309; }
+.ma-list-filter-ft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border, #e2e8f0);
+  width: 100%;
+}
+.ma-list-filter-ft-note { font-size: calc(11.5px * var(--font-scale, 1)); margin-left: auto; }
+@media (max-width: 960px) {
+  .ma-list-filter-top2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 900px) {
+  .ma-list-filter-grid4 { grid-template-columns: 1fr 1fr; }
+  .ma-list-filter-items,
+  .ma-list-filter-dates { grid-template-columns: 1fr; }
+  .ma-list-filter-ft-note { margin-left: 0; width: 100%; }
+}
+@media (max-width: 560px) {
+  .ma-list-filter-grid4 { grid-template-columns: 1fr; }
+}
+.ma-list-table td.ma-list-ma-items {
+  max-width: 220px;
+  font-size: calc(12.5px * var(--font-scale, 1));
+  vertical-align: top;
+}
+.ma-list-item-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: flex-start;
+}
+.ma-list-item-chip {
+  display: inline-block;
+  max-width: 100%;
+  font-size: calc(11px * var(--font-scale, 1));
+  line-height: 1.35;
+  padding: 2px 8px;
+  border-radius: 999px;
+  overflow-wrap: anywhere;
+}
+.ma-list-item-chip-ok { background: #d1fae5; color: #065f46; }
+.ma-list-item-chip-replace { background: #fef3c7; color: #854d0e; }
+.ma-list-item-chip-repair { background: #fee2e2; color: #991b1b; }
+.ma-list-item-chip-more {
+  background: var(--surface-soft, #f6f4fb);
+  color: var(--text-muted, #6b6480);
+  font-weight: 600;
+  cursor: default;
+}
 
 /* ปุ่มลบในไทม์ไลน์หน้าเครื่อง — ทรงเดียวกับปุ่มแก้ไข/อื่น ๆ ต่างกันแค่สีเตือน
    ของเดิมใส่แค่ btn-sm btn-danger (ไม่มีคลาส btn) จึงกลายเป็นปุ่มแดงทึบคนละทรงกับเพื่อนข้าง ๆ */
@@ -2089,11 +2544,60 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
 }
 .asset-site-more { display: inline-block; margin-top: 6px; font-size: calc(12px * var(--font-scale, 1)); }
 
-/* ── การ์ด "การเบิกใช้งานขาย" แบบไทม์ไลน์ ──
-   เรียงตามลำดับที่เกิดจริง: ระบบขาย → ทะเบียน stock → ส่งมอบ
-   แต่ละเรื่องพูดครั้งเดียว ชื่อสินค้ากับสถานะส่งมอบอยู่หัวการ์ด ไม่ซ้ำลงมาในขั้น */
+/* ── การ์ด "การเบิกใช้งานขาย" แบบสรุป + ที่มา ──
+   ข้อเท็จจริงอยู่บล็อกบน ที่มาอยู่แถบล่าง ไม่เล่าเรื่องขายซ้ำตามแหล่งข้อมูล
+   specificity ของ .asset-head .asset-sales-facts ต้องชนะ .asset-head dl */
 .asset-sales-head-sub { font-size: calc(12px * var(--font-scale, 1)); margin-left: 2px; }
 .asset-sales-head-flag { margin-left: auto; }
+.asset-sales-cust-line {
+  font-weight: 700; margin: 0 0 8px;
+  font-size: calc(13.5px * var(--font-scale, 1)); line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.asset-head .asset-sales-facts,
+.asset-sales-card .asset-sales-facts {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  column-gap: 10px; row-gap: 6px;
+  margin: 0; width: 100%;
+  font-size: calc(13px * var(--font-scale, 1));
+}
+.asset-head .asset-sales-facts dt,
+.asset-sales-card .asset-sales-facts dt {
+  color: var(--text-muted, #6b6480);
+  font-size: calc(12px * var(--font-scale, 1)); font-weight: 500;
+  margin: 0; padding: 0; align-self: baseline;
+}
+.asset-head .asset-sales-facts dd,
+.asset-sales-card .asset-sales-facts dd {
+  margin: 0; padding: 0; font-weight: 600; line-height: 1.45;
+  min-width: 0; overflow-wrap: break-word;
+}
+.asset-head .asset-sales-facts dd.muted,
+.asset-sales-card .asset-sales-facts dd.muted { font-weight: 400; color: var(--text-muted, #6b6480); }
+.asset-sales-facts + .asset-sales-claim-pair,
+.asset-sales-facts + .asset-sales-conflict { margin-top: 10px; }
+a.asset-sales-ref-link {
+  display: inline-block;
+  font-size: calc(11.5px * var(--font-scale, 1));
+  font-weight: 600;
+  padding: 1px 9px;
+  border-radius: 999px;
+  text-decoration: none;
+  color: #3730a3;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  white-space: nowrap;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+a.asset-sales-ref-link:hover {
+  background: #e0e7ff;
+  border-color: #a5b4fc;
+}
+.asset-sales-src {
+  margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border, #e3ddf0);
+  font-size: calc(12px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); line-height: 1.7;
+}
 .asset-sales-timeline { border-left: 2px solid var(--border); padding-left: 14px; margin-left: 4px; }
 .asset-sales-step + .asset-sales-step { margin-top: 14px; }
 .asset-sales-step-when {

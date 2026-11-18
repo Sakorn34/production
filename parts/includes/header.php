@@ -13,9 +13,12 @@ $settingsActive = false;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= e($pageTitle ?? 'Stock Management') ?> - <?= e($partsAppName) ?></title>
     <link rel="icon" type="image/png" href="<?= url('/favicon.png') ?>">
-    <?php if (!empty($fontCfg['google'])): ?>
-    <link rel="stylesheet" href="<?= e($fontCfg['google']) ?>">
-    <?php endif; ?>
+    <?php
+    require_once dirname(__DIR__, 2) . '/shared/ui_tokens.php';
+    if (!empty($fontCfg['google'])) {
+        echo ui_google_font_link_html((string) $fontCfg['google']);
+    }
+    ?>
     <?php if (!empty($fontCfg['custom_file'])):
         $fontUrl = main_upload_url($fontCfg['custom_file']);
         $ext = strtolower(pathinfo($fontCfg['custom_file'], PATHINFO_EXTENSION));
@@ -106,3 +109,30 @@ a.classList.remove('nav-collapsed');a.classList.add('nav-expanded');}}catch(e){}
     <?= ui_mobile_bar_html($mbarCur, $fgBase, ui_parts_base_url()) ?>
 
     <main class="content">
+    <div id="flash-toast-host" class="flash-toast-host" aria-live="polite" aria-atomic="true"></div>
+    <?php if (!empty($flash['message'])): ?>
+    <script>window.__flash = <?= json_encode([
+        'msg'  => (string) $flash['message'],
+        'type' => (($flash['type'] ?? '') === 'error' || ($flash['type'] ?? '') === 'err') ? 'err' : 'ok',
+    ], JSON_UNESCAPED_UNICODE) ?>;</script>
+    <?php endif; ?>
+    <script>
+    window.__flashToast = window.__flashToast || function(msg, type, duration){
+      type = type || 'ok';
+      duration = duration || (type === 'err' ? 5200 : 3600);
+      var host = document.getElementById('flash-toast-host');
+      if (!host || !msg) return;
+      var el = document.createElement('div');
+      el.className = 'flash-toast flash-toast-' + type;
+      el.setAttribute('role', 'status');
+      el.textContent = msg;
+      host.appendChild(el);
+      requestAnimationFrame(function(){ requestAnimationFrame(function(){ el.classList.add('flash-toast-show'); }); });
+      setTimeout(function(){
+        el.classList.remove('flash-toast-show');
+        el.classList.add('flash-toast-hide');
+        setTimeout(function(){ if (el.parentNode) el.parentNode.removeChild(el); }, 420);
+      }, duration);
+    };
+    if (window.__flash) window.__flashToast(window.__flash.msg, window.__flash.type);
+    </script>

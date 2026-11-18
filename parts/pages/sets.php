@@ -40,11 +40,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([
                 (int) $_POST['set_id'],
                 (int) $_POST['product_id'],
-                (int) $_POST['quantity'],
+                qty_sql(qty_post('quantity')),
             ]);
             flash('success', 'เพิ่มอะไหล่ใน Set เรียบร้อย');
         } elseif ($action === 'update_item_qty') {
-            $stock->updateSetItemQty((int) $_POST['item_id'], (int) $_POST['quantity']);
+            $stock->updateSetItemQty((int) $_POST['item_id'], qty_post('quantity'));
             flash('success', 'แก้จำนวนต่อ Set แล้ว');
         } elseif ($action === 'remove_item') {
             $stmt = $db->prepare('DELETE FROM set_items WHERE id = ?');
@@ -120,7 +120,7 @@ parts_page_header(
     ]) ?>
     <div class="form-group">
         <label for="set-item-qty">จำนวนต่อ 1 Set</label>
-        <input type="number" id="set-item-qty" name="quantity" min="1" value="1" required>
+        <input type="number" id="set-item-qty" name="quantity" min="0.01" step="0.01" value="1" required>
     </div>
     <p class="muted" style="font-size:12px;margin:0 0 12px">ถ้าอะไหล่นี้มีใน Set อยู่แล้ว ระบบจะแทนที่จำนวนเดิม</p>
     <div class="form-actions">
@@ -130,4 +130,5 @@ parts_page_header(
 </form>
 <?php parts_modal_end(); ?>
 
+<?php parts_photo_modal_html(); ?>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

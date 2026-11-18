@@ -178,3 +178,63 @@ function fg_shortage_filter_items(array $items): array
     }
     return ['items' => array_values($keep), 'skipped' => $n, 'hidden' => $h];
 }
+
+/**
+ * รุ่นที่ "ไม่นับ" สต็อกวนกลับ MA ในยอดขาด (คิดขาดจากเช่าใหม่เท่านั้น)
+ * การแสดง New / MA บนตาราง Dashboard ใช้กับทุกรุ่นที่มีข้อมูลแยกยอด
+ *
+ * @return string[] product_code ตัวพิมพ์ใหญ่
+ */
+function fg_ma_reuse_display_codes(): array
+{
+    return ['ACC027'];
+}
+
+/**
+ * รุ่นนี้ "ไม่นับ" ยอด MA ในสูตรขาดหรือไม่ (เฉพาะรายการใน fg_ma_reuse_display_codes)
+ * การแสดง New / MA บนตาราง Dashboard ไม่ได้ถูกจำกัดด้วยฟังก์ชันนี้แล้ว
+ *
+ * @param string $productCode
+ * @return bool
+ */
+function fg_model_show_ma_reuse_ui(string $productCode): bool
+{
+    $code = strtoupper(trim($productCode));
+
+    return $code !== '' && in_array($code, fg_ma_reuse_display_codes(), true);
+}
+
+/**
+ * ยอดที่มีสำหรับคิดขาด/ความเร่งด่วน — รุ่นที่แยก MA ไม่นับสต็อกวนกลับ MA ในคลังเช่า
+ *
+ * @param int $newQty เครื่องใหม่
+ * @param int $rentQty คลังพร้อมเช่ารวม (ใหม่ + MA)
+ * @param string $productCode
+ * @param int $maReuseQty ยอดวนกลับ MA ในคลัง (รุ่นที่แยก UI)
+ * @return array{available:int,gap:int,over:int,state:string}
+ */
+function fg_model_shortage_from_stock(int $newQty, int $rentQty, int $required, string $productCode, int $maReuseQty = 0): array
+{
+    if (fg_model_show_ma_reuse_ui($productCode)) {
+        $rentForNeed = max(0, max(0, $rentQty) - max(0, $maReuseQty));
+    } else {
+        $rentForNeed = max(0, $rentQty);
+    }
+    $available = max(0, $newQty) + $rentForNeed;
+    $need = $available - max(0, $required);
+    if ($need >= 0) {
+        return [
+            'available' => $available,
+            'gap'       => 0,
+            'over'      => $need,
+            'state'     => 'over',
+        ];
+    }
+
+    return [
+        'available' => $available,
+        'gap'       => abs($need),
+        'over'      => 0,
+        'state'     => 'short',
+    ];
+}

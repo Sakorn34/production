@@ -3,6 +3,7 @@
  * ma_snippets.php — คำสั่งตั้งค่าหมายเลขสินค้า (คัดลอก Serial/MAC/สรุป MA)
  *
  * ใช้ในหน้า ma.php และ asset.php (popup จาก timeline)
+ * ข้อ 4 + ลิงก์รอ MA ใช้ class ma-snippet-rental — หน้า MA ซ่อนเมื่อเลือกเครื่องสำรอง
  */
 
 /**
@@ -33,7 +34,7 @@ function ma_snippets_inner_html($pfx, array $opts = []) {
     $showRental = !isset($opts['rental']) || $opts['rental'];
     ob_start();
     if ($showTitle) { ?>
-    <h3 class="ma-snippets-title h-with-icon"><?= ui_icon_html('clipboard', 15, 'h-svg') ?><span><?= h(ma_snippets_title($showRental)) ?></span></h3>
+    <h3 class="ma-snippets-title h-with-icon"><?= ui_icon_html('clipboard', 15, 'h-svg') ?><span class="ma-snippets-title-text" data-title-rental="<?= h(ma_snippets_title(true)) ?>" data-title-plain="<?= h(ma_snippets_title(false)) ?>"><?= h(ma_snippets_title($showRental)) ?></span></h3>
     <?php }
     if ($showLead) { ?>
     <p class="muted ma-snippets-lead">อัปเดตตามรหัสเครื่องและฟอร์ม · กดคัดลอกทีละข้อ</p>
@@ -61,15 +62,15 @@ function ma_snippets_inner_html($pfx, array $opts = []) {
       <p class="muted ma-snippet-note">เช่น BS22120047 → 22:12:00:47</p>
     </div>
     <?php if ($showRental) { ?>
-    <div class="ma-snippet">
+    <div class="ma-snippet ma-snippet-rental">
       <div class="ma-snippet-hd">
         <span>4. สรุปส่งงานเช่า Office</span>
         <button type="button" class="btn-sm btn-line btn-with-icon ma-copy-btn" data-target="<?= h($pfx) ?>-rental"><?= ui_btn_label('copy', 'คัดลอก', 13) ?></button>
       </div>
       <textarea class="ma-snippet-txt ma-snippet-txt-tall" id="<?= h($pfx) ?>-rental" readonly rows="4" aria-label="ข้อความสรุป MA งานเช่า"></textarea>
-      <p class="muted ma-snippet-note">บันทึกไป「รายการซ่อม」ในระบบเช่าอัตโนมัติเมื่อเลือก ซ่อมแล้ว/เสื่อมสภาพ — ข้อความตรงกับที่แสดงด้านบน</p>
+      <p class="muted ma-snippet-note">บันทึกไป「รายการซ่อม」ในระบบเช่าอัตโนมัติเมื่อเลือก ซ่อมแล้ว/เสื่อมสภาพ — ซ่อมแล้วขึ้นต้นว่าใช้งานได้ปกติ · เสื่อมสภาพส่งเฉพาะหมายเหตุ</p>
     </div>
-    <div class="ma-snippet">
+    <div class="ma-snippet ma-snippet-rental">
       <a href="https://bit-online.net/rent/detail_product_waitma.php" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-line btn-with-icon ma-waitma-link">
         <?= ui_icon_html('external-link', 14, 'btn-svg') ?><span>เปิดฟอร์มรอ MA — bit-online</span>
       </a>

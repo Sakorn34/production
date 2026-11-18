@@ -829,21 +829,23 @@ function asset_maintenance_section_html(array $info, int $assetId = 0): string
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   วันเปลี่ยนอะไหล่สิ้นเปลือง (SD Card / Battery Backup RTC) จากงานซ่อม
+   วันเปลี่ยนอะไหล่สิ้นเปลือง (SD Card / Battery Backup RTC / Battery Power) จากงานซ่อม
    ═══════════════════════════════════════════════════════════════════════════
    การแจ้งเตือน "ถึงกำหนดเปลี่ยน" เดิมดูจาก ma_records ของ production อย่างเดียว
    เครื่องที่เข้าศูนย์ซ่อมแล้วเปลี่ยนอะไหล่ไปจึงไม่ถูกนับ แล้วเตือนซ้ำทั้งที่เพิ่งเปลี่ยน
 
    ระบบซ่อมเรียกชิ้นส่วนเดียวกันคนละชื่อตามรุ่น (ตรวจจากตาราง rate + ค่าที่ใช้จริง
-   194 แบบ) และมีรายการเหมารวม "MA เปลียนอะไหล่พื้นฐาน" ที่รวมทั้งสองอย่างไว้แล้ว
+   194 แบบ) และมีรายการเหมารวม "MA เปลียนอะไหล่พื้นฐาน" ที่รวม SD Card กับถ่าน RTC
+   ไม่รวมแบตก้อนใหญ่ (Battery Power)
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /**
  * ชื่อรายการซ่อมที่ถือว่าเปลี่ยนอะไหล่สิ้นเปลืองแต่ละชนิด
  *
  * คีย์ต้องตรงกับ part_watch_catalog() ใน config.php
- * ไม่รวม "battery 3.7v/320mA" กับ "batt." — เป็นแบตก้อนใหญ่ของเครื่อง คนละชิ้นกับถ่าน RTC
- * และระวังอย่าใช้แค่ "ถ่าน" เพราะจะไปโดน "ขั้วถ่าน" (435 งาน) ซึ่งเป็นขั้วไม่ใช่ถ่าน
+ * Battery Power = แบตก้อนใหญ่ของเครื่อง (battery 3.7v / Li-ion / batt.) คนละชิ้นกับถ่าน RTC
+ * ระวังอย่าใช้แค่ "ถ่าน" เพราะจะไปโดน "ขั้วถ่าน" (435 งาน) ซึ่งเป็นขั้วไม่ใช่ถ่าน
+ * และห้ามใช้ "Battery" ล้วน — จะไปโดน Battery Backup RTC
  *
  * @return array<string,array<int,string>>
  */
@@ -858,6 +860,10 @@ function ma_repair_part_aliases(): array
             'ถ่าน BACKUP RTC', 'Battery Backup RTC', 'ถ่าน CR2032', 'CR2032',
             'ถ่าน RTC', 'RTC DS3231', 'Module RTC', 'ถ่าน 3',
             'MA เปลียนอะไหล่พื้นฐาน',
+        ],
+        'Battery Power' => [
+            'battery 3.7', 'Battery 3.7', 'Battery Li-ion', 'Li-ion 3.7',
+            'batt.',
         ],
     ];
 }
@@ -942,6 +948,101 @@ function asset_maintenance_part_replacements(string $serial): array
                 }
             }
         }
+    }
+    return $out;
+}
+
+/**
+ * วันซ่อมที่เปลี่ยน SD Card / อะไหล่พื้นฐาน ล่าสุด ของหลาย S/N
+ *
+ * นับเฉพาะงานที่ลงมือซ่อมจริง ใช้วันซ่อมเสร็จ ถ้าไม่มีค่อยใช้วันรับเครื่อง
+ * คีย์ในผลลัพธ์เป็น S/N ตัวพิมพ์ใหญ่
+ *
+ * @param  string[] $serials
+ * @return array<string,string> S/N => วันที่ Y-m-d
+ */
+function asset_maintenance_sd_card_dates_map(array $serials): array
+{
+    $want = [];
+    foreach ($serials as $s) {
+        $k = strtoupper(trim((string) $s));
+        if ($k !== '') {
+            $want[$k] = $k;
+        }
+    }
+    if (!$want || !function_exists('dbMaintenance')) {
+        return [];
+    }
+    $sec = function_exists('db_secrets') ? db_secrets() : [];
+    if (empty($sec['maintenance']) || !is_array($sec['maintenance'])
+        || trim((string) ($sec['maintenance']['host'] ?? '')) === '') {
+        return [];
+    }
+    $db = dbMaintenance();
+    if ($db === null) {
+        return [];
+    }
+
+    $pats = ma_repair_part_aliases()['SD Card'] ?? [];
+    if (!$pats) {
+        return [];
+    }
+
+    $cols = [];
+    for ($i = 1; $i <= 10; $i++) {
+        $cols[] = 'trp_repair_no' . $i;
+    }
+    $out = [];
+    foreach (array_chunk(array_values($want), 200) as $chunk) {
+        $ph = implode(',', array_fill(0, count($chunk), '?'));
+        $sql = 'SELECT UPPER(TRIM(trp_sn)) sn, trp_status_firmma, trp_success_date, trp_receive_date, '
+            . implode(', ', $cols)
+            . ' FROM transac_repair WHERE UPPER(TRIM(trp_sn)) IN (' . $ph . ') ORDER BY trp_id DESC';
+        $st = $db->prepare($sql);
+        if (!$st) {
+            continue;
+        }
+        $types = str_repeat('s', count($chunk));
+        $bind = [$types];
+        foreach ($chunk as $i => $_) {
+            $bind[] = &$chunk[$i];
+        }
+        call_user_func_array([$st, 'bind_param'], $bind);
+        if (!$st->execute()) {
+            $st->close();
+            continue;
+        }
+        $res = $st->get_result();
+        while ($res && ($row = $res->fetch_assoc())) {
+            $sn = strtoupper(trim((string) ($row['sn'] ?? '')));
+            if ($sn === '' || ma_job_is_declined($row['trp_status_firmma'] ?? null)) {
+                continue;
+            }
+            $date = ma_val($row['trp_success_date'] ?? null) ?? ma_val($row['trp_receive_date'] ?? null);
+            if ($date === null || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+                continue;
+            }
+            if (isset($out[$sn]) && strcmp($out[$sn], $date) >= 0) {
+                continue;
+            }
+            $items = '';
+            for ($i = 1; $i <= 10; $i++) {
+                $v = ma_val($row['trp_repair_no' . $i] ?? null);
+                if ($v !== null) {
+                    $items .= $v . '|';
+                }
+            }
+            if ($items === '') {
+                continue;
+            }
+            foreach ($pats as $p) {
+                if (mb_stripos($items, $p) !== false) {
+                    $out[$sn] = $date;
+                    break;
+                }
+            }
+        }
+        $st->close();
     }
     return $out;
 }

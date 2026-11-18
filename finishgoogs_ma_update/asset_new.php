@@ -96,6 +96,19 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fields') {
         $partRows[] = $r;
     }
     $qtyMap = tech_parts_qty_map_for_parts($partRows);
+    // อะไหล่ที่ถูกลบจากแอป parts แล้ว: แถวใน parts ของเรายังค้าง (stock_code ชี้ไปรหัสที่ไม่มีในคลังช่าง)
+    // เบิกไม่ได้จริง จึงไม่ควรโผล่ในตัวเลือก/ชุดเบิก — ข้ามเฉพาะเมื่อโหลดคลังช่างได้ (map ไม่ว่าง)
+    // ไม่งั้นคลังช่างล่มชั่วคราวจะทำให้อะไหล่หายหมด
+    $goneIds = [];
+    if ($qtyMap) {
+        foreach ($partRows as $k => $r) {
+            $sc = part_row_stock_code($r);
+            if ($sc !== '' && !isset($qtyMap[$sc])) {
+                $goneIds[(int) $r['id']] = (string) $r['name'];
+                unset($partRows[$k]);
+            }
+        }
+    }
     foreach ($partRows as $r) {
         $codeKey = part_row_stock_code($r);
         if ($codeKey === '') {
@@ -109,12 +122,21 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fields') {
             'stock_code' => (string)($r['stock_code'] ?? ''),
             'search'     => part_search_key($r),
             'icon'       => img_url($r['icon_path'] ?? '') ?: '',
-            'stock_qty'  => ($codeKey !== '' && isset($qtyMap[$codeKey])) ? (int)$qtyMap[$codeKey] : null,
+            'stock_qty'  => ($codeKey !== '' && isset($qtyMap[$codeKey])) ? (float)$qtyMap[$codeKey] : null,
         ];
     }
     $out['bom'] = [];
-    $rb = qr("SELECT b.part_id, b.qty_per_unit FROM bom_items b JOIN parts pa ON pa.id=b.part_id WHERE b.product_id=? ORDER BY pa.name", 'i', [$pid]);
-    while ($r = $rb->fetch_assoc()) $out['bom'][] = ['part_id' => (int)$r['part_id'], 'qty' => (float)$r['qty_per_unit']];
+    // ชุดเบิก: ตัดอะไหล่ที่ปิดใช้งานหรือถูกลบจากคลังช่างแล้วออก — บันทึกฟอร์มครั้งถัดไปจะล้างแถวเหล่านี้ออกจาก bom_items เอง
+    $out['bom_hidden'] = [];
+    $rb = qr("SELECT b.part_id, b.qty_per_unit, pa.name, pa.is_active FROM bom_items b JOIN parts pa ON pa.id=b.part_id WHERE b.product_id=? ORDER BY pa.name", 'i', [$pid]);
+    while ($r = $rb->fetch_assoc()) {
+        $pidRow = (int)$r['part_id'];
+        if ((int)$r['is_active'] !== 1 || isset($goneIds[$pidRow])) {
+            $out['bom_hidden'][] = (string)$r['name'];
+            continue;
+        }
+        $out['bom'][] = ['part_id' => $pidRow, 'qty' => (float)$r['qty_per_unit']];
+    }
 
     // ค่าจากเครื่องล่าสุด (สำหรับ prefill)
     $lastComp = [];
@@ -405,7 +427,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // บรรทัดนี้ตัดสต็อกไปแล้วแต่ยังไม่มี movement — รวมเข้า rollback ชุดเดียวกัน
                 $deductedThisUnit[] = [
                     'part_id'      => $partId,
-                    'qty'          => (int)($out['qty'] ?? tech_parts_qty_to_int($bq)),
+                    'qty'          => (float)($out['qty'] ?? tech_parts_qty_norm($bq)),
                     'movement_id'  => 0,
                     'stock_out_id' => (int)($out['stock_out_id'] ?? 0),
                 ];
@@ -416,7 +438,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $bomMid = (int)($ins['insert_id'] ?? 0);
             $deductedThisUnit[] = [
                 'part_id'      => $partId,
-                'qty'          => (int)($out['qty'] ?? tech_parts_qty_to_int($bq)),
+                'qty'          => (float)($out['qty'] ?? tech_parts_qty_norm($bq)),
                 'movement_id'  => $bomMid,
                 'stock_out_id' => (int)($out['stock_out_id'] ?? 0),
             ];
@@ -527,9 +549,9 @@ page_header('บันทึกเครื่องผลิตใหม่');
         <div id="unit-list"></div>
         <div class="unit-actions">
           <button type="button" class="btn btn-line btn-sm" id="add-unit" onclick="addUnit()" disabled><?= ui_btn_label('plus', 'เพิ่มเครื่อง') ?></button>
-          <button type="button" class="btn btn-line btn-sm" id="scan-units" onclick="scanUnits(null)" hidden><?= ui_btn_label('scan', 'สแกนต่อเนื่อง') ?></button>
+          <button type="button" class="btn btn-line btn-sm scan-mobile-only" id="scan-units" onclick="scanUnits(null)" hidden><?= ui_btn_label('scan', 'สแกนต่อเนื่อง') ?></button>
           <?php // ป้ายที่สแกนสดอ่านยาก (บาร์โค้ดเส้นถี่) — ถ่ายรูปนิ่งทีละหลายเครื่องแล้วอ่านจากรูปแทน ?>
-          <button type="button" class="btn btn-line btn-sm" id="photo-units" onclick="photoUnits()" hidden><?= ui_btn_label('camera', 'ถ่ายรูปหลายเครื่อง') ?></button>
+          <button type="button" class="btn btn-line btn-sm scan-mobile-only" id="photo-units" onclick="photoUnits()" hidden><?= ui_btn_label('camera', 'ถ่ายรูปหลายเครื่อง') ?></button>
         </div>
         <input type="hidden" name="gen_count" id="gen_count" value="0">
       </div>
@@ -589,17 +611,18 @@ page_header('บันทึกเครื่องผลิตใหม่');
 
 <!-- popup ยืนยันก่อนบันทึก -->
 <div id="confirm-overlay" class="notif-overlay" hidden>
-  <div class="notif-box" style="width:min(680px,94vw); max-height:84vh">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px">
+  <?php // กล่องเป็น flex column สูงเกือบเต็มจอ — เฉพาะ #confirm-body ที่ scroll ส่วนหัว/ปุ่มบันทึกค้างให้เห็นเสมอ ?>
+  <div class="notif-box" style="width:min(680px,94vw); height:min(92vh,900px); max-height:92vh; display:flex; flex-direction:column; overflow:hidden">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex:0 0 auto">
       <h2 style="margin:0" class="h-with-icon"><?= ui_icon_html('search', 17, 'h-svg') ?><span>ตรวจสอบก่อนบันทึก</span></h2>
       <button type="button" class="btn-sm btn-line" onclick="closeOverlay('confirm-overlay')"><?= ui_btn_label('close', 'ปิด') ?></button>
     </div>
-    <div id="confirm-body" style="overflow:auto; max-height:62vh"></div>
+    <div id="confirm-body" style="overflow:auto; flex:1 1 auto; min-height:0"></div>
     <?php // รุ่นที่เปิด "ย้ายไประบบเช่าอัตโนมัติ" ในหลังบ้าน — ถามทุกครั้ง เอาติ๊กออกได้ถ้ารอบนี้ไม่ต้องการย้าย ?>
     <div id="confirm-inv" class="confirm-inv" hidden></div>
     <label id="confirm-lease" class="confirm-lease" hidden><input type="checkbox" id="confirm-lease-cb" checked> <span id="confirm-lease-text"></span></label>
     <div id="confirm-error" hidden style="margin-top:10px; padding:12px 14px; background:#fff4f4; border:1px solid #f5c2c2; border-radius:8px; color:#b42318; font-size:14px; line-height:1.5; white-space:pre-wrap"></div>
-    <div style="margin-top:14px; display:flex; gap:10px; justify-content:flex-end">
+    <div style="margin-top:14px; display:flex; gap:10px; justify-content:flex-end; flex:0 0 auto">
       <button type="button" class="btn btn-line" onclick="closeOverlay('confirm-overlay')">← กลับไปแก้ไข</button>
       <button type="button" id="confirm-submit-btn" onclick="doConfirmSubmit()"><?= ui_btn_label('check-circle', 'ยืนยันบันทึก') ?></button>
     </div>
@@ -950,8 +973,13 @@ function bomRowHtml(partId, qty){
 function renderBom(d){
   bomAllParts = d.all_parts || [];
   var rows = (d.bom || []).map(function(b){ return bomRowHtml(b.part_id, b.qty); }).join('');
+  var hid = d.bom_hidden || [];
+  var hidNote = hid.length
+    ? '<div class="muted" style="font-size:12px;margin-bottom:6px">ซ่อนอะไหล่ที่ถูกลบ/ปิดใช้งานแล้ว ' + hid.length + ' รายการ ('
+      + hid.map(esc).join(', ') + ') — จะถูกถอดออกจากชุดเบิกเมื่อกดบันทึก</div>'
+    : '';
   document.getElementById('bom-fields').innerHTML =
-    '<div id="bom-list">' + rows + '</div>'
+    hidNote + '<div id="bom-list">' + rows + '</div>'
     + '<button type="button" class="btn btn-line btn-sm" style="margin-top:6px" onclick="addBomRow()">' + ICON_PLUS + '<span>เพิ่มอะไหล่</span></button>';
 }
 function addBomRow(){
@@ -1228,7 +1256,7 @@ function addUnit(noFocus){
     row.innerHTML = '<span class="badge st-new">#' + unitCount + '</span>'
       + '<input type="text" name="serials[]" placeholder="รหัสเครื่อง" style="flex:1; min-width:0" required autocomplete="off">'
       + '<div class="unit-row-btns">'
-      + '<button type="button" class="btn-sm btn-line unit-scan" onclick="scanUnits(this)">สแกน</button>'
+      + '<button type="button" class="btn-sm btn-line unit-scan scan-mobile-only" onclick="scanUnits(this)">สแกน</button>'
       + '<button type="button" class="btn-sm btn-line unit-del" onclick="removeUnit(this)" aria-label="ลบแถวนี้"><span class="u-txt">ลบ</span><span class="u-ic" aria-hidden="true">✕</span></button>'
       + '</div>';
     list.appendChild(row);

@@ -2,8 +2,13 @@
 /**
  * includes/asset_status_sync.php
  * ────────────────────────────────────────────────────────────────────────────────
- * sync assets.status จากระบบเช่า (biton_leasing) และการเบิกขาย (biton_stockparts)
- * กติกา: ลงทะเบียนในระบบเช่า = เครื่องเช่า (ยกเว้นปลดระวาง/สูญหาย) > เบิกขาย = ขายแล้ว · ไม่ทับ spare
+ * sync assets.status จากระบบเช่า (biton_leasing) การเบิกขาย (biton_stockparts)
+ * และใบยืมเครื่องสำรองในระบบซ่อม (biton_maintenance.transac_spare)
+ *
+ * กติกา (เรียงตามน้ำหนัก): ใช้งานครั้งล่าสุดเป็นสำรองหรือเช่า (วันที่ยืมสำรอง vs วันเริ่มสัญญาเช่า vs MA)
+ * · ลงทะเบียนในระบบเช่า = เครื่องเช่า (ยกเว้นปลดระวาง/สูญหาย)
+ * · เบิกขาย = ขายแล้ว
+ * · ไม่ทับ sold / retired / lost · เครื่องสำรองที่ตั้งเองและไม่มีประวัติยืม/MA ยังไม่แตะ
  * ────────────────────────────────────────────────────────────────────────────────
  */
 
@@ -80,14 +85,6 @@ function asset_status_leasing_implies_new(array $lease): bool
 }
 
 /**
- * คำนวณสถานะเป้าหมายจากแหล่งภายนอก
- *
- * @param string                   $current assets.status ปัจจุบัน
- * @param array<string,mixed>|null $sale    จาก asset_stockparts_sale_status_by_sn
- * @param array<string,mixed>|null $lease   จาก asset_leasing_status_by_assets
- * @return array{target:?string,reason:string}
- */
-/**
  * ลงทะเบียนเข้าคลังเช่าไว้นานกี่วัน ถึงเลิกนับว่าเป็น "เครื่องพร้อมส่งให้เช่า"
  *
  * เครื่องที่ลงไว้ไม่นานยังเชื่อว่ารอปล่อยเช่าอยู่จริง แต่ถ้าค้างเกินเกณฑ์นี้
@@ -133,9 +130,264 @@ function asset_status_setup_reason(array $hit): string
     return 'ระบบ Setup: ' . $label . ($ref !== '' ? ' ' . $ref : '');
 }
 
-function asset_status_target_from_external(string $current, ?array $sale, ?array $lease, ?array $setup = null): array
+/**
+ * แปลงค่าวันที่เป็น Y-m-d — ค่าว่าง / 0000-00-00 ไม่ใช้ตัดสิน
+ *
+ * @param mixed $v
+ * @return string|null
+ */
+function asset_status_parse_day($v): ?string
 {
+    $s = trim((string) $v);
+    if ($s === '' || strpos($s, '0000-00-00') === 0) {
+        return null;
+    }
+    if (preg_match('/^(\d{4}-\d{2}-\d{2})/', $s, $m)) {
+        return $m[1];
+    }
+    $t = strtotime($s);
+    return ($t && $t > 0) ? date('Y-m-d', $t) : null;
+}
+
+/**
+ * การยืมเป็นเครื่องสำรองครั้งล่าสุดต่อ S/N จากระบบซ่อม
+ *
+ * เอาแถวที่ส่งออกจริงล่าสุด (ไม่จำกัดว่าคืนแล้วหรือยัง) เพื่อเทียบกับการปล่อยเช่าครั้งล่าสุด
+ *
+ * @return array<string,array{at:string,open:bool}> UPPER(S/N) => ข้อมูล
+ */
+function asset_status_spare_usage_map(): array
+{
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+    $cache = [];
+    if (!function_exists('dbMaintenance')) {
+        return $cache;
+    }
+    $db = dbMaintenance();
+    if (!$db) {
+        return $cache;
+    }
+    try {
+        $res = $db->query(
+            "SELECT tsp_sn, tsp_datesend, tsp_datereturn
+             FROM transac_spare
+             WHERE tsp_sn IS NOT NULL
+               AND TRIM(tsp_sn) <> ''
+               AND UPPER(TRIM(tsp_sn)) NOT LIKE 'WAITING%'
+               AND tsp_datesend IS NOT NULL
+               AND tsp_datesend <> '0000-00-00'
+             ORDER BY tsp_datesend DESC, tsp_id DESC"
+        );
+        while ($res && ($r = $res->fetch_assoc())) {
+            $sn = strtoupper(trim((string) ($r['tsp_sn'] ?? '')));
+            $at = asset_status_parse_day($r['tsp_datesend'] ?? '');
+            if ($sn === '' || $at === null || isset($cache[$sn])) {
+                continue;
+            }
+            $cache[$sn] = [
+                'at' => $at,
+                'open' => asset_status_parse_day($r['tsp_datereturn'] ?? '') === null,
+            ];
+        }
+    } catch (\Throwable $e) {
+        error_log('[asset_status_spare_usage_map] ' . $e->getMessage());
+        $cache = [];
+    }
+    return $cache;
+}
+
+/**
+ * S/N ที่ระบบซ่อมยังยืมเป็นเครื่องสำรองอยู่ (ส่งไปแล้ว · ยังไม่คืน)
+ *
+ * @return array<string,true> UPPER(S/N) => true
+ */
+function asset_status_open_spare_sn_map(): array
+{
+    $out = [];
+    foreach (asset_status_spare_usage_map() as $sn => $info) {
+        if (!empty($info['open'])) {
+            $out[$sn] = true;
+        }
+    }
+    return $out;
+}
+
+/**
+ * การยืมสำรองครั้งล่าสุดของเครื่องนี้ จาก usage map
+ *
+ * @param array<string,mixed>                    $row         ต้องมี asset_code / factory_serial
+ * @param array<string,array{at:string,open:bool}> $spareUseMap จาก asset_status_spare_usage_map()
+ * @return array{at:string,open:bool}|null
+ */
+function asset_status_row_spare_use(array $row, array $spareUseMap): ?array
+{
+    if (!$spareUseMap) {
+        return null;
+    }
+    foreach (['asset_code', 'factory_serial'] as $k) {
+        $sn = strtoupper(trim((string) ($row[$k] ?? '')));
+        if ($sn !== '' && isset($spareUseMap[$sn])) {
+            return $spareUseMap[$sn];
+        }
+    }
+    return null;
+}
+
+/**
+ * ตรวจว่าเครื่องนี้อยู่ในใบยืมเครื่องสำรองที่ยังไม่คืนหรือไม่
+ *
+ * @param array<string,mixed> $row          ต้องมี asset_code / factory_serial
+ * @param array<string,true>  $openSpareMap จาก asset_status_open_spare_sn_map()
+ * @return bool
+ */
+function asset_status_row_is_open_spare(array $row, array $openSpareMap): bool
+{
+    if (!$openSpareMap) {
+        return false;
+    }
+    foreach (['asset_code', 'factory_serial'] as $k) {
+        $sn = strtoupper(trim((string) ($row[$k] ?? '')));
+        if ($sn !== '' && !empty($openSpareMap[$sn])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * machine_status ล่าสุดจาก MA ต่อเครื่อง (เฉพาะ rental/spare ที่ระบุจริง)
+ *
+ * @param int[] $assetIds
+ * @return array<int,array{status:string,at:string}> asset_id => rental|spare + วันที่
+ */
+function asset_status_latest_ma_status_map(array $assetIds): array
+{
+    $out = [];
+    $ids = array_values(array_unique(array_filter(array_map('intval', $assetIds))));
+    if (!$ids) {
+        return $out;
+    }
+    foreach (array_chunk($ids, 200) as $chunk) {
+        $ph = implode(',', array_fill(0, count($chunk), '?'));
+        $res = qr(
+            "SELECT asset_id, machine_status, visited_at
+             FROM ma_records
+             WHERE asset_id IN ($ph) AND machine_status IN ('rental','spare')
+             ORDER BY visited_at DESC, id DESC",
+            str_repeat('i', count($chunk)),
+            $chunk
+        );
+        while ($r = $res->fetch_assoc()) {
+            $id = (int) ($r['asset_id'] ?? 0);
+            if ($id <= 0 || isset($out[$id])) {
+                continue;
+            }
+            $at = asset_status_parse_day($r['visited_at'] ?? '');
+            $out[$id] = [
+                'status' => (string) $r['machine_status'],
+                'at' => $at !== null ? $at : '',
+            ];
+        }
+    }
+    return $out;
+}
+
+/**
+ * สถานะจากการใช้งานครั้งล่าสุด — สำรองหรือเช่า อันที่วันที่ใหม่กว่า
+ *
+ * ใช้เมื่อมีหลักฐานยืมสำรองหรือ MA ที่ระบุ rental/spare จริง ไม่เดาจากทะเบียนเช่าอย่างเดียว
+ *
+ * @param array{at?:string,open?:bool}|null           $spareUse
+ * @param array<string,mixed>|null                    $lease
+ * @param array{status?:string,at?:string}|null       $latestMa
+ * @return array{target:string,reason:string}|null
+ */
+function asset_status_latest_use_target(?array $spareUse, ?array $lease, ?array $latestMa): ?array
+{
+    $events = [];
+    $spareAt = asset_status_parse_day($spareUse['at'] ?? '');
+    if ($spareAt !== null) {
+        $events[] = ['at' => $spareAt, 'target' => 'spare', 'reason' => 'ใช้งานล่าสุดเป็นเครื่องสำรอง'];
+    }
+    $maAt = asset_status_parse_day($latestMa['at'] ?? '');
+    $maSt = trim((string) ($latestMa['status'] ?? ''));
+    if ($maAt !== null && in_array($maSt, ['rental', 'spare'], true)) {
+        $events[] = [
+            'at' => $maAt,
+            'target' => $maSt,
+            'reason' => 'MA ล่าสุดระบุ' . ($maSt === 'spare' ? 'เครื่องสำรอง' : 'เครื่องเช่า'),
+        ];
+    }
+    if (!$events) {
+        return null;
+    }
+    $rentAt = asset_status_parse_day($lease['rent_at'] ?? '');
+    if ($rentAt !== null) {
+        $events[] = ['at' => $rentAt, 'target' => 'rental', 'reason' => 'ใช้งานล่าสุดเป็นเครื่องเช่า'];
+    }
+    $openSpare = !empty($spareUse['open']);
+    $rentActive = trim((string) ($lease['p_status'] ?? '')) === 'active';
+    usort($events, function ($a, $b) use ($openSpare, $rentActive) {
+        $c = strcmp((string) $b['at'], (string) $a['at']);
+        if ($c !== 0) {
+            return $c;
+        }
+        if ($a['target'] === $b['target']) {
+            return 0;
+        }
+        if ($openSpare && $a['target'] === 'spare') {
+            return -1;
+        }
+        if ($openSpare && $b['target'] === 'spare') {
+            return 1;
+        }
+        if ($rentActive && $a['target'] === 'rental') {
+            return -1;
+        }
+        if ($rentActive && $b['target'] === 'rental') {
+            return 1;
+        }
+        return 0;
+    });
+    $best = $events[0];
+    return [
+        'target' => (string) $best['target'],
+        'reason' => (string) $best['reason'] . ' (' . $best['at'] . ')',
+    ];
+}
+
+/**
+ * คำนวณสถานะเป้าหมายจากแหล่งภายนอก
+ *
+ * @param string                   $current    assets.status ปัจจุบัน
+ * @param array<string,mixed>|null $sale       จาก asset_stockparts_sale_status_by_sn
+ * @param array<string,mixed>|null $lease      จาก asset_leasing_status_by_assets
+ * @param array<string,mixed>|null $setup      จาก asset_status_setup_sold_map
+ * @param array{at?:string,open?:bool}|null     $spareUse  การยืมสำรองครั้งล่าสุดจากระบบซ่อม
+ * @param array{status?:string,at?:string}|null $latestMa  machine_status จาก MA ล่าสุด
+ * @return array{target:?string,reason:string,want_setup?:bool}
+ */
+function asset_status_target_from_external(
+    string $current,
+    ?array $sale,
+    ?array $lease,
+    ?array $setup = null,
+    ?array $spareUse = null,
+    ?array $latestMa = null
+): array {
     $current = trim($current) !== '' ? trim($current) : 'new';
+
+    // เทียบวันที่ยืมสำรอง / วันเริ่มสัญญาเช่า / วันที่ MA — ใช้อันใหม่สุดว่าเอาไปใช้แบบไหน
+    // ไม่แตะ sold / retired / lost เพราะสถานะปลายทางนั้นสำคัญกว่าประวัติยืม-เช่า
+    if (in_array($current, ['rental', 'spare', 'new', 'unknown'], true)) {
+        $use = asset_status_latest_use_target($spareUse, $lease, $latestMa);
+        if ($use) {
+            return $use;
+        }
+    }
 
     // ระบบเช่าชนะใบเบิกขาย — เครื่องเช่าก็ต้องเบิกออกจากคลังเหมือนกัน ใบเบิกจึงบอกได้
     // แค่ว่าเครื่องออกไปแล้ว ไม่ได้บอกว่าออกไปแบบไหน
@@ -230,15 +482,6 @@ function asset_status_sync_log(int $assetId, string $from, string $to, string $r
     );
 }
 
-/**
- * sync แถวเครื่องเดียว (มี sale/lease map แล้ว)
- *
- * @param array<string,mixed>                   $row
- * @param array<string,array<string,mixed>>     $saleMap
- * @param array<string,array<string,mixed>>     $leaseMap
- * @param bool                                  $write
- * @return array{changed:bool,asset_code:string,from:string,to:string,reason:string}
- */
 /**
  * asset id ที่สแกนเจอในคลังตอนนับสต็อกรอบล่าสุด (รอบที่ยังเปิดหรือจบแล้ว ไม่นับรอบที่ยกเลิก)
  *
@@ -358,8 +601,29 @@ function asset_status_setup_sold_map(array $codes): array
     return $out;
 }
 
-function asset_status_sync_row(array $row, array $saleMap, array $leaseMap, bool $write = true, array $installMap = [], array $setupMap = []): array
-{
+/**
+ * sync แถวเครื่องเดียว (มี sale/lease/spare map แล้ว)
+ *
+ * @param array<string,mixed>               $row
+ * @param array<string,array<string,mixed>> $saleMap
+ * @param array<string,array<string,mixed>> $leaseMap
+ * @param bool                              $write
+ * @param array<string,mixed>               $installMap
+ * @param array<string,array<string,mixed>> $setupMap
+ * @param array<string,array{at:string,open:bool}> $spareUseMap จาก asset_status_spare_usage_map()
+ * @param array<int,array{status:string,at:string}> $maStatusMap จาก asset_status_latest_ma_status_map()
+ * @return array{changed:bool,asset_code:string,from:string,to:string,reason:string}
+ */
+function asset_status_sync_row(
+    array $row,
+    array $saleMap,
+    array $leaseMap,
+    bool $write = true,
+    array $installMap = [],
+    array $setupMap = [],
+    array $spareUseMap = [],
+    array $maStatusMap = []
+): array {
     $id = (int) ($row['id'] ?? 0);
     $code = trim((string) ($row['asset_code'] ?? ''));
     $current = trim((string) ($row['status'] ?? 'new'));
@@ -367,12 +631,14 @@ function asset_status_sync_row(array $row, array $saleMap, array $leaseMap, bool
         $current = 'new';
     }
 
-
+    $latestMa = $maStatusMap[$id] ?? null;
     $resolved = asset_status_target_from_external(
         $current,
         $code !== '' ? ($saleMap[$code] ?? null) : null,
         $code !== '' ? ($leaseMap[$code] ?? null) : null,
-        $code !== '' ? ($setupMap[strtoupper($code)] ?? null) : null
+        $code !== '' ? ($setupMap[strtoupper($code)] ?? null) : null,
+        asset_status_row_spare_use($row, $spareUseMap),
+        is_array($latestMa) ? $latestMa : null
     );
     $target = $resolved['target'];
     $reason = (string) ($resolved['reason'] ?? '');
@@ -443,6 +709,8 @@ function asset_status_sync_batch(array $assetRows, bool $write = true): array
 
     $saleMap = $codes ? asset_stockparts_sale_status_by_sn($codes) : [];
     $leaseMap = asset_leasing_status_by_assets($assetRows);
+    $spareUseMap = asset_status_spare_usage_map();
+    $maStatusMap = asset_status_latest_ma_status_map(array_column($assetRows, 'id'));
     // โหลดประวัติติดตั้งเฉพาะเครื่องที่ยังเป็น "ใหม่" — กฎนี้ไม่แตะสถานะอื่น
     $newRows = array_values(array_filter($assetRows, function ($r) { return trim((string) ($r['status'] ?? '')) === 'new'; }));
     $installMap = $newRows ? installation_history_map($newRows) : [];
@@ -458,10 +726,14 @@ function asset_status_sync_batch(array $assetRows, bool $write = true): array
         if ($c === '' || isset($setupMap[strtoupper($c)])) {
             continue;
         }
+        $peekMa = isset($row['id']) ? ($maStatusMap[(int) $row['id']] ?? null) : null;
         $peek = asset_status_target_from_external(
             trim((string) ($row['status'] ?? 'new')),
             $saleMap[$c] ?? null,
-            $leaseMap[$c] ?? null
+            $leaseMap[$c] ?? null,
+            null,
+            asset_status_row_spare_use($row, $spareUseMap),
+            is_array($peekMa) ? $peekMa : null
         );
         if (!empty($peek['want_setup'])) {
             $wantSetup[] = $c;
@@ -474,7 +746,7 @@ function asset_status_sync_batch(array $assetRows, bool $write = true): array
     }
 
     foreach ($assetRows as $row) {
-        $item = asset_status_sync_row($row, $saleMap, $leaseMap, $write, $installMap, $setupMap);
+        $item = asset_status_sync_row($row, $saleMap, $leaseMap, $write, $installMap, $setupMap, $spareUseMap, $maStatusMap);
         if (!empty($item['changed'])) {
             $stats['changed']++;
             $stats['items'][] = $item;
@@ -508,13 +780,70 @@ function asset_status_sync_by_id(int $assetId, bool $write = true): array
     $installMap = $isNew ? installation_history_map([$row]) : [];
     // ถามหลักฐานฝั่ง setup ทุกครั้ง — เครื่องเดียวไม่หนัก และกฎทะเบียนเช่าก็ใช้หลักฐานชุดนี้
     $setupMap = $code !== '' ? asset_status_setup_sold_map([$code]) : [];
-    $item = asset_status_sync_row($row, $saleMap, $leaseMap, $write, $installMap, $setupMap);
+    $spareUseMap = asset_status_spare_usage_map();
+    $maStatusMap = asset_status_latest_ma_status_map([(int) $assetId]);
+    $item = asset_status_sync_row($row, $saleMap, $leaseMap, $write, $installMap, $setupMap, $spareUseMap, $maStatusMap);
     return [
         'changed' => !empty($item['changed']),
         'from' => (string) ($item['from'] ?? ''),
         'to' => (string) ($item['to'] ?? ''),
         'reason' => (string) ($item['reason'] ?? ''),
     ];
+}
+
+/**
+ * sync เครื่องที่มีประวัติยืมสำรอง ให้สถานะตามการใช้งานครั้งล่าสุด (สำรองหรือเช่า)
+ *
+ * รวมทั้งที่คืนแล้ว เพราะวันที่ยืมสำรองอาจใหม่กว่าวันเริ่มสัญญาเช่า
+ *
+ * @param bool $write
+ * @return array{changed:int,total:int,items:array<int,array<string,mixed>>}
+ */
+function asset_status_sync_open_spares(bool $write = true): array
+{
+    $map = asset_status_spare_usage_map();
+    $sns = array_keys($map);
+    if (!$sns) {
+        return ['changed' => 0, 'total' => 0, 'items' => []];
+    }
+    $rows = [];
+    foreach (array_chunk($sns, 80) as $chunk) {
+        $ph = implode(',', array_fill(0, count($chunk), '?'));
+        $types = str_repeat('s', count($chunk));
+        $res = qr(
+            "SELECT id, asset_code, factory_serial, status, produced_at FROM assets
+             WHERE UPPER(TRIM(asset_code)) IN ($ph) OR UPPER(TRIM(factory_serial)) IN ($ph)",
+            $types . $types,
+            array_merge($chunk, $chunk)
+        );
+        while ($r = $res->fetch_assoc()) {
+            $st = trim((string) ($r['status'] ?? ''));
+            if (in_array($st, ['rental', 'spare', 'new', 'unknown'], true)) {
+                $rows[(int) $r['id']] = $r;
+            }
+        }
+    }
+    return asset_status_sync_batch(array_values($rows), $write);
+}
+
+/**
+ * sync สถานะสำรอง/เช่าตามการใช้งานครั้งล่าสุด เมื่อครบ interval
+ *
+ * ไม่ใช่ full sync ทั้งทะเบียน (18k+ เครื่อง) แค่เครื่องที่มีประวัติยืมสำรอง
+ *
+ * @param int $intervalSec ค่าเริ่มต้น 1 ชม.
+ * @return array{changed:int,total:int,items:array}|null null = ยังไม่ถึงรอบ
+ */
+function asset_status_sync_open_spares_if_stale(int $intervalSec = 3600): ?array
+{
+    $intervalSec = max(300, $intervalSec);
+    $flag = dirname(__DIR__) . '/uploads/.asset_spare_sync_last';
+    if (is_file($flag) && (time() - filemtime($flag)) < $intervalSec) {
+        return null;
+    }
+    $stats = asset_status_sync_open_spares(true);
+    @touch($flag);
+    return $stats;
 }
 
 /**

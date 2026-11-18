@@ -1,4 +1,12 @@
 <?php
+/**
+ * StockService.php — logic สต็อกอะไหล่ (รับเข้า/เบิกออก/ชุด/ประวัติ) บน biton_tech_parts
+ *
+ * จำนวนทุกชนิดเป็นทศนิยม 2 ตำแหน่ง (DECIMAL(12,2)) เพราะอะไหล่บางตัวใช้ 0.5 ชิ้น/เครื่อง —
+ * ห้าม cast เป็น (int) หรือ type-hint int กับจำนวน ให้ใช้ qty_norm/qty_sql/qty_lt จาก shared/qty_helpers.php
+ */
+
+require_once dirname(__DIR__, 2) . '/shared/qty_helpers.php';
 
 class StockService
 {
@@ -9,12 +17,59 @@ class StockService
         $this->db = $db;
     }
 
+    /**
+     * กันเขียนจำนวนทศนิยมลงคอลัมน์ที่ยังเป็น INT (MySQL จะปัด 0.5 เป็น 1 โดยไม่ error)
+     *
+     * @param float $quantity
+     * @return void
+     * @throws RuntimeException เมื่อ migrate เป็น DECIMAL ไม่สำเร็จและจำนวนมีเศษ
+     */
+    private function assertDecimalSchema(float $quantity): void
+    {
+        if (qty_has_fraction($quantity) && !tech_parts_ensure_decimal_qty_schema($this->db)) {
+            throw new RuntimeException('ฐานสต็อกยังไม่รองรับจำนวนทศนิยม — แจ้งผู้ดูแลระบบให้ migrate คอลัมน์เป็น DECIMAL');
+        }
+    }
+
+    /**
+     * แปลงชื่อคนในแถวประวัติเป็นชื่อในทะเบียนงาน (ธันวา → Ice)
+     *
+     * @param array<int,array<string,mixed>> $rows
+     * @param string                         $field คอลัมน์ชื่อคน
+     * @return array<int,array<string,mixed>>
+     */
+    private function mapActorNames(array $rows, string $field): array
+    {
+        if (!function_exists('production_person_display_name')) {
+            return $rows;
+        }
+        foreach ($rows as $i => $row) {
+            $rows[$i][$field] = production_person_display_name((string) ($row[$field] ?? ''));
+        }
+        return $rows;
+    }
+
+    /**
+     * ชื่อคนสำหรับบันทึกรายการสต็อก — ใช้ชื่อในทะเบียนงาน
+     *
+     * @param string|null $raw
+     * @return string|null
+     */
+    private function resolveActorName(?string $raw): ?string
+    {
+        if (!function_exists('production_person_display_name')) {
+            return $raw;
+        }
+        $mapped = production_person_display_name((string) $raw);
+        return $mapped !== '' ? $mapped : $raw;
+    }
+
     public function getDashboardStats(): array
     {
         $stats = [];
 
         $stats['total_products'] = (int) $this->db->query('SELECT COUNT(*) FROM products')->fetchColumn();
-        $stats['total_quantity'] = (int) $this->db->query('SELECT COALESCE(SUM(quantity), 0) FROM products')->fetchColumn();
+        $stats['total_quantity'] = qty_norm($this->db->query('SELECT COALESCE(SUM(quantity), 0) FROM products')->fetchColumn());
         $stats['low_stock'] = (int) $this->db->query('SELECT COUNT(*) FROM products WHERE quantity <= min_stock AND is_active = 1')->fetchColumn();
         $stats['total_sets'] = (int) $this->db->query('SELECT COUNT(*) FROM sets')->fetchColumn();
         $stats['today_out'] = (int) $this->db->query(
@@ -79,7 +134,29 @@ class StockService
         }
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$productId]);
-        return $stmt->fetchAll();
+        return $this->mapActorNames($stmt->fetchAll(), 'issued_by');
+    }
+
+    /**
+     * ประวัติรับเข้าคลังของอะไหล่หนึ่งรายการ เรียงจากล่าสุด
+     *
+     * @param int      $productId รหัส products.id
+     * @param int|null $limit     จำกัดจำนวนแถว (null = ไม่จำกัด)
+     * @return array<int,array<string,mixed>>
+     */
+    public function getProductStockInHistory(int $productId, ?int $limit = 50): array
+    {
+        if ($productId <= 0) {
+            return [];
+        }
+        $sql = 'SELECT id, quantity, note, received_by, created_at
+                FROM stock_in WHERE product_id = ? ORDER BY created_at DESC, id DESC';
+        if ($limit) {
+            $sql .= ' LIMIT ' . (int) $limit;
+        }
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$productId]);
+        return $this->mapActorNames($stmt->fetchAll(), 'received_by');
     }
 
     /**
@@ -119,7 +196,7 @@ class StockService
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$productId, $productId]);
-        return $stmt->fetchAll();
+        return $this->mapActorNames($stmt->fetchAll(), 'actor');
     }
 
     public function getLowStockProducts(): array
@@ -177,10 +254,11 @@ class StockService
         if ($name === '' || $unit === '') {
             throw new InvalidArgumentException('ชื่อและหน่วยต้องไม่ว่าง');
         }
-        $minStock = (int) ($data['min_stock'] ?? 0);
+        $minStock = qty_norm($data['min_stock'] ?? 0);
         if ($minStock < 0) {
             throw new InvalidArgumentException('สต็อกขั้นต่ำต้องไม่ติดลบ');
         }
+        $this->assertDecimalSchema($minStock);
         $price = round((float) ($data['price'] ?? 0), 2);
         if ($price < 0) {
             throw new InvalidArgumentException('ราคาต้องไม่ติดลบ');
@@ -192,7 +270,7 @@ class StockService
         $stmt->execute([
             $name,
             $unit,
-            $minStock,
+            qty_sql($minStock),
             $price,
             $data['supplier'] ?? null,
             $data['purchase_link'] ?? null,
@@ -200,23 +278,35 @@ class StockService
         ]);
     }
 
-    public function stockIn(int $productId, int $quantity, ?string $note = null, ?string $receivedBy = null): void
+    /**
+     * รับอะไหล่เข้าสต็อก
+     *
+     * @param int         $productId
+     * @param float       $quantity   ทศนิยมได้ 2 ตำแหน่ง
+     * @param string|null $note
+     * @param string|null $receivedBy
+     * @return void
+     */
+    public function stockIn(int $productId, float $quantity, ?string $note = null, ?string $receivedBy = null): void
     {
+        $quantity = qty_norm($quantity);
         if ($quantity <= 0) {
             throw new InvalidArgumentException('จำนวนรับเข้าต้องมากกว่า 0');
         }
+        $this->assertDecimalSchema($quantity);
+        $receivedBy = $this->resolveActorName($receivedBy);
 
         $this->db->beginTransaction();
         try {
             $stmt = $this->db->prepare(
                 'INSERT INTO stock_in (product_id, quantity, note, received_by) VALUES (?, ?, ?, ?)'
             );
-            $stmt->execute([$productId, $quantity, $note, $receivedBy]);
+            $stmt->execute([$productId, qty_sql($quantity), $note, $receivedBy]);
 
             $stmt = $this->db->prepare(
                 'UPDATE products SET quantity = quantity + ? WHERE id = ?'
             );
-            $stmt->execute([$quantity, $productId]);
+            $stmt->execute([qty_sql($quantity), $productId]);
 
             $this->db->commit();
         } catch (Exception $e) {
@@ -330,19 +420,21 @@ class StockService
     /**
      * แก้จำนวนอะไหล่ต่อ 1 Set
      */
-    public function updateSetItemQty(int $itemId, int $quantity): void
+    public function updateSetItemQty(int $itemId, float $quantity): void
     {
-        if ($quantity < 1) {
+        $quantity = qty_norm($quantity);
+        if ($quantity <= 0) {
             throw new InvalidArgumentException('จำนวนต่อ Set ต้องมากกว่า 0');
         }
+        $this->assertDecimalSchema($quantity);
         $stmt = $this->db->prepare('UPDATE set_items SET quantity = ? WHERE id = ?');
-        $stmt->execute([$quantity, $itemId]);
+        $stmt->execute([qty_sql($quantity), $itemId]);
     }
 
     private function canIssueSet(array $items): bool
     {
         foreach ($items as $item) {
-            if ((int) $item['stock_qty'] < (int) $item['quantity']) {
+            if (qty_lt($item['stock_qty'], $item['quantity'])) {
                 return false;
             }
         }
@@ -370,13 +462,15 @@ class StockService
             );
 
             foreach ($set['items'] as $item) {
-                $needed = (int) $item['quantity'] * $setCount;
+                $needed = qty_norm((float) $item['quantity'] * $setCount);
+                $this->assertDecimalSchema($needed);
                 $lockStmt->execute([(int) $item['product_id']]);
                 $locked = $lockStmt->fetch(PDO::FETCH_ASSOC);
-                if (!$locked || (int) $locked['quantity'] < $needed) {
-                    $have = $locked ? (int) $locked['quantity'] : 0;
+                if (!$locked || qty_lt($locked['quantity'], $needed)) {
+                    $have = $locked ? qty_fmt($locked['quantity']) : '0';
+                    $neededTxt = qty_fmt($needed);
                     throw new InvalidArgumentException(
-                        "อะไหล่ {$item['name']} คงเหลือไม่พอ (ต้องการ {$needed} {$item['unit']}, มี {$have})"
+                        "อะไหล่ {$item['name']} คงเหลือไม่พอ (ต้องการ {$neededTxt} {$item['unit']}, มี {$have})"
                     );
                 }
             }
@@ -386,7 +480,7 @@ class StockService
             $stmt = $this->db->prepare(
                 'INSERT INTO stock_out (doc_no, set_id, note, issued_by, asset_code) VALUES (?, ?, ?, ?, ?)'
             );
-            $stmt->execute([$docNo, $setId, $note, $issuedBy, trim((string) $assetCode) ?: null]);
+            $stmt->execute([$docNo, $setId, $note, $this->resolveActorName($issuedBy), trim((string) $assetCode) ?: null]);
             $outId = (int) $this->db->lastInsertId();
 
             $itemStmt = $this->db->prepare(
@@ -395,16 +489,16 @@ class StockService
             $insertedItems = [];
 
             foreach ($set['items'] as $item) {
-                $qty = (int) $item['quantity'] * $setCount;
+                $qty = qty_norm((float) $item['quantity'] * $setCount);
                 $productId = (int) $item['product_id'];
-                $itemStmt->execute([$outId, $productId, $qty]);
+                $itemStmt->execute([$outId, $productId, qty_sql($qty)]);
                 $insertedItems[] = [
                     'item_id'      => (int) $this->db->lastInsertId(),
                     'product_id'   => $productId,
                     'product_code' => (string) $item['code'],
                     'quantity'     => $qty,
                 ];
-                $deductStmt->execute([$qty, $productId, $qty]);
+                $deductStmt->execute([qty_sql($qty), $productId, qty_sql($qty)]);
                 if ($deductStmt->rowCount() === 0) {
                     throw new InvalidArgumentException(
                         'จำนวนอะไหล่ไม่พอ กรุณาตรวจสอบยอดคงเหลือใหม่'
@@ -426,11 +520,23 @@ class StockService
         }
     }
 
-    public function stockOutItem(int $productId, int $quantity, ?string $note, ?string $issuedBy, ?string $assetCode = null): string
+    /**
+     * เบิกอะไหล่รายชิ้น
+     *
+     * @param int         $productId
+     * @param float       $quantity  ทศนิยมได้ 2 ตำแหน่ง (เช่น 0.5)
+     * @param string|null $note
+     * @param string|null $issuedBy
+     * @param string|null $assetCode S/N เครื่อง (ถ้ามี)
+     * @return string เลขที่เอกสารเบิก
+     */
+    public function stockOutItem(int $productId, float $quantity, ?string $note, ?string $issuedBy, ?string $assetCode = null): string
     {
+        $quantity = qty_norm($quantity);
         if ($quantity <= 0) {
             throw new InvalidArgumentException('จำนวนเบิกต้องมากกว่า 0');
         }
+        $this->assertDecimalSchema($quantity);
 
         $this->db->beginTransaction();
         try {
@@ -442,9 +548,11 @@ class StockService
             if (!$product) {
                 throw new InvalidArgumentException('ไม่พบอะไหล่');
             }
-            if ((int) $product['quantity'] < $quantity) {
+            if (qty_lt($product['quantity'], $quantity)) {
+                $needTxt = qty_fmt($quantity);
+                $haveTxt = qty_fmt($product['quantity']);
                 throw new InvalidArgumentException(
-                    "อะไหล่ {$product['name']} คงเหลือไม่พอ (ต้องการ {$quantity} {$product['unit']}, มี {$product['quantity']})"
+                    "อะไหล่ {$product['name']} คงเหลือไม่พอ (ต้องการ {$needTxt} {$product['unit']}, มี {$haveTxt})"
                 );
             }
 
@@ -453,19 +561,19 @@ class StockService
             $stmt = $this->db->prepare(
                 'INSERT INTO stock_out (doc_no, set_id, note, issued_by, asset_code) VALUES (?, NULL, ?, ?, ?)'
             );
-            $stmt->execute([$docNo, $note, $issuedBy, trim((string) $assetCode) ?: null]);
+            $stmt->execute([$docNo, $note, $this->resolveActorName($issuedBy), trim((string) $assetCode) ?: null]);
             $outId = (int) $this->db->lastInsertId();
 
             $stmt = $this->db->prepare(
                 'INSERT INTO stock_out_items (stock_out_id, product_id, quantity) VALUES (?, ?, ?)'
             );
-            $stmt->execute([$outId, $productId, $quantity]);
+            $stmt->execute([$outId, $productId, qty_sql($quantity)]);
             $itemId = (int) $this->db->lastInsertId();
 
             $stmt = $this->db->prepare(
                 'UPDATE products SET quantity = quantity - ? WHERE id = ? AND quantity >= ?'
             );
-            $stmt->execute([$quantity, $productId, $quantity]);
+            $stmt->execute([qty_sql($quantity), $productId, qty_sql($quantity)]);
             if ($stmt->rowCount() === 0) {
                 throw new InvalidArgumentException(
                     'จำนวนอะไหล่ไม่พอ กรุณาตรวจสอบยอดคงเหลือใหม่'
@@ -507,7 +615,7 @@ class StockService
         if ($limit) {
             $sql .= ' LIMIT ' . (int) $limit;
         }
-        return $this->db->query($sql)->fetchAll();
+        return $this->mapActorNames($this->db->query($sql)->fetchAll(), 'issued_by');
     }
 
     public function getStockOutHistory(?int $limit = null): array
@@ -529,7 +637,7 @@ class StockService
         if ($limit) {
             $sql .= ' LIMIT ' . (int) $limit;
         }
-        return $this->db->query($sql)->fetchAll();
+        return $this->mapActorNames($this->db->query($sql)->fetchAll(), 'issued_by');
     }
 
     public function getStockOutDetail(int $id): ?array
@@ -544,6 +652,9 @@ class StockService
         $out = $stmt->fetch();
         if (!$out) {
             return null;
+        }
+        if (function_exists('production_person_display_name')) {
+            $out['issued_by'] = production_person_display_name((string) ($out['issued_by'] ?? ''));
         }
 
         $stmt = $this->db->prepare("
@@ -610,7 +721,7 @@ class StockService
         if ($limit) {
             $sql .= ' LIMIT ' . (int) $limit;
         }
-        return $this->db->query($sql)->fetchAll();
+        return $this->mapActorNames($this->db->query($sql)->fetchAll(), 'actor');
     }
 
     /**
@@ -644,7 +755,7 @@ class StockService
         if ($limit) {
             $sql .= ' LIMIT ' . (int) $limit;
         }
-        return $this->db->query($sql)->fetchAll();
+        return $this->mapActorNames($this->db->query($sql)->fetchAll(), 'received_by');
     }
 
     /**
@@ -688,22 +799,24 @@ class StockService
      * แก้ไขรายการรับเข้า
      *
      * @param int         $id
-     * @param int         $quantity
+     * @param float       $quantity ทศนิยมได้ 2 ตำแหน่ง
      * @param string|null $note
      * @return void
      */
-    public function updateStockIn(int $id, int $quantity, ?string $note = null): void
+    public function updateStockIn(int $id, float $quantity, ?string $note = null): void
     {
+        $quantity = qty_norm($quantity);
         if ($quantity <= 0) {
             throw new InvalidArgumentException('จำนวนรับเข้าต้องมากกว่า 0');
         }
+        $this->assertDecimalSchema($quantity);
         $st = $this->db->prepare('SELECT * FROM stock_in WHERE id = ?');
         $st->execute([$id]);
         $old = $st->fetch();
         if (!$old) {
             throw new InvalidArgumentException('ไม่พบรายการรับเข้า');
         }
-        $diff = $quantity - (int) $old['quantity'];
+        $diff = qty_norm($quantity - qty_norm($old['quantity']));
         $productId = (int) $old['product_id'];
 
         $this->db->beginTransaction();
@@ -713,23 +826,24 @@ class StockService
                 $lockStmt = $this->db->prepare('SELECT quantity FROM products WHERE id = ? FOR UPDATE');
                 $lockStmt->execute([$productId]);
                 $prow = $lockStmt->fetch(PDO::FETCH_ASSOC);
-                if (!$prow || (int) $prow['quantity'] < $need) {
-                    $have = $prow ? (int) $prow['quantity'] : 0;
+                if (!$prow || qty_lt($prow['quantity'], $need)) {
+                    $have = $prow ? qty_fmt($prow['quantity']) : '0';
+                    $needTxt = qty_fmt($need);
                     throw new InvalidArgumentException(
-                        "ไม่สามารถแก้ไขได้ เพราะอะไหล่ถูกเบิกออกไปแล้ว (คงเหลือ {$have} ชิ้น ต้องการลด {$need} ชิ้น)"
+                        "ไม่สามารถแก้ไขได้ เพราะอะไหล่ถูกเบิกออกไปแล้ว (คงเหลือ {$have} ชิ้น ต้องการลด {$needTxt} ชิ้น)"
                     );
                 }
             }
 
             $this->db->prepare('UPDATE stock_in SET quantity = ?, note = ? WHERE id = ?')
-                ->execute([$quantity, $note, $id]);
-            if ($diff !== 0) {
+                ->execute([qty_sql($quantity), $note, $id]);
+            if (qty_cmp($diff, 0) !== 0) {
                 if ($diff < 0) {
                     $need = abs($diff);
                     $upd = $this->db->prepare(
                         'UPDATE products SET quantity = quantity + ? WHERE id = ? AND quantity >= ?'
                     );
-                    $upd->execute([$diff, $productId, $need]);
+                    $upd->execute([qty_sql($diff), $productId, qty_sql($need)]);
                     if ($upd->rowCount() === 0) {
                         throw new InvalidArgumentException(
                             'ไม่สามารถแก้ไขได้ เพราะอะไหล่ถูกเบิกออกไปแล้ว กรุณาตรวจสอบยอดคงเหลือใหม่'
@@ -737,7 +851,7 @@ class StockService
                     }
                 } else {
                     $this->db->prepare('UPDATE products SET quantity = quantity + ? WHERE id = ?')
-                        ->execute([$diff, $productId]);
+                        ->execute([qty_sql($diff), $productId]);
                 }
             }
             $this->db->commit();
@@ -762,7 +876,7 @@ class StockService
             throw new InvalidArgumentException('ไม่พบรายการรับเข้า');
         }
 
-        $delQty = (int) $old['quantity'];
+        $delQty = qty_norm($old['quantity']);
         $productId = (int) $old['product_id'];
 
         $this->db->beginTransaction();
@@ -770,10 +884,11 @@ class StockService
             $lockStmt = $this->db->prepare('SELECT quantity FROM products WHERE id = ? FOR UPDATE');
             $lockStmt->execute([$productId]);
             $prow = $lockStmt->fetch(PDO::FETCH_ASSOC);
-            if (!$prow || (int) $prow['quantity'] < $delQty) {
-                $have = $prow ? (int) $prow['quantity'] : 0;
+            if (!$prow || qty_lt($prow['quantity'], $delQty)) {
+                $have = $prow ? qty_fmt($prow['quantity']) : '0';
+                $delTxt = qty_fmt($delQty);
                 throw new InvalidArgumentException(
-                    "ไม่สามารถลบได้ เพราะอะไหล่ถูกเบิกออกไปแล้ว (คงเหลือ {$have} ชิ้น ต้องการลด {$delQty} ชิ้น)"
+                    "ไม่สามารถลบได้ เพราะอะไหล่ถูกเบิกออกไปแล้ว (คงเหลือ {$have} ชิ้น ต้องการลด {$delTxt} ชิ้น)"
                 );
             }
 
@@ -781,7 +896,7 @@ class StockService
             $upd = $this->db->prepare(
                 'UPDATE products SET quantity = quantity - ? WHERE id = ? AND quantity >= ?'
             );
-            $upd->execute([$delQty, $productId, $delQty]);
+            $upd->execute([qty_sql($delQty), $productId, qty_sql($delQty)]);
             if ($upd->rowCount() === 0) {
                 throw new InvalidArgumentException(
                     'ไม่สามารถลบได้ เพราะอะไหล่ถูกเบิกออกไปแล้ว กรุณาตรวจสอบยอดคงเหลือใหม่'
@@ -798,7 +913,7 @@ class StockService
      * แก้ไขรายการเบิก (รายชิ้น — set_id IS NULL)
      *
      * @param int         $stockOutId
-     * @param int         $quantity
+     * @param float       $quantity ทศนิยมได้ 2 ตำแหน่ง
      * @param string|null $note
      * @param string|null $assetCode S/N สินค้า
      * @param string|null $issuedBy
@@ -806,21 +921,23 @@ class StockService
      */
     public function updateStockOutSingle(
         int $stockOutId,
-        int $quantity,
+        float $quantity,
         ?string $note,
         ?string $assetCode,
         ?string $issuedBy
     ): void {
+        $quantity = qty_norm($quantity);
         if ($quantity <= 0) {
             throw new InvalidArgumentException('จำนวนเบิกต้องมากกว่า 0');
         }
+        $this->assertDecimalSchema($quantity);
         $detail = $this->getStockOutDetail($stockOutId);
         if (!$detail || !empty($detail['set_id']) || count($detail['items']) !== 1) {
             throw new InvalidArgumentException('แก้ไขได้เฉพาะรายการเบิกรายชิ้น');
         }
         $item = $detail['items'][0];
-        $oldQty = (int) $item['quantity'];
-        $diff = $quantity - $oldQty;
+        $oldQty = qty_norm($item['quantity']);
+        $diff = qty_norm($quantity - $oldQty);
         $productId = (int) $item['product_id'];
 
         $movementId = (int) ($detail['part_movement_id'] ?? 0);
@@ -833,11 +950,11 @@ class StockService
 
         $this->db->beginTransaction();
         try {
-            if ($diff !== 0) {
+            if (qty_cmp($diff, 0) !== 0) {
                 $this->db->prepare('UPDATE stock_out_items SET quantity = ? WHERE id = ?')
-                    ->execute([$quantity, (int) $item['id']]);
+                    ->execute([qty_sql($quantity), (int) $item['id']]);
             }
-            if ($diff !== 0 && $touchesStock) {
+            if (qty_cmp($diff, 0) !== 0 && $touchesStock) {
                 // ล็อกแถวก่อนแล้วหักแบบมี guard — กันสองคนแก้พร้อมกันจนสต็อกติดลบ
                 // (รูปแบบเดียวกับ stockOutItem / stockOutBySet / deleteStockIn)
                 $lockStmt = $this->db->prepare('SELECT quantity FROM products WHERE id = ? FOR UPDATE');
@@ -847,20 +964,20 @@ class StockService
                     throw new InvalidArgumentException('ไม่พบอะไหล่');
                 }
                 if ($diff > 0) {
-                    if ((int) $locked['quantity'] < $diff) {
+                    if (qty_lt($locked['quantity'], $diff)) {
                         throw new InvalidArgumentException(
-                            'สต็อกไม่พอสำหรับเพิ่มจำนวนเบิก (คงเหลือ ' . (int) $locked['quantity']
-                            . ' ต้องการเพิ่ม ' . $diff . ')'
+                            'สต็อกไม่พอสำหรับเพิ่มจำนวนเบิก (คงเหลือ ' . qty_fmt($locked['quantity'])
+                            . ' ต้องการเพิ่ม ' . qty_fmt($diff) . ')'
                         );
                     }
                     $upd = $this->db->prepare(
                         'UPDATE products SET quantity = quantity - ? WHERE id = ? AND quantity >= ?'
                     );
-                    $upd->execute([$diff, $productId, $diff]);
+                    $upd->execute([qty_sql($diff), $productId, qty_sql($diff)]);
                 } else {
                     // $diff ติดลบ = ลดจำนวนเบิก → คืนของเข้าคลัง ไม่ต้องมี guard
                     $upd = $this->db->prepare('UPDATE products SET quantity = quantity - ? WHERE id = ?');
-                    $upd->execute([$diff, $productId]);
+                    $upd->execute([qty_sql($diff), $productId]);
                 }
                 if ($upd->rowCount() === 0) {
                     throw new InvalidArgumentException('จำนวนอะไหล่ไม่พอ กรุณาตรวจสอบยอดคงเหลือใหม่');
@@ -953,7 +1070,7 @@ class StockService
             if ($returnStock) {
                 foreach ($detail['items'] as $item) {
                     $this->db->prepare('UPDATE products SET quantity = quantity + ? WHERE id = ?')
-                        ->execute([(int) $item['quantity'], (int) $item['product_id']]);
+                        ->execute([qty_sql($item['quantity']), (int) $item['product_id']]);
                 }
             }
             $this->db->prepare('DELETE FROM stock_out_items WHERE stock_out_id = ?')->execute([$stockOutId]);
@@ -975,7 +1092,7 @@ class StockService
      * @param int         $stockOutId
      * @param int         $itemId
      * @param string      $productCode
-     * @param int         $qty
+     * @param float       $qty
      * @param string|null $assetCode
      * @param string|null $note
      * @param string|null $issuedBy
@@ -985,7 +1102,7 @@ class StockService
         int $stockOutId,
         int $itemId,
         string $productCode,
-        int $qty,
+        float $qty,
         ?string $assetCode,
         ?string $note,
         ?string $issuedBy
@@ -1071,15 +1188,19 @@ class StockService
                 $sns = [''];
             }
             $n = count($sns);
-            $totalQty = (int) ($row['total_qty'] ?? 0);
-            $baseQty = $n > 0 ? intdiv($totalQty, $n) : $totalQty;
-            $remainder = $n > 0 ? ($totalQty % $n) : 0;
+            // แบ่งจำนวนให้แต่ละ S/N — จำนวนเต็มแบ่งทีละ 1 ชิ้น, จำนวนมีเศษ (เช่น 0.5) แบ่งทีละ 0.01
+            // เพื่อไม่ให้ผลรวมของทุก S/N เพี้ยนจากยอดจริง
+            $totalQty = qty_norm($row['total_qty'] ?? 0);
+            $unitStep = qty_has_fraction($totalQty) ? 0.01 : 1.0;
+            $totalSteps = (int) round($totalQty / $unitStep);
+            $baseSteps = $n > 0 ? intdiv($totalSteps, $n) : $totalSteps;
+            $remainder = $n > 0 ? ($totalSteps % $n) : 0;
 
             foreach ($sns as $i => $sn) {
                 $copy = $row;
                 $copy['asset_code'] = $sn;
                 $copy['asset_code_raw'] = $rawSn;
-                $copy['display_qty'] = $baseQty + ($i < $remainder ? 1 : 0);
+                $copy['display_qty'] = qty_norm(($baseSteps + ($i < $remainder ? 1 : 0)) * $unitStep);
                 $expanded[] = $copy;
             }
         }
@@ -1123,7 +1244,7 @@ class StockService
             $totalQty = 0;
             foreach ($items as $it) {
                 $docIds[(int) $it['id']] = true;
-                $totalQty += (int) ($it['display_qty'] ?? 0);
+                $totalQty = qty_norm($totalQty + qty_norm($it['display_qty'] ?? 0));
             }
             $result[] = [
                 'type'      => $g['type'],
@@ -1179,7 +1300,7 @@ class StockService
             $items = $g['items'];
             $totalQty = 0;
             foreach ($items as $it) {
-                $totalQty += (int) ($it['total_qty'] ?? 0);
+                $totalQty = qty_norm($totalQty + qty_norm($it['total_qty'] ?? 0));
             }
             $result[] = [
                 'type'      => $g['type'],

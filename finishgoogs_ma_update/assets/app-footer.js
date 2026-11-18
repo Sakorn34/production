@@ -4,6 +4,39 @@
  * รูปที่แนบย่อในเบราว์เซอร์ก่อนส่ง (JPEG) — รูปจากกล้องมือถือ 4-8MB ต่อรูป อัปโหลดผ่านเน็ตมือถือช้า
  * และ LINE ต้องการรูป preview ไม่เกิน 1MB จึงทำ 2 ขนาด: ตัวเต็ม ≤ 1600px · ตัวย่อ ≤ 480px
  */
+(function paintSidebarPerf() {
+  var el = document.getElementById('sidebar-perf');
+  if (!el) { return; }
+  var php = parseInt(el.getAttribute('data-php-ms') || '0', 10);
+  function fmt(ms) {
+    ms = Math.max(0, Math.round(ms));
+    if (ms < 1000) { return ms + ' ms'; }
+    return (ms / 1000).toFixed(1) + ' วิ';
+  }
+  function pageMs() {
+    var n = (performance.getEntriesByType && performance.getEntriesByType('navigation')[0]) || null;
+    if (n) {
+      if (n.loadEventEnd > 0) { return n.loadEventEnd; }
+      if (n.duration > 0) { return n.duration; }
+    }
+    var t = performance.timing;
+    if (t && t.navigationStart > 0) {
+      var end = t.loadEventEnd || t.domComplete || t.responseEnd;
+      if (end > t.navigationStart) { return end - t.navigationStart; }
+    }
+    return performance.now();
+  }
+  function paint() {
+    var total = pageMs();
+    var s = php > 0 ? ('เซิร์ฟเวอร์ ' + fmt(php)) : '';
+    if (total > 0) { s += (s ? ' · ' : '') + 'หน้า ' + fmt(total); }
+    if (s) { el.textContent = s; }
+  }
+  function afterLoad() { setTimeout(paint, 0); }
+  if (document.readyState === 'complete') { afterLoad(); }
+  else { window.addEventListener('load', afterLoad); }
+})();
+
 (function () {
   'use strict';
   var form = document.getElementById('support-form');

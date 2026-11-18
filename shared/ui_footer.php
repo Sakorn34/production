@@ -1,6 +1,6 @@
 <?php
 /**
- * shared/ui_footer.php — ท้ายเมนูข้าง (คู่มือ · แจ้งปัญหา · เวอร์ชัน) + หน้าต่างแจ้งปัญหา ใช้ทั้งแอปผลิตและแอปอะไหล่
+ * shared/ui_footer.php — ท้ายเมนูข้าง (คู่มือ · แจ้งปัญหา · เวอร์ชัน · เวลาโหลด) + หน้าต่างแจ้งปัญหา ใช้ทั้งแอปผลิตและแอปอะไหล่
  *
  * ปุ่มแจ้งปัญหาเปิดหน้าต่างเล่าปัญหา + แนบรูป แล้วส่งเข้า LINE ผู้ดูแล (finishgoogs_ma_update/support_report.php)
  * ตัวหน้าต่างและสคริปต์อยู่ที่ finishgoogs_ma_update/assets/app-footer.js · สไตล์อยู่ใน sidebar.css ที่สองแอปโหลดร่วมกัน
@@ -33,7 +33,39 @@ function ui_footer_version_age(string $ver): array
 }
 
 /**
- * ท้ายเมนูข้าง: คู่มือการใช้งาน · แจ้งปัญหา · บรรทัดเวอร์ชัน
+/**
+ * มิลลิวินาทีตั้งแต่เริ่ม request ถึงตอนวาดท้ายเมนู
+ *
+ * @return int
+ */
+function ui_request_elapsed_ms(): int
+{
+    if (!defined('APP_REQUEST_START')) {
+        return 0;
+    }
+    $ms = (int) round((microtime(true) - (float) APP_REQUEST_START) * 1000);
+    return max(0, min(600000, $ms));
+}
+
+/**
+ * ป้ายเวลาโหลดฝั่งเซิร์ฟเวอร์ — JS จะเติมเวลาทั้งหน้าทีหลัง
+ *
+ * @param int $ms
+ * @return string
+ */
+function ui_request_elapsed_label(int $ms): string
+{
+    if ($ms <= 0) {
+        return 'กำลังวัดเวลาโหลด…';
+    }
+    if ($ms < 1000) {
+        return 'เซิร์ฟเวอร์ ' . $ms . ' ms';
+    }
+    return 'เซิร์ฟเวอร์ ' . sprintf('%.1f', $ms / 1000) . ' วิ';
+}
+
+/**
+ * ท้ายเมนูข้าง: คู่มือการใช้งาน · แจ้งปัญหา · บรรทัดเวอร์ชัน · เวลาโหลดหน้า
  *
  * เดิมเป็นส่วนท้ายใต้เนื้อหาทุกหน้า (18 ก.ย. 2026) — สูงจนกินพื้นที่รายการ ย้ายมาอยู่ในเมนู
  * มือถือเปิดจากปุ่ม "เมนู" ของแถบล่าง · จอคอมตอนหุบเมนูเหลือแค่ไอคอน
@@ -48,11 +80,15 @@ function ui_sidebar_help_html(string $fgBase, string $version, bool $guideActive
     $e = function ($s) { return htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8'); };
     $fg = rtrim($fgBase, '/');
     $age = ui_footer_version_age($version);
+    $phpMs = ui_request_elapsed_ms();
     $ver = '© ' . $e(UI_FOOTER_COMPANY) . ' · ' . $e(UI_FOOTER_GROUP);
     if ($version !== '') {
         $ver .= '<br><span title="' . $e('รหัสชุด deploy — อัปเดตเมื่อ ' . $age['full']) . '">v' . $e($version)
               . ($age['rel'] !== '' ? ' (' . $e($age['rel']) . ')' : '') . '</span>';
     }
+    $ver .= '<span class="sidebar-perf" id="sidebar-perf" data-php-ms="' . (int) $phpMs . '"'
+        . ' title="' . $e('เซิร์ฟเวอร์ = เวลาสร้างหน้า · หน้า = เวลาที่เบราว์เซอร์โหลดครบ') . '">'
+        . $e(ui_request_elapsed_label($phpMs)) . '</span>';
     return '<div class="sidebar-help">'
         . '<a class="nav-cross sidebar-help-link' . ($guideActive ? ' active' : '') . '" href="' . $e($fg . '/guide.php') . '" title="คู่มือการใช้งาน">'
         . '<span class="nav-ico">' . ui_icon_html('book', 18) . '</span><span class="nav-text">คู่มือการใช้งาน</span></a>'

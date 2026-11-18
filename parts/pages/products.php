@@ -25,6 +25,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (parts_product_forms_handle_post($db, $stock, $productsReturnTo)) {
         exit;
     }
+    if (parts_withdraw_sync_handle_post($db, $stock, $productsReturnTo, $line_name ?? null)) {
+        exit;
+    }
     $action = $_POST['action'] ?? '';
 
     // งานสต็อกประจำวัน (รับเข้า / เบิกออก) — ตัวจัดการอยู่ใน product_edit.php
@@ -43,8 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $code,
                 trim($_POST['name']),
                 trim($_POST['unit']),
-                (int) $_POST['quantity'],
-                (int) $_POST['min_stock'],
+                qty_sql(qty_post('quantity')),
+                qty_sql(qty_post('min_stock')),
                 ($_POST['price'] !== '' ? (float) $_POST['price'] : 0.00),
                 trim($_POST['purchase_link'] ?? '') ?: null,
                 trim($_POST['supplier'] ?? '') ?: null,
@@ -135,6 +138,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if ($deleted) {
+                // ปิดใช้งานแถวคู่กันในทะเบียนผลิต (ไม่ลบ — ประวัติเบิกเดิมยังอ้างถึงอยู่)
+                // ไม่งั้นอะไหล่ที่ลบแล้วจะยังโผล่ในตัวเลือก/ชุดเบิกของหน้าผลิต
+                try {
+                    production_sync_product_active_by_code((string) $prod['code'], false);
+                } catch (Throwable $syncEx) {
+                    error_log('[products.php delete sync] ' . $syncEx->getMessage());
+                }
                 $logDir = __DIR__ . '/../logs';
                 if (!is_dir($logDir)) {
                     @mkdir($logDir, 0777, true);
@@ -191,9 +201,9 @@ foreach ($sets as $s) {
         $list[] = [
             'code'  => $code,
             'name'  => $productNameById[(int) $it['product_id']] ?? (string) ($it['name'] ?? ''),
-            'qty'   => (int) $it['quantity'],
+            'qty'   => qty_norm($it['quantity']),
             'unit'  => (string) ($it['unit'] ?? 'ชิ้น'),
-            'stock' => (int) ($it['stock_qty'] ?? 0),
+            'stock' => qty_norm($it['stock_qty'] ?? 0),
             'icon'  => parts_upload_img_url($partIcons[$code] ?? '') ?? '',
         ];
     }
@@ -214,6 +224,8 @@ foreach ($sets as $s) {
         <?php if (!empty($sets)): ?>
         <?= parts_btn_open_modal('stock-out-set-modal', 'เบิก Set', 'stock-out-set', 'btn-danger') ?>
         <?php endif; ?>
+        <span class="parts-actions-sep" aria-hidden="true"></span>
+        <?= parts_withdraw_sync_button(null, $productsReturnTo, 'btn btn-outline btn-sm btn-with-icon') ?>
         <?php // ไม่มีปุ่ม "จัดการ Set" ที่นี่ — มีในเมนูด้านซ้ายอยู่แล้ว ?>
     </div>
 </div>
@@ -282,7 +294,7 @@ foreach ($sets as $s) {
                 <tr class="<?= $isActive ? '' : 'row-inactive' ?>" data-search="<?= e($searchKey) ?>" data-supplier="<?= e(trim((string) ($p["supplier"] ?? ""))) ?>">
                     <td class="col-img" data-pri="2"><?= parts_product_img_cell($icon, $p, $productsReturnTo) ?></td>
                     <td data-pri="2"><?= e($p['code']) ?></td>
-                    <td data-pri="1"><a href="<?= url('/pages/product-detail.php?id=' . (int) $p['id']) ?>" class="detail-link"><?= parts_product_name_html($p) ?></a>
+                    <td data-pri="1"><a href="<?= url('/pages/product-detail.php?id=' . (int) $p['id']) ?>" class="detail-link" target="_blank" rel="noopener noreferrer" title="เปิดโปรไฟล์อะไหล่ในแท็บใหม่"><?= parts_product_name_html($p) ?></a>
                         <?php // บรรทัดรอง — โผล่เมื่อคอลัมน์ระดับ 2 ถูกยุบที่จอแคบ ?>
                         <span class="cell-sub"><?= e($p['code']) ?><?= !empty($p['supplier']) ? ' · ' . e($p['supplier']) : '' ?></span></td>
                     <td class="col-status" data-pri="2">
@@ -310,7 +322,7 @@ foreach ($sets as $s) {
                     <?php
                     // สถานะสต็อกจาก shared/stock_status.php — คอลัมน์ "สถานะ" ทางซ้ายเป็นสวิตช์
                     // เปิด/ปิดการใช้งานอะไหล่ คนละเรื่องกัน จึงแสดงสถานะสต็อกไว้ที่ช่องคงเหลือ
-                    $stStatus = stock_status_key((int) $p['quantity'], (int) $p['min_stock']);
+                    $stStatus = stock_status_key($p['quantity'], $p['min_stock']);
                     $stMeta = stock_status_meta($stStatus);
                     ?>
                     <td class="text-right" data-pri="1">
@@ -369,11 +381,11 @@ foreach ($sets as $s) {
                 <div class="form-row">
                     <div class="form-group">
                         <label>จำนวนเริ่มต้น</label>
-                        <input type="number" name="quantity" value="0" min="0" required>
+                        <input type="number" name="quantity" value="0" min="0" step="0.01" required>
                     </div>
                     <div class="form-group">
                         <label>สต็อกขั้นต่ำ (แจ้งเตือน)</label>
-                        <input type="number" name="min_stock" value="0" min="0" required>
+                        <input type="number" name="min_stock" value="0" min="0" step="0.01" required>
                     </div>
                 </div>
                 <div class="form-row">
@@ -419,7 +431,7 @@ foreach ($sets as $s) {
     <div class="form-row">
         <div class="form-group">
             <label>จำนวนรับเข้า</label>
-            <input type="number" name="quantity" min="1" value="1" required>
+            <input type="number" name="quantity" min="0.01" step="0.01" value="1" required>
         </div>
         <div class="form-group">
             <label>หมายเหตุ</label>
@@ -444,7 +456,7 @@ foreach ($sets as $s) {
     <div class="form-row">
         <div class="form-group">
             <label>จำนวนเบิก</label>
-            <input type="number" name="quantity" min="1" value="1" required>
+            <input type="number" name="quantity" min="0.01" step="0.01" value="1" required>
         </div>
         <div class="form-group">
             <label>หมายเลขเครื่อง (S/N)</label>

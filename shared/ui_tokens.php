@@ -123,3 +123,24 @@ function ui_tokens_css_block(array $t): string
   --sidebar: var(--sidebar-bg);
 }';
 }
+
+/**
+ * ลิงก์ฟอนต์ Google ที่ไม่บล็อกการวาดหน้าแรก
+ *
+ * โหลดแบบ media=print แล้วสลับเป็น all ตอนไฟล์มา — หน้าจะขึ้นก่อนฟอนต์
+ *
+ * @param string $href URL stylesheet จาก fonts.googleapis.com
+ * @return string HTML
+ */
+function ui_google_font_link_html(string $href): string
+{
+    $href = trim($href);
+    if ($href === '') {
+        return '';
+    }
+    $u = htmlspecialchars($href, ENT_QUOTES, 'UTF-8');
+    return '<link rel="preconnect" href="https://fonts.googleapis.com">'
+        . '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+        . '<link rel="stylesheet" href="' . $u . '" media="print" onload="this.media=\'all\'">'
+        . '<noscript><link rel="stylesheet" href="' . $u . '"></noscript>';
+}

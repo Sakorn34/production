@@ -181,7 +181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $pid) {
                    VALUES (?,'production','Checklist ตรวจก่อนส่งมอบ','checklist',?,'',?)", 'isi', [$pid, $chkText, $sort++]);
                 $saved++;
             }
-            // แจ้งเตือน SD Card / Battery Backup RTC ต่อรุ่น
+            // แจ้งเตือน SD Card / Battery Backup RTC / Battery Power ต่อรุ่น
             q("DELETE FROM product_field_config WHERE product_id=? AND context='production' AND field_kind IN ('watch_alert','watch_alert_cfg')", 'i', [$pid]);
             q("INSERT INTO product_field_config (product_id,context,field_name,field_kind,options_text,input_mode,sort_order)
                VALUES (?,'production','แจ้งเตือนอะไหล่','watch_alert_cfg','','',?)", 'ii', [$pid, $sort++]);
@@ -238,12 +238,14 @@ $adminGroups = [
         ['finishgood_shortage_preview.php', 'box', 'ขั้นต่ำและการแจ้งเตือนรายรุ่น', 'ตั้งสต็อกขั้นต่ำ · ปิดแจ้งเตือนบางรุ่น · ดูตัวอย่าง LINE'],
         ['stock_movements.php', 'history', 'ประวัติเข้า-ออกคลัง', 'การเปลี่ยนสถานะเครื่องทั้งหมด · ค้นตาม S/N'],
         ['inv_pickup_map.php', 'download', 'ผูกใบเบิก inventory กับรุ่น', 'ชุด/อะไหล่ที่เบิกผลิต → รุ่นของเรา · วันเริ่มติดตาม'],
+        ['key_parts_order_config.php', 'chart', 'รายการอะไหล่สั่งต่างประเทศ', 'เพิ่ม-ลดรายการที่สรุปในหน้า parts · ชื่อ log_part ต้องตรง inventory'],
     ]],
     ['title' => 'รายงานและแจ้งเตือน', 'note' => '', 'items' => [
         ['support_reports.php', 'alert', 'เรื่องที่แจ้งเข้ามา', 'จากปุ่มแจ้งปัญหา · รูปที่แนบ · ติดตามสถานะการแก้'],
         ['line_notify_settings.php', 'bell', 'แจ้งเตือน LINE', 'Token · เปิด/ปิด event · ทดสอบส่ง · Outbox'],
         ['work_report.php', 'chart', 'สรุปงานรายคน', 'งานรายคนต่อรอบเดือน · ผูกไลน์ · ส่งสรุป'],
         ['activity_logs.php', 'user', 'Activity Log', 'ความเคลื่อนไหวผู้ใช้ · Production + Parts · Export CSV'],
+        ['sd_image_check.php', 'updates', 'คิวเขียน SD image', 'เครื่องเช่า+สำรองที่ยังไม่ได้ชุดปัจจุบัน · เปลี่ยนชื่อไฟล์ image · แยก Pi2/Pi3'],
     ]],
     ['title' => 'ทะเบียนและเทียบข้อมูลกับระบบอื่น', 'note' => '', 'items' => [
         ['share.php', 'clipboard', 'ทะเบียนสินค้า (stock)', 'ดู · ค้นหา · แก้ไข · ลบรายการประจำวัน'],
@@ -264,6 +266,7 @@ $adminGroups = [
         ['system_doc.php', 'book', 'หลักการทำงานของระบบ', 'DB · ตาราง · Data flow · ฟังก์ชัน · สิทธิ์ผู้ใช้'],
         ['release_notes.php', 'updates', 'ประวัติการอัปเดตระบบ', 'ระบบพัฒนาอะไรไปบ้างในแต่ละรอบ · ของใหม่ · ปรับปรุง · แก้ไข'],
         ['rent_idle_check.php', 'alert', 'เครื่องค้างในคลังเช่า', 'ลงทะเบียนเช่าไว้แต่ไม่เคยปล่อยเช่า · เช็คตัวที่ถูกขายไปแล้วหรือค้างนานผิดปกติ'],
+        ['leasing_registry.php', 'search', 'ทะเบียนเครื่องระบบเช่า', 'เครื่องที่มีในระบบเช่า · การเบิกเช่าล่าสุด'],
         ['rent_sale_conflict.php', 'switch', 'เครื่องที่สองระบบขัดกัน', 'ระบบเช่าว่ายังเช่าอยู่ แต่ฝั่งขายมีใบเบิก/ใบสั่งงาน · ไล่ตรวจว่าฝั่งไหนถูก'],
         ['site_assets.php', 'search', 'ทะเบียนตามไซต์งาน', 'ค้นชื่อไซต์งาน · ดูว่าไซต์นั้นใช้เครื่องอะไรบ้าง ทั้งเช่าและขายขาด'],
         ['integration.php', 'external-link', 'การเชื่อมต่อกับระบบอื่น', 'งานขาย · งานเช่า · งานซ่อม · ใบเบิก · คลังอะไหล่ — เราดึงอะไร เขียนอะไร กันข้อมูลเสียหายอย่างไร'],
@@ -275,8 +278,12 @@ if (!$product) { ?>
   <section class="admin-group">
     <h2 class="admin-group-title"><?= h($g['title']) ?><?php if ($g['note'] !== '') { ?> <span class="muted"><?= h($g['note']) ?></span><?php } ?></h2>
     <div class="admin-links">
-      <?php foreach ($g['items'] as $it) { ?>
-      <a class="admin-link" href="<?= h(BASE_URL . '/' . $it[0]) ?>">
+      <?php foreach ($g['items'] as $it) {
+          $adminHref = (strpos($it[0], 'parts:') === 0)
+              ? (ui_parts_base_url() . '/' . substr($it[0], 6))
+              : (BASE_URL . '/' . $it[0]);
+      ?>
+      <a class="admin-link" href="<?= h($adminHref) ?>">
         <span class="admin-link-ic"><?= ui_icon_html($it[1], 18, 'h-svg') ?></span>
         <span class="admin-link-text"><b><?= h($it[2]) ?></b><span class="muted"><?= h($it[3]) ?></span></span>
         <span class="admin-link-go" aria-hidden="true">›</span>
@@ -532,7 +539,7 @@ foreach ($prodEff as $f) if (!isset($KIND_LABELS[$f['kind']]) && $f['kind'] !== 
 
   <div class="panel" style="margin-bottom:14px; padding:12px 14px">
     <b>แจ้งเตือนอะไหล่ที่ควรเปลี่ยน</b>
-    <p class="muted" style="margin:4px 0 10px; font-size:13px">เลือกว่ารุ่นนี้จะแสดงข้อความ "ถึงกำหนดเปลี่ยน …" อะไรบ้าง (นับจากวันผลิตหรือวันเปลี่ยนล่าสุดใน MA) · รุ่นที่ยังไม่เคยบันทึกจะเปิดทุกรายการไว้เป็นค่าเริ่ม</p>
+    <p class="muted" style="margin:4px 0 10px; font-size:13px">เลือกว่ารุ่นนี้จะแสดงข้อความ "ถึงกำหนดเปลี่ยน …" อะไรบ้าง (นับจากวันผลิตหรือวันเปลี่ยนล่าสุดใน MA) · รุ่นที่ยังไม่เคยบันทึกจะเปิด SD Card / Battery Backup RTC ไว้เป็นค่าเริ่ม · Battery Power ปิดไว้จนกว่าจะติ๊กเอง</p>
     <div style="display:grid; gap:8px">
       <?php foreach ($watchCatalog as $alertName => $_aliases) { ?>
       <label style="display:flex; align-items:center; gap:8px; font-weight:500">

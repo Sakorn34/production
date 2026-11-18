@@ -138,20 +138,21 @@ function parts_sets_accordion_html(array $sets, array $partIcons, array $partPro
                 $code = (string) ($item['code'] ?? '');
                 $name = (string) ($item['name'] ?? '');
                 $icon = $partIcons[$code] ?? '';
-                $need = (int) $item['quantity'];
-                $have = (int) ($item['stock_qty'] ?? 0);
-                $short = $have < $need;
+                $need = qty_norm($item['quantity']);
+                $have = qty_norm($item['stock_qty'] ?? 0);
+                $short = qty_lt($have, $need);
 
                 $out .= '<tr' . ($short ? ' class="set-item-short"' : '') . '>';
-                $out .= '<td class="col-img">' . parts_img_tag($icon, parts_label_for_code($code, $name, $partProdLabels)) . '</td>';
-                $out .= '<td>' . e(parts_format_product_line($code, $name, $partProdLabels)) . '</td>';
+                $label = parts_label_for_code($code, $name, $partProdLabels);
+                $out .= '<td class="col-img">' . parts_img_link_tag($icon, $label, $code) . '</td>';
+                $out .= '<td>' . parts_name_profile_link($code, $label) . '</td>';
 
                 if ($manage) {
                     $out .= '<td class="text-right set-qty-cell">'
                         . '<form method="POST" class="set-qty-form">'
                         . '<input type="hidden" name="action" value="update_item_qty">'
                         . '<input type="hidden" name="item_id" value="' . (int) $item['id'] . '">'
-                        . '<input type="number" name="quantity" min="1" value="' . $need . '" class="set-qty-input" aria-label="จำนวนต่อ Set">'
+                        . '<input type="number" name="quantity" min="0.01" step="0.01" value="' . e(qty_input_value($need)) . '" class="set-qty-input" aria-label="จำนวนต่อ Set">'
                         . '<button type="submit" class="btn btn-sm btn-icon" title="บันทึกจำนวน">' . ui_icon_html('save', 14, 'btn-svg') . '</button>'
                         . '</form>'
                         . '<span class="text-muted set-qty-unit">' . e($item['unit']) . '</span>'

@@ -24,18 +24,16 @@ function ensure_parts_stock_code_schema() {
         return;
     }
     $done = true;
+    require_once dirname(__DIR__, 2) . '/shared/schema_once.php';
+    // ไม่แตะ part_movements ตอนเปิดทุกหน้า — ถ้าตารางถูกล็อกทั้งระบบจะค้าง
+    if (schema_once_skip('parts_stock_code')) {
+        return;
+    }
     $res = db()->query("SHOW COLUMNS FROM parts LIKE 'stock_code'");
     if ($res && $res->num_rows === 0) {
         db()->query('ALTER TABLE parts ADD COLUMN stock_code VARCHAR(50) NULL DEFAULT NULL AFTER part_code');
     }
-    $res2 = db()->query("SHOW COLUMNS FROM part_movements LIKE 'tech_stock_out_id'");
-    if ($res2 && $res2->num_rows === 0) {
-        db()->query('ALTER TABLE part_movements ADD COLUMN tech_stock_out_id INT UNSIGNED NULL DEFAULT NULL AFTER remark');
-    }
-    $res3 = db()->query("SHOW COLUMNS FROM part_movements LIKE 'ma_record_id'");
-    if ($res3 && $res3->num_rows === 0) {
-        db()->query('ALTER TABLE part_movements ADD COLUMN ma_record_id BIGINT UNSIGNED NULL DEFAULT NULL AFTER ref_asset_id');
-    }
+    schema_once_mark('parts_stock_code');
 }
 
 ensure_parts_stock_code_schema();
@@ -44,6 +42,7 @@ $__partSyncPath = dirname(__DIR__, 2) . '/parts/includes/production_sync.php';
 if (is_file($__partSyncPath)) {
     require_once $__partSyncPath;
 }
+require_once dirname(__DIR__, 2) . '/shared/qty_helpers.php';
 $__helpersPath = dirname(__DIR__, 2) . '/parts/includes/helpers.php';
 if (is_file($__helpersPath)) {
     require_once $__helpersPath;
@@ -52,17 +51,17 @@ if (is_file($__helpersPath)) {
 // ─ Helpers ────────────────────────────────────────────────────────────────────
 
 /**
- * แปลง qty จาก finishgoogs (float) เป็น int สำหรับ tech_parts
+ * ทำ qty จาก finishgoogs ให้เป็นทศนิยม 2 ตำแหน่งสำหรับ tech_parts
  *
- * @param float $qty
- * @return int
+ * เดิมแปลงเป็น int ด้วย round() ทำให้อะไหล่ที่ใช้ 0.5 ชิ้น/เครื่อง ถูกตัดสต็อกเป็น 1 ชิ้น
+ * (บั๊กชุดสายแพร + IDE 40 Pin ของ bitvisitor S) — ห้ามกลับไปปัดเป็นจำนวนเต็ม
+ *
+ * @param mixed $qty
+ * @return float 0.0 ถ้าไม่เกิน 0
  */
-function tech_parts_qty_to_int($qty) {
-    $q = (float)$qty;
-    if ($q <= 0) {
-        return 0;
-    }
-    return (int)round($q);
+function tech_parts_qty_norm($qty) {
+    $q = qty_norm($qty);
+    return $q > 0 ? $q : 0.0;
 }
 
 /**
@@ -124,7 +123,7 @@ function part_search_key(array $row) {
  * อ่านจำนวนคงเหลือจาก biton_tech_parts ตาม part_id
  *
  * @param int $partId
- * @return int|null null ถ้าไม่มีรหัสหรือไม่พบใน tech_parts
+ * @return float|null null ถ้าไม่มีรหัสหรือไม่พบใน tech_parts
  */
 function tech_parts_qty_by_part_id($partId) {
     $code = part_resolve_code($partId);
@@ -138,7 +137,7 @@ function tech_parts_qty_by_part_id($partId) {
  * อ่านจำนวนคงเหลือจาก biton_tech_parts ตาม product code
  *
  * @param string $code
- * @return int|null null ถ้าไม่พบ
+ * @return float|null null ถ้าไม่พบ
  */
 function tech_parts_qty_by_code($code) {
     $code = trim((string)$code);
@@ -148,7 +147,7 @@ function tech_parts_qty_by_code($code) {
     $st = dbParts()->prepare('SELECT quantity FROM products WHERE code = ? LIMIT 1');
     $st->execute([$code]);
     $row = $st->fetch();
-    return $row ? (int)$row['quantity'] : null;
+    return $row ? qty_norm($row['quantity']) : null;
 }
 
 /**
@@ -186,14 +185,14 @@ function tech_parts_product_by_code($code) {
  * เบิกอะไหล่จาก biton_tech_parts (transaction ภายใน DB เดียว)
  *
  * @param string $productCode รหัส products.code
- * @param int    $quantity    จำนวน (int)
+ * @param float  $quantity    จำนวน (ทศนิยมได้ 2 ตำแหน่ง เช่น 0.5)
  * @param string $purpose     หมายเหตุ/วัตถุประสงค์
  * @param string      $issuedBy    ผู้เบิก
  * @param string|null $assetCode   S/N สินค้า (optional)
  * @return array{ok:bool, doc_no?:string, stock_out_id?:int, error?:string}
  */
 function tech_parts_stock_out($productCode, $quantity, $purpose, $issuedBy, $assetCode = null) {
-    $quantity = (int)$quantity;
+    $quantity = tech_parts_qty_norm($quantity);
     if ($quantity <= 0) {
         return ['ok' => false, 'error' => 'จำนวนเบิกต้องมากกว่า 0'];
     }
@@ -206,6 +205,10 @@ function tech_parts_stock_out($productCode, $quantity, $purpose, $issuedBy, $ass
     $pdo = dbParts();
     if (function_exists('ensure_stock_production_sync_schema')) {
         ensure_stock_production_sync_schema($pdo);
+    }
+    // คอลัมน์ยังเป็น INT = MySQL ปัดเศษเงียบ ๆ → ปฏิเสธแทนการตัดสต็อกผิด
+    if (qty_has_fraction($quantity) && !tech_parts_ensure_decimal_qty_schema($pdo)) {
+        return ['ok' => false, 'error' => 'ฐานสต็อกยังไม่รองรับจำนวนทศนิยม (migrate DECIMAL ไม่สำเร็จ) — แจ้งผู้ดูแลระบบ'];
     }
 
     $sn = trim((string) $assetCode);
@@ -238,11 +241,11 @@ function tech_parts_stock_out($productCode, $quantity, $purpose, $issuedBy, $ass
         $pq = $pdo->prepare('SELECT id, name, unit, quantity FROM products WHERE id = ? FOR UPDATE');
         $pq->execute([$productId]);
         $prow = $pq->fetch(PDO::FETCH_ASSOC);
-        if (!$prow || (int) $prow['quantity'] < $quantity) {
-            $have = $prow ? (int) $prow['quantity'] : 0;
+        if (!$prow || qty_lt($prow['quantity'], $quantity)) {
+            $have = $prow ? qty_fmt($prow['quantity']) : '0';
             throw new RuntimeException(
                 'อะไหล่ ' . ($prow['name'] ?? $productCode) . ' คงเหลือไม่พอ (ต้องการ '
-                . $quantity . ' ' . ($prow['unit'] ?? '') . ', มี ' . $have . ')'
+                . qty_fmt($quantity) . ' ' . ($prow['unit'] ?? '') . ', มี ' . $have . ')'
             );
         }
 
@@ -253,10 +256,10 @@ function tech_parts_stock_out($productCode, $quantity, $purpose, $issuedBy, $ass
         $outId = (int) $pdo->lastInsertId();
 
         $st = $pdo->prepare('INSERT INTO stock_out_items (stock_out_id, product_id, quantity) VALUES (?, ?, ?)');
-        $st->execute([$outId, $productId, $quantity]);
+        $st->execute([$outId, $productId, qty_sql($quantity)]);
 
         $st = $pdo->prepare('UPDATE products SET quantity = quantity - ? WHERE id = ? AND quantity >= ?');
-        $st->execute([$quantity, $productId, $quantity]);
+        $st->execute([qty_sql($quantity), $productId, qty_sql($quantity)]);
         if ($st->rowCount() === 0) {
             throw new RuntimeException('จำนวนอะไหล่ไม่พอ กรุณาตรวจสอบยอดคงเหลือใหม่');
         }
@@ -276,13 +279,13 @@ function tech_parts_stock_out($productCode, $quantity, $purpose, $issuedBy, $ass
  * รับคืน/เพิ่มสต็อกใน biton_tech_parts (reverse การเบิก)
  *
  * @param string $productCode
- * @param int    $quantity
+ * @param float  $quantity ทศนิยมได้ 2 ตำแหน่ง
  * @param string $note
  * @param string $receivedBy
  * @return array{ok:bool, error?:string}
  */
 function tech_parts_stock_in($productCode, $quantity, $note, $receivedBy) {
-    $quantity = (int)$quantity;
+    $quantity = tech_parts_qty_norm($quantity);
     if ($quantity <= 0) {
         return ['ok' => false, 'error' => 'จำนวนคืนต้องมากกว่า 0'];
     }
@@ -293,14 +296,17 @@ function tech_parts_stock_in($productCode, $quantity, $note, $receivedBy) {
     }
 
     $pdo = dbParts();
+    if (qty_has_fraction($quantity) && !tech_parts_ensure_decimal_qty_schema($pdo)) {
+        return ['ok' => false, 'error' => 'ฐานสต็อกยังไม่รองรับจำนวนทศนิยม (migrate DECIMAL ไม่สำเร็จ) — แจ้งผู้ดูแลระบบ'];
+    }
     try {
         $pdo->beginTransaction();
 
         $st = $pdo->prepare('INSERT INTO stock_in (product_id, quantity, note, received_by) VALUES (?, ?, ?, ?)');
-        $st->execute([(int)$product['id'], $quantity, $note, $receivedBy !== '' ? $receivedBy : 'finishgoogs']);
+        $st->execute([(int)$product['id'], qty_sql($quantity), $note, $receivedBy !== '' ? $receivedBy : 'finishgoogs']);
 
         $st = $pdo->prepare('UPDATE products SET quantity = quantity + ? WHERE id = ?');
-        $st->execute([$quantity, (int)$product['id']]);
+        $st->execute([qty_sql($quantity), (int)$product['id']]);
 
         $pdo->commit();
         return ['ok' => true];
@@ -320,14 +326,14 @@ function tech_parts_stock_in($productCode, $quantity, $note, $receivedBy) {
  * @param float  $qtyFloat
  * @param string $purpose
  * @param string $issuedBy
- * @return array{ok:bool, doc_no?:string, stock_out_id?:int, error?:string, code?:string, qty?:int}
+ * @return array{ok:bool, doc_no?:string, stock_out_id?:int, error?:string, code?:string, qty?:float}
  */
 function tech_parts_stock_out_by_part_id($partId, $qtyFloat, $purpose, $issuedBy, $assetCode = null) {
     $code = part_resolve_code($partId);
     if ($code === null) {
         return ['ok' => false, 'error' => 'ไม่พบรหัสอะไหล่ (part_id=' . (int)$partId . ')'];
     }
-    $qty = tech_parts_qty_to_int($qtyFloat);
+    $qty = tech_parts_qty_norm($qtyFloat);
     if ($qty <= 0) {
         return ['ok' => false, 'error' => 'จำนวนเบิกต้องมากกว่า 0'];
     }
@@ -351,7 +357,7 @@ function tech_parts_stock_in_by_part_id($partId, $qtyFloat, $note, $receivedBy) 
     if ($code === null) {
         return ['ok' => false, 'error' => 'ไม่พบรหัสอะไหล่ (part_id=' . (int)$partId . ')'];
     }
-    $qty = tech_parts_qty_to_int($qtyFloat);
+    $qty = tech_parts_qty_norm($qtyFloat);
     if ($qty <= 0) {
         return ['ok' => false, 'error' => 'จำนวนคืนต้องมากกว่า 0'];
     }
@@ -368,7 +374,7 @@ function tech_parts_stock_in_by_part_id($partId, $qtyFloat, $note, $receivedBy) 
  * @return array{ok:bool, error?:string}
  */
 function tech_parts_adjust_by_part_id($partId, $diffQty, $issuedBy, $purpose = 'ปรับรายการเบิก', $movementId = 0) {
-    $qty = tech_parts_qty_to_int(abs((float)$diffQty));
+    $qty = tech_parts_qty_norm(abs((float)$diffQty));
     if ($qty <= 0) {
         return ['ok' => true];
     }
@@ -394,7 +400,7 @@ function tech_parts_adjust_by_part_id($partId, $diffQty, $issuedBy, $purpose = '
  * โหลด quantity จาก tech_parts เป็น map code => qty
  *
  * @param array<int,array<string,mixed>> $partRows
- * @return array<string,int>
+ * @return array<string,float>
  */
 function tech_parts_qty_map_for_parts(array $partRows) {
     $codes = [];
@@ -419,7 +425,7 @@ function tech_parts_qty_map_for_parts(array $partRows) {
     $st->execute($list);
     $map = [];
     while ($row = $st->fetch()) {
-        $map[(string)$row['code']] = (int)$row['quantity'];
+        $map[(string)$row['code']] = qty_norm($row['quantity']);
     }
     return $map;
 }
@@ -955,7 +961,7 @@ function ma_withdrawal_count($maRecordId) {
  * เหลือคู่ "เบิก + รับคืน" ของรายการที่จริง ๆ แล้วไม่เคยบันทึกสำเร็จ ถ้าลบไม่ได้
  * จึงค่อยคืนสต็อกด้วยใบรับเข้าแทน — ยอดคงเหลือถูกต้องทั้งสองทาง
  *
- * @param array<int,array{part_id:int,qty:int,movement_id?:int,stock_out_id?:int}> $deducted
+ * @param array<int,array{part_id:int,qty:float,movement_id?:int,stock_out_id?:int}> $deducted
  * @param string $actor
  * @param string $note
  * @return void
@@ -979,7 +985,7 @@ function ma_rollback_partial_movements(array $deducted, $actor, $note = 'ยก�
             continue;
         }
 
-        tech_parts_stock_in_by_part_id((int) $rev['part_id'], (int) $rev['qty'], $note, $actor);
+        tech_parts_stock_in_by_part_id((int) $rev['part_id'], (float) $rev['qty'], $note, $actor);
         if ($movementId > 0) {
             q('DELETE FROM part_movements WHERE id=?', 'i', [$movementId]);
         }
@@ -1031,7 +1037,7 @@ function ma_withdraw_parts($maRecordId, $assetId, $assetCode, array $lines, $act
             // เพื่อให้ใบเบิกที่ค้างอยู่ถูกลบทิ้งด้วย ไม่ใช่แค่คืนยอด
             $deducted[] = [
                 'part_id'      => $partId,
-                'qty'          => (int)($out['qty'] ?? tech_parts_qty_to_int($qty)),
+                'qty'          => (float)($out['qty'] ?? tech_parts_qty_norm($qty)),
                 'movement_id'  => 0,
                 'stock_out_id' => (int)($out['stock_out_id'] ?? 0),
             ];
@@ -1044,7 +1050,7 @@ function ma_withdraw_parts($maRecordId, $assetId, $assetCode, array $lines, $act
         }
         $deducted[] = [
             'part_id'      => $partId,
-            'qty'          => (int)($out['qty'] ?? tech_parts_qty_to_int($qty)),
+            'qty'          => (float)($out['qty'] ?? tech_parts_qty_norm($qty)),
             'movement_id'  => $mid,
             'stock_out_id' => (int)($out['stock_out_id'] ?? 0),
         ];
@@ -1671,6 +1677,30 @@ function asset_withdraw_list_sync_pending_count_full(string $whereSql, string $t
 }
 
 /**
+ * cache session 60 วิ — รายการ asset.id ที่ต้อง Sync รายการเบิก
+ *
+ * @param string $whereSql
+ * @param string $types
+ * @param array<int|string> $params
+ * @return array<int,int>
+ */
+function asset_withdraw_list_sync_pending_ids_cached(string $whereSql, string $types, array $params): array
+{
+    $key = asset_withdraw_list_sync_pending_cache_key($whereSql, $types, $params) . '_ids';
+    $now = time();
+    if (isset($_SESSION[$key], $_SESSION[$key . '_t']) && ($now - (int) $_SESSION[$key . '_t']) < 60) {
+        return is_array($_SESSION[$key]) ? array_map('intval', $_SESSION[$key]) : [];
+    }
+    $ids = asset_ids_needing_withdraw_list_sync($whereSql, $types, $params);
+    $_SESSION[$key] = $ids;
+    $_SESSION[$key . '_t'] = $now;
+    $ck = asset_withdraw_list_sync_pending_cache_key($whereSql, $types, $params);
+    $_SESSION[$ck] = count($ids);
+    $_SESSION[$ck . '_t'] = $now;
+    return $ids;
+}
+
+/**
  * cache session 60 วิ — นับเครื่องที่ต้อง Sync รายการเบิก
  *
  * @param string $whereSql
@@ -1680,15 +1710,7 @@ function asset_withdraw_list_sync_pending_count_full(string $whereSql, string $t
  */
 function asset_withdraw_list_sync_pending_count_cached(string $whereSql, string $types, array $params): int
 {
-    $key = asset_withdraw_list_sync_pending_cache_key($whereSql, $types, $params);
-    $now = time();
-    if (isset($_SESSION[$key], $_SESSION[$key . '_t']) && ($now - (int) $_SESSION[$key . '_t']) < 60) {
-        return (int) $_SESSION[$key];
-    }
-    $cnt = asset_withdraw_list_sync_pending_count_full($whereSql, $types, $params);
-    $_SESSION[$key] = $cnt;
-    $_SESSION[$key . '_t'] = $now;
-    return $cnt;
+    return count(asset_withdraw_list_sync_pending_ids_cached($whereSql, $types, $params));
 }
 
 /**
@@ -1715,7 +1737,7 @@ function asset_withdraw_list_sync_pending_cache_key(string $whereSql, string $ty
 function asset_withdraw_list_sync_pending_cache_clear(string $whereSql, string $types, array $params): void
 {
     $key = asset_withdraw_list_sync_pending_cache_key($whereSql, $types, $params);
-    unset($_SESSION[$key], $_SESSION[$key . '_t']);
+    unset($_SESSION[$key], $_SESSION[$key . '_t'], $_SESSION[$key . '_ids'], $_SESSION[$key . '_ids_t']);
 }
 
 /**

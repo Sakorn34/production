@@ -24,25 +24,30 @@
  * near ใช้ ceil() เพราะถ้าไม่ปัดขึ้น อะไหล่ที่ขั้นต่ำน้อย ๆ จะไม่มีจำนวนเต็มไหน
  * เข้าช่วงเลย (ขั้นต่ำ 1 → ช่วง (1, 1.25] ว่างเปล่า) ซึ่งกระทบอะไหล่ 14 รายการ
  *
- * @param int $qty คงเหลือ
- * @param int $min ขั้นต่ำ (0 = ไม่ได้ตั้ง)
+ * จำนวนเป็นทศนิยมได้ (เช่น คงเหลือ 0.5 ชิ้น) — ห้าม cast เป็น int ก่อนเรียก ไม่งั้น 0.5 จะกลายเป็น
+ * 0 แล้วขึ้น "หมดแล้ว" ผิด ๆ ทั้งที่ยังมีของ
+ *
+ * @param float|int|string $qty คงเหลือ
+ * @param float|int|string $min ขั้นต่ำ (0 = ไม่ได้ตั้ง)
  * @return string out|critical|low|near|ok
  */
-function stock_status_key(int $qty, int $min): string
+function stock_status_key($qty, $min): string
 {
+    $qty = round((float) $qty, 2);
+    $min = round((float) $min, 2);
     if ($qty <= 0) {
         return 'out';
     }
     if ($min <= 0) {
         return 'ok'; // ไม่ได้ตั้งขั้นต่ำ = ไม่มีเกณฑ์ให้เทียบ อย่าเดาว่าขาด
     }
-    if ($qty <= max(1, intdiv($min, 2))) {
+    if ($qty <= max(1.0, floor($min / 2))) {
         return 'critical';
     }
     if ($qty <= $min) {
         return 'low';
     }
-    if ($qty <= (int) ceil($min * 1.25)) {
+    if ($qty <= ceil($min * 1.25)) {
         return 'near';
     }
     return 'ok';
@@ -91,7 +96,7 @@ function stock_status_is_reorder(string $key): bool
  * @param string $class คลาสเพิ่มเติมของ <span> ชั้นนอก
  * @return string HTML
  */
-function stock_status_badge_html(int $qty, int $min, string $class = ''): string
+function stock_status_badge_html($qty, $min, string $class = ''): string
 {
     $meta = stock_status_meta(stock_status_key($qty, $min));
     $cls = trim($class . ' ' . $meta['tone']);

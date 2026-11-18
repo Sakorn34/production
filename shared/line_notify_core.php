@@ -279,6 +279,10 @@ function line_notify_db()
  */
 function line_notify_ensure_schema(): void
 {
+    require_once __DIR__ . '/schema_once.php';
+    if (schema_once_skip('line_notify')) {
+        return;
+    }
     $db = line_notify_db();
     if (!$db) {
         return;
@@ -340,6 +344,7 @@ function line_notify_ensure_schema(): void
         enabled TINYINT(1) NOT NULL DEFAULT 1,
         UNIQUE KEY uq_event_recipient (event_key, recipient_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    schema_once_mark('line_notify');
 }
 
 // ─ Dedup / Snapshot ──────────────────────────────────────────────────────────
@@ -1122,7 +1127,8 @@ function line_notify_check_low_stock_product(int $productId): void
     $stmt = $pdo->prepare('SELECT id, code, name, quantity, min_stock, unit, supplier, purchase_link, is_active FROM products WHERE id=?');
     $stmt->execute([$productId]);
     $p = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$p || (int)$p['quantity'] > (int)$p['min_stock']) {
+    // เทียบเป็นทศนิยม — (int) จะปัด 0.5 เป็น 0 แล้วแจ้งเตือนผิด
+    if (!$p || round((float)$p['quantity'], 2) > round((float)$p['min_stock'], 2)) {
         return;
     }
     // อะไหล่ที่ปิดการใช้งานแล้วไม่ต้องแจ้งเตือน (คอลัมน์อาจไม่มีในสคีมาเก่า — ถือว่าเปิดใช้งาน)
@@ -1133,8 +1139,8 @@ function line_notify_check_low_stock_product(int $productId): void
         'product_id'   => (int)$p['id'],
         'code'         => (string)$p['code'],
         'name'         => (string)$p['name'],
-        'quantity'     => (int)$p['quantity'],
-        'min_stock'    => (int)$p['min_stock'],
+        'quantity'     => round((float)$p['quantity'], 2),
+        'min_stock'    => round((float)$p['min_stock'], 2),
         'unit'         => (string)$p['unit'],
         'supplier'     => (string)($p['supplier'] ?? ''),
         'entity_id'    => (int)$p['id'],

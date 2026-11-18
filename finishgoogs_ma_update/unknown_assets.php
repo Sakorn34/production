@@ -41,12 +41,19 @@ function unknown_assets_suggest(array $rows)
     $saleMap = $codes ? asset_stockparts_sale_status_by_sn($codes) : [];
     $leaseMap = asset_leasing_status_by_assets($rows);
     $installMap = installation_history_map($rows);
+    $spareUseMap = asset_status_spare_usage_map();
     foreach ($rows as $r) {
         $code = trim((string) $r['asset_code']);
         $key = strtoupper($code);
         $sale = $saleMap[$code] ?? null;
-        $lease = $leaseMap[$key] ?? null;
-        $t = asset_status_target_from_external('unknown', $sale, $lease);
+        $lease = $leaseMap[$key] ?? ($leaseMap[$code] ?? null);
+        $t = asset_status_target_from_external(
+            'unknown',
+            $sale,
+            $lease,
+            null,
+            asset_status_row_spare_use($r, $spareUseMap)
+        );
         if (!empty($t['target']) && $t['target'] !== 'unknown') {
             $out[(int) $r['id']] = ['target' => (string) $t['target'], 'reason' => (string) $t['reason']];
         } elseif (empty($lease['found']) && empty($sale['sold'])

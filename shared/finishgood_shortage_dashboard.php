@@ -173,16 +173,30 @@ function fg_model_stock_map(): array
         if ($code === '') {
             continue;
         }
+        $maPool = (int) ($it['leasing_ma_qty'] ?? 0);
+        $rentNew = (int) ($it['leasing_rent_new_qty'] ?? $it['leasing_qty']);
+        $splitShortageMa = fg_model_show_ma_reuse_ui($code);
+        $eff = fg_model_shortage_from_stock(
+            (int) $it['stock_qty'],
+            (int) $it['leasing_qty'],
+            (int) $it['required'],
+            $code,
+            $maPool
+        );
         $out['codes'][$code] = [
-            'state' => 'short',
-            'gap'   => abs((int) $it['need']),
-            'have'  => (int) $it['available'],
+            'state' => $eff['state'] === 'short' ? 'short' : 'over',
+            'gap'   => (int) $eff['gap'],
+            'over'  => (int) $eff['over'],
+            'have'  => (int) $eff['available'],
             'req'   => (int) $it['required'],
             'min'   => (int) $it['minimum_stock'],
             'po'    => (int) $it['po_qty'],
             // แยกของที่ผลิตใหม่ ออกจากเครื่องเช่าที่รับคืนแล้ววนกลับมาปล่อยใหม่
             'new'   => (int) $it['stock_qty'],
-            'rent'  => (int) $it['leasing_qty'],
+            'rent'  => $rentNew,
+            'rent_total' => (int) $it['leasing_qty'],
+            'ma_reuse' => $maPool,
+            'show_ma_reuse' => $splitShortageMa,
             'src'   => (($it['stock_source'] ?? '') === 'production_registry') ? 'registry' : 'setup',
         ] + $sources($code);
     }
@@ -195,18 +209,31 @@ function fg_model_stock_map(): array
             if ($code === '' || isset($out['codes'][$code]) || isset($hidden[$code])) {
                 continue;
             }
-            $need = (int) $row['need'];
+            $maPool = (int) ($row['leasing_ma_qty'] ?? 0);
+            $rentNew = (int) ($row['leasing_rent_new_qty'] ?? $row['leasing_qty']);
+            $splitShortageMa = fg_model_show_ma_reuse_ui($code);
+            $eff = fg_model_shortage_from_stock(
+                (int) $row['stock_qty'],
+                (int) $row['leasing_qty'],
+                (int) $row['required'],
+                $code,
+                $maPool
+            );
+            $need = (int) $eff['available'] - (int) $row['required'];
             $out['codes'][$code] = [
                 // ไม่อยู่ในรายการขาดแต่นับแล้วติดลบ = รุ่นที่ตั้งปิดแจ้งเตือนไว้
                 'state' => $need >= 0 ? 'over' : 'muted',
                 'over'  => max(0, $need),
                 'gap'   => max(0, -$need),
-                'have'  => (int) $row['available'],
+                'have'  => (int) $eff['available'],
                 'req'   => (int) $row['required'],
                 'min'   => (int) $row['minimum_stock'],
                 'po'    => (int) $row['po_qty'],
                 'new'   => (int) $row['stock_qty'],
-                'rent'  => (int) $row['leasing_qty'],
+                'rent'  => $rentNew,
+                'rent_total' => (int) $row['leasing_qty'],
+                'ma_reuse' => $maPool,
+                'show_ma_reuse' => $splitShortageMa,
                 'src'   => 'registry',
             ] + $sources($code);
         }
@@ -671,11 +698,21 @@ function fg_shortage_model_matches(string $model, string $productName, string $p
  *   - หมวดที่ setupsystem ใช้ยอดนับมือ → ไม่มีหมายเลขให้แสดง
  *
  * @param array<string,mixed> $item แถวจาก fg_shortage_dashboard_data()
- * @return array{ok:bool,error:string,mode:string,stock:array<int,array<string,mixed>>,leasing:array<int,array<string,mixed>>,manual_qty:int,last_check_at:string}
+ * @return array{ok:bool,error:string,mode:string,stock:array<int,array<string,mixed>>,leasing:array<int,array<string,mixed>>,leasing_new:array<int,array<string,mixed>>,leasing_ma:array<int,array<string,mixed>>,manual_qty:int,last_check_at:string}
  */
 function fg_shortage_serials(array $item): array
 {
-    $out = ['ok' => true, 'error' => '', 'mode' => 'serial', 'stock' => [], 'leasing' => [], 'manual_qty' => 0, 'last_check_at' => ''];
+    $out = [
+        'ok'            => true,
+        'error'         => '',
+        'mode'          => 'serial',
+        'stock'         => [],
+        'leasing'       => [],
+        'leasing_new'   => [],
+        'leasing_ma'    => [],
+        'manual_qty'    => 0,
+        'last_check_at' => '',
+    ];
     $fail = static function (string $error) use ($out): array {
         $out['ok'] = false;
         $out['error'] = $error;
@@ -690,10 +727,12 @@ function fg_shortage_serials(array $item): array
         if (($item['stock_source'] ?? '') === 'production_registry') {
             $out['mode'] = 'registry';
             // stock   = เครื่องใหม่ที่ไม่ได้ลงทะเบียนในระบบเช่า (ยอดที่ใช้คิดขาด)
-            // leasing = คลังพร้อมเช่า (ระบบเช่าเป็น finished goods) — แสดงแยก ไม่นับรวมในยอดขาด
+            // leasing = คลังพร้อมเช่า (ระบบเช่าเป็น finished goods และไม่มีสัญญา active/MA/claim)
             //           ชุดเดียวกับคอลัมน์ "คลังพร้อมเช่า" บนการ์ด (fg_model_stock_map → pool)
             $ready = fg_shortage_leasing_ready_serials();
             $inLease = fg_shortage_leasing_all_serials();
+            $everRented = fg_shortage_leasing_ever_rented_serials();
+            $splitPool = true;
             $res = qr(
                 "SELECT a.id, a.asset_code, a.factory_serial, a.produced_at, a.status
                  FROM assets a JOIN products p ON p.id = a.product_id
@@ -708,6 +747,14 @@ function fg_shortage_serials(array $item): array
                 $row = ['sn' => (string) $r['asset_code'], 'date' => (string) $r['produced_at'], 'asset_id' => (int) $r['id']];
                 if (isset($ready[$sn]) || ($fs !== '' && isset($ready[$fs]))) {
                     $out['leasing'][] = $row;
+                    if ($splitPool) {
+                        $wasRented = isset($everRented[$sn]) || ($fs !== '' && isset($everRented[$fs]));
+                        if ($wasRented) {
+                            $out['leasing_ma'][] = $row;
+                        } else {
+                            $out['leasing_new'][] = $row;
+                        }
+                    }
                 } elseif ((string) $r['status'] === 'new' && !isset($inLease[$sn]) && ($fs === '' || !isset($inLease[$fs]))) {
                     $out['stock'][] = $row;
                 }
@@ -803,8 +850,24 @@ function fg_shortage_serials(array $item): array
             $st->bind_param('s', $leaseName);
             $st->execute();
             $res = $st->get_result();
+            $busy = function_exists('fg_shortage_leasing_busy_serials') ? fg_shortage_leasing_busy_serials() : [];
+            $everRented = fg_shortage_leasing_ever_rented_serials();
+            $splitPool = true;
             while ($r = $res->fetch_assoc()) {
-                $out['leasing'][] = ['sn' => (string) $r['sn'], 'date' => (string) $r['pro_date'], 'asset_id' => 0];
+                $sn = (string) $r['sn'];
+                $snU = strtoupper(trim($sn));
+                if ($sn !== '' && isset($busy[$snU])) {
+                    continue;
+                }
+                $row = ['sn' => $sn, 'date' => (string) $r['pro_date'], 'asset_id' => 0];
+                $out['leasing'][] = $row;
+                if ($splitPool) {
+                    if (isset($everRented[$snU])) {
+                        $out['leasing_ma'][] = $row;
+                    } else {
+                        $out['leasing_new'][] = $row;
+                    }
+                }
             }
         } elseif ((int) ($item['leasing_qty'] ?? 0) > 0) {
             $out['error'] = 'ต่อระบบเช่าไม่ได้ — รายการเครื่องเช่าพร้อมเช่าไม่ครบ';

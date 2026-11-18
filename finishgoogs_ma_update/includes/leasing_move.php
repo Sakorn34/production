@@ -203,3 +203,21 @@ function leasing_move_assets(array $assetIds, string $actor): array
     $out['ok'] = true;
     return $out;
 }
+
+/**
+ * รูปย่อรุ่นสินค้า — ใช้รูปประจำรุ่น ถ้าไม่มีใช้ไอคอนกล่อง
+ *
+ * @param string $iconPath ค่า products.icon_path
+ * @param string $name     ชื่อรุ่น (alt)
+ * @param string $imgClass class ของ img/placeholder
+ * @return string HTML
+ */
+function leasing_move_product_thumb(string $iconPath, string $name, string $imgClass = 'model-thumb'): string
+{
+    $iconPath = trim($iconPath);
+    if ($iconPath !== '' && function_exists('img_tag')) {
+        return img_tag($iconPath, $name, $imgClass);
+    }
+    $ph = function_exists('ui_icon_html') ? ui_icon_html('box', 22) : '';
+    return '<span class="' . h($imgClass) . ' model-thumb-ph" aria-hidden="true">' . $ph . '</span>';
+}

@@ -645,6 +645,9 @@ function asset_head_hardware_field_rows(array $ctx, array $componentRows, int $p
         if ($name === '' || preg_match('/^Board\s+/ui', trim($name))) {
             continue;
         }
+        if ($name === 'Raspberry' || $name === 'SD Image') {
+            continue;
+        }
         $val = trim((string)($f['value'] ?? ''));
         if ($val === '' || $val === '-') {
             continue;
@@ -656,7 +659,7 @@ function asset_head_hardware_field_rows(array $ctx, array $componentRows, int $p
     // แถวจาก asset_components ไม่มี kind ติดมา ต้องย้อนไปดูที่ตั้งค่าของรุ่น
     foreach ($componentRows as $c) {
         $name = (string)($c['component_name'] ?? '');
-        if ($name === '' || isset($seen[$name]) || !asset_head_is_hardware_field($name, $productId)) {
+        if ($name === '' || $name === 'Raspberry' || $name === 'SD Image' || isset($seen[$name]) || !asset_head_is_hardware_field($name, $productId)) {
             continue;
         }
         $val = trim((string)($c['component_value'] ?? ''));
@@ -707,6 +710,10 @@ function asset_head_dl_html(array $assetRow, array $ctx, array $componentRows): 
 
     $out .= asset_head_row_html('สถานะ', status_badge($assetRow['status']));
 
+    require_once __DIR__ . '/sd_image.php';
+    $sdInfo = sd_image_info($assetRow, (string) ($assetRow['pname'] ?? ''));
+    $out .= sd_image_profile_row_html($sdInfo);
+
     $producedAt = trim((string)($assetRow['produced_at'] ?? ''));
     $producedSrc = '';
     if (!empty($ctx['prod_rec']['recorded_at'])) {
@@ -739,6 +746,8 @@ function asset_head_dl_html(array $assetRow, array $ctx, array $componentRows): 
         $out .= asset_head_row_html('FW ปัจจุบัน', h($fw));
 
     }
+
+    $out .= sd_image_profile_file_row_html($sdInfo);
 
     $note = trim((string)($assetRow['note'] ?? ''));
 
@@ -905,7 +914,10 @@ function asset_production_edit_form_html(array $assetRow, array $ctx, array $pro
 
       </select>
 
-
+      <?php
+      require_once __DIR__ . '/sd_image.php';
+      echo sd_image_edit_field_html($assetRow);
+      ?>
 
       <label>วันที่ผลิต</label>
 
@@ -963,7 +975,10 @@ function asset_production_edit_form_html(array $assetRow, array $ctx, array $pro
 
       <?php } ?>
 
-
+      <?php
+      require_once __DIR__ . '/sd_image.php';
+      echo sd_image_edit_write_html($assetRow);
+      ?>
 
       <?php if (!empty($ctx['show_lot'])) { ?>
 

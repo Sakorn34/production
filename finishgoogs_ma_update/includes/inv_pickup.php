@@ -20,6 +20,7 @@
  * ค่าเริ่มต้น seed จาก INV_PICKUP_SET_COMPANIONS / INV_PICKUP_BUNDLE_COMPANIONS ถ้าตารางยังว่าง
  *   แยกตามชื่อชุด เช่น Mobile Printer ในใบ bitVisitor S → Portable Printer
  *   หรือต้องครบในใบเดียวกัน (need_all) เช่น กล่อง Card Cam + Logitech Brio → Card Camera
+ *   ยกเว้นชุดใน INV_PICKUP_COMPANION_SKIP_SETS (เช่น bitVisitor Plus — Brio อยู่ในสูตรชุด ไม่แยกคิว Card Camera)
  * ใบชุดยังนับรุ่นหลักตามเดิม · ใบเบิกเสริมที่เหลือแค่อะไหล่พวกนี้จะไม่นับเป็นเครื่องรุ่นหลัก แต่คิวที่แยกยังขึ้น
  *
  * อะไหล่/ชุดเดียวใช้ได้หลายรุ่น (เช่น หัวอ่านตัวเดียวกันใส่ได้ทั้ง Smart Card Reader และรุ่น S)
@@ -54,6 +55,28 @@ const INV_PICKUP_BUNDLE_COMPANIONS = [
         'parts' => ['กล่อง Card Cam', 'Logitech Brio100-Graphite'],
     ],
 ];
+/**
+ * ชุดผลิตที่ไม่แยกของสำเร็จรูปอื่นเป็นคิว (อะไหล่ในใบ = ประกอบรุ่นหลักอย่างเดียว)
+ * bitVisitor Plus มี Brio/กล่อง Card Cam ในสูตร แต่ไม่ผลิต Card Camera แยกจากใบชุด Plus
+ *
+ * @var string[]
+ */
+const INV_PICKUP_COMPANION_SKIP_SETS = [
+    'bitVisitor Plus',
+];
+
+/**
+ * ชุดที่ไม่ใช้กฎ companion (แยกคิว Card Camera / Portable Printer ฯลฯ)
+ *
+ * @param string $setName ชื่อชุด pre_product ใน inventory
+ * @return bool true = ใช้ companion ได้ตาม inv_set_line_map
+ */
+function inv_pickup_set_allows_companion_machine(string $setName): bool
+{
+    $setName = trim($setName);
+
+    return $setName !== '' && !in_array($setName, INV_PICKUP_COMPANION_SKIP_SETS, true);
+}
 
 /**
  * ตารางของเราเอง (biton_production)
@@ -144,6 +167,8 @@ function ensure_inv_pickup_set_companions(): void
     if ($cnt && ($row = $cnt->fetch_assoc())) {
         $n = (int) $row['c'];
     }
+    inv_pickup_scrub_companion_skip_sets();
+
     if ($n > 0) {
         return;
     }
@@ -159,10 +184,31 @@ function ensure_inv_pickup_set_companions(): void
     foreach (INV_PICKUP_BUNDLE_COMPANIONS as $b) {
         $sets = inv_pickup_bundle_sets($inv, $b['parts']);
         foreach ($sets as $set) {
+            if (!inv_pickup_set_allows_companion_machine($set)) {
+                continue;
+            }
             foreach ($b['parts'] as $partName) {
                 inv_pickup_line_map_seed($inv, $set, $partName, $b['product'], 1);
             }
         }
+    }
+}
+
+/**
+ * ลบแถว companion ของชุดที่ไม่แยกคิว (เช่น bitVisitor Plus × Card Camera)
+ *
+ * @return void
+ */
+function inv_pickup_scrub_companion_skip_sets(): void
+{
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+    ensure_inv_pickup_schema();
+    foreach (INV_PICKUP_COMPANION_SKIP_SETS as $setName) {
+        q('DELETE FROM inv_set_line_map WHERE inv_name = ?', 's', [$setName]);
     }
 }
 
@@ -460,6 +506,9 @@ function inv_pickup_line_maps(): array
  */
 function inv_pickup_set_companion_grp(string $setName, string $partName, array $docLineNames = []): string
 {
+    if (!inv_pickup_set_allows_companion_machine($setName)) {
+        return '';
+    }
     $rules = inv_pickup_line_maps()[$setName] ?? [];
     $rule = null;
     foreach ($rules as $r) {
@@ -517,6 +566,10 @@ function inv_pickup_set_companion_grp(string $setName, string $partName, array $
  */
 function inv_pickup_line_other_machine(int $partId, string $itemGrp, array $maps, string $setName = '', string $partName = '', array $docLineNames = []): bool
 {
+    $setName = trim($setName);
+    if ($setName !== '' && !inv_pickup_set_allows_companion_machine($setName)) {
+        return false;
+    }
     if ($setName !== '' && $partName !== '') {
         $g = inv_pickup_set_companion_grp($setName, $partName, $docLineNames);
         if ($g !== '') {

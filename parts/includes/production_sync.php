@@ -10,6 +10,7 @@
  */
 
 require_once dirname(__DIR__, 2) . '/shared/app_paths.php';
+require_once dirname(__DIR__, 2) . '/shared/qty_helpers.php';
 
 // ─ Helpers ────────────────────────────────────────────────────────────────────
 
@@ -33,6 +34,121 @@ function production_db(): PDO
         PDO::ATTR_EMULATE_PREPARES   => false,
     ]);
     return $pdo;
+}
+
+/**
+ * แผนที่ชื่อที่เจอในข้อมูล → ชื่อในทะเบียนงาน (work_people.display_name)
+ *
+ * รับเข้ามักถูกบันทึกด้วยชื่อ LINE (SaKorN, ธันวา) ในขณะที่เบิกออกใช้ชื่อคนในระบบ (Tom, Ice)
+ *
+ * @return array<string,string> key = ชื่อที่ normalize แล้ว (ตัวพิมพ์เล็ก)
+ */
+function production_person_name_map(): array
+{
+    static $map = null;
+    if ($map !== null) {
+        return $map;
+    }
+    $map = [];
+    try {
+        $pdo = production_db();
+        $people = $pdo->query('SELECT id, display_name, line_display_name FROM work_people')->fetchAll();
+        $byId = [];
+        foreach ($people as $p) {
+            $display = trim((string) ($p['display_name'] ?? ''));
+            if ($display === '') {
+                continue;
+            }
+            $byId[(int) $p['id']] = $display;
+            $map[mb_strtolower($display, 'UTF-8')] = $display;
+            $line = trim((string) ($p['line_display_name'] ?? ''));
+            if ($line !== '') {
+                $map[mb_strtolower($line, 'UTF-8')] = $display;
+            }
+        }
+        $aliases = $pdo->query('SELECT alias, person_id FROM work_person_aliases')->fetchAll();
+        foreach ($aliases as $a) {
+            $pid = (int) ($a['person_id'] ?? 0);
+            $alias = trim((string) ($a['alias'] ?? ''));
+            if ($pid <= 0 || $alias === '' || !isset($byId[$pid])) {
+                continue;
+            }
+            $map[mb_strtolower($alias, 'UTF-8')] = $byId[$pid];
+        }
+    } catch (Throwable $e) {
+        error_log('[production_person_name_map] ' . $e->getMessage());
+    }
+    foreach (production_person_known_aliases() as $k => $v) {
+        $map[$k] = $v;
+    }
+    return $map;
+}
+
+/**
+ * ชื่อที่รู้แน่ว่าเป็นคนไหน — ไม่พึ่งการผูก LINE ในทะเบียน
+ *
+ * @return array<string,string> key = ชื่อที่ normalize แล้ว
+ */
+function production_person_known_aliases(): array
+{
+    $pairs = [
+        'ธันวา' => 'Ice',
+        'SaKorN' => 'Tom',
+    ];
+    $out = [];
+    foreach ($pairs as $from => $to) {
+        $out[mb_strtolower($from, 'UTF-8')] = $to;
+    }
+    return $out;
+}
+
+/**
+ * แปลงชื่อที่บันทึก (login / ชื่อ LINE) เป็นชื่อคนในทะเบียนงานให้ตรงกับผู้เบิก
+ *
+ * @param string|null $raw ชื่อดิบจาก stock_in.received_by หรือ session
+ * @return string ชื่อในทะเบียน ถ้าไม่รู้จักคืนค่าเดิม (ตัดช่องว่างแล้ว)
+ */
+function production_person_display_name(?string $raw): string
+{
+    $name = trim((string) $raw);
+    if ($name === '') {
+        return '';
+    }
+    $key = mb_strtolower($name, 'UTF-8');
+    $map = production_person_name_map();
+    return $map[$key] ?? $name;
+}
+
+/**
+ * ชื่อคนจาก session profile ที่ตรงกับทะเบียนงาน (เทียบทั้ง login และชื่อ LINE)
+ *
+ * @param object|array|null $profile
+ * @param string            $fallback
+ * @return string
+ */
+function production_session_actor_name($profile, string $fallback = 'User'): string
+{
+    $candidates = [];
+    $keys = ['login_name', 'display_name', 'name', 'nickname', 'full_name', 'emp_name'];
+    foreach ($keys as $k) {
+        $v = '';
+        if (is_object($profile) && isset($profile->{$k})) {
+            $v = trim((string) $profile->{$k});
+        } elseif (is_array($profile) && isset($profile[$k])) {
+            $v = trim((string) $profile[$k]);
+        }
+        if ($v !== '') {
+            $candidates[] = $v;
+        }
+    }
+    $map = production_person_name_map();
+    foreach ($candidates as $c) {
+        $hit = $map[mb_strtolower($c, 'UTF-8')] ?? '';
+        if ($hit !== '') {
+            return $hit;
+        }
+    }
+    return $candidates[0] ?? $fallback;
 }
 
 /**
@@ -134,7 +250,7 @@ function parts_history_group_by_model(array $history): array
         }
         $g = &$groups[$key];
         $g['docs']++;
-        $g['qty'] += (int) ($h['quantity'] ?? 0);
+        $g['qty'] = qty_norm($g['qty'] + qty_norm($h['quantity'] ?? 0));
         $when = (string) ($h['created_at'] ?? '');
         if ($when > $g['last']) {
             $g['last'] = $when;
@@ -169,6 +285,10 @@ function ensure_stock_production_sync_schema(PDO $techDb): void
         return;
     }
     $done = true;
+    require_once dirname(__DIR__, 2) . '/shared/schema_once.php';
+    if (schema_once_skip('stock_production_sync')) {
+        return;
+    }
 
     $techCols = [
         'stock_out'       => [
@@ -192,15 +312,7 @@ function ensure_stock_production_sync_schema(PDO $techDb): void
         }
     }
 
-    try {
-        $prod = production_db();
-        $st = $prod->query("SHOW COLUMNS FROM part_movements LIKE 'tech_stock_out_id'");
-        if ($st && !$st->fetch()) {
-            $prod->exec('ALTER TABLE part_movements ADD COLUMN tech_stock_out_id INT UNSIGNED NULL DEFAULT NULL AFTER remark');
-        }
-    } catch (Throwable $e) {
-        error_log('[ensure_stock_production_sync_schema] production: ' . $e->getMessage());
-    }
+    schema_once_mark('stock_production_sync');
 }
 
 /**
@@ -625,30 +737,9 @@ function production_match_tech_product_row(array $partRow, PDO $tech): ?array
         return $p;
     }
 
-    $st = $tech->prepare(
-        'SELECT id, code, name, unit FROM products WHERE ? LIKE CONCAT(name, "%") ORDER BY CHAR_LENGTH(name) DESC LIMIT 1'
-    );
-    $st->execute([$name]);
-    $p = $st->fetch();
-    if ($p) {
-        if ($partId > 0) {
-            $matchCache[$cacheKey] = $p;
-        }
-        return $p;
-    }
-
-    $st = $tech->prepare(
-        'SELECT id, code, name, unit FROM products WHERE name LIKE CONCAT(?, "%") ORDER BY CHAR_LENGTH(name) ASC LIMIT 1'
-    );
-    $st->execute([$name]);
-    $p = $st->fetch();
-    if ($p) {
-        if ($partId > 0) {
-            $matchCache[$cacheKey] = $p;
-        }
-        return $p;
-    }
-
+    // จับคู่ด้วยชื่อที่ normalize แล้วแบบตรงกันเท่านั้น
+    // ห้ามใช้ prefix เช่น "Switch Reset bitStamp Lite" ไปลงที่ "Switch Reset bitStamp"
+    // เพราะจะกลายเป็นอะไหล่คนละตัว (เคยทำให้ Lite ไปผูก P152)
     $norm = production_match_label_normalize($name);
     if ($norm === '') {
         if ($partId > 0) {
@@ -663,11 +754,7 @@ function production_match_tech_product_row(array $partRow, PDO $tech): ?array
         if ($tn === '') {
             continue;
         }
-        if ($norm === $tn
-            || strpos($norm, $tn) === 0
-            || strpos($tn, $norm) === 0
-            || strpos($tn, $norm) !== false
-            || strpos($norm, $tn) !== false) {
+        if ($norm === $tn) {
             $len = strlen($tn);
             if ($len > $bestLen) {
                 $best = $row;
@@ -866,7 +953,7 @@ function production_normalize_movement_mode(?string $mode): ?string
 function production_movement_as_history_item(array $row): array
 {
     $mid = (int) ($row['movement_id'] ?? 0);
-    $qty = (int) round((float) ($row['qty'] ?? 0));
+    $qty = qty_norm($row['qty'] ?? 0);
     $code = trim((string) ($row['product_code'] ?? ''));
     $name = trim((string) ($row['product_name'] ?? ''));
     return [
@@ -1039,6 +1126,7 @@ function tech_parts_sync_db(): PDO
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES   => false,
     ]);
+    tech_parts_ensure_decimal_qty_schema($pdo);
     return $pdo;
 }
 
@@ -1111,18 +1199,24 @@ function production_sync_stock_out_from_movement(
         return false;
     }
 
-    $newQty = (int) round($qty);
-    $oldQty = (int) $item['quantity'];
-    $diff = $newQty - $oldQty;
+    $newQty = qty_norm($qty);
+    $oldQty = qty_norm($item['quantity']);
+    $diff = qty_norm($newQty - $oldQty);
+
+    // คอลัมน์ยังเป็น INT = MySQL จะปัด 0.5 เป็น 1 เงียบ ๆ — ห้ามเขียนค่าทศนิยมจนกว่าจะ migrate สำเร็จ
+    if (qty_has_fraction($newQty) && !tech_parts_ensure_decimal_qty_schema($tech)) {
+        error_log('[production_sync_stock_out_from_movement] คอลัมน์จำนวนยังไม่เป็น DECIMAL — ปฏิเสธ qty ' . qty_sql($newQty));
+        return false;
+    }
 
     $tech->beginTransaction();
     try {
-        if ($diff !== 0) {
-            if ($diff > 0 && (int) $item['stock_qty'] < $diff) {
+        if (qty_cmp($diff, 0) !== 0) {
+            if ($diff > 0 && qty_lt($item['stock_qty'], $diff)) {
                 throw new RuntimeException('สต็ock tech_parts ไม่พอสำหรับ sync');
             }
-            $tech->prepare('UPDATE stock_out_items SET quantity = ? WHERE id = ?')->execute([$newQty, $item['id']]);
-            $tech->prepare('UPDATE products SET quantity = quantity - ? WHERE id = ?')->execute([$diff, $item['product_id']]);
+            $tech->prepare('UPDATE stock_out_items SET quantity = ? WHERE id = ?')->execute([qty_sql($newQty), $item['id']]);
+            $tech->prepare('UPDATE products SET quantity = quantity - ? WHERE id = ?')->execute([qty_sql($diff), $item['product_id']]);
         }
         $tech->prepare('UPDATE stock_out SET asset_code = ?, note = ? WHERE id = ?')
             ->execute([trim((string) $assetCode) ?: null, production_stock_out_note_from_mode($note), $outId]);
@@ -1200,7 +1294,7 @@ function production_sync_delete_stock_out_by_id(int $stockOutId): bool
         if ($returnStock) {
             foreach ($rows as $r) {
                 $tech->prepare('UPDATE products SET quantity = quantity + ? WHERE id = ?')
-                    ->execute([(int) $r['quantity'], (int) $r['product_id']]);
+                    ->execute([qty_sql($r['quantity']), (int) $r['product_id']]);
             }
         }
         $tech->prepare('DELETE FROM stock_out_items WHERE stock_out_id = ?')->execute([$stockOutId]);
@@ -1264,7 +1358,7 @@ function production_sync_delete_stock_out_from_movement(int $movementId): bool
         try {
             if ($returnStock) {
                 $tech->prepare('UPDATE products SET quantity = quantity + ? WHERE id = ?')
-                    ->execute([(int) $item['quantity'], (int) $item['product_id']]);
+                    ->execute([qty_sql($item['quantity']), (int) $item['product_id']]);
             }
             $tech->prepare('DELETE FROM stock_out_items WHERE id = ?')->execute([(int) $item['id']]);
             $remain = $tech->prepare('SELECT COUNT(*) FROM stock_out_items WHERE stock_out_id = ?');
@@ -1378,10 +1472,10 @@ function production_sync_delete_all_withdrawals_for_asset(int $assetId, ?string 
  * @param int    $outId
  * @param string $assetCode
  * @param int    $productId
- * @param int    $qty
+ * @param float  $qty
  * @return void
  */
-function production_sync_link_movement_pair(PDO $tech, int $movementId, int $outId, string $assetCode, int $productId, int $qty): void
+function production_sync_link_movement_pair(PDO $tech, int $movementId, int $outId, string $assetCode, int $productId, float $qty): void
 {
     $tech->prepare(
         'UPDATE stock_out SET asset_code = COALESCE(NULLIF(TRIM(asset_code), ""), ?) WHERE id = ?'
@@ -1392,7 +1486,7 @@ function production_sync_link_movement_pair(PDO $tech, int $movementId, int $out
          WHERE stock_out_id = ? AND product_id = ? AND quantity = ?
            AND (part_movement_id IS NULL OR part_movement_id = 0 OR part_movement_id = ?)
          LIMIT 1'
-    )->execute([$movementId, $outId, $productId, $qty, $movementId]);
+    )->execute([$movementId, $outId, $productId, qty_sql($qty), $movementId]);
 
     $prod = production_db();
     $prod->prepare('UPDATE part_movements SET tech_stock_out_id = ? WHERE id = ?')->execute([$outId, $movementId]);
@@ -1425,13 +1519,14 @@ function production_sync_taken_stock_out_ids(int $excludeMovementId = 0): array
  * @param PDO    $tech
  * @param string $assetCode
  * @param int    $productId
- * @param int    $qty
+ * @param float  $qty
  * @param string $mDate   Y-m-d
  * @param int    $movementId
  * @return int stock_out.id หรือ 0
  */
-function production_sync_find_unlinked_stock_out(PDO $tech, string $assetCode, int $productId, int $qty, string $mDate, int $movementId): int
+function production_sync_find_unlinked_stock_out(PDO $tech, string $assetCode, int $productId, float $qty, string $mDate, int $movementId): int
 {
+    $qty = qty_sql($qty);
     $taken = production_sync_taken_stock_out_ids($movementId);
     $excludeSql = '';
     $excludeParams = [];
@@ -1659,7 +1754,7 @@ function production_get_or_create_stock_out_for_sn(
  * @param PDO  $tech
  * @param int  $outId
  * @param int  $productId
- * @param int  $qty
+ * @param float $qty จำนวนทศนิยมได้ (เช่น 0.5) — ปัดที่ 2 ตำแหน่ง
  * @param int  $movementId
  * @param bool $deductStock หักสต็ockจริง
  * @return int stock_out_items.id
@@ -1668,12 +1763,17 @@ function production_stock_out_add_item(
     PDO $tech,
     int $outId,
     int $productId,
-    int $qty,
+    float $qty,
     int $movementId = 0,
     bool $deductStock = true
 ): int {
+    $qty = qty_norm($qty);
     if ($outId <= 0 || $productId <= 0 || $qty <= 0) {
         throw new InvalidArgumentException('outId/productId/qty ไม่ถูกต้อง');
+    }
+    // คอลัมน์ยังเป็น INT = MySQL ปัด 0.5 เป็น 1 เงียบ ๆ (บั๊กเดิม) — ปฏิเสธดีกว่าตัดสต็อกเกินจริง
+    if (qty_has_fraction($qty) && !tech_parts_ensure_decimal_qty_schema($tech)) {
+        throw new RuntimeException('คอลัมน์จำนวนใน biton_tech_parts ยังไม่เป็น DECIMAL — เบิกจำนวนทศนิยมไม่ได้');
     }
 
     if ($movementId > 0) {
@@ -1691,17 +1791,17 @@ function production_stock_out_add_item(
         $pq = $tech->prepare('SELECT quantity FROM products WHERE id = ? FOR UPDATE');
         $pq->execute([$productId]);
         $prow = $pq->fetch();
-        if (!$prow || (int) $prow['quantity'] < $qty) {
+        if (!$prow || qty_lt($prow['quantity'], $qty)) {
             throw new RuntimeException('สต็ock tech_parts ไม่พอสำหรับเบิก');
         }
-        $tech->prepare('UPDATE products SET quantity = quantity - ? WHERE id = ?')
-            ->execute([$qty, $productId]);
+        $tech->prepare('UPDATE products SET quantity = quantity - ? WHERE id = ? AND quantity >= ?')
+            ->execute([qty_sql($qty), $productId, qty_sql($qty)]);
     }
 
     $tech->prepare(
         'INSERT INTO stock_out_items (stock_out_id, product_id, quantity, part_movement_id)
          VALUES (?, ?, ?, ?)'
-    )->execute([$outId, $productId, $qty, $movementId > 0 ? $movementId : null]);
+    )->execute([$outId, $productId, qty_sql($qty), $movementId > 0 ? $movementId : null]);
 
     return (int) $tech->lastInsertId();
 }
@@ -1734,7 +1834,7 @@ function production_sync_delete_stock_out_doc(PDO $tech, int $outId, bool $retur
     if ($doReturn) {
         foreach ($rows as $r) {
             $tech->prepare('UPDATE products SET quantity = quantity + ? WHERE id = ?')
-                ->execute([(int) $r['quantity'], (int) $r['product_id']]);
+                ->execute([qty_sql($r['quantity']), (int) $r['product_id']]);
         }
     }
     $tech->prepare('DELETE FROM stock_out_items WHERE stock_out_id = ?')->execute([$outId]);
@@ -1851,7 +1951,7 @@ function production_consolidate_stock_outs_for_sn(string $assetCode, bool $dryRu
  * @param PDO    $tech
  * @param int    $movementId
  * @param int    $productId
- * @param int    $qty
+ * @param float  $qty
  * @param string $assetCode
  * @param string $movedAt
  * @param string $note
@@ -1862,12 +1962,16 @@ function production_sync_create_stock_out_from_movement(
     PDO $tech,
     int $movementId,
     int $productId,
-    int $qty,
+    float $qty,
     string $assetCode,
     string $movedAt,
     string $note,
     string $issuedBy
 ): int {
+    $qty = qty_norm($qty);
+    if (qty_has_fraction($qty) && !tech_parts_ensure_decimal_qty_schema($tech)) {
+        throw new RuntimeException('คอลัมน์จำนวนใน biton_tech_parts ยังไม่เป็น DECIMAL — sync จำนวนทศนิยมไม่ได้');
+    }
     $assetCode = trim($assetCode);
     $note = production_stock_out_note_from_mode($note);
     if ($movementId > 0) {
@@ -1914,7 +2018,7 @@ function production_sync_create_stock_out_from_movement(
     $tech->prepare(
         'INSERT INTO stock_out_items (stock_out_id, product_id, quantity, part_movement_id)
          VALUES (?, ?, ?, ?)'
-    )->execute([$outId, $productId, $qty, $movementId]);
+    )->execute([$outId, $productId, qty_sql($qty), $movementId]);
     return $outId;
 }
 
@@ -2007,7 +2111,7 @@ function production_sync_asset_withdrawals(int $assetId): array
             continue;
         }
 
-        $qty = (int) round((float) $row['qty']);
+        $qty = qty_norm($row['qty']);
         if ($qty <= 0) {
             $result['skipped']++;
             continue;

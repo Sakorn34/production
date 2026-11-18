@@ -13,6 +13,10 @@ if (defined('PARTS_BOOTSTRAP_LOADED')) {
     return;
 }
 
+if (!defined('APP_REQUEST_START')) {
+    define('APP_REQUEST_START', microtime(true));
+}
+
 session_start();
 
 require_once __DIR__ . '/../config/database.php';
@@ -40,17 +44,23 @@ require_once dirname(__DIR__, 2) . '/shared/line_notify_core.php';
 require_once dirname(__DIR__, 2) . '/shared/line_flex_templates.php';
 require_once dirname(__DIR__, 2) . '/shared/error_messages.php';
 require_once dirname(__DIR__, 2) . '/shared/stock_status.php';
-activity_log_register_post_shutdown('parts', $line_name);
-activity_log_register_page_view_shutdown('parts', $line_name);
-
 require_once __DIR__ . '/StockService.php';
+require_once __DIR__ . '/production_sync.php';
 
 $db = getDB();
 $GLOBALS['line_notify_stock_db'] = $db;
-require_once __DIR__ . '/production_sync.php';
 ensure_stock_production_sync_schema($db);
 
 $stock = new StockService($db);
+
+// ชื่อที่ใช้บันทึกรายการให้ตรงกับผู้เบิก (ชื่อในทะเบียนงาน ไม่ใช่ชื่อ LINE)
+$mappedActor = production_session_actor_name($profile);
+if ($mappedActor !== '') {
+    $line_name = $mappedActor;
+}
+
+activity_log_register_post_shutdown('parts', $line_name);
+activity_log_register_page_view_shutdown('parts', $line_name);
 
 $currentPage = basename($_SERVER['PHP_SELF'], '.php');
 $flash = getFlash();

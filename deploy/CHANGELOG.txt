@@ -5149,3 +5149,3748 @@ Files:
   finishgoogs_ma_update/release_notes.php
   finishgoogs_ma_update/settings.php
 
+
+================================================================
+v2026-09-25_162053 | Patch | 2026-09-25 16:20:55
+From: 2026-09-25_103131  ->  To: 1d4b113  |  Files: 8
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/asset_new.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/parts_link_check.php
+  finishgoogs_ma_update/settings.php
+
+
+================================================================
+v2026-09-25_163143 | Patch | 2026-09-25 16:31:45
+From: 2026-09-25_162053  ->  To: 753d54e  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/parts_link_check.php
+
+
+================================================================
+v2026-09-25_164845 | Patch | 2026-09-25 16:48:47
+From: 2026-09-25_163143  ->  To: 91708ef  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/parts_link_check.php
+
+
+================================================================
+v2026-09-25_165500 | Patch | 2026-09-25 16:55:01
+From: 2026-09-25_164845  ->  To: 9fce156  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/parts_link_check.php
+
+
+================================================================
+v2026-09-25_171154 | Patch | 2026-09-25 17:11:56
+From: 2026-09-25_165500  ->  To: 00d6836  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/parts.php
+  parts/includes/production_sync.php
+
+
+================================================================
+v2026-09-25_175221 | Patch | 2026-09-25 17:52:23
+From: 2026-09-25_171154  ->  To: d186800  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+
+
+================================================================
+v2026-09-26_085258 | Patch | 2026-09-26 08:53:00
+From: 2026-09-25_175221  ->  To: 2d463c2  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/asset_status_sync.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/stock_active_sync.php
+  finishgoogs_ma_update/share.php
+
+
+================================================================
+v2026-09-26_090443 | Patch | 2026-09-26 09:04:45
+From: 2026-09-26_085258  ->  To: c9a6f1e  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/appearance.php
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/share.php
+
+
+================================================================
+v2026-09-26_091106 | Patch | 2026-09-26 09:11:08
+From: 2026-09-26_090443  ->  To: a73b3cf  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/appearance.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+
+
+================================================================
+v2026-09-26_100257 | Patch | 2026-09-26 10:02:59
+From: 2026-09-26_091106  ->  To: 0413833  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/share.php
+  shared/ui_table.js
+
+
+================================================================
+v2026-09-26_101819 | Patch | 2026-09-26 10:18:21
+From: 2026-09-26_100257  ->  To: 59e17b1  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/stock_active_sync.php
+  finishgoogs_ma_update/share.php
+  finishgoogs_ma_update/share_admin.php
+
+
+================================================================
+v2026-09-26_102945 | Patch | 2026-09-26 10:29:47
+From: 2026-09-26_101819  ->  To: de737ec  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/share_admin.php
+
+
+================================================================
+v2026-09-26_105039 | Patch | 2026-09-26 10:50:40
+From: 2026-09-26_102945  ->  To: b549027  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/share.php
+  finishgoogs_ma_update/share_admin.php
+
+
+================================================================
+v2026-09-26_105535 | Patch | 2026-09-26 10:55:37
+From: 2026-09-26_105039  ->  To: 91e5cb5  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/share.php
+
+
+================================================================
+v2026-09-26_111947 | Patch | 2026-09-26 11:19:48
+From: 2026-09-26_105535  ->  To: 70bb1c6  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/release_notes.php
+
+
+================================================================
+v2026-09-26_113419 | Patch | 2026-09-26 11:34:21
+From: 2026-09-26_111947  ->  To: bba7372  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/integration.php
+  finishgoogs_ma_update/release_notes.php
+  finishgoogs_ma_update/settings.php
+
+
+================================================================
+v2026-09-26_114237 | Patch | 2026-09-26 11:42:39
+From: 2026-09-26_113419  ->  To: 07d4bc0  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/integration.php
+
+
+================================================================
+v2026-09-26_115848 | Patch | 2026-09-26 11:58:51
+From: 2026-09-26_114237  ->  To: d714cb9  |  Files: 17
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/integration/inv-list.jpg
+  finishgoogs_ma_update/assets/integration/inv-queue.jpg
+  finishgoogs_ma_update/assets/integration/parts-check.jpg
+  finishgoogs_ma_update/assets/integration/parts-chips.jpg
+  finishgoogs_ma_update/assets/integration/rent-card.jpg
+  finishgoogs_ma_update/assets/integration/rent-history.jpg
+  finishgoogs_ma_update/assets/integration/rent-queue.jpg
+  finishgoogs_ma_update/assets/integration/rent-timeline.jpg
+  finishgoogs_ma_update/assets/integration/repair-section.jpg
+  finishgoogs_ma_update/assets/integration/sale-card.jpg
+  finishgoogs_ma_update/assets/integration/sale-search.jpg
+  finishgoogs_ma_update/assets/integration/sale-status.jpg
+  finishgoogs_ma_update/assets/integration/stock-compare.jpg
+  finishgoogs_ma_update/assets/integration/stock-stats.jpg
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/integration.php
+
+
+================================================================
+v2026-09-26_135705 | Patch | 2026-09-26 13:57:07
+From: 2026-09-26_115848  ->  To: 8ee70d2  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+
+
+================================================================
+v2026-09-28_132750 | Patch | 2026-09-28 13:27:53
+From: 2026-09-26_135705  ->  To: 3d29372  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-09-28_155252 | Patch | 2026-09-28 15:52:54
+From: 2026-09-28_132750  ->  To: 68b971c  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/line_bot.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+
+
+================================================================
+v2026-09-28_161700 | Patch | 2026-09-28 16:17:02
+From: 2026-09-28_155252  ->  To: 34295f2  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+
+
+================================================================
+v2026-09-28_163019 | Patch | 2026-09-28 16:30:21
+From: 2026-09-28_155252  ->  To: 2a9f1b5  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+
+
+================================================================
+v2026-09-28_165623 | Patch | 2026-09-28 16:56:26
+From: 2026-09-28_155252  ->  To: a7398bc  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  parts/pages/sets.php
+
+
+================================================================
+v2026-09-28_170121 | Patch | 2026-09-28 17:01:23
+From: 2026-09-28_165623  ->  To: 2f80ca2  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  parts/assets/app.js
+
+
+================================================================
+v2026-09-29_094113 | Patch | 2026-09-29 09:41:15
+From: 2026-09-28_170121  ->  To: 934c16a  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+
+
+================================================================
+v2026-09-29_095922 | Patch | 2026-09-29 09:59:24
+From: 2026-09-28_170121  ->  To: 1351f4c  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+
+
+================================================================
+v2026-09-29_134035 | Patch | 2026-09-29 13:40:38
+From: 2026-09-29_095922  ->  To: 53e777b  |  Files: 2
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/ma_snippets.php
+
+
+================================================================
+v2026-09-29_154433 | Patch | 2026-09-29 15:44:35
+From: 2026-09-29_134035  ->  To: 16fed42  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/inv_pickups.php
+
+
+================================================================
+v2026-09-30_112711 | Patch | 2026-09-30 11:27:13
+From: 2026-09-29_154433  ->  To: 3592372  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/asset_status_sync.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+
+
+================================================================
+v2026-09-30_113504 | Patch | 2026-09-30 11:35:06
+From: 2026-09-30_112711  ->  To: ec3cf5f  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/rent_idle_check.php
+  finishgoogs_ma_update/settings.php
+
+
+================================================================
+v2026-09-30_115511 | Patch | 2026-09-30 11:55:13
+From: 2026-09-30_113504  ->  To: 0ae8fcc  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/rent_idle_check.php
+
+
+================================================================
+v2026-09-30_130625 | Patch | 2026-09-30 13:06:27
+From: 2026-09-30_115511  ->  To: 5e16f71  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/asset_status_sync.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/rent_idle_check.php
+  finishgoogs_ma_update/unknown_assets.php
+
+
+================================================================
+v2026-09-30_131609 | Patch | 2026-09-30 13:16:11
+From: 2026-09-30_115511  ->  To: 4992976  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/asset_status_sync.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/rent_idle_check.php
+  finishgoogs_ma_update/unknown_assets.php
+
+
+================================================================
+v2026-09-30_132632 | Patch | 2026-09-30 13:26:35
+From: 2026-09-30_115511  ->  To: 1127d45  |  Files: 9
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/asset_status_sync.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/rent_idle_check.php
+  finishgoogs_ma_update/rent_sale_conflict.php
+  finishgoogs_ma_update/settings.php
+  finishgoogs_ma_update/unknown_assets.php
+
+
+================================================================
+v2026-09-30_134343 | Patch | 2026-09-30 13:43:45
+From: 2026-09-30_132632  ->  To: 9ddec45  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+  finishgoogs_ma_update/rent_idle_check.php
+  finishgoogs_ma_update/rent_sale_conflict.php
+
+
+================================================================
+v2026-09-30_141146 | Patch | 2026-09-30 14:11:49
+From: 2026-09-30_134343  ->  To: db1f596  |  Files: 8
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/site_assets.php
+  finishgoogs_ma_update/settings.php
+  finishgoogs_ma_update/site_assets.php
+
+
+================================================================
+v2026-09-30_160503 | Patch | 2026-09-30 16:05:06
+From: 2026-09-30_134343  ->  To: 93de7ec  |  Files: 10
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/includes/site_assets.php
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+  finishgoogs_ma_update/settings.php
+  finishgoogs_ma_update/site_assets.php
+
+
+================================================================
+v2026-09-30_163659 | Patch | 2026-09-30 16:37:01
+From: 2026-09-30_160503  ->  To: eef40a7  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+
+
+================================================================
+v2026-09-30_170421 | Patch | 2026-09-30 17:04:23
+From: 2026-09-30_163659  ->  To: 3bdbaef  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/setup_sale_history.php
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+
+
+================================================================
+v2026-10-01_101624 | Patch | 2026-10-01 10:16:26
+From: 2026-09-30_163659  ->  To: e0fbbcd  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/setup_sale_history.php
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+
+
+================================================================
+v2026-10-01_110643 | Patch | 2026-10-01 11:06:46
+From: 2026-10-01_101624  ->  To: 28de932  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-10-01_111919 | Patch | 2026-10-01 11:19:22
+From: 2026-10-01_110643  ->  To: ebd827b  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-10-01_112705 | Patch | 2026-10-01 11:27:07
+From: 2026-10-01_111919  ->  To: 360b976  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-10-01_114559 | Patch | 2026-10-01 11:46:01
+From: 2026-10-01_112705  ->  To: c22599e  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-10-01_134705 | Patch | 2026-10-01 13:47:07
+From: 2026-10-01_114559  ->  To: b1c5076  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/part_stock_bridge.php
+  finishgoogs_ma_update/includes/release_notes.php
+
+
+================================================================
+v2026-10-01_140903 | Patch | 2026-10-01 14:09:06
+From: 2026-10-01_134705  ->  To: 9df5b14  |  Files: 8
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  parts/assets/theme-v2.css
+  parts/includes/product_edit.php
+  parts/includes/production_sync.php
+  parts/includes/StockService.php
+  parts/pages/product-detail.php
+  parts/pages/products.php
+
+
+================================================================
+v2026-10-01_141841 | Patch | 2026-10-01 14:18:43
+From: 2026-10-01_140903  ->  To: 76d4991  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  parts/assets/theme-v2.css
+  parts/includes/production_sync.php
+  parts/pages/product-detail.php
+
+
+================================================================
+v2026-10-01_142246 | Patch | 2026-10-01 14:22:48
+From: 2026-10-01_140903  ->  To: b137f9c  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  parts/assets/theme-v2.css
+  parts/includes/production_sync.php
+  parts/pages/product-detail.php
+
+
+================================================================
+v2026-10-01_152508 | Patch | 2026-10-01 15:25:10
+From: 2026-10-01_142246  ->  To: 9da5182  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  parts/assets/theme-v2.css
+  parts/pages/product-detail.php
+
+
+================================================================
+v2026-10-01_153159 | Patch | 2026-10-01 15:32:01
+From: 2026-10-01_152508  ->  To: 0c62349  |  Files: 7
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  parts/assets/app.js
+  parts/assets/theme-v2.css
+  parts/includes/helpers.php
+  parts/pages/product-detail.php
+  parts/pages/products.php
+
+
+================================================================
+v2026-10-01_155537 | Patch | 2026-10-01 15:55:39
+From: 2026-10-01_153159  ->  To: 12efb4d  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  parts/assets/app.js
+  parts/includes/helpers.php
+  parts/includes/product_edit.php
+
+
+================================================================
+v2026-10-05_110730 | Patch | 2026-10-05 11:07:35
+From: 2026-10-01_153159  ->  To: 12c4c63  |  Files: 30
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/asset_new.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/dash_low_stock.php
+  finishgoogs_ma_update/includes/part_stock_bridge.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/smart_search.php
+  finishgoogs_ma_update/includes/timeline.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/parts.php
+  finishgoogs_ma_update/parts_link_check.php
+  parts/assets/app.js
+  parts/assets/style.css
+  parts/config/database.php
+  parts/includes/helpers.php
+  parts/includes/product_edit.php
+  parts/includes/production_asset_withdraw_sync.php
+  parts/includes/production_sync.php
+  parts/includes/StockService.php
+  parts/includes/ui_parts.php
+  parts/pages/history.php
+  parts/pages/product-detail.php
+  parts/pages/products.php
+  parts/pages/sets.php
+  parts/pages/year-end-summary.php
+  shared/line_flex_templates.php
+  shared/line_notify_core.php
+  shared/qty_helpers.php
+  shared/stock_status.php
+
+
+================================================================
+v2026-10-05_114215 | Patch | 2026-10-05 11:42:20
+From: 2026-10-01_153159  ->  To: 12c4c63  |  Files: 30
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/asset_new.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/dash_low_stock.php
+  finishgoogs_ma_update/includes/part_stock_bridge.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/smart_search.php
+  finishgoogs_ma_update/includes/timeline.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/parts.php
+  finishgoogs_ma_update/parts_link_check.php
+  parts/assets/app.js
+  parts/assets/style.css
+  parts/config/database.php
+  parts/includes/helpers.php
+  parts/includes/product_edit.php
+  parts/includes/production_asset_withdraw_sync.php
+  parts/includes/production_sync.php
+  parts/includes/StockService.php
+  parts/includes/ui_parts.php
+  parts/pages/history.php
+  parts/pages/product-detail.php
+  parts/pages/products.php
+  parts/pages/sets.php
+  parts/pages/year-end-summary.php
+  shared/line_flex_templates.php
+  shared/line_notify_core.php
+  shared/qty_helpers.php
+  shared/stock_status.php
+
+
+================================================================
+v2026-10-05_123533 | Patch | 2026-10-05 12:35:38
+From: 2026-10-01_153159  ->  To: 12c4c63  |  Files: 30
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/asset_new.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/dash_low_stock.php
+  finishgoogs_ma_update/includes/part_stock_bridge.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/includes/smart_search.php
+  finishgoogs_ma_update/includes/timeline.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/parts.php
+  finishgoogs_ma_update/parts_link_check.php
+  parts/assets/app.js
+  parts/assets/style.css
+  parts/config/database.php
+  parts/includes/helpers.php
+  parts/includes/product_edit.php
+  parts/includes/production_asset_withdraw_sync.php
+  parts/includes/production_sync.php
+  parts/includes/StockService.php
+  parts/includes/ui_parts.php
+  parts/pages/history.php
+  parts/pages/product-detail.php
+  parts/pages/products.php
+  parts/pages/sets.php
+  parts/pages/year-end-summary.php
+  shared/line_flex_templates.php
+  shared/line_notify_core.php
+  shared/qty_helpers.php
+  shared/stock_status.php
+
+
+================================================================
+v2026-10-05_125628 | Patch | 2026-10-05 12:56:30
+From: 2026-10-05_123533  ->  To: 12c4c63  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/app.js
+  parts/assets/style.css
+  parts/assets/theme-v2.css
+  parts/pages/history.php
+
+
+================================================================
+v2026-10-05_130420 | Patch | 2026-10-05 13:04:22
+From: 2026-10-05_123533  ->  To: 12c4c63  |  Files: 7
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/asset_new.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/config.php
+  parts/assets/app.js
+  parts/assets/style.css
+  parts/assets/theme-v2.css
+  parts/pages/history.php
+
+
+================================================================
+v2026-10-05_131246 | Patch | 2026-10-05 13:12:50
+From: 2026-10-05_130420  ->  To: 12c4c63  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/asset_new.php
+  finishgoogs_ma_update/config.php
+  parts/assets/app.js
+  parts/pages/history.php
+
+
+================================================================
+v2026-10-05_175156 | Patch | 2026-10-05 17:51:58
+From: 2026-10-05_131246  ->  To: 12c4c63  |  Files: 2
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/pages/history.php
+
+
+================================================================
+v2026-10-05_180037 | Patch | 2026-10-05 18:00:40
+From: 2026-10-05_131246  ->  To: 12c4c63  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/stock-chart.js
+  parts/assets/style.css
+  parts/includes/helpers.php
+  parts/pages/history.php
+  parts/pages/product-detail.php
+
+
+================================================================
+v2026-10-05_180422 | Patch | 2026-10-05 18:04:24
+From: 2026-10-05_131246  ->  To: 12c4c63  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/stock-chart.js
+  parts/assets/style.css
+  parts/includes/helpers.php
+  parts/pages/history.php
+  parts/pages/product-detail.php
+
+
+================================================================
+v2026-10-05_181433 | Patch | 2026-10-05 18:14:35
+From: 2026-10-05_180422  ->  To: 12c4c63  |  Files: 2
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/stock-chart.js
+
+
+================================================================
+v2026-10-05_182109 | Patch | 2026-10-05 18:21:11
+From: 2026-10-05_181433  ->  To: 12c4c63  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/dash_low_stock.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-10-05_183002 | Patch | 2026-10-05 18:30:05
+From: 2026-10-05_182109  ->  To: 12c4c63  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/dash_low_stock.php
+
+
+================================================================
+v2026-10-06_163440 | Patch | 2026-10-06 16:34:42
+From: 2026-10-05_182109  ->  To: 12c4c63  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/dash_low_stock.php
+  finishgoogs_ma_update/includes/site_assets.php
+  finishgoogs_ma_update/site_assets.php
+
+
+================================================================
+v2026-10-06_163722 | Patch | 2026-10-06 16:37:25
+From: 2026-10-05_182109  ->  To: 12c4c63  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/dash_low_stock.php
+  finishgoogs_ma_update/includes/site_assets.php
+  finishgoogs_ma_update/site_assets.php
+
+
+================================================================
+v2026-10-06_164714 | Patch | 2026-10-06 16:47:16
+From: 2026-10-06_163722  ->  To: 12c4c63  |  Files: 2
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/config.php
+
+
+================================================================
+v2026-10-06_170650 | Patch | 2026-10-06 17:06:53
+From: 2026-10-06_164714  ->  To: 12c4c63  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/asset_new.php
+  finishgoogs_ma_update/config.php
+  parts/pages/products.php
+
+
+================================================================
+v2026-10-06_171647 | Patch | 2026-10-06 17:16:50
+From: 2026-10-06_170650  ->  To: 12c4c63  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/includes/product_edit.php
+  parts/includes/production_asset_withdraw_sync.php
+  parts/pages/product-detail.php
+  parts/pages/products.php
+
+
+================================================================
+v2026-10-06_172743 | Patch | 2026-10-06 17:27:46
+From: 2026-10-06_170650  ->  To: 12c4c63  |  Files: 7
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/theme-v2.css
+  parts/includes/header.php
+  parts/includes/product_edit.php
+  parts/includes/production_asset_withdraw_sync.php
+  parts/pages/product-detail.php
+  parts/pages/products.php
+
+
+================================================================
+v2026-10-06_173019 | Patch | 2026-10-06 17:30:22
+From: 2026-10-06_170650  ->  To: 12c4c63  |  Files: 8
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/theme-v2.css
+  parts/includes/header.php
+  parts/includes/product_edit.php
+  parts/includes/production_asset_withdraw_sync.php
+  parts/includes/production_sync.php
+  parts/pages/product-detail.php
+  parts/pages/products.php
+
+
+================================================================
+v2026-10-06_173805 | Patch | 2026-10-06 17:38:08
+From: 2026-10-06_173019  ->  To: 12c4c63  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/theme-v2.css
+  parts/pages/product-detail.php
+
+
+================================================================
+v2026-10-06_174145 | Patch | 2026-10-06 17:41:47
+From: 2026-10-06_173019  ->  To: 12c4c63  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/theme-v2.css
+  parts/includes/StockService.php
+  parts/pages/product-detail.php
+
+
+================================================================
+v2026-10-06_174409 | Patch | 2026-10-06 17:44:11
+From: 2026-10-06_173019  ->  To: 12c4c63  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/theme-v2.css
+  parts/includes/StockService.php
+  parts/pages/product-detail.php
+
+
+================================================================
+v2026-10-06_175845 | Patch | 2026-10-06 17:58:47
+From: 2026-10-06_174409  ->  To: 12c4c63  |  Files: 2
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/pages/product-detail.php
+
+
+================================================================
+v2026-10-06_180744 | Patch | 2026-10-06 18:07:47
+From: 2026-10-06_175845  ->  To: 12c4c63  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  parts/includes/parts_bootstrap.php
+  parts/includes/production_sync.php
+  parts/includes/StockService.php
+  parts/pages/product-detail.php
+
+
+================================================================
+v2026-10-06_181001 | Patch | 2026-10-06 18:10:04
+From: 2026-10-06_175845  ->  To: 12c4c63  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  parts/includes/parts_bootstrap.php
+  parts/includes/production_sync.php
+  parts/includes/StockService.php
+  parts/pages/product-detail.php
+
+
+================================================================
+v2026-10-06_181338 | Patch | 2026-10-06 18:13:44
+From: 2026-10-06_175845  ->  To: 12c4c63  |  Files: 7
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  parts/includes/parts_bootstrap.php
+  parts/includes/production_sync.php
+  parts/includes/StockService.php
+  parts/pages/product-detail.php
+
+
+================================================================
+v2026-10-06_183250 | Patch | 2026-10-06 18:32:51
+From: 2026-10-06_181338  ->  To: 12c4c63  |  Files: 5
+----------------------------------------------------------------
+- หน้าทะเบียนเครื่องระบบเช่า (แบบ B) — การ์ดสรุป + แท็บทะเบียน / การเบิกเช่าล่าสุด
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/leasing_registry.php
+  finishgoogs_ma_update/leasing_registry.php
+  finishgoogs_ma_update/settings.php
+
+
+================================================================
+v2026-10-07_084806 | Patch | 2026-10-07 08:48:07
+From: 2026-10-06_183250  ->  To: 12c4c63  |  Files: 4
+----------------------------------------------------------------
+- กดรูปอะไหล่ในรายการควรสั่งเพิ่มแล้วเปิดดูขนาดเต็มเป็น popup
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/dash_low_stock.php
+  finishgoogs_ma_update/includes/layout.php
+
+
+================================================================
+v2026-10-07_084951 | Patch | 2026-10-07 08:49:51
+From: 2026-10-06_183250  ->  To: 12c4c63  |  Files: 4
+----------------------------------------------------------------
+- กดชื่ออะไหล่ในรายการควรสั่งเพิ่มแล้วเปิดโปรไฟล์แท็บใหม่ + กดรูปดูขนาดเต็ม
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/dash_low_stock.php
+  finishgoogs_ma_update/includes/layout.php
+
+
+================================================================
+v2026-10-07_090030 | Patch | 2026-10-07 09:00:31
+From: 2026-10-07_084951  ->  To: 12c4c63  |  Files: 14
+----------------------------------------------------------------
+- กดรูปดูขนาดเต็มและกดชื่อเปิดโปรไฟล์อะไหล่ให้ครบทุกรายการ
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/dash_low_stock.php
+  finishgoogs_ma_update/includes/part_list_ui.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/parts.php
+  parts/includes/helpers.php
+  parts/includes/ui_parts.php
+  parts/pages/history.php
+  parts/pages/products.php
+  parts/pages/sets.php
+  parts/pages/year-end-summary.php
+
+
+================================================================
+v2026-10-07_090405 | Patch | 2026-10-07 09:04:06
+From: 2026-10-07_084951  ->  To: 12c4c63  |  Files: 3
+----------------------------------------------------------------
+- ดูเครื่องที่ต้อง Sync รายการเบิกได้จากปุ่มดูเครื่องนี้
+
+Files:
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/part_stock_bridge.php
+
+
+================================================================
+v2026-10-07_110247 | Patch | 2026-10-07 11:02:48
+From: 2026-10-07_090405  ->  To: 12c4c63  |  Files: 1
+----------------------------------------------------------------
+- หน้าเช็คสั่งซื้อแบบ B — ยอดเบิกผลิตต่อรุ่น เทียบคงเหลือวันนี้
+
+Files:
+  parts/pages/purchase-check.php
+
+
+================================================================
+v2026-10-07_110300 | Patch | 2026-10-07 11:03:01
+From: 2026-10-07_090405  ->  To: 12c4c63  |  Files: 7
+----------------------------------------------------------------
+- หน้าเช็คสั่งซื้อแบบ B — ยอดเบิกผลิตต่อรุ่น เทียบคงเหลือวันนี้
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/style.css
+  parts/includes/helpers.php
+  parts/includes/purchase_check.php
+  parts/pages/purchase-check.php
+  shared/activity_log_core.php
+  shared/ui_icons.php
+
+
+================================================================
+v2026-10-07_110522 | Patch | 2026-10-07 11:05:23
+From: 2026-10-07_090405  ->  To: 12c4c63  |  Files: 7
+----------------------------------------------------------------
+- เช็คสั่งซื้อ: แท็บแยกตามผู้จำหน่าย สำหรับสั่งทีละเจ้าหลายอะไหล่
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/style.css
+  parts/includes/helpers.php
+  parts/includes/purchase_check.php
+  parts/pages/purchase-check.php
+  shared/activity_log_core.php
+  shared/ui_icons.php
+
+
+================================================================
+v2026-10-07_111121 | Patch | 2026-10-07 11:11:22
+From: 2026-10-07_090405  ->  To: 12c4c63  |  Files: 7
+----------------------------------------------------------------
+- แก้หัวตารางเช็คสั่งซื้อให้ตรงกับคอลัมน์ข้อมูล — แยก รุ่น/เบิกตามรุ่น/เครื่อง เป็นคอลัมน์จริง
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/style.css
+  parts/includes/helpers.php
+  parts/includes/purchase_check.php
+  parts/pages/purchase-check.php
+  shared/activity_log_core.php
+  shared/ui_icons.php
+
+
+================================================================
+v2026-10-07_111830 | Patch | 2026-10-07 11:18:30
+From: 2026-10-07_090405  ->  To: 12c4c63  |  Files: 3
+----------------------------------------------------------------
+- แก้ตารางเช็คสั่งซื้อให้คอลัมน์ตรงใน Chrome และกรอบเต็มจอ
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/style.css
+  parts/pages/purchase-check.php
+
+
+================================================================
+v2026-10-07_112908 | Patch | 2026-10-07 11:29:09
+From: 2026-10-07_090405  ->  To: 12c4c63  |  Files: 4
+----------------------------------------------------------------
+- ตารางเช็คสั่งซื้อใช้ฟอร์มเดียวกันทั้ง 3 แท็บ คอลัมน์ตรงกัน และมีรูปอะไหล่หน้าชื่อ
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/style.css
+  parts/includes/purchase_check.php
+  parts/pages/purchase-check.php
+
+
+================================================================
+v2026-10-07_113621 | Patch | 2026-10-07 11:36:21
+From: 2026-10-07_112908  ->  To: 12c4c63  |  Files: 4
+----------------------------------------------------------------
+- ปุ่มซ่อน-ขยายรายการรุ่นเครื่องใต้แต่ละอะไหล่ในหน้าเช็คสั่งซื้อ
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/style.css
+  parts/includes/purchase_check.php
+  parts/pages/purchase-check.php
+
+
+================================================================
+v2026-10-07_113737 | Patch | 2026-10-07 11:37:38
+From: 2026-10-07_112908  ->  To: 12c4c63  |  Files: 4
+----------------------------------------------------------------
+- ตรึงหัวตารางเช็คสั่งซื้อตอนเลื่อน และปุ่มซ่อน-ขยายรุ่นเครื่อง
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/style.css
+  parts/includes/purchase_check.php
+  parts/pages/purchase-check.php
+
+
+================================================================
+v2026-10-07_114329 | Patch | 2026-10-07 11:43:30
+From: 2026-10-07_113737  ->  To: 12c4c63  |  Files: 2
+----------------------------------------------------------------
+- ขยายกรอบตารางเช็คสั่งซื้อให้สูงเต็มจอ
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/style.css
+
+
+================================================================
+v2026-10-07_123840 | Patch | 2026-10-07 12:38:40
+From: 2026-10-07_113737  ->  To: 12c4c63  |  Files: 2
+----------------------------------------------------------------
+- กรอบตารางเช็คสั่งซื้อสูงเกือบหนึ่งจอ เลื่อนหน้าลงมาแล้วดูเฉพาะตาราง
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/style.css
+
+
+================================================================
+v2026-10-07_125555 | Patch | 2026-10-07 12:55:56
+From: 2026-10-07_113737  ->  To: 12c4c63  |  Files: 3
+----------------------------------------------------------------
+- โชว์สูตรต่อเครื่องบนแถวอะไหล่ ไม่บังคับเป็นขีดเมื่อมีหลายรุ่น
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/includes/purchase_check.php
+  parts/pages/purchase-check.php
+
+
+================================================================
+v2026-10-07_125705 | Patch | 2026-10-07 12:57:06
+From: 2026-10-07_113737  ->  To: 12c4c63  |  Files: 4
+----------------------------------------------------------------
+- เปลี่ยนไอคอนค้นหาหน้าเช็คสั่งซื้อเป็นแว่นชุดเดียวกับเมนู
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/style.css
+  parts/includes/purchase_check.php
+  parts/pages/purchase-check.php
+
+
+================================================================
+v2026-10-07_130224 | Patch | 2026-10-07 13:02:24
+From: 2026-10-07_125705  ->  To: 12c4c63  |  Files: 3
+----------------------------------------------------------------
+- อะไหล่ที่ใช้รุ่นเดียวก็แสดงรุ่นเครื่องได้เหมือนหลายรุ่น
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/includes/purchase_check.php
+  parts/pages/purchase-check.php
+
+
+================================================================
+v2026-10-07_130646 | Patch | 2026-10-07 13:06:47
+From: 2026-10-07_130224  ->  To: 12c4c63  |  Files: 3
+----------------------------------------------------------------
+- ย่อรุ่นเครื่องเป็นค่าเริ่มต้น และเรียกเบิกไม่ผูกเครื่องว่าเบิกแยก
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/includes/purchase_check.php
+  parts/pages/purchase-check.php
+
+
+================================================================
+v2026-10-07_131011 | Patch | 2026-10-07 13:10:12
+From: 2026-10-07_130646  ->  To: 12c4c63  |  Files: 2
+----------------------------------------------------------------
+- ไม่แสดงเบิกไม่ผูกเครื่องเป็นรุ่น แต่ยังนับยอดในอะไหล่
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/includes/purchase_check.php
+
+
+================================================================
+v2026-10-07_132230 | Patch | 2026-10-07 13:22:30
+From: 2026-10-07_131011  ->  To: 12c4c63  |  Files: 3
+----------------------------------------------------------------
+- เร่งหน้าเช็คสั่งซื้อ: รวมยอดใน SQL, ใส่ index ตามวันที่เบิก, ไม่โหลดรายการสินค้าทั้งตารางแค่เพื่อลิงก์รูป
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/includes/helpers.php
+  parts/includes/purchase_check.php
+
+
+================================================================
+v2026-10-07_132846 | Patch | 2026-10-07 13:28:47
+From: 2026-10-07_132230  ->  To: 12c4c63  |  Files: 3
+----------------------------------------------------------------
+- เลิก ALTER ตารางตอนเปิดหน้าเช็คสั่งซื้อ (ล็อกเซิร์ฟเวอร์) เหลือ query เดียว และ cache สั้นตอนสลับแท็บ
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/includes/purchase_check.php
+  parts/pages/purchase-check.php
+
+
+================================================================
+v2026-10-07_133517 | Patch | 2026-10-07 13:35:19
+From: 2026-10-07_132230  ->  To: 12c4c63  |  Files: 12
+----------------------------------------------------------------
+- ทั้งระบบ production: เลิก SHOW COLUMNS part_movements ทุกหน้า, จำ schema ที่ตรวจแล้ว, ฟอนต์ Google ไม่บล็อกการวาดหน้า
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/part_stock_bridge.php
+  parts/includes/header.php
+  parts/includes/production_sync.php
+  parts/includes/purchase_check.php
+  parts/pages/purchase-check.php
+  shared/activity_log_core.php
+  shared/line_notify_core.php
+  shared/qty_helpers.php
+  shared/schema_once.php
+  shared/ui_tokens.php
+
+
+================================================================
+v2026-10-07_135056 | Patch | 2026-10-07 13:50:57
+From: 2026-10-07_133517  ->  To: 12c4c63  |  Files: 5
+----------------------------------------------------------------
+- แสดงเวลาโหลดหน้า (เซิร์ฟเวอร์ + ทั้งหน้า) ใต้เวอร์ชันในแถบเมนู
+
+Files:
+  finishgoogs_ma_update/assets/app-footer.js
+  finishgoogs_ma_update/assets/sidebar.css
+  finishgoogs_ma_update/config.php
+  parts/includes/parts_bootstrap.php
+  shared/ui_footer.php
+
+
+================================================================
+v2026-10-07_144355 | Patch | 2026-10-07 14:43:55
+From: 2026-10-07_135056  ->  To: 12c4c63  |  Files: 3
+----------------------------------------------------------------
+- เรียงแท็บมุมมองหน้าเช็คสั่งซื้อให้ตรงกับแถบสรุป: รุ่น · อะไหล่ · ผู้จำหน่าย
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/style.css
+  parts/includes/purchase_check.php
+
+
+================================================================
+v2026-10-07_144430 | Patch | 2026-10-07 14:44:31
+From: 2026-10-07_135056  ->  To: 12c4c63  |  Files: 3
+----------------------------------------------------------------
+- เรียงช่วงเวลาหน้าเช็คสั่งซื้อจากสั้นไปยาว และแท็บมุมมองให้ตรงแถบสรุป
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/style.css
+  parts/includes/purchase_check.php
+
+
+================================================================
+v2026-10-14_114827 | Patch | 2026-10-14 11:48:28
+From: 2026-10-07_144430  ->  To: 12c4c63  |  Files: 5
+----------------------------------------------------------------
+- Spare MA stays production-only; read-only wait-MA warning if SN still in rental queue
+
+Files:
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/ma_snippets.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-14_202004 | Patch | 2026-10-14 20:20:05
+From: 2026-10-07_144430  ->  To: 12c4c63  |  Files: 5
+----------------------------------------------------------------
+- MA เครื่องสำรองบันทึกเฉพาะ production ไม่ปิดคิวเช่า ถ้า S/N ยังอยู่ในคิวรอ MA จะเตือนอย่างเดียว
+
+Files:
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/ma_snippets.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-14_203244 | Patch | 2026-10-14 20:32:44
+From: 2026-10-14_202004  ->  To: 12c4c63  |  Files: 1
+----------------------------------------------------------------
+- Sync สถานะเครื่องที่ถูกยืมเป็นเครื่องสำรองในระบบซ่อมแล้วยังขึ้นว่าเช่าหรือไม่มีสถานะ
+
+Files:
+  finishgoogs_ma_update/config.php
+
+
+================================================================
+v2026-10-14_203305 | Patch | 2026-10-14 20:33:06
+From: 2026-10-14_202004  ->  To: 12c4c63  |  Files: 4
+----------------------------------------------------------------
+- Sync สถานะเครื่องที่ถูกยืมเป็นเครื่องสำรองในระบบซ่อมแล้วยังขึ้นว่าเช่าหรือไม่มีสถานะ
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/asset_status_sync.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/unknown_assets.php
+
+
+================================================================
+v2026-10-14_203956 | Patch | 2026-10-14 20:39:57
+From: 2026-10-14_202004  ->  To: 12c4c63  |  Files: 5
+----------------------------------------------------------------
+- สถานะเครื่องตามการใช้งานครั้งล่าสุด ว่าเอาไปใช้สำรองหรือเช่า โดยเทียบวันที่ยืมสำรองกับวันเริ่มสัญญาเช่า
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/asset_status_sync.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/unknown_assets.php
+
+
+================================================================
+v2026-10-14_204929 | Patch | 2026-10-14 20:49:30
+From: 2026-10-14_202004  ->  To: 12c4c63  |  Files: 4
+----------------------------------------------------------------
+- ตารางประวัติตาม S/N ให้กว้างเต็มการ์ดและสูงเท่าที่เหลือบนจอ เหมือนหน้ารายการอะไหล่
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/style.css
+  parts/pages/history.php
+  shared/ui_table.js
+
+
+================================================================
+v2026-10-15_124040 | Patch | 2026-10-15 12:40:41
+From: 2026-10-14_204929  ->  To: 12c4c63  |  Files: 3
+----------------------------------------------------------------
+- ตารางประวัติตาม S/N สูงกินพื้นที่ที่เหลือบนจอ เลื่อนในกรอบ ไม่หดตามจำนวนแถว
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/style.css
+  shared/ui_table.js
+
+
+================================================================
+v2026-10-15_124617 | Patch | 2026-10-15 12:46:17
+From: 2026-10-14_204929  ->  To: 12c4c63  |  Files: 3
+----------------------------------------------------------------
+- product-detail: การ์ดกราฟยอดคงเหลือไม่ล้นกรอบพื้นหลังขาว
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/stock-chart.js
+  parts/assets/style.css
+
+
+================================================================
+v2026-10-15_130004 | Patch | 2026-10-15 13:00:05
+From: 2026-10-14_204929  ->  To: 12c4c63  |  Files: 5
+----------------------------------------------------------------
+- หน้าประวัติไม่เลื่อนทั้งจอ — เลื่อนเฉพาะในตาราง และกราฟโปรไฟล์อะไหล่ไม่ล้นกรอบ
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/stock-chart.js
+  parts/assets/style.css
+  parts/pages/history.php
+  shared/ui_table.js
+
+
+================================================================
+v2026-10-15_130619 | Patch | 2026-10-15 13:06:19
+From: 2026-10-15_130004  ->  To: 12c4c63  |  Files: 3
+----------------------------------------------------------------
+- คลังพร้อมเช่าไม่นับเครื่องที่สัญญายัง active อยู่กับลูกค้า แม้ทะเบียนเช่าค้างเป็น finished goods
+
+Files:
+  finishgoogs_ma_update/config.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_registry.php
+
+
+================================================================
+v2026-10-15_131730 | Patch | 2026-10-15 13:17:30
+From: 2026-10-15_130619  ->  To: 12c4c63  |  Files: 2
+----------------------------------------------------------------
+- ตัวกรองการเบิกใช้งานแยกสถานะระบบเช่าให้ตรงป้ายในตาราง ไม่กอง MA/คลัง/รับคืนไว้ช่องเดียว
+
+Files:
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/config.php
+
+
+================================================================
+v2026-10-15_134036 | Patch | 2026-10-15 13:40:36
+From: 2026-10-15_131730  ->  To: 12c4c63  |  Files: 1
+----------------------------------------------------------------
+- จัดหน้าการ์ดการเบิกใช้งานขายเป็นสรุปครั้งเดียว ไม่เล่าเรื่องขายซ้ำตามแหล่งข้อมูล
+
+Files:
+  finishgoogs_ma_update/config.php
+
+
+================================================================
+v2026-10-15_134055 | Patch | 2026-10-15 13:40:56
+From: 2026-10-15_131730  ->  To: 12c4c63  |  Files: 4
+----------------------------------------------------------------
+- จัดหน้าการ์ดการเบิกใช้งานขายเป็นสรุปครั้งเดียว ไม่เล่าเรื่องขายซ้ำตามแหล่งข้อมูล
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/setup_sale_history.php
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+
+
+================================================================
+v2026-10-15_135616 | Patch | 2026-10-15 13:56:17
+From: 2026-10-15_134055  ->  To: 12c4c63  |  Files: 2
+----------------------------------------------------------------
+- เอาปุ่มย้อนกลับออกจากหัวหน้าโปรไฟล์เครื่อง
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/config.php
+
+
+================================================================
+v2026-10-15_135723 | Patch | 2026-10-15 13:57:24
+From: 2026-10-15_134055  ->  To: 12c4c63  |  Files: 3
+----------------------------------------------------------------
+- เอาปุ่มย้อนกลับออกจากหัวโปรไฟล์เครื่องและหน้ารายละเอียดอะไหล่
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/config.php
+  parts/pages/product-detail.php
+
+
+================================================================
+v2026-10-15_140849 | Patch | 2026-10-15 14:08:50
+From: 2026-10-15_134055  ->  To: 12c4c63  |  Files: 6
+----------------------------------------------------------------
+- ซิงค์ Active = 0 ให้รายการ stock ที่มี Setup ID แล้ว และเอาปุ่มย้อนกลับออกจากโปรไฟล์เครื่องกับหน้ารายละเอียดอะไหล่
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/stock_active_sync.php
+  finishgoogs_ma_update/share.php
+  finishgoogs_ma_update/share_admin.php
+  parts/pages/product-detail.php
+
+
+================================================================
+v2026-10-15_141909 | Patch | 2026-10-15 14:19:10
+From: 2026-10-15_140849  ->  To: 12c4c63  |  Files: 3
+----------------------------------------------------------------
+- หน้าย้ายไประบบเช่าเริ่มที่การ์ดรุ่นพร้อมรูป แล้วค่อยเลือกหมายเลขเครื่อง
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/leasing_move.php
+  finishgoogs_ma_update/leasing_move.php
+
+
+================================================================
+v2026-10-15_143036 | Patch | 2026-10-15 14:30:37
+From: 2026-10-15_141909  ->  To: 12c4c63  |  Files: 1
+----------------------------------------------------------------
+- เลือกหมายเลขเครื่องใน popup แทนการเปิดหน้าใหม่ เมื่อกดการ์ดรุ่นจากหน้าย้ายไประบบเช่า
+
+Files:
+  finishgoogs_ma_update/leasing_move.php
+
+
+================================================================
+v2026-10-15_143054 | Patch | 2026-10-15 14:30:55
+From: 2026-10-15_141909  ->  To: 12c4c63  |  Files: 2
+----------------------------------------------------------------
+- เลือกหมายเลขเครื่องใน popup แทนการเปิดหน้าใหม่ เมื่อกดการ์ดรุ่นจากหน้าย้ายไประบบเช่า
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/leasing_move.php
+
+
+================================================================
+v2026-10-15_143703 | Patch | 2026-10-15 14:37:03
+From: 2026-10-15_143054  ->  To: 12c4c63  |  Files: 3
+----------------------------------------------------------------
+- การ์ดรุ่นตอนวางเมาส์คงพื้นขาว ข้อความอ่านได้ ไม่ทาชมพูเข้มจากปุ่ม
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/leasing_move.php
+
+
+================================================================
+v2026-10-15_143828 | Patch | 2026-10-15 14:38:29
+From: 2026-10-15_143054  ->  To: 12c4c63  |  Files: 5
+----------------------------------------------------------------
+- เอาปุ่มใบเบิกรอผลิตออกจากหน้าทะเบียนเครื่อง ให้เข้าดูจาก dashboard และแก้การ์ดรุ่นตอน hover ไม่ทาชมพูเข้ม
+
+Files:
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/leasing_move.php
+
+
+================================================================
+v2026-10-15_145029 | Patch | 2026-10-15 14:50:30
+From: 2026-10-15_143828  ->  To: 12c4c63  |  Files: 6
+----------------------------------------------------------------
+- แยกของสำเร็จรูปที่ปนในใบชุด (เช่น Mobile Printer ในใบ bitVisitor S) ออกเป็นคิวรุ่นของตัวเอง
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/inv_pickup_map.php
+  finishgoogs_ma_update/inv_pickups.php
+
+
+================================================================
+v2026-10-15_145827 | Patch | 2026-10-15 14:58:27
+From: 2026-10-15_145029  ->  To: 12c4c63  |  Files: 4
+----------------------------------------------------------------
+- แยกกล่อง Card Cam และ Logitech Brio ในใบ bitVisitor M ออกเป็นคิว Card Camera
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/inv_pickup_map.php
+
+
+================================================================
+v2026-10-15_150740 | Patch | 2026-10-15 15:07:41
+From: 2026-10-15_145827  ->  To: 12c4c63  |  Files: 6
+----------------------------------------------------------------
+- Logitech Brio ในใบ bitVisitor Plus นับเป็นอะไหล่ของ Plus ไม่แยกเป็น Card Camera — แยกคิวตามชื่อชุดเท่านั้น
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/inv_pickup_map.php
+  finishgoogs_ma_update/inv_pickups.php
+
+
+================================================================
+v2026-10-15_151037 | Patch | 2026-10-15 15:10:38
+From: 2026-10-15_145827  ->  To: 12c4c63  |  Files: 6
+----------------------------------------------------------------
+- แยกเป็น Card Camera เฉพาะเมื่อใบเดียวกันมีทั้งกล่อง Card Cam และ Logitech Brio — มีแค่ Brio นับเป็นอะไหล่ของรุ่นในใบนั้น
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/inv_pickup_map.php
+  finishgoogs_ma_update/inv_pickups.php
+
+
+================================================================
+v2026-10-15_153850 | Patch | 2026-10-15 15:38:50
+From: 2026-10-15_151037  ->  To: 12c4c63  |  Files: 4
+----------------------------------------------------------------
+- ตั้งค่าอะไหล่ในใบเบิกได้รายชุดบนหน้าผูกใบเบิก
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/inv_pickup_map.php
+
+
+================================================================
+v2026-10-16_084523 | Patch | 2026-10-16 08:45:24
+From: 2026-10-15_153850  ->  To: be39da7  |  Files: 3
+----------------------------------------------------------------
+- การ์ดเช่าโชว์การใช้งานปัจจุบัน คลังพร้อมเช่าเป็นค่าว่าง และประวัติการเช่ากางรายละเอียดได้
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+
+
+================================================================
+v2026-10-16_090149 | Patch | 2026-10-16 09:01:49
+From: 2026-10-16_084523  ->  To: be39da7  |  Files: 2
+----------------------------------------------------------------
+- เพิ่มปุ่มเคลียร์ทั้งหมดในช่องเลือกอะไหล่ MA
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-16_195138 | Patch | 2026-10-16 19:51:39
+From: 2026-10-16_090149  ->  To: be39da7  |  Files: 7
+----------------------------------------------------------------
+- คิวเขียน SD image ชุด AL-26-10-14 (Pi3 และ S) และแผงเลือก Pi ในฟอร์ม MA
+
+Files:
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/sd_image.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/sd_image_check.php
+  finishgoogs_ma_update/settings.php
+
+
+================================================================
+v2026-10-16_195153 | Patch | 2026-10-16 19:51:54
+From: 2026-10-16_090149  ->  To: be39da7  |  Files: 8
+----------------------------------------------------------------
+- คิวเขียน SD image ชุด AL-26-10-14 (Pi3 และ S) และแผงเลือก Pi ในฟอร์ม MA
+
+Files:
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/sd_image.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/sd_image_check.php
+  finishgoogs_ma_update/settings.php
+
+
+================================================================
+v2026-10-16_195546 | Patch | 2026-10-16 19:55:48
+From: 2026-10-16_090149  ->  To: be39da7  |  Files: 9
+----------------------------------------------------------------
+- โปรไฟล์เครื่อง Plus/M แสดง Raspberry Pi2/Pi3 จาก S/N จุดตัด และคิวเขียน SD image
+
+Files:
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/asset_production_edit.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/sd_image.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/sd_image_check.php
+  finishgoogs_ma_update/settings.php
+
+
+================================================================
+v2026-10-16_200426 | Patch | 2026-10-16 20:04:27
+From: 2026-10-16_090149  ->  To: be39da7  |  Files: 10
+----------------------------------------------------------------
+- โปรไฟล์เครื่อง Plus/M เลือก Pi2/Pi3 ได้ที่แถว Raspberry Pi
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/asset_production_edit.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/sd_image.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/sd_image_check.php
+  finishgoogs_ma_update/settings.php
+
+
+================================================================
+v2026-10-16_200823 | Patch | 2026-10-16 20:08:24
+From: 2026-10-16_090149  ->  To: be39da7  |  Files: 10
+----------------------------------------------------------------
+- Raspberry Pi บนโปรไฟล์เป็นข้อความ แก้รุ่นที่ฟอร์มแก้ไขเครื่อง
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/asset_production_edit.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/sd_image.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/sd_image_check.php
+  finishgoogs_ma_update/settings.php
+
+
+================================================================
+v2026-10-16_201307 | Patch | 2026-10-16 20:13:08
+From: 2026-10-16_200823  ->  To: be39da7  |  Files: 2
+----------------------------------------------------------------
+- ปุ่มบันทึก MA ในคิวเขียน SD image ให้อยู่บรรทัดเดียว
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/sd_image_check.php
+
+
+================================================================
+v2026-10-16_201529 | Patch | 2026-10-16 20:15:30
+From: 2026-10-16_200823  ->  To: be39da7  |  Files: 4
+----------------------------------------------------------------
+- ตั้งชื่อไฟล์ SD image ชุดปัจจุบันได้ที่หน้าคิว
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/sd_image.php
+  finishgoogs_ma_update/sd_image_check.php
+  finishgoogs_ma_update/settings.php
+
+
+================================================================
+v2026-10-16_202450 | Patch | 2026-10-16 20:24:51
+From: 2026-10-16_201529  ->  To: be39da7  |  Files: 5
+----------------------------------------------------------------
+- ติ๊กเขียน SD image ต่อจาก FW โดยไม่ต้องลง MA
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/asset_production_edit.php
+  finishgoogs_ma_update/includes/sd_image.php
+
+
+================================================================
+v2026-10-16_203816 | Patch | 2026-10-16 20:38:18
+From: 2026-10-16_201529  ->  To: be39da7  |  Files: 7
+----------------------------------------------------------------
+- เดาชุด SD image จาก FW / วันผลิต / ซ่อมอะไหล่พื้นฐาน / MA เปลี่ยน SD Card
+
+Files:
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/maintenance_repair_bridge.php
+  finishgoogs_ma_update/includes/sd_image.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/sd_image_check.php
+
+
+================================================================
+v2026-10-16_203834 | Patch | 2026-10-16 20:38:37
+From: 2026-10-16_201529  ->  To: be39da7  |  Files: 9
+----------------------------------------------------------------
+- เดาชุด SD image จาก FW / วันผลิต / ซ่อมอะไหล่พื้นฐาน / MA เปลี่ยน SD Card
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/asset_production_edit.php
+  finishgoogs_ma_update/includes/maintenance_repair_bridge.php
+  finishgoogs_ma_update/includes/sd_image.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/sd_image_check.php
+
+
+================================================================
+v2026-10-16_204339 | Patch | 2026-10-16 20:43:41
+From: 2026-10-16_201529  ->  To: be39da7  |  Files: 9
+----------------------------------------------------------------
+- map version FW จุดเริ่มต้นของแต่ละไฟล์ SD image
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/asset_production_edit.php
+  finishgoogs_ma_update/includes/maintenance_repair_bridge.php
+  finishgoogs_ma_update/includes/sd_image.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/sd_image_check.php
+
+
+================================================================
+v2026-10-16_204616 | Patch | 2026-10-16 20:46:18
+From: 2026-10-16_201529  ->  To: be39da7  |  Files: 9
+----------------------------------------------------------------
+- ชุด image แต่ละไฟล์ map ได้หลาย version FW
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/asset_production_edit.php
+  finishgoogs_ma_update/includes/maintenance_repair_bridge.php
+  finishgoogs_ma_update/includes/sd_image.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/sd_image_check.php
+
+
+================================================================
+v2026-10-16_204811 | Patch | 2026-10-16 20:48:12
+From: 2026-10-16_201529  ->  To: be39da7  |  Files: 9
+----------------------------------------------------------------
+- ชุด image แต่ละไฟล์มี version FW เริ่มต้น แล้วใช้กับ version นั้นขึ้นไป
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/asset_production_edit.php
+  finishgoogs_ma_update/includes/maintenance_repair_bridge.php
+  finishgoogs_ma_update/includes/sd_image.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/sd_image_check.php
+
+
+================================================================
+v2026-10-16_205456 | Patch | 2026-10-16 20:54:56
+From: 2026-10-16_204811  ->  To: be39da7  |  Files: 4
+----------------------------------------------------------------
+- โปรไฟล์แสดงแค่ชื่อ SD image อ้างอิงและติ๊กเขียนอยู่ที่แก้ไขเครื่องกับ MA
+
+Files:
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/sd_image.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-17_084819 | Patch | 2026-10-17 08:48:20
+From: 2026-10-16_204811  ->  To: be39da7  |  Files: 4
+----------------------------------------------------------------
+- MA เครื่องสำรองบันทึกเฉพาะผลิต ไม่ปิดคิวระบบเช่า
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-17_085741 | Patch | 2026-10-17 08:57:41
+From: 2026-10-16_204811  ->  To: be39da7  |  Files: 4
+----------------------------------------------------------------
+- catalog เก็บไฟล์เก่าต่อช่อง เดาชุด image จาก version FW ไม่ใช้วันที่เริ่มชุด
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/sd_image.php
+  finishgoogs_ma_update/sd_image_check.php
+
+
+================================================================
+v2026-10-17_091121 | Patch | 2026-10-17 09:11:21
+From: 2026-10-17_085741  ->  To: be39da7  |  Files: 5
+----------------------------------------------------------------
+- แสดงชื่อ SD image ตาม version FW ไม่ใส่ไฟล์ปัจจุบันให้เครื่องที่ยังไม่ยืนยัน
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/sd_image.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/sd_image_check.php
+
+
+================================================================
+v2026-10-17_101025 | Patch | 2026-10-17 10:10:26
+From: 2026-10-17_091121  ->  To: be39da7  |  Files: 4
+----------------------------------------------------------------
+- ชื่อ SD image บนโปรไฟล์ไม่หักบรรทัดที่ขีดในชื่อไฟล์
+
+Files:
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/sd_image.php
+
+
+================================================================
+v2026-10-17_101621 | Patch | 2026-10-17 10:16:21
+From: 2026-10-17_091121  ->  To: be39da7  |  Files: 2
+----------------------------------------------------------------
+- ฟอร์มชุด image เลือกช่องก่อนแล้วค่อยแก้ไฟล์และ FW
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/sd_image_check.php
+
+
+================================================================
+v2026-10-17_101839 | Patch | 2026-10-17 10:18:40
+From: 2026-10-17_091121  ->  To: be39da7  |  Files: 2
+----------------------------------------------------------------
+- การ์ดเลือกช่อง image โฮเวอร์ไม่กลืนข้อความ
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/sd_image_check.php
+
+
+================================================================
+v2026-10-17_103523 | Patch | 2026-10-17 10:35:24
+From: 2026-10-17_101839  ->  To: be39da7  |  Files: 4
+----------------------------------------------------------------
+- การ์ดรอผลิตเลื่อนดูทุกรุ่นตามแนวนอนด้วยสกอร์ลเมาส์
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-10-17_105754 | Patch | 2026-10-17 10:57:55
+From: 2026-10-17_101839  ->  To: be39da7  |  Files: 3
+----------------------------------------------------------------
+- สกอร์ลเมาส์บนการ์ดรอผลิตเลื่อนรายการแนวนอนได้จริง
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-10-17_110054 | Patch | 2026-10-17 11:00:55
+From: 2026-10-17_101839  ->  To: be39da7  |  Files: 3
+----------------------------------------------------------------
+- แถบเลื่อนการ์ดรอผลิตแบบมินิมอล ไม่โชว์ลูกศรวินโดว์
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-10-17_110816 | Patch | 2026-10-17 11:08:17
+From: 2026-10-17_101839  ->  To: be39da7  |  Files: 4
+----------------------------------------------------------------
+- แผงคิวรอ MA กรอบเดียว กด S/N แล้วเลื่อนไปฟอร์ม
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+
+
+================================================================
+v2026-10-17_111106 | Patch | 2026-10-17 11:11:06
+From: 2026-10-17_101839  ->  To: be39da7  |  Files: 4
+----------------------------------------------------------------
+- คิวรอ MA แสดงครั้งที่เคยใช้งานและครั้งที่เคยทำ MA
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+
+
+================================================================
+v2026-10-17_112954 | Patch | 2026-10-17 11:29:55
+From: 2026-10-17_101839  ->  To: be39da7  |  Files: 5
+----------------------------------------------------------------
+- หน้า MA เทียบ SD image จาก version FW ไม่ต้องติ๊กเขียน
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/sd_image.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/sd_image_check.php
+
+
+================================================================
+v2026-10-17_154258 | Patch | 2026-10-17 15:42:58
+From: 2026-10-17_112954  ->  To: be39da7  |  Files: 5
+----------------------------------------------------------------
+- ตารางประวัติ MA แสดงผลต่อระบบเช่า ซ่อมแล้วหรือเสื่อมสภาพ
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/guide.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-17_155733 | Patch | 2026-10-17 15:57:34
+From: 2026-10-17_154258  ->  To: be39da7  |  Files: 6
+----------------------------------------------------------------
+- Add Battery Power to spare-part watch alerts (same 22/24-month rule as Battery Backup RTC)
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/maintenance_repair_bridge.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/settings.php
+  finishgoogs_ma_update/settings_bulk.php
+  finishgoogs_ma_update/system_doc.php
+
+
+================================================================
+v2026-10-17_155936 | Patch | 2026-10-17 15:59:37
+From: 2026-10-17_154258  ->  To: be39da7  |  Files: 6
+----------------------------------------------------------------
+- Battery Power watch alert defaults off for every model until ticked on
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/maintenance_repair_bridge.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/settings.php
+  finishgoogs_ma_update/settings_bulk.php
+  finishgoogs_ma_update/system_doc.php
+
+
+================================================================
+v2026-10-17_160843 | Patch | 2026-10-17 16:08:45
+From: 2026-10-17_154258  ->  To: be39da7  |  Files: 9
+----------------------------------------------------------------
+- Rental MA summary: retire status must not say the unit is working normally
+
+Files:
+  finishgoogs_ma_update/assets/ma-snippets.js
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/ma_snippets.php
+  finishgoogs_ma_update/includes/maintenance_repair_bridge.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/settings.php
+  finishgoogs_ma_update/settings_bulk.php
+  finishgoogs_ma_update/system_doc.php
+
+
+================================================================
+v2026-10-29_114011 | Patch | 2026-10-29 11:40:12
+From: 2026-10-17_154258  ->  To: be39da7  |  Files: 4
+----------------------------------------------------------------
+- Allow reverting retired MA back to repaired: edit MA close_fg reverts Asset Retirement to finished goods in rent system; delete MA also reverts
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-29_114939 | Patch | 2026-10-29 11:49:39
+From: 2026-10-29_114011  ->  To: be39da7  |  Files: 4
+----------------------------------------------------------------
+- Allow deleting rental-sourced MA records from production UI; auto-sync machine status after delete
+
+Files:
+  finishgoogs_ma_update/asset.php
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-29_124338 | Patch | 2026-10-29 12:43:39
+From: 2026-10-29_114939  ->  To: be39da7  |  Files: 2
+----------------------------------------------------------------
+- Compute unified MA round numbers across production and rental records
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-29_133033 | Patch | 2026-10-29 13:30:34
+From: 2026-10-29_124338  ->  To: be39da7  |  Files: 4
+----------------------------------------------------------------
+- Add MA stacked bar chart beside production chart on dashboard — drill year to month, trend badge
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/dashboard_chart.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-10-29_133317 | Patch | 2026-10-29 13:33:17
+From: 2026-10-29_124338  ->  To: be39da7  |  Files: 2
+----------------------------------------------------------------
+- Fix MA chart bar labels wrapping — set min-width on bar columns in 2-col layout
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+
+
+================================================================
+v2026-10-29_134856 | Patch | 2026-10-29 13:48:57
+From: 2026-10-29_124338  ->  To: be39da7  |  Files: 2
+----------------------------------------------------------------
+- Fix MA/prod chart totals wrapping in 2-column layout — max-content labels and bar min-width tokens
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+
+
+================================================================
+v2026-10-29_135818 | Patch | 2026-10-29 13:58:19
+From: 2026-10-29_124338  ->  To: be39da7  |  Files: 2
+----------------------------------------------------------------
+- Fix chart bar totals buried under short stacks — absolute label band, clip segment overflow
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+
+
+================================================================
+v2026-10-29_140106 | Patch | 2026-10-29 14:01:07
+From: 2026-10-29_124338  ->  To: be39da7  |  Files: 3
+----------------------------------------------------------------
+- Chart totals back on each bar head; clip stack overflow, fix MA segment flex basis
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/dashboard_chart.php
+
+
+================================================================
+v2026-10-29_140424 | Patch | 2026-10-29 14:04:25
+From: 2026-10-29_124338  ->  To: be39da7  |  Files: 4
+----------------------------------------------------------------
+- MA dashboard chart drill-down: click bar segment or month total opens MA list modal
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/dashboard_chart.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-10-29_141432 | Patch | 2026-10-29 14:14:33
+From: 2026-10-29_124338  ->  To: be39da7  |  Files: 4
+----------------------------------------------------------------
+- MA dashboard chart: legend/stack retire (เสื่อมสภาพ)
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/dashboard_chart.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-10-29_142947 | Patch | 2026-10-29 14:29:47
+From: 2026-10-29_141432  ->  To: be39da7  |  Files: 3
+----------------------------------------------------------------
+- Dashboard: align prod/MA chart height; hide MA back on year view
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-10-29_143218 | Patch | 2026-10-29 14:32:18
+From: 2026-10-29_141432  ->  To: be39da7  |  Files: 4
+----------------------------------------------------------------
+- Prod year chart: show status legend like MA chart
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/dashboard_chart.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-10-29_143523 | Patch | 2026-10-29 14:35:23
+From: 2026-10-29_141432  ->  To: be39da7  |  Files: 2
+----------------------------------------------------------------
+- Legend swatch color for status unknown
+
+Files:
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/config.php
+
+
+================================================================
+v2026-10-29_152559 | Patch | 2026-10-29 15:26:00
+From: 2026-10-29_143523  ->  To: be39da7  |  Files: 2
+----------------------------------------------------------------
+- MA S/N autocomplete: suggest filter by product id
+
+Files:
+  finishgoogs_ma_update/assets.php
+  finishgoogs_ma_update/config.php
+
+
+================================================================
+v2026-10-29_153840 | Patch | 2026-10-29 15:38:40
+From: 2026-10-29_152559  ->  To: be39da7  |  Files: 3
+----------------------------------------------------------------
+- list-search-form: live search on type (MA list filters)
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/list_search.php
+
+
+================================================================
+v2026-10-29_171712 | Patch | 2026-10-29 17:17:12
+From: 2026-10-29_153840  ->  To: be39da7  |  Files: 3
+----------------------------------------------------------------
+- Prod chart: keep status legend on month drill like MA
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-10-29_171727 | Patch | 2026-10-29 17:17:28
+From: 2026-10-29_153840  ->  To: be39da7  |  Files: 3
+----------------------------------------------------------------
+- Prod chart: status legend on month drill (fix CSS)
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-10-30_163424 | Patch | 2026-10-30 16:34:24
+From: 2026-10-29_171727  ->  To: be39da7  |  Files: 3
+----------------------------------------------------------------
+- MA list: color bar rental vs spare machine kind
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-30_163613 | Patch | 2026-10-30 16:36:14
+From: 2026-10-29_171727  ->  To: be39da7  |  Files: 4
+----------------------------------------------------------------
+- Fix status_th_chip for MA list; verify pass
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/dashboard_chart.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-30_163958 | Patch | 2026-10-30 16:39:58
+From: 2026-10-29_171727  ->  To: be39da7  |  Files: 3
+----------------------------------------------------------------
+- MA list: remove row bar; show rental+spare chips
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-30_164323 | Patch | 2026-10-30 16:43:23
+From: 2026-10-29_171727  ->  To: be39da7  |  Files: 3
+----------------------------------------------------------------
+- MA table: remove kind legend; item chips in ok/replace/repair cols
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-30_164713 | Patch | 2026-10-30 16:47:14
+From: 2026-10-29_171727  ->  To: be39da7  |  Files: 3
+----------------------------------------------------------------
+- MA list filter: machine kind rental/spare (mkind)
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/list_search.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-30_165116 | Patch | 2026-10-30 16:51:16
+From: 2026-10-29_171727  ->  To: be39da7  |  Files: 4
+----------------------------------------------------------------
+- MA list: move search filters into table header row
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-30_165638 | Patch | 2026-10-30 16:56:39
+From: 2026-10-29_171727  ->  To: be39da7  |  Files: 1
+----------------------------------------------------------------
+- finishgoogs_ma_update/includes/layout.php
+
+Files:
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-30_172449 | Patch | 2026-10-30 17:24:49
+From: 2026-10-29_171727  ->  To: be39da7  |  Files: 1
+----------------------------------------------------------------
+- finishgoogs_ma_update/assets/theme-v2.css
+
+Files:
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-30_173246 | Patch | 2026-10-30 17:32:46
+From: 2026-10-29_171727  ->  To: be39da7  |  Files: 1
+----------------------------------------------------------------
+- finishgoogs_ma_update/assets/theme-v2.css
+
+Files:
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-30_173438 | Patch | 2026-10-30 17:34:41
+From: 2026-10-29_171727  ->  To: be39da7  |  Files: 6
+----------------------------------------------------------------
+- One-shot from server v2026-10-29_171727
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/dashboard_chart.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/list_search.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-30_173458 | Patch | 2026-10-30 17:35:01
+From: 2026-10-29_171727  ->  To: be39da7  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/dashboard_chart.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/list_search.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-30_174524 | Patch | 2026-10-30 17:45:24
+From: 2026-10-30_173458  ->  To: be39da7  |  Files: 1
+----------------------------------------------------------------
+- finishgoogs_ma_update/assets/theme-v2.css
+
+Files:
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-30_174538 | Patch | 2026-10-30 17:45:40
+From: 2026-10-30_173458  ->  To: be39da7  |  Files: 3
+----------------------------------------------------------------
+- COMBO-A MA filter layout
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-30_174637 | Patch | 2026-10-30 17:46:40
+From: 2026-10-30_173458  ->  To: be39da7  |  Files: 3
+----------------------------------------------------------------
+- One-shot from server v2026-10-30_173458 (COMBO-A filter layout)
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/ma.php
+
+
+================================================================
+v2026-10-31_094702 | Patch | 2026-10-31 09:47:03
+From: 2026-10-30_174637  ->  To: be39da7  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-order.php
+  shared/ui_icons.php
+
+
+================================================================
+v2026-10-31_094715 | Patch | 2026-10-31 09:47:16
+From: 2026-10-30_174637  ->  To: be39da7  |  Files: 1
+----------------------------------------------------------------
+
+Files:
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_094722 | Patch | 2026-10-31 09:47:23
+From: 2026-10-30_174637  ->  To: be39da7  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-order.php
+  shared/ui_icons.php
+
+
+================================================================
+v2026-10-31_100546 | Patch | 2026-10-31 10:05:47
+From: 2026-10-30_174637  ->  To: be39da7  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  parts/assets/style.css
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-order.php
+  shared/ui_icons.php
+
+
+================================================================
+v2026-10-31_100608 | Patch | 2026-10-31 10:06:09
+From: 2026-10-30_174637  ->  To: be39da7  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_100623 | Patch | 2026-10-31 10:06:24
+From: 2026-10-30_174637  ->  To: be39da7  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/assets/style.css
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-order.php
+  shared/ui_icons.php
+
+
+================================================================
+v2026-10-31_101000 | Patch | 2026-10-31 10:10:01
+From: 2026-10-30_174637  ->  To: be39da7  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_101408 | Patch | 2026-10-31 10:14:09
+From: 2026-10-30_174637  ->  To: be39da7  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_103726 | Patch | 2026-10-31 10:37:26
+From: 2026-10-30_174637  ->  To: be39da7  |  Files: 1
+----------------------------------------------------------------
+- parts/pages/key-parts-order.php
+
+Files:
+  parts/includes/key_parts_order.php
+
+
+================================================================
+v2026-10-31_103736 | Patch | 2026-10-31 10:37:37
+From: 2026-10-30_174637  ->  To: be39da7  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-order.php
+  shared/ui_icons.php
+
+
+================================================================
+v2026-10-31_104546 | Patch | 2026-10-31 10:45:47
+From: 2026-10-30_174637  ->  To: be39da7  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_110702 | Patch | 2026-10-31 11:07:03
+From: 2026-10-30_174637  ->  To: be39da7  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+  shared/ui_icons.php
+
+
+================================================================
+v2026-10-31_113542 | Patch | 2026-10-31 11:35:45
+From: 2026-10-30_174637  ->  To: be39da7  |  Files: 8
+----------------------------------------------------------------
+- KPO: ย้ายจัดการรูปไปหลังบ้าน ซ่อนเมนู/ปุ่ม parts
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/style.css
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+  shared/ui_icons.php
+
+
+================================================================
+v2026-10-31_114512 | Patch | 2026-10-31 11:45:15
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 3
+----------------------------------------------------------------
+- KPO drill-down กรองตามชิป filter
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_123912 | Patch | 2026-10-31 12:39:15
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 3
+----------------------------------------------------------------
+- KPO การ์ด: ป้ายสต็อกแทน part_status_purchase เมื่อต่ำกว่าขั้นต่ำ
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_124331 | Patch | 2026-10-31 12:43:34
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 5
+----------------------------------------------------------------
+- KPO: ตั้งรายการอะไหล่เพิ่ม-ลดจากหลังบ้าน
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_125719 | Patch | 2026-10-31 12:57:21
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 8
+----------------------------------------------------------------
+- KPO: จัดการรายการ+ค้น inventory บนหน้า parts
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_130025 | Patch | 2026-10-31 13:00:28
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 8
+----------------------------------------------------------------
+- KPO: ปุ่มลบรายการบนการ์ด
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_130131 | Patch | 2026-10-31 13:01:33
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 8
+----------------------------------------------------------------
+- KPO modal: ธีมกรอบ/ช่องกรอกตาม token ระบบ
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_131419 | Patch | 2026-10-31 13:14:22
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 8
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_143612 | Patch | 2026-10-31 14:36:14
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 8
+----------------------------------------------------------------
+- KPO UX-T2 production: table-only, no cards
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_144241 | Patch | 2026-10-31 14:42:44
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 8
+----------------------------------------------------------------
+- KPO catalog: collapse search pick after add
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_144625 | Patch | 2026-10-31 14:46:28
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 8
+----------------------------------------------------------------
+- KPO catalog: fix pick dismiss after add (flex + search race)
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_144841 | Patch | 2026-10-31 14:48:45
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 8
+----------------------------------------------------------------
+- KPO catalog: collapse search results after pick add
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_145334 | Patch | 2026-10-31 14:53:37
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 8
+----------------------------------------------------------------
+- KPO drill: purpose column colored chips
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_145606 | Patch | 2026-10-31 14:56:09
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 8
+----------------------------------------------------------------
+- KPO drill: unify chip pill radius in table
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_145727 | Patch | 2026-10-31 14:57:31
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 8
+----------------------------------------------------------------
+- KPO drill: flow column same purpose chip pills
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_150639 | Patch | 2026-10-31 15:06:43
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 8
+----------------------------------------------------------------
+- Admin: remove unused KPO card images menu link
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_162021 | Patch | 2026-10-31 16:20:25
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 9
+----------------------------------------------------------------
+- KPO drill: click row for inventory pickup confirm popup
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_162853 | Patch | 2026-10-31 16:28:57
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 10
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_163006 | Patch | 2026-10-31 16:30:10
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 10
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_163826 | Patch | 2026-10-31 16:38:30
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 10
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_164729 | Patch | 2026-10-31 16:47:33
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 11
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_165130 | Patch | 2026-10-31 16:51:34
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 12
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-10-31_165753 | Patch | 2026-10-31 16:57:57
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 12
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-11-02_083811 | Patch | 2026-11-02 08:38:15
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 14
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-11-02_084453 | Patch | 2026-11-02 08:44:58
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 14
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+
+
+================================================================
+v2026-11-02_092102 | Patch | 2026-11-02 09:21:07
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 18
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_filter.php
+
+
+================================================================
+v2026-11-02_092331 | Patch | 2026-11-02 09:23:38
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 18
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_filter.php
+
+
+================================================================
+v2026-11-02_092820 | Patch | 2026-11-02 09:28:25
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 18
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_filter.php
+
+
+================================================================
+v2026-11-02_094132 | Patch | 2026-11-02 09:41:37
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 19
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_filter.php
+  shared/finishgood_shortage_registry.php
+
+
+================================================================
+v2026-11-02_095058 | Patch | 2026-11-02 09:51:03
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 19
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_filter.php
+  shared/finishgood_shortage_registry.php
+
+
+================================================================
+v2026-11-02_095115 | Patch | 2026-11-02 09:51:20
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 19
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_filter.php
+  shared/finishgood_shortage_registry.php
+
+
+================================================================
+v2026-11-02_095621 | Patch | 2026-11-02 09:56:27
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 20
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_filter.php
+  shared/finishgood_shortage_registry.php
+
+
+================================================================
+v2026-11-02_095731 | Patch | 2026-11-02 09:57:36
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 20
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_filter.php
+  shared/finishgood_shortage_registry.php
+
+
+================================================================
+v2026-11-02_124127 | Patch | 2026-11-02 12:41:33
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 20
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_filter.php
+  shared/finishgood_shortage_registry.php
+
+
+================================================================
+v2026-11-02_124540 | Patch | 2026-11-02 12:45:45
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 20
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_filter.php
+  shared/finishgood_shortage_registry.php
+
+
+================================================================
+v2026-11-02_124948 | Patch | 2026-11-02 12:49:53
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 22
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/helpers.php
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/includes/StockService.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_filter.php
+  shared/finishgood_shortage_registry.php
+
+
+================================================================
+v2026-11-02_125720 | Patch | 2026-11-02 12:57:25
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 23
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/config/database.php
+  parts/includes/helpers.php
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/includes/StockService.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_filter.php
+  shared/finishgood_shortage_registry.php
+
+
+================================================================
+v2026-11-02_162338 | Patch | 2026-11-02 16:23:45
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 25
+----------------------------------------------------------------
+- History: popup รายละเอียดอะไหล่ใบเบิก Set + ซ่อนรหัส Set ในตาราง; รวมงานหลัง online v124540
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/app.js
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/config/database.php
+  parts/includes/helpers.php
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/includes/StockService.php
+  parts/pages/history.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_filter.php
+  shared/finishgood_shortage_registry.php
+
+
+================================================================
+v2026-11-02_164114 | Patch | 2026-11-02 16:41:20
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 23
+----------------------------------------------------------------
+- History popup ใบเบิก Set/S/N แบบ D2 (สองคอลัมน์ แผงชมพู + รายการ scroll)
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/app.js
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/helpers.php
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/history.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_filter.php
+  shared/finishgood_shortage_registry.php
+
+
+================================================================
+v2026-11-02_164610 | Patch | 2026-11-02 16:46:17
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 23
+----------------------------------------------------------------
+- Popup ใบเบิก D2: ความสูงตามจำนวนอะไหล่ ไม่ scroll ในรายการ (scroll ทั้ง modal เมื่อเกินจอ)
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/app.js
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/includes/helpers.php
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/history.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_filter.php
+  shared/finishgood_shortage_registry.php
+
+
+================================================================
+v2026-11-02_165548 | Patch | 2026-11-02 16:55:52
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 24
+----------------------------------------------------------------
+- product-detail: ตารางประวัติรับเข้า/เบิกเต็มความกว้างการ์ด (ยก max-width part-hist-wrap)
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/app.js
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/assets/theme-v2.css
+  parts/includes/helpers.php
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/history.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_filter.php
+  shared/finishgood_shortage_registry.php
+
+
+================================================================
+v2026-11-02_173541 | Patch | 2026-11-02 17:35:47
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 25
+----------------------------------------------------------------
+- product-detail: จัดแนวคอลัมน์ตารางประวัติรับเข้า/เบิกให้สม่ำเสมอ
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/app.js
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/assets/theme-v2.css
+  parts/includes/helpers.php
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/history.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+  parts/pages/product-detail.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_filter.php
+  shared/finishgood_shortage_registry.php
+
+
+================================================================
+v2026-11-10_202057 | Patch | 2026-11-10 20:21:13
+From: 2026-10-31_113542  ->  To: be39da7  |  Files: 28
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/style.css
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/inv_pickup.php
+  finishgoogs_ma_update/includes/rent_ma_bridge.php
+  finishgoogs_ma_update/index.php
+  finishgoogs_ma_update/inv_pickups.php
+  finishgoogs_ma_update/key_parts_order_config.php
+  finishgoogs_ma_update/ma.php
+  finishgoogs_ma_update/settings.php
+  parts/assets/app.js
+  parts/assets/kpo-catalog.js
+  parts/assets/kpo-drill.js
+  parts/assets/style.css
+  parts/assets/theme-v2.css
+  parts/includes/helpers.php
+  parts/includes/inventory_db.php
+  parts/includes/key_parts_order.php
+  parts/includes/maintenance_db.php
+  parts/pages/history.php
+  parts/pages/key-parts-catalog-api.php
+  parts/pages/key-parts-images.php
+  parts/pages/key-parts-order.php
+  parts/pages/product-detail.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_filter.php
+  shared/finishgood_shortage_registry.php
+
+
+================================================================
+v2026-11-10_204147 | Patch | 2026-11-10 20:41:50
+From: 2026-11-10_202057  ->  To: be39da7  |  Files: 7
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+  finishgoogs_ma_update/index.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_filter.php
+
+
+================================================================
+v2026-11-10_205255 | Patch | 2026-11-10 20:53:01
+From: 2026-11-10_202057  ->  To: be39da7  |  Files: 7
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+  finishgoogs_ma_update/index.php
+  shared/finishgood_shortage_dashboard.php
+  shared/finishgood_shortage_filter.php
+
+
+================================================================
+v2026-11-11_145342 | Patch | 2026-11-11 14:53:48
+From: 2026-11-10_205255  ->  To: be39da7  |  Files: 4
+----------------------------------------------------------------
+- การ์ดเบิกขาย: ลูกค้า/ไซต์/S/N ลิงก์/อ้างอิงระบบขาย
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/setup_sale_history.php
+  finishgoogs_ma_update/includes/stockparts_withdraw.php
+

@@ -149,7 +149,8 @@ function site_assets_top(int $perSource = 8): array
 /**
  * เครื่องทั้งหมดที่ไซต์งานหนึ่ง (ชื่อตรงเป๊ะ ในแหล่งเดียว)
  *
- * @return array<int,array<string,mixed>> sn · model · note · date
+ * @return array<int,array<string,mixed>> sn · model · note · date · active
+ *         active: true = ใช้งานอยู่, false = จบงานแล้ว, null = แหล่งนี้ไม่มีข้อมูลสถานะ (ทะเบียนเก่า/ใบสั่งงาน)
  */
 function site_assets_at(string $src, string $site, int $limit = 300): array
 {
@@ -185,6 +186,7 @@ function site_assets_at(string $src, string $site, int $limit = 300): array
                 'sn' => $sn,
                 'model' => trim((string) $x['p_product']),
                 'note' => trim((string) $x['cus_name']),
+                'active' => trim((string) $x['p_status']) === 'active',
                 'tag' => trim((string) $x['p_status']) === 'active' ? 'สัญญายังเดินอยู่' : 'สัญญาจบแล้ว',
                 'date' => substr(trim((string) $x['p_date_received']), 0, 10),
             ];
@@ -210,6 +212,7 @@ function site_assets_at(string $src, string $site, int $limit = 300): array
             $rows[] = [
                 'sn' => trim((string) $x['serial_number']),
                 'model' => trim((string) $x['model']),
+                'active' => null, // ทะเบียนเดิมไม่มีข้อมูลวันจบงาน
                 'note' => $guard !== '' ? 'รปภ. ' . $guard : '',
                 'tag' => $by !== '' ? 'บันทึกโดย ' . $by : '',
                 'date' => substr(trim((string) $x['timestamp']), 0, 10),
@@ -242,6 +245,7 @@ function site_assets_at(string $src, string $site, int $limit = 300): array
             $po = trim((string) $x['po_number']);
             $rows[] = [
                 'sn' => $sn,
+                'active' => null, // ใบสั่งงานไม่มีข้อมูลวันจบงาน
                 'model' => trim((string) $x['product']),
                 'note' => trim(implode(' · ', array_filter([$ref, $po !== '' ? 'PO ' . $po : '']))),
                 'tag' => trim((string) $x['sale_type']) !== '' ? trim((string) $x['sale_type'])
@@ -371,8 +375,14 @@ function site_assets_inline_html(string $sn, int $preview = 5): string
         $all = site_assets_at($st['src'], $st['site'], 200);
         // ตัดตัวเองออก เหลือเฉพาะ "เครื่องอื่น" ที่ไซต์เดียวกัน
         $others = [];
+        $allOthers = 0;
         foreach ($all as $r) {
-            if (strtoupper((string) $r['sn']) !== strtoupper($sn)) {
+            if (strtoupper((string) $r['sn']) === strtoupper($sn)) {
+                continue;
+            }
+            $allOthers++;
+            // แสดงเฉพาะเครื่องที่ใช้งานอยู่ปัจจุบัน — ที่จบงานแล้วดูได้ในหน้าไซต์งาน
+            if ($r['active'] === true) {
                 $others[] = $r;
             }
         }
@@ -386,7 +396,7 @@ function site_assets_inline_html(string $sn, int $preview = 5): string
         $blocks .= '<div class="asset-site-block-head">'
             . '<span class="asset-site-src">' . h(site_assets_source_label($st['src'])) . '</span> '
             . '<b>' . h($st['site']) . '</b> '
-            . '<span class="muted">· อีก ' . number_format(count($others)) . ' เครื่อง</span></div>';
+            . '<span class="muted">· ใช้งานอยู่อีก ' . number_format(count($others)) . ' เครื่อง</span></div>';
         $blocks .= '<table class="asset-sales-lines"><tbody>';
         foreach ($shown as $r) {
             $blocks .= '<tr><td>' . ($r['asset_id'] > 0
@@ -400,9 +410,9 @@ function site_assets_inline_html(string $sn, int $preview = 5): string
                     : '<span class="muted">ไม่มีในทะเบียนเรา</span>') . '</td></tr>';
         }
         $blocks .= '</tbody></table>';
-        if (count($others) > $preview) {
+        if ($allOthers > count($shown)) {
             $blocks .= '<a class="asset-site-more" href="' . h($url) . '">ดูทั้งหมด '
-                . number_format(count($others)) . ' เครื่อง ›</a>';
+                . number_format($allOthers) . ' เครื่อง (รวมที่จบงานแล้ว) ›</a>';
         } else {
             $blocks .= '<a class="asset-site-more" href="' . h($url) . '">เปิดหน้าไซต์งานนี้ ›</a>';
         }

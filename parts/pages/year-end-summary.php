@@ -28,7 +28,7 @@ function year_end_has_price($price): bool
  * คำนวณสรุปจากแถวสินค้า
  *
  * @param array<int,array<string,mixed>> $rows
- * @return array{total_items:int,total_qty:int,total_value:float,missing_price:int,valued_items:int}
+ * @return array{total_items:int,total_qty:float,total_value:float,missing_price:int,valued_items:int}
  */
 function year_end_compute_summary(array $rows): array
 {
@@ -40,8 +40,8 @@ function year_end_compute_summary(array $rows): array
         'valued_items'   => 0,
     ];
     foreach ($rows as $row) {
-        $qty = (int) ($row['quantity'] ?? 0);
-        $summary['total_qty'] += $qty;
+        $qty = qty_norm($row['quantity'] ?? 0);
+        $summary['total_qty'] = qty_norm($summary['total_qty'] + $qty);
         if (!year_end_has_price($row['price'] ?? null)) {
             $summary['missing_price']++;
             continue;
@@ -67,14 +67,14 @@ function year_end_export_csv(array $rows, array $summary): void
     $out = fopen('php://output', 'w');
     fputcsv($out, ['รหัส', 'ชื่ออะไหล่', 'จำนวนคงเหลือ', 'หน่วย', 'ราคาต่อหน่วย', 'มูลค่ารวม', 'หมายเหตุ']);
     foreach ($rows as $row) {
-        $qty = (int) $row['quantity'];
+        $qty = qty_norm($row['quantity']);
         $hasPrice = year_end_has_price($row['price'] ?? null);
         $price = $hasPrice ? (float) $row['price'] : null;
         $lineValue = $hasPrice ? $qty * $price : null;
         fputcsv($out, [
             $row['code'],
             parts_display_name($row),
-            $qty,
+            qty_input_value($qty),
             $row['unit'],
             $hasPrice ? number_format($price, 2, '.', '') : '',
             $lineValue !== null ? number_format($lineValue, 2, '.', '') : '',
@@ -82,7 +82,7 @@ function year_end_export_csv(array $rows, array $summary): void
         ]);
     }
     fputcsv($out, []);
-    fputcsv($out, ['สรุป', '', $summary['total_qty'], '', '', number_format($summary['total_value'], 2, '.', ''), '']);
+    fputcsv($out, ['สรุป', '', qty_input_value($summary['total_qty']), '', '', number_format($summary['total_value'], 2, '.', ''), '']);
     fputcsv($out, ['รายการในคลัง', $summary['total_items'], '', '', '', '', '']);
     fputcsv($out, ['ยังไม่มีราคา', $summary['missing_price'], '', '', '', '', '']);
     fclose($out);
@@ -191,7 +191,7 @@ require_once __DIR__ . '/../includes/header.php';
             </thead>
             <tbody>
                 <?php foreach ($rows as $row):
-                    $qty = (int) $row['quantity'];
+                    $qty = qty_norm($row['quantity']);
                     $hasPrice = year_end_has_price($row['price'] ?? null);
                     $priceVal = $hasPrice ? (float) $row['price'] : null;
                     $lineTotal = $hasPrice ? $qty * $priceVal : null;
@@ -199,7 +199,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <tr class="<?= $hasPrice ? '' : 'row-missing-price' ?>">
                     <td><?= e($row['code']) ?></td>
                     <td>
-                        <a href="<?= url('/pages/product-detail.php?id=' . (int) $row['id']) ?>"><?= e(parts_display_name($row)) ?></a>
+                        <a href="<?= url('/pages/product-detail.php?id=' . (int) $row['id']) ?>" target="_blank" rel="noopener noreferrer" title="เปิดโปรไฟล์อะไหล่ในแท็บใหม่"><?= e(parts_display_name($row)) ?></a>
                     </td>
                     <td class="text-right"><?= formatNumber($qty) ?> <?= e($row['unit']) ?></td>
                     <td class="text-right" style="min-width:120px">

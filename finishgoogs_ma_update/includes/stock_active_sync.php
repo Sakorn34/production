@@ -2,10 +2,11 @@
 /**
  * includes/stock_active_sync.php — ตั้งค่า active ในทะเบียนสินค้า (stock) ตามสถานะเครื่องในระบบผลิต
  *
- * กติกา (ตกลง 26 ก.ย. 2569):
+ * กติกา (ตกลง 26 ก.ย. 2569 + Setup ID 15 ต.ค. 2569):
  *   สถานะ "เครื่องใหม่" (new)                          → active = 1  นับเป็นสต๊อก
  *   เบิกใช้งานแล้ว: ขาย · เช่า · สำรอง · เสื่อมสภาพ ·
  *   สูญหาย · ไม่มีสถานะ · ไม่พบ serial ในระบบผลิต       → active = 0  ไม่นับ
+ *   มี Setup ID แล้ว (ส่งมอบ/ติดตั้งแล้ว)               → active = 0  ไม่นับ แม้สถานะยังเป็นเครื่องใหม่
  *
  * ตาราง stock เป็นของทีมสต๊อกอะไหล่ — ห้าม ALTER เพิ่มฟิลด์ เขียนได้เฉพาะค่าในคอลัมน์เดิม
  */
@@ -19,6 +20,104 @@
 function stock_active_wanted($status): int
 {
     return trim((string) $status) === 'new' ? 1 : 0;
+}
+
+/**
+ * มี Setup ID แล้วหรือยัง — ค่าว่าง / 0 / NULL ไม่นับ
+ *
+ * Setup ID แปลว่าส่งมอบหรือติดตั้งแล้ว จึงไม่นับเป็นสต๊อก แม้สถานะเครื่องยังเป็นใหม่
+ *
+ * @param mixed $setupId
+ * @return bool
+ */
+function stock_setup_id_is_set($setupId): bool
+{
+    $s = trim((string) $setupId);
+    return $s !== '' && $s !== '0';
+}
+
+/**
+ * เงื่อนไข SQL: มี Setup ID แต่ยัง Active 1
+ *
+ * ไม่รับอินพุตผู้ใช้ ใช้ประกอบ query ในโมดูลนี้เท่านั้น
+ *
+ * @return string
+ */
+function stock_active_setup_mismatch_sql(): string
+{
+    return "active = 1 AND setup_id IS NOT NULL AND CAST(setup_id AS CHAR) NOT IN ('', '0')";
+}
+
+/**
+ * จำนวนแถวที่มี Setup ID แต่ยังนับเป็นสต๊อก
+ *
+ * @return int
+ */
+function stock_active_from_setup_count(): int
+{
+    $r = dbStock()->query('SELECT COUNT(*) c FROM stock WHERE ' . stock_active_setup_mismatch_sql());
+    return $r ? (int) $r->fetch_assoc()['c'] : 0;
+}
+
+/**
+ * ตั้ง Active = 0 ให้ทุกรายการที่มี Setup ID แล้วยังเป็น 1
+ *
+ * @return array{pending:int,changed:int}
+ */
+function stock_active_from_setup_apply(): array
+{
+    $stock = dbStock();
+    $pending = stock_active_from_setup_count();
+    $changed = 0;
+    if ($pending > 0) {
+        $ok = $stock->query('UPDATE stock SET active = 0 WHERE ' . stock_active_setup_mismatch_sql());
+        if ($ok) {
+            $changed = (int) $stock->affected_rows;
+        }
+    }
+    return ['pending' => $pending, 'changed' => $changed];
+}
+
+/**
+ * serial ในชุดที่ระบุซึ่งมี Setup ID แล้ว
+ *
+ * @param array<int,string> $serials
+ * @return array<string,true>
+ */
+function stock_serials_with_setup_id(array $serials): array
+{
+    $found = [];
+    $list = [];
+    foreach ($serials as $c) {
+        $c = trim((string) $c);
+        if ($c !== '') {
+            $list[$c] = true;
+        }
+    }
+    if (!$list) {
+        return $found;
+    }
+    $stock = dbStock();
+    foreach (array_chunk(array_keys($list), 500) as $chunk) {
+        $ph = implode(',', array_fill(0, count($chunk), '?'));
+        $st = $stock->prepare(
+            "SELECT serial_number FROM stock
+             WHERE serial_number IN ($ph)
+               AND setup_id IS NOT NULL
+               AND CAST(setup_id AS CHAR) NOT IN ('', '0')"
+        );
+        if (!$st) {
+            continue;
+        }
+        $st->bind_param(str_repeat('s', count($chunk)), ...$chunk);
+        $st->execute();
+        $res = $st->get_result();
+        while ($r = $res->fetch_assoc()) {
+            $found[trim((string) $r['serial_number'])] = true;
+        }
+        $st->close();
+    }
+    return $found;
 }
 
 /**
@@ -41,7 +140,7 @@ function stock_active_diff(): array
 
     $out = ['total' => 0, 'ok' => 0, 'to1' => 0, 'to0' => 0, 'no_asset' => 0,
             'diff' => 0, 'a1_now' => 0, 'a1_after' => 0, 'new_assets' => $newAssets];
-    $res = dbStock()->query('SELECT serial_number, active FROM stock');
+    $res = dbStock()->query('SELECT serial_number, active, setup_id FROM stock');
     while ($r = $res->fetch_assoc()) {
         $out['total']++;
         $cur = (int) $r['active'];
@@ -54,6 +153,9 @@ function stock_active_diff(): array
             $out['no_asset']++;
         }
         $w = $has ? $want[$sn] : 0;
+        if (stock_setup_id_is_set($r['setup_id'] ?? null)) {
+            $w = 0;
+        }
         if ($w === 1) {
             $out['a1_after']++;
         }
@@ -87,10 +189,13 @@ function stock_active_apply(): array
     $stock = dbStock();
     $to1 = [];
     $to0 = [];
-    $res = $stock->query('SELECT serial_number, active FROM stock');
+    $res = $stock->query('SELECT serial_number, active, setup_id FROM stock');
     while ($r = $res->fetch_assoc()) {
         $sn = trim((string) $r['serial_number']);
         $want = isset($newCodes[$sn]) ? 1 : 0;
+        if (stock_setup_id_is_set($r['setup_id'] ?? null)) {
+            $want = 0;
+        }
         if ($want === (int) $r['active']) {
             continue;
         }
@@ -263,6 +368,19 @@ function stock_active_sync_codes(array $assetCodes): int
             if (!isset($seen[$c])) {
                 $to0[] = $c;
             }
+        }
+        // มี Setup ID แล้วไม่นับเป็นสต๊อก แม้สถานะยังเป็นเครื่องใหม่
+        $blocked = stock_serials_with_setup_id($to1);
+        if ($blocked) {
+            $keep = [];
+            foreach ($to1 as $c) {
+                if (isset($blocked[trim((string) $c)])) {
+                    $to0[] = $c;
+                } else {
+                    $keep[] = $c;
+                }
+            }
+            $to1 = $keep;
         }
         return stock_active_write_batch($to1, 1) + stock_active_write_batch($to0, 0);
     } catch (Throwable $e) {

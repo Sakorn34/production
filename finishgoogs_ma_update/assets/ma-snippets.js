@@ -16,11 +16,29 @@
     return digits.slice(0, 2) + ':' + digits.slice(2, 4) + ':' + digits.slice(4, 6) + ':' + digits.slice(6, 8);
   }
 
-  function buildRentalSummaryFromData(rep, fix, fw, remark) {
+  function isRetireRentalAction(action, remark) {
+    action = normItem(action);
+    remark = normItem(remark);
+    if (action === 'retire' || action === 'เสื่อมสภาพ') return true;
+    if (action === 'close_fg' || action === 'ซ่อมแล้ว' || action === 'keep' || action === 'ไม่ปิดคิว') return false;
+    return remark.indexOf('เสื่อมสภาพ') === 0;
+  }
+
+  function buildRetireRemark(remark) {
+    remark = normItem(remark).replace(/\s+/g, ' ');
+    if (!remark) return 'เสื่อมสภาพ';
+    if (remark.indexOf('เสื่อมสภาพ') === -1) return 'เสื่อมสภาพ · ' + remark;
+    return remark;
+  }
+
+  function buildRentalSummaryFromData(rep, fix, fw, remark, action) {
+    remark = normItem(remark);
+    if (isRetireRentalAction(action, remark)) {
+      return buildRetireRemark(remark);
+    }
     rep = normItem(rep);
     fix = normItem(fix);
     fw = normItem(fw);
-    remark = normItem(remark);
     var parts = ['ใช้งานได้ปกติ เช็ดทำความสะอาด'];
     if (rep) parts.push('เปลี่ยน: ' + rep);
     if (fix) parts.push('แก้ไข: ' + fix);
@@ -44,7 +62,13 @@
       macAddrEl.value = code ? assetCodeToMac(code) : '(กรอกหมายเลขสินค้าก่อน)';
     }
     if (rentalEl) {
-      rentalEl.value = buildRentalSummaryFromData(data.replace, data.repair, data.fw, data.remark);
+      rentalEl.value = buildRentalSummaryFromData(
+        data.replace,
+        data.repair,
+        data.fw,
+        data.remark,
+        data.action || data.rentClose
+      );
     }
   };
 

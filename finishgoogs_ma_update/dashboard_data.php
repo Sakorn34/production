@@ -52,6 +52,71 @@ function year_range($y) {
     return [sprintf('%04d-01-01', (int)$y), sprintf('%04d-01-01', (int)$y + 1)];
 }
 
+/** ช่วง visited_at ของ MA รายปี */
+function ma_year_visit_range($y) {
+    return [sprintf('%04d-01-01 00:00:00', (int) $y), sprintf('%04d-01-01 00:00:00', (int) $y + 1)];
+}
+
+/** ช่วง visited_at ของ MA รายเดือน */
+function ma_month_visit_range($ym) {
+    [$start, $end] = ym_range($ym);
+    return [$start . ' 00:00:00', $end . ' 00:00:00'];
+}
+
+/**
+ * แสดงชื่อผลการตรวจ MA ในตาราง modal
+ *
+ * @param string|null $result
+ * @return string
+ */
+function ma_result_list_label($result, $remark = null) {
+    if ($remark !== null && ma_remark_indicates_retire($remark)) {
+        return ma_result_th('retire');
+    }
+    $r = trim((string) $result);
+    if ($r === '' || $r === 'ok') {
+        return 'ปกติ';
+    }
+    return ma_result_valid($r) ? ma_result_th($r) : $r;
+}
+
+/**
+ * ตารางรายการ MA สำหรับ modal — กดแถวเปิดรายละเอียด
+ *
+ * @param mysqli_result|bool $res
+ * @param int $limit
+ * @return void
+ */
+function ma_records_table($res, $limit = 150) {
+    if (!$res) {
+        echo '<p class="muted">ไม่มีข้อมูล</p>';
+        return;
+    }
+    echo '<div class="table-wrap"><table class="list"><tr><th>วันเวลา</th><th>เครื่อง</th><th>รุ่น</th><th>ผลการตรวจ</th><th>โดย</th></tr>';
+    $n = 0;
+    while ($r = $res->fetch_assoc()) {
+        $n++;
+        $title = 'MA ' . dthai_full($r['visited_at']);
+        $url = BASE_URL . '/ma.php?ajax=ma_detail&id=' . (int) $r['id'];
+        echo '<tr class="clickable" style="cursor:pointer" onclick="' . drill_onclick($title, $url) . '">'
+           . '<td>' . h(dthai_full($r['visited_at'])) . '</td>'
+           . '<td><a href="' . BASE_URL . '/asset.php?id=' . (int) $r['asset_id'] . '" onclick="event.stopPropagation()"><b>'
+           . h($r['asset_code']) . '</b></a></td>'
+           . '<td>' . h($r['pname']) . '</td>'
+           . '<td>' . h(ma_result_list_label($r['result'] ?? '', $r['remark'] ?? null)) . '</td>'
+           . '<td>' . h($r['done_by'] ?: '-') . '</td></tr>';
+    }
+    echo '</table></div>';
+    if ($n === 0) {
+        echo '<p class="muted">ไม่มีข้อมูล</p>';
+    } else {
+        echo '<p class="muted" style="margin-top:6px;font-size:12px">กดแถวเพื่อดูรายละเอียด MA · กดรหัสเครื่องเพื่อเปิดหน้าเต็ม</p>';
+        if ($n >= $limit) {
+            echo '<p class="muted" style="font-size:12px">แสดง ' . number_format($limit) . ' รายการล่าสุด</p>';
+        }
+    }
+}
+
 /** ตรวจสถานะเครื่องที่ใช้ drill-down จาก KPI */
 function asset_status_valid($st) {
     return $st === 'all' || in_array($st, status_list(), true);
@@ -144,13 +209,13 @@ function render_stock_today_table(array $rows, $partsBase) {
     $outQty = 0;
     foreach ($rows as $mv) {
         if ($mv['move_type'] === 'in') {
-            $inQty += (int) $mv['quantity'];
+            $inQty += qty_norm($mv['quantity']);
         } else {
-            $outQty += (int) $mv['quantity'];
+            $outQty += qty_norm($mv['quantity']);
         }
     }
     echo '<p class="muted" style="font-size:12px;margin:0 0 10px">วันนี้ ' . dthai(date('Y-m-d'))
-       . ' · รับเข้า ' . number_format($inQty) . ' · เบิกออก ' . number_format($outQty)
+       . ' · รับเข้า ' . qty_fmt($inQty) . ' · เบิกออก ' . qty_fmt($outQty)
        . ' · ' . count($rows) . ' รายการ</p>';
     echo '<table class="list part-move-table"><tr>'
        . '<th>เวลา</th><th>ประเภท</th><th>อะไหล่</th><th>จำนวน</th><th>รายละเอียด</th><th>ผู้ทำรายการ</th></tr>';
@@ -182,11 +247,14 @@ function render_stock_today_table(array $rows, $partsBase) {
            . '<td>' . ($isIn
                ? '<span class="part-move-badge part-move-badge-in">รับเข้า</span>'
                : '<span class="part-move-badge part-move-badge-out">เบิกออก</span>') . '</td>'
-           . '<td><span class="muted" style="font-size:11px">' . h($mv['code']) . '</span><br>' . h($mv['name']) . '</td>'
+           . '<td><span class="muted" style="font-size:11px">' . h($mv['code']) . '</span><br>'
+           . part_list_name_link((string) ($mv['name'] ?? ''), (int) ($mv['product_id'] ?? 0)) . '</td>'
            . '<td class="' . ($isIn ? 'part-move-in' : 'part-move-out') . '">'
-           . ($isIn ? '+' : '-') . number_format((int) $mv['quantity']) . ' ' . h($unit) . '</td>'
+           . ($isIn ? '+' : '-') . qty_fmt($mv['quantity']) . ' ' . h($unit) . '</td>'
            . '<td style="font-size:12px">' . $detail . '</td>'
-           . '<td>' . h($mv['actor'] ?: '-') . '</td>'
+           . '<td>' . h(function_exists('production_person_display_name')
+               ? (production_person_display_name((string) ($mv['actor'] ?? '')) ?: '-')
+               : ($mv['actor'] ?: '-')) . '</td>'
            . '</tr>';
     }
     echo '</table>';
@@ -465,6 +533,7 @@ switch ($type) {
             exit('รหัสอะไหล่ไม่ถูกต้อง');
         }
         require_once __DIR__ . '/includes/part_stock_bridge.php';
+        require_once dirname(__DIR__) . '/parts/includes/production_sync.php';
         require_once dirname(__DIR__) . '/parts/includes/StockService.php';
         try {
             $partsPdo = dbParts();
@@ -499,23 +568,23 @@ switch ($type) {
 
         $moves = $stockSvc->getProductMovementHistory($pid, 80);
         $partsBase = ui_parts_base_url();
-        $qty = (int) $part['quantity'];
-        $minStock = (int) $part['min_stock'];
+        $qty = qty_norm($part['quantity']);
+        $minStock = qty_norm($part['min_stock']);
         $unit = $part['unit'] ?: 'ชิ้น';
         $low = $qty <= $minStock;
         $totalIn = 0;
         $totalOut = 0;
         foreach ($moves as $mv) {
             if ($mv['move_type'] === 'in') {
-                $totalIn += (int) $mv['quantity'];
+                $totalIn += qty_norm($mv['quantity']);
             } else {
-                $totalOut += (int) $mv['quantity'];
+                $totalOut += qty_norm($mv['quantity']);
             }
         }
 
         echo '<div class="part-profile-head">';
         if ($iconPath) {
-            echo img_tag($iconPath, $displayName, 'thumb');
+            echo part_list_photo_btn($iconPath, $displayName, 'thumb');
         } else {
             echo '<span class="part-profile-ph">' . ui_icon_html('parts', 22) . '</span>';
         }
@@ -526,17 +595,17 @@ switch ($type) {
             $subLine = h($displaySub);
         }
         echo '<div class="part-profile-meta">'
-           . '<div><b style="font-size:15px">' . h($displayName) . '</b>'
+           . '<div><b style="font-size:15px">' . part_list_name_link($displayName, $pid) . '</b>'
            . ($displaySub !== '' ? '<br><span class="muted" style="font-size:12px">' . $subLine . '</span>' : '')
            . '</div>'
            . '<div class="part-profile-stats">'
-           . '<span class="part-profile-stat">คงเหลือ <b>' . number_format($qty) . '</b> ' . h($unit) . '</span>'
-           . '<span class="part-profile-stat">ขั้นต่ำ <b>' . number_format($minStock) . '</b></span>'
+           . '<span class="part-profile-stat">คงเหลือ <b>' . qty_fmt($qty) . '</b> ' . h($unit) . '</span>'
+           . '<span class="part-profile-stat">ขั้นต่ำ <b>' . qty_fmt($minStock) . '</b></span>'
            . '<span class="part-profile-stat">' . stock_status_badge_html($qty, $minStock) . '</span>'
            . '</div></div></div>';
 
-        echo '<p class="muted" style="font-size:12px;margin:0 0 10px">สรุปในตาราง: รับเข้า ' . number_format($totalIn)
-           . ' · เบิกออก ' . number_format($totalOut) . ' ' . h($unit) . ' (แสดงล่าสุด ' . count($moves) . ' รายการ)</p>';
+        echo '<p class="muted" style="font-size:12px;margin:0 0 10px">สรุปในตาราง: รับเข้า ' . qty_fmt($totalIn)
+           . ' · เบิกออก ' . qty_fmt($totalOut) . ' ' . h($unit) . ' (แสดงล่าสุด ' . count($moves) . ' รายการ)</p>';
 
         if (!$moves) {
             echo '<p class="muted">ยังไม่มีประวัติรับเข้า/เบิกออก</p>';
@@ -574,7 +643,7 @@ switch ($type) {
                    ? '<span class="part-move-badge part-move-badge-in">รับเข้า</span>'
                    : '<span class="part-move-badge part-move-badge-out">เบิกออก</span>') . '</td>'
                . '<td class="' . ($isIn ? 'part-move-in' : 'part-move-out') . '">'
-               . ($isIn ? '+' : '-') . number_format((int) $mv['quantity']) . ' ' . h($unit) . '</td>'
+               . ($isIn ? '+' : '-') . qty_fmt($mv['quantity']) . ' ' . h($unit) . '</td>'
                . '<td style="font-size:12px">' . $detail . '</td>'
                . '<td>' . h($mv['actor'] ?: '-') . '</td>'
                . '</tr>';
@@ -588,7 +657,7 @@ switch ($type) {
         try {
             $partsPdo = dbParts();
             $lowRows = $partsPdo->query(
-                'SELECT id, code, name, unit, quantity, min_stock FROM products
+                'SELECT id, code, name, unit, quantity, min_stock, purchase_link, supplier FROM products
                  WHERE quantity <= min_stock AND is_active = 1 ORDER BY quantity ASC LIMIT ' . (int) $LIMIT
             )->fetchAll();
         } catch (Throwable $e) {
@@ -787,6 +856,7 @@ switch ($type) {
         break;
 
     case 'stock_today': // KPI รับเข้า/เบิกออกวันนี้
+        require_once dirname(__DIR__) . '/parts/includes/production_sync.php';
         require_once dirname(__DIR__) . '/parts/includes/StockService.php';
         try {
             $partsPdo = dbParts();
@@ -795,7 +865,7 @@ switch ($type) {
         }
         $partsBase = ui_parts_base_url();
         $sql = "
-            (SELECT 'in' AS move_type, si.id AS ref_id, p.code, p.name, p.unit, si.quantity, si.note,
+            (SELECT 'in' AS move_type, si.id AS ref_id, p.id AS product_id, p.code, p.name, p.unit, si.quantity, si.note,
                     si.received_by AS actor, si.created_at,
                     NULL AS doc_no, NULL AS asset_code, NULL AS stock_out_id,
                     NULL AS set_id, NULL AS set_code, NULL AS set_name
@@ -803,7 +873,7 @@ switch ($type) {
              JOIN products p ON p.id = si.product_id
              WHERE DATE(si.created_at) = CURDATE())
             UNION ALL
-            (SELECT 'out' AS move_type, soi.id AS ref_id, p.code, p.name, p.unit, soi.quantity, so.note,
+            (SELECT 'out' AS move_type, soi.id AS ref_id, p.id AS product_id, p.code, p.name, p.unit, soi.quantity, so.note,
                     so.issued_by AS actor, so.created_at,
                     so.doc_no, so.asset_code, so.id AS stock_out_id,
                     so.set_id, s.code AS set_code, s.name AS set_name
@@ -850,6 +920,7 @@ switch ($type) {
         $pct = $qtyAll > 0 ? min(100, (int) round($doneAll * 100 / $qtyAll)) : 0;
         $barCol = status_bar_color('new');   // ผลิตแล้ว = เครื่องใหม่ (สีจาก ui_status_palette)
         $snByDoc = inv_pickup_alloc_assets_by_doc($grp, array_column($list, 'pre_id'));
+        $pkMaps = inv_pickup_maps();
         $B = BASE_URL;
         echo '<div class="pk-pop">';
         echo '<div class="pk-pop-head">' . ($icon ? img_tag($icon, $list[0]['model'], 'pk-pop-img') : '<span class="pk-pop-img pk-noimg"></span>')
@@ -883,7 +954,12 @@ switch ($type) {
                 echo '<div class="muted pk-doc-none">ยังไม่ได้ลงทะเบียนเครื่องจากใบนี้</div>';
             }
             $parts = [];
-            foreach ($d['docs'][$it['pre_id']]['lines'] as $ln) {
+            $docNames = inv_pickup_line_names($d['docs'][$it['pre_id']]['lines']);
+            foreach ($d['docs'][$it['pre_id']]['lines'] as $pid => $ln) {
+                // ของสำเร็จรูปที่แยกคิวอีกรุ่น ไม่โชว์เป็นอะไหล่ของรุ่นนี้
+                if (inv_pickup_line_other_machine((int) $pid, $it['grp'], $pkMaps, $it['set'], $ln['name'], $docNames)) {
+                    continue;
+                }
                 // ใบแยกชิ้น: นับเฉพาะอะไหล่ของรุ่นนี้ (ใบเดียวกันมีของรุ่นอื่น/สายคล้องปนอยู่)
                 $mine = $it['kind'] !== 'parts' || array_filter($it['parts'], function ($p) use ($ln) { return strpos($p, $ln['name']) === 0; });
                 if ($ln['got'] > 0 && $mine) {
@@ -1169,7 +1245,12 @@ switch ($type) {
         echo '<p style="margin:0 0 4px">มี <b>' . number_format((int) $fgItem['available']) . '</b> · ต้องการ <b>' . number_format((int) $fgItem['required'])
            . '</b> (ขั้นต่ำ ' . number_format((int) $fgItem['minimum_stock']) . ' + PO ค้าง ' . number_format((int) $fgItem['po_qty'])
            . ') · ' . $fgVerdict
-           . ($fgFromRegistry && $sr['leasing'] ? ' · <span class="muted">เครื่องใหม่ ' . number_format(count($sr['stock'])) . ' + คลังพร้อมเช่า ' . number_format(count($sr['leasing'])) . '</span>' : '')
+           . ($fgFromRegistry && $sr['leasing']
+               ? ' · <span class="muted">เครื่องใหม่ ' . number_format(count($sr['stock']))
+               . ' · เช่าใหม่ ' . number_format(count($sr['leasing_new']))
+               . ' · MA ' . number_format(count($sr['leasing_ma']))
+               . '</span>'
+               : '')
            . '</p>';
         echo '<p class="muted" style="font-size:12px;margin:0 0 12px">'
            . ($fgFromRegistry
@@ -1185,7 +1266,7 @@ switch ($type) {
             echo '<p class="muted" style="font-size:12px;color:var(--warning)">' . h($sr['error']) . '</p>';
         }
 
-        $fgTable = static function (string $heading, array $rows, string $note = '') {
+        $fgTable = static function (string $heading, array $rows, string $note = '', string $listClass = '') {
             echo '<h4 style="margin:14px 0 6px;font-size:14px">' . h($heading) . ' <span class="muted" style="font-weight:400">(' . number_format(count($rows)) . ')</span></h4>';
             if ($note !== '') {
                 echo '<p class="muted" style="font-size:12px;margin:0 0 6px">' . h($note) . '</p>';
@@ -1195,7 +1276,8 @@ switch ($type) {
                 return;
             }
             // กริดแทนตาราง — มีแค่หมายเลขกับวันที่ ตาราง .list ที่พับบนจอเล็กและเลื่อนข้างบนจอกว้างเกินความจำเป็น
-            echo '<ul class="fg-sn-list">';
+            $listClass = preg_replace('/[^a-z0-9_-]/i', '', $listClass);
+            echo '<ul class="fg-sn-list' . ($listClass !== '' ? ' ' . $listClass : '') . '">';
             foreach ($rows as $row) {
                 $sn = h($row['sn']);
                 $label = $row['asset_id'] > 0
@@ -1220,13 +1302,26 @@ switch ($type) {
             $fgTable('หมายเลขในสต็อก', $sr['stock'], $fgNote);
         }
         if ($sr['leasing'] || (int) $fgItem['leasing_qty'] > 0) {
-            $fgTable(
-                $fgFromRegistry ? 'คลังพร้อมเช่า' : 'เครื่องเช่าวนกลับมาปล่อยใหม่',
-                $sr['leasing'],
-                $fgFromRegistry
-                    ? 'ระบบเช่าเป็น finished goods รอปล่อยเช่า — นับรวมในยอดที่มี'
-                    : 'รับคืนจากลูกค้าและตรวจ MA แล้ว พร้อมปล่อยเช่ารอบใหม่ — ไม่ใช่ของที่ผลิตใหม่'
-            );
+            $poolNote = $fgFromRegistry
+                ? 'ระบบเช่าเป็น finished goods รอปล่อยเช่า — เช่าใหม่นับรวมในยอดขาด · MA แสดงแยก (รุ่น ACC027 ไม่นับ MA ในยอดขาด)'
+                : 'รับคืนจากลูกค้าและตรวจ MA แล้ว พร้อมปล่อยเช่ารอบใหม่ — ไม่ใช่ของที่ผลิตใหม่';
+            if ($fgFromRegistry) {
+                echo '<h4 style="margin:14px 0 4px;font-size:14px">คลังพร้อมเช่า <span class="muted" style="font-weight:400">('
+                   . number_format(count($sr['leasing'])) . ')</span></h4>';
+                echo '<p class="muted" style="font-size:12px;margin:0 0 8px">' . h($poolNote) . '</p>';
+                $fgTable('เช่าใหม่ — ยังไม่เคยอยู่ในสัญญา', $sr['leasing_new'],
+                    'ย้ายไประบบเช่าแล้ว แต่ยังไม่มีประวัติใน tbl_rent_product — นับรวมในคอลัมน์เช่าใหม่บนตาราง',
+                    'is-pool-new');
+                $fgTable('MA — วนกลับคลัง', $sr['leasing_ma'],
+                    'เคยอยู่ในสัญญาเช่าแล้ว กลับ finished goods — แสดงเป็น MA n เครื่อง ไม่นับในขาด',
+                    'is-pool-ma');
+            } else {
+                $fgTable(
+                    'เครื่องเช่าวนกลับมาปล่อยใหม่',
+                    $sr['leasing'],
+                    $poolNote
+                );
+            }
         }
 
         // ฝั่ง "ต้องการ" — PO ค้างมาจากใบสั่งงานใบไหนบ้าง
@@ -1363,6 +1458,56 @@ switch ($type) {
                . ') — ตัวเลขด้านบนคำนวณไว้เมื่อ ' . h($fg['saved_at'] > 0 ? date('H:i', (int) $fg['saved_at']) . ' น.' : '-')
                . ' ข้อมูลอาจเปลี่ยนไปแล้ว</p>';
         }
+        break;
+
+    case 'ma_year': // รายการ MA ในปี (จากกราฟ dashboard)
+        if (!preg_match('/^\d{4}$/', $v)) {
+            exit('ปีไม่ถูกต้อง');
+        }
+        $result = isset($_GET['result']) ? (string) $_GET['result'] : 'all';
+        if ($result !== 'all' && !ma_result_valid($result)) {
+            exit('ผลการตรวจไม่ถูกต้อง');
+        }
+        [$ys, $ye] = ma_year_visit_range((int) $v);
+        $rf = ma_result_filter_sql($result);
+        ma_records_table(
+            qr(
+                'SELECT m.id, m.visited_at, m.result, m.remark, m.done_by, a.id asset_id, a.asset_code, p.name pname
+                 FROM ma_records m
+                 JOIN assets a ON a.id = m.asset_id
+                 JOIN products p ON p.id = a.product_id
+                 WHERE m.visited_at >= ? AND m.visited_at < ?' . $rf['sql'] . '
+                 ORDER BY m.visited_at DESC, m.id DESC LIMIT ' . (int) $LIMIT,
+                'ss' . $rf['types'],
+                array_merge([$ys, $ye], $rf['params'])
+            ),
+            $LIMIT
+        );
+        break;
+
+    case 'ma_month': // รายการ MA ในเดือน (จากกราฟ dashboard มุมมองรายเดือน)
+        if (!preg_match('/^\d{4}-\d{2}$/', $v)) {
+            exit('เดือนไม่ถูกต้อง');
+        }
+        $result = isset($_GET['result']) ? (string) $_GET['result'] : 'all';
+        if ($result !== 'all' && !ma_result_valid($result)) {
+            exit('ผลการตรวจไม่ถูกต้อง');
+        }
+        [$ms, $me] = ma_month_visit_range($v);
+        $rf = ma_result_filter_sql($result);
+        ma_records_table(
+            qr(
+                'SELECT m.id, m.visited_at, m.result, m.remark, m.done_by, a.id asset_id, a.asset_code, p.name pname
+                 FROM ma_records m
+                 JOIN assets a ON a.id = m.asset_id
+                 JOIN products p ON p.id = a.product_id
+                 WHERE m.visited_at >= ? AND m.visited_at < ?' . $rf['sql'] . '
+                 ORDER BY m.visited_at DESC, m.id DESC LIMIT ' . (int) $LIMIT,
+                'ss' . $rf['types'],
+                array_merge([$ms, $me], $rf['params'])
+            ),
+            $LIMIT
+        );
         break;
 
     default:

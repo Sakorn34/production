@@ -142,6 +142,15 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'parts_list') {
         $partList[] = $r;
     }
     $qtyMap = tech_parts_qty_map_for_parts($partList);
+    $appIdCodes = [];
+    foreach ($partList as $pr) {
+        foreach ([part_row_stock_code($pr), trim((string) ($pr['stock_code'] ?? '')), trim((string) ($pr['part_code'] ?? ''))] as $ck) {
+            if ($ck !== '') {
+                $appIdCodes[] = $ck;
+            }
+        }
+    }
+    $appIds = parts_app_ids_by_code($appIdCodes);
 
     $baseUrl = BASE_URL;
     ?>
@@ -164,7 +173,8 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'parts_list') {
           if ($codeKey === '') {
               $codeKey = trim((string)($r['name'] ?? ''));
           }
-          $stockQty = ($codeKey !== '' && isset($qtyMap[$codeKey])) ? (int)$qtyMap[$codeKey] : null;
+          $stockQty = ($codeKey !== '' && isset($qtyMap[$codeKey])) ? (float)$qtyMap[$codeKey] : null;
+          $appId = (int) ($appIds[$codeKey] ?? 0);
           $qty = rtrim(rtrim(number_format((float)$r['used_qty'], 2), '0'), '.');
           $usedLink = (float)$r['used_qty'] > 0
               ? '<a href="javascript:void(0)" onclick="showListModal(' . h(json_encode('เครื่องที่เบิก: ' . $r['name'], JSON_UNESCAPED_UNICODE)) . ',' . h(json_encode($baseUrl . '/parts.php?part_used=' . $r['id'])) . ",'')\">"
@@ -172,14 +182,17 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'parts_list') {
               : '<span class="muted">0</span>';
           ?>
       <tr>
-        <td style="width:48px"><?= img_tag($r['icon_path'], $r['name']) ?></td>
+        <td style="width:48px"><?php
+          $photo = part_list_photo_btn((string) ($r['icon_path'] ?? ''), (string) ($r['name'] ?? ''), 'thumb');
+          echo $photo !== '' ? $photo : img_tag($r['icon_path'], $r['name']);
+        ?></td>
         <td>
-          <b><?= h($r['name']) ?></b>
+          <b><?= part_list_name_link((string) ($r['name'] ?? ''), $appId) ?></b>
           <?= $r['part_code'] ? '<br><span class="muted">Code Part : ' . h($r['part_code']) . '</span>' : '' ?>
           <?= $r['stock_code'] ? '<br><span class="muted">ID Part : ' . h($r['stock_code']) . '</span>' : '' ?>
         </td>
         <td><?= h($r['category'] ?: '-') ?></td>
-        <td style="text-align:right"><?= $stockQty === null ? '<span class="muted" title="ไม่พบรหัสในระบบสต็อก">—</span>' : '<b>' . $stockQty . '</b>' . ($r['unit'] ? ' <span class="muted">' . h($r['unit']) . '</span>' : '') ?></td>
+        <td style="text-align:right"><?= $stockQty === null ? '<span class="muted" title="ไม่พบรหัสในระบบสต็อก">—</span>' : '<b>' . h(qty_fmt($stockQty)) . '</b>' . ($r['unit'] ? ' <span class="muted">' . h($r['unit']) . '</span>' : '') ?></td>
         <td style="text-align:right"><?= $usedLink ?></td>
         <td><?= h($r['dealer'] ?: '-') ?><?= $r['link'] ? ' · <a href="' . h($r['link']) . '" target="_blank">ลิงก์</a>' : '' ?></td>
         <?php if (can('parts')) { ?>
@@ -346,7 +359,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['move_part'])) {
     require_withdraw_edit_access();
     $back = trim(isset($_POST['back']) ? $_POST['back'] : '');
     $pid  = (int)$_POST['part_id'];
-    $qty  = max(0.01, (float)$_POST['qty']);
+    $qty  = max(0.01, qty_norm($_POST['qty'] ?? 0));
     $refId = null;
     $code = trim(isset($_POST['asset_code']) ? $_POST['asset_code'] : '');
     if ($code !== '') {
@@ -394,7 +407,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_movement'])) {
         header('Location: ' . ($back !== '' ? $back : BASE_URL . '/parts.php'));
         exit;
     }
-    $qty = max(0.01, (float)$_POST['qty']);
+    $qty = max(0.01, qty_norm($_POST['qty'] ?? 0));
     $code = trim(isset($_POST['asset_code']) ? $_POST['asset_code'] : '');
     $remark = trim(isset($_POST['remark']) ? $_POST['remark'] : '') ?: null;
     $modeCategory = trim(isset($_POST['mode_category']) ? $_POST['mode_category'] : '');

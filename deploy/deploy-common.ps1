@@ -31,6 +31,7 @@ $script:DeployStripAfterCopy = @(
 
 $script:DeployGuardFiles = @(
     'finishgoogs_ma_update\uploads\.htaccess',
+    'finishgoogs_ma_update\uploads\kpo\.htaccess',
     'parts\logs\.htaccess',
     'finishgoogs_ma_update\database\.htaccess',
     'parts\database\.htaccess'

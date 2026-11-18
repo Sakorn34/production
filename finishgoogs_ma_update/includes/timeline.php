@@ -1,8 +1,8 @@
 <?php
 /** timeline.php — สร้างรายการ timeline ของเครื่อง (ใช้ร่วมกันระหว่าง asset.php และ popup เจาะลึกจาก dashboard) */
 
-/** จัดรูปเลขจำนวน (ตัด .00) */
-function qty_fmt($v) { return rtrim(rtrim(number_format((float)$v, 2), '0'), '.'); }
+// qty_fmt() ย้ายไป shared/qty_helpers.php (ใช้ร่วมกันทั้งสองแอป) — โหลดผ่าน config.php
+require_once dirname(__DIR__, 2) . '/shared/qty_helpers.php';
 
 /**
  * แยกข้อความคั่นด้วย comma เป็นรายการ (ตัดช่องว่างและค่า "-")
