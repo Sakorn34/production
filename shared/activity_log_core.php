@@ -49,6 +49,11 @@ function activity_log_db_connect() {
         $failed = true;
         return null;
     }
+    // PHP 8.1 ขึ้นไป mysqli โยน exception เมื่อต่อไม่ติด แทนที่จะคืน object ที่มี connect_errno
+    // ซึ่ง @ กันไม่ได้ — ฟังก์ชันนี้ถูกเรียกจาก register_shutdown_function ทุกหน้า
+    // ฐานข้อมูลสะดุดแป๊บเดียวจึงกลายเป็น fatal ทั้งเว็บ ทั้งที่ตั้งใจให้ล้มเงียบแล้วไม่เขียน log
+    // (deploy_config.php ใช้ท่าเดียวกันนี้อยู่แล้ว ไฟล์นี้ยืนเดี่ยวจึงต้องสั่งเอง)
+    if (function_exists('mysqli_report')) { mysqli_report(MYSQLI_REPORT_OFF); }
     $db = @new mysqli($p['host'], $p['user'], $p['pass'], $p['db']);
     if ($db->connect_errno) {
         $failed = true;
