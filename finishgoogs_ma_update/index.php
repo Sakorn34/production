@@ -309,56 +309,6 @@ function pct_label($v, $t) {
 }
 
 page_header('Dashboard', true, 'ภาพรวมการผลิตและสต็อกอะไหล่');
-
-/**
- * KPI การ์ดขาว + แถบสีความหมาย (แทน stat tile gradient เดิม)
- *
- * @param int    $num     ตัวเลขหลัก
- * @param string $label   ป้ายบนการ์ด
- * @param string $icon    icon key จาก ui_icons
- * @param string $tone    primary|success|info|warning
- * @param string $sub     ข้อความบรรทัดล่าง
- * @param string $onclick JS เมื่อคลิก ('' = ไม่คลิก)
- * @param string $sys     ป้ายมุมขวา (เครื่อง/อะไหล่/วันนี้)
- * @param string $numText override ตัวเลข (เช่น "12 / 38")
- * @param bool   $subHtml  อนุญาต HTML ใน $sub (เช่น <br>)
- * @param bool   $numHtml  อนุญาต HTML ใน $numText
- */
-function kpi($num, $label, $icon, $tone, $sub = '', $onclick = '', $sys = '', $numText = '', $subHtml = false, $numHtml = false, $href = '') {
-    // การ์ดที่กดได้ต้องเป็น <a> ไม่ใช่ <div onclick> — ไม่งั้น Tab ไปไม่ถึง
-    // โปรแกรมอ่านหน้าจอไม่รู้ว่ากดได้ และเปิดแท็บใหม่/คัดลอกลิงก์ไม่ได้
-    // ถ้าเป็น modal: คลิกปกติเปิด modal (return false) ส่วน Ctrl/กลางคลิกไปหน้าเต็มตาม href
-    $tag = $href !== '' ? 'a' : 'div';
-    $attr = '';
-    if ($href !== '') {
-        $attr .= ' href="' . h($href) . '"';
-        if ($onclick !== '') {
-            $attr .= ' onclick="if(event.ctrlKey||event.metaKey||event.shiftKey||event.button===1)return true;'
-                   . h($onclick) . ';return false;"';
-        }
-        $attr .= ' class="kpi kpi-' . h($tone) . ' clickable"';
-    } elseif ($onclick !== '') {
-        $attr .= ' class="kpi kpi-' . h($tone) . ' clickable" onclick="' . h($onclick) . '"'
-               . ' role="button" tabindex="0"'
-               . ' onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.click();}"';
-    } else {
-        $attr .= ' class="kpi kpi-' . h($tone) . '"';
-    }
-    echo '<' . $tag . $attr . '>';
-    if ($sys !== '') echo '<span class="kpi-sys">' . h($sys) . '</span>';
-    echo '<div class="kpi-top"><span class="kpi-ic">' . ui_icon_html($icon, 14) . '</span> ' . h($label) . '</div>';
-    if ($numText !== '') {
-        $numClass = 'kpi-num' . ($numHtml ? ' kpi-num-stack' : '');
-        echo '<b class="' . $numClass . '">' . ($numHtml ? $numText : h($numText)) . '</b>';
-    } else {
-        echo '<b class="kpi-num">' . number_format($num) . '</b>';
-    }
-    if ($sub !== '') {
-        $subClass = 'kpi-sub' . ($subHtml ? ' kpi-sub-stack' : '');
-        echo '<div class="' . $subClass . '">' . ($subHtml ? $sub : h($sub)) . '</div>';
-    }
-    echo '</' . $tag . '>';
-}
 /** สร้างโค้ด JS ดิบสำหรับ onclick — ต้องครอบด้วย h() เมื่อใส่ใน attribute */
 function modal_js($title, $dataUrl, $moreUrl = '') {
     return 'showListModal('
@@ -409,63 +359,64 @@ $partsBase = ui_parts_base_url();
       return $d !== 0 ? $d : ($statusCycleIdx[$a] - $statusCycleIdx[$b]);
   });
   ?>
-  <div class="kpi kpi-primary kpi-status-overview">
-    <div class="kpi-top"><span class="kpi-ic"><?= ui_icon_html('assets', 14) ?></span> เครื่องทั้งหมด</div>
-    <b class="kpi-num"><?= number_format($total) ?></b>
-    <?php // status_th_chip() ให้ชื่อสั้น (ใหม่/เช่า/สำรอง…) — ใช้ตัวเดียวกับ legend ของกราฟ
-         // "ภาพรวมการผลิตรายปี" ด้านล่าง ให้สองการ์ดอ่านเป็นชุดเดียวกัน · status_th() (เต็ม
-         // "เครื่องใหม่") เก็บไว้ใช้เฉพาะหัว modal ที่กดเปิดดูรายรุ่น ซึ่งเป็นข้อความเดี่ยว
-         // ไม่ได้อยู่ติดกับตัวเลข จึงยังต้องการคำเต็มเพื่อความชัดเจน
-         if ($total > 0) { ?>
-    <div class="status-bar" role="img" aria-label="สัดส่วนเครื่องแยกตามสถานะ">
-      <?php foreach ($statusByCount as $st):
-          $n = (int) ($byStatus[$st] ?? 0);
-          if ($n <= 0) { continue; }
-          $flex = max($n / $total * 100, 0.6); // ขั้นต่ำกันสถานะที่มีไม่กี่เครื่อง (เช่นสูญหาย) หายไปจากแท่งเลย
-          $modalTitle = status_th($st) . ' — รายรุ่น';
-          $dataUrl = "$B/dashboard_data.php?type=asset_models&st=$st";
-          $href = "$B/assets.php?status=$st";
-      ?>
-      <a class="status-bar-seg" data-status="<?= h($st) ?>" style="flex:<?= $flex ?> 1 0; background:<?= h(dash_chart_color($st)) ?>"
-         href="<?= h($href) ?>"
-         onclick="if(event.ctrlKey||event.metaKey||event.shiftKey||event.button===1)return true;<?= h(modal_js($modalTitle, $dataUrl, $href)) ?>;return false;"
-         title="<?= h(status_th_chip($st) . ': ' . number_format($n) . ' เครื่อง (' . pct_label($n, $total) . ')') ?>"></a>
-      <?php endforeach; ?>
+  <?php // ตัวเลขรวมฝั่งซ้าย รายการสถานะสองคอลัมน์ฝั่งขวา แต่ละสถานะมีแถบสัดส่วนของตัวเอง
+       // แทนแท่งรวมยาวแท่งเดียว — สถานะเล็ก ๆ (สำรอง/สูญหาย) อ่านค่าได้โดยไม่ต้องเพ่งหาบล็อก 4px
+       // กดป้าย = ไฮไลต์สถานะนั้นในกราฟด้านล่าง (dashStatusFilter) · Ctrl/กลางคลิก = ไปทะเบียนเครื่อง ?>
+  <div class="kpi kpi-status-overview">
+    <div class="so-wrap">
+    <div class="so-total">
+      <span class="so-ic"><?= ui_icon_html('assets', 16) ?></span>
+      <div class="so-lbl">เครื่องทั้งหมด</div>
+      <b class="so-num"><?= number_format($total) ?></b>
+      <div class="so-hint">กดสถานะเพื่อไฮไลต์กราฟ</div>
     </div>
-    <?php } ?>
-    <?php // กดที่ป้าย = filter ไฮไลต์เฉพาะสถานะนั้นทั้งการ์ดนี้และกราฟรายปีด้านล่าง (ดู
-         // dashStatusFilter ท้ายไฟล์) ไม่พาไปหน้าไหน — ปุ่ม modifier+คลิก (Ctrl/⌘/กลาง)
-         // ยังพาไปทะเบียนเครื่องกรองแล้วเหมือนเดิม สำหรับคนอยากได้รายชื่อเต็ม ?>
     <div class="status-legend">
       <?php foreach ($statusByCount as $st):
           $n = (int) ($byStatus[$st] ?? 0);
           $href = "$B/assets.php?status=$st";
+          $w = $total > 0 ? max($n / $total * 100, $n > 0 ? 1.5 : 0) : 0;
       ?>
       <a class="status-legend-item" href="<?= h($href) ?>" data-status="<?= h($st) ?>"
          onclick="if(event.ctrlKey||event.metaKey||event.shiftKey||event.button===1)return true;dashStatusFilter.toggle('<?= h($st) ?>');return false;"
          <?= $statusNote[$st] !== '' ? 'title="' . h($statusNote[$st]) . '"' : '' ?>>
-        <i class="status-dot" style="background:<?= h(dash_chart_color($st)) ?>"></i>
-        <span class="status-legend-label"><?= h(status_th_chip($st)) ?></span>
-        <b class="status-legend-num"><?= number_format($n) ?></b>
-        <span class="status-legend-pct"><?= h(pct_label($n, $total)) ?></span>
+        <span class="status-legend-row">
+          <i class="status-dot" style="background:<?= h(dash_chart_color($st)) ?>"></i>
+          <span class="status-legend-label"><?= h(status_th_chip($st)) ?></span>
+          <b class="status-legend-num"><?= number_format($n) ?></b>
+          <span class="status-legend-pct"><?= h(pct_label($n, $total)) ?></span>
+        </span>
+        <span class="status-legend-track"><span style="width:<?= round($w, 2) ?>%;background:<?= h(dash_chart_color($st)) ?>"></span></span>
       </a>
       <?php endforeach; ?>
+    </div>
     </div>
   </div>
   <div class="dash-side-kpis">
     <?php
+    $sideClick = function ($js) {
+        return ' onclick="if(event.ctrlKey||event.metaKey||event.shiftKey||event.button===1)return true;' . h($js) . ';return false;"';
+    };
     if ($stock['ok']) {
-        kpi($stock['low'], 'อะไหล่ควรสั่งเพิ่ม', 'alert', $stock['low'] > 0 ? 'warning' : 'success', $stock['low'] > 0 ? '<span class="kpi-down">ต้องตรวจสอบ/สั่งซื้อ</span>' : 'ทุกรายการเพียงพอ',
-            $stock['low'] > 0
-                ? modal_js('อะไหล่ที่ควรสั่งเพิ่ม (' . number_format($stock['low']) . ' รายการ)', "$B/dashboard_data.php?type=low_stock", "$partsBase/pages/products.php")
-                : "location.href='" . h($partsBase) . "/pages/products.php'",
-            'อะไหล่', '', true, false, $partsBase . '/pages/products.php');
-        kpi(0, 'รับเข้า / เบิกออก', 'history', 'info', 'ความเคลื่อนไหววันนี้',
-            modal_js('รับเข้า / เบิกออกวันนี้', "$B/dashboard_data.php?type=stock_today", "$partsBase/pages/history.php"), 'วันนี้',
-            'รับเข้า ' . qty_fmt($stock['in_today']) . ' ชิ้น · เบิกออก ' . qty_fmt($stock['out_today']) . ' ชิ้น',
-            false, true, $partsBase . '/pages/history.php');
+        $low = (int) $stock['low'];
+        $lowTone = $low > 0 ? 'warn' : 'ok';
+        ?>
+    <a class="kpi clickable side-kpi side-kpi-<?= $lowTone ?>" href="<?= h($partsBase . '/pages/products.php') ?>"<?=
+        $low > 0 ? $sideClick(modal_js('อะไหล่ที่ควรสั่งเพิ่ม (' . number_format($low) . ' รายการ)', "$B/dashboard_data.php?type=low_stock", "$partsBase/pages/products.php")) : '' ?>>
+      <div class="side-kpi-top"><span class="side-kpi-ic"><?= ui_icon_html($low > 0 ? 'alert' : 'check-circle', 15) ?></span> อะไหล่ควรสั่งเพิ่ม</div>
+      <div class="side-kpi-num"><?= number_format($low) ?> <small>รายการ</small></div>
+      <div class="side-kpi-sub"><?= $low > 0 ? 'ตรวจสอบ / สั่งซื้อ →' : 'ทุกรายการเพียงพอ' ?></div>
+    </a>
+    <a class="kpi clickable side-kpi side-kpi-info" href="<?= h($partsBase . '/pages/history.php') ?>"<?=
+        $sideClick(modal_js('รับเข้า / เบิกออกวันนี้', "$B/dashboard_data.php?type=stock_today", "$partsBase/pages/history.php")) ?>>
+      <div class="side-kpi-top"><span class="side-kpi-ic"><?= ui_icon_html('arrows-exchange', 15) ?></span> ความเคลื่อนไหววันนี้</div>
+      <div class="side-kpi-io">
+        <div><span>รับเข้า</span><b class="is-in"><?= h(qty_fmt($stock['in_today'])) ?></b></div>
+        <div><span>เบิกออก</span><b class="is-out"><?= h(qty_fmt($stock['out_today'])) ?></b></div>
+      </div>
+    </a>
+    <?php
     } else {
-        echo '<div class="kpi kpi-warning"><div class="kpi-top"><span class="kpi-ic">' . ui_icon_html('alert', 14) . '</span> สต็อกอะไหล่</div><b class="kpi-num">—</b><div class="kpi-sub">เชื่อมต่อระบบสต็อกไม่ได้</div></div>';
+        echo '<div class="kpi side-kpi side-kpi-warn"><div class="side-kpi-top"><span class="side-kpi-ic">' . ui_icon_html('alert', 15) . '</span> สต็อกอะไหล่</div><div class="side-kpi-num">—</div><div class="side-kpi-sub">เชื่อมต่อระบบสต็อกไม่ได้</div></div>';
     }
     ?>
   </div>
@@ -1569,7 +1520,7 @@ $partsBase = ui_parts_base_url();
   // สถานะนั้นในทั้งสองที่พร้อมกัน ไม่ใช่แค่การ์ดเดียว — ผูกด้วย [data-status] แบบเดียวกัน
   // ที่ฝังไว้ในทุกจุด (แถบสัดส่วน, legend การ์ด, legend กราฟ, แท่งกราฟรายปี/รายเดือน)
   // เป็น state บนหน้าเว็บล้วน ๆ ไม่ยิง request ใหม่ ตัวเลขที่ต้องใช้มีอยู่ใน DOM แล้ว
-  var TARGET_SEL = '.status-legend-item[data-status], .status-bar-seg[data-status],'
+  var TARGET_SEL = '.status-legend-item[data-status],'
     + ' .dash-bar-seg[data-status]';
   var active = null;
 

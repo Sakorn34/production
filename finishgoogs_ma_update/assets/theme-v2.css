@@ -206,68 +206,112 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
    auto-fit ต้องเผื่อคอลัมน์ให้พอกับการ์ดรวมที่กว้างเต็มแถว แต่การ์ดอะไหล่ใช้แค่คอลัมน์เดียว
    เหลือช่องว่างลอยข้าง ๆ เกือบครึ่งแถว */
 .dash-top-row {
-  display: grid; grid-template-columns: minmax(0, 2.8fr) minmax(200px, 1fr);
+  display: grid; grid-template-columns: minmax(0, 2.6fr) minmax(220px, 1fr);
   gap: 12px; align-items: stretch; margin-bottom: 16px;
 }
 .dash-side-kpis { display: flex; flex-direction: column; gap: 12px; }
-.dash-side-kpis .kpi { flex: 1; display: flex; flex-direction: column; justify-content: center; }
 @media (max-width: 760px) {
   .dash-top-row { grid-template-columns: 1fr; }
 }
-.kpi-status-overview { padding-bottom: 14px; }
-/* แท่งสัดส่วน — แยกเป็นบล็อกมีช่องไฟเหมือน .dash-bar-stack ของกราฟรายปี (gap 3px,
-   มุมมนเท่ากัน) เดิมเป็นแท่งเดียวยาวติดกัน คนละภาษาภาพกับกราฟทั้งที่เล่าเรื่องเดียวกัน */
-.status-bar {
-  display: flex; gap: 3px; height: 10px; margin-top: 12px;
-}
-/* min-width พอให้บล็อกเล็กสุดยังเห็น แต่ไม่กว้างจนสถานะที่ต่างกันสิบเท่า (เสื่อมสภาพ 390
-   กับสูญหาย 13) ถูกดันไปชนพื้นเท่ากันหมดจนอ่านสัดส่วนผิด */
-.status-bar-seg {
-  display: block; min-width: 4px; border-radius: var(--radius-sm, 8px);
-  transition: filter .12s, opacity .15s;
-}
-.status-bar-seg:hover, .status-bar-seg:focus-visible { filter: brightness(0.92); }
-.status-legend {
-  display: flex; flex-wrap: wrap; gap: 4px 2px;
-  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
-}
-.status-legend-item {
-  display: inline-flex; align-items: baseline; gap: 6px;
-  padding: 5px 9px; border-radius: var(--radius-sm, 8px);
-  color: inherit; text-decoration: none;
-}
-.status-legend-item:hover, .status-legend-item:focus-visible {
-  background: var(--surface-muted); outline: none;
-}
 
-/* ── กดป้ายสถานะในการ์ดนี้ = highlight เฉพาะสถานะนั้น ทั้งแถบสัดส่วนของการ์ดเองและ
-   ทุกแท่งในกราฟ "ภาพรวมการผลิตรายปี" ด้านล่าง (state อยู่ที่ dashStatusFilter ท้าย
-   index.php) · กราฟไม่มี legend ของตัวเองแล้ว การ์ดนี้เป็นคีย์สีของทั้งหน้า ──────── */
-.status-legend-item { transition: opacity .15s; }
+/* การ์ดเครื่องทั้งหมด — ตัวเลขรวมซ้าย รายการสถานะสองคอลัมน์ขวา */
+.kpi-status-overview { display: flex; flex-direction: column; justify-content: center; padding: 16px 18px; border-radius: 14px; }
+.so-wrap { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 20px; align-items: center; }
+.dash-top-row > .kpi-status-overview { container-type: inline-size; }
+.so-total { padding-right: 16px; border-right: 1px solid var(--border); }
+.so-ic {
+  width: 28px; height: 28px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--primary) 10%, #fff); color: var(--primary);
+}
+.so-lbl { margin-top: 10px; font-size: calc(12px * var(--font-scale, 1)); font-weight: 600; color: var(--text-muted, #6b6480); }
+.so-num {
+  display: block; font-size: calc(30px * var(--font-scale, 1)); font-weight: 700; line-height: 1.15;
+  letter-spacing: -.02em; color: var(--primary); font-variant-numeric: tabular-nums;
+}
+.so-hint { margin-top: 2px; font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-faint, #a49cc0); }
+
+.status-legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 14px; }
+.status-legend-item {
+  display: block; padding: 5px 8px; border-radius: var(--radius-sm, 8px);
+  color: inherit; text-decoration: none; transition: background .12s, opacity .15s;
+}
+.status-legend-item:hover, .status-legend-item:focus-visible { background: var(--surface-muted); outline: none; }
+.status-legend-row { display: flex; align-items: center; gap: 7px; }
 .status-legend-item.is-active-filter {
   background: var(--surface-muted);
   box-shadow: inset 0 0 0 1.5px var(--border-strong);
 }
 .status-legend-item.is-dimmed-filter,
-.status-bar-seg.is-dimmed-filter,
 .dash-bar-seg.is-dimmed-filter { opacity: .28; }
-/* สี่เหลี่ยมมุมมน ขนาดเดียวกับ .dash-status-swatch ที่กราฟ "ภาพรวมการผลิตรายปี" ใช้
-   (12px, radius 3px) เดิมเป็นจุดกลม คนละทรงกับสวอตช์ของกราฟ ทั้งที่เป็นชุดสีเดียวกัน */
-.status-dot {
-  align-self: center; width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0;
-}
+/* สี่เหลี่ยมมุมมน ชุดเดียวกับ .dash-status-swatch ของกราฟด้านล่าง */
+.status-dot { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
 .status-legend-label {
+  flex: 1 0 auto; white-space: nowrap;
   font-size: calc(12px * var(--font-scale, 1)); color: var(--text-muted, #6b6480);
 }
 .status-legend-num {
-  font-size: calc(14px * var(--font-scale, 1)); font-variant-numeric: tabular-nums;
-  color: #211a2e;
+  font-size: calc(13.5px * var(--font-scale, 1)); font-weight: 700; font-variant-numeric: tabular-nums; color: #211a2e;
 }
 .status-legend-pct {
-  font-size: calc(11px * var(--font-scale, 1)); color: var(--text-faint, #a49cc0);
-  font-variant-numeric: tabular-nums;
+  width: 36px; text-align: right; flex-shrink: 0;
+  font-size: calc(11px * var(--font-scale, 1)); color: var(--text-faint, #a49cc0); font-variant-numeric: tabular-nums;
 }
+.status-legend-track {
+  display: block; height: 3px; margin-top: 5px; border-radius: 2px;
+  background: var(--surface-muted, #f4f1fb); overflow: hidden;
+}
+.status-legend-track > span { display: block; height: 100%; border-radius: 2px; }
 
+/* การ์ดอะไหล่ด้านขวา — พื้นสีอ่อนตามความหมาย ไอคอนในกล่องขาวหน้าหัวข้อ */
+.dash-side-kpis .side-kpi {
+  flex: 1; display: flex; flex-direction: column; justify-content: center;
+  padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--sk) 16%, #fff); border-radius: 14px; box-shadow: none;
+  --sk: var(--warning); --sk-bg: color-mix(in srgb, var(--warning) 9%, #fff);
+  background: var(--sk-bg);
+}
+.dash-side-kpis .side-kpi-info { --sk: var(--info); --sk-bg: color-mix(in srgb, var(--info) 11%, #fff); }
+.dash-side-kpis .side-kpi-ok { --sk: var(--success); --sk-bg: color-mix(in srgb, var(--success) 9%, #fff); }
+.side-kpi.clickable:hover { box-shadow: var(--shadow-sm); }
+.side-kpi-top {
+  display: flex; align-items: center; gap: 8px;
+  font-size: calc(12px * var(--font-scale, 1)); font-weight: 600;
+  color: color-mix(in srgb, var(--sk) 75%, #000);
+}
+.side-kpi-ic {
+  width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #fff; color: var(--sk);
+}
+.side-kpi-num {
+  margin-top: 6px; font-size: calc(26px * var(--font-scale, 1)); font-weight: 700; line-height: 1.15;
+  color: var(--sk); font-variant-numeric: tabular-nums;
+}
+.side-kpi-num small { font-size: calc(12px * var(--font-scale, 1)); font-weight: 500; color: color-mix(in srgb, var(--sk) 75%, #000); }
+.side-kpi-sub { margin-top: 2px; font-size: calc(11.5px * var(--font-scale, 1)); color: var(--sk); }
+.side-kpi-io { display: grid; grid-template-columns: 1fr 1fr; margin-top: 8px; }
+.side-kpi-io > div + div { padding-left: 12px; border-left: 1px solid color-mix(in srgb, var(--sk) 18%, #fff); }
+.side-kpi-io span { display: block; font-size: calc(11px * var(--font-scale, 1)); color: color-mix(in srgb, var(--sk) 75%, #000); }
+.side-kpi-io b { font-size: calc(22px * var(--font-scale, 1)); font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.side-kpi-io .is-in { color: var(--success); }
+.side-kpi-io .is-out { color: var(--sk); }
+
+/* การ์ดแคบ (จอโน้ตบุ๊กที่ย่อเมนูไม่ได้ / แท็บเล็ต) — ตัวเลขรวมขึ้นไปเป็นแถวบน รายการสถานะได้ความกว้างเต็มการ์ด */
+@container (max-width: 640px) {
+  .so-wrap { grid-template-columns: 1fr; gap: 10px; }
+  .so-total {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px;
+    padding: 0 0 10px; border-right: 0; border-bottom: 1px solid var(--border);
+  }
+  .so-lbl { margin-top: 0; }
+  .so-num { font-size: calc(26px * var(--font-scale, 1)); }
+  .so-hint { margin: 0 0 0 auto; }
+  .status-legend { gap: 0 10px; }
+  .status-legend-pct { width: 32px; }
+  .status-legend-item { padding: 5px 6px; }
+}
+@container (max-width: 330px) {
+  .status-legend { grid-template-columns: 1fr; }
+}
 /* ── Dashboard รวม: อะไหล่ใกล้หมด (modal / popup) ── */
 .dash-low-stock-empty { margin: 0; padding: 4px 0; }
 .low-stock-cards { display: flex; flex-direction: column; gap: 10px; }
