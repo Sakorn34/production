@@ -95,12 +95,7 @@ parts_page_header(
             <div class="pc-num"><?= formatNumber($counts['models']) ?></div>
             <div class="pc-lbl">รุ่นที่เบิกผลิต</div>
         </a>
-        <a class="pc-stat<?= $tabIn === 'parts' && $stIn === 'all' ? ' is-on' : '' ?>"
-           href="<?= e(purchase_check_url(['period' => $periodIn, 'tab' => 'parts', 'st' => 'all'])) ?>">
-            <div class="pc-num"><?= formatNumber($counts['parts']) ?></div>
-            <div class="pc-lbl">อะไหล่ที่ถูกใช้</div>
-        </a>
-        <a class="pc-stat<?= $tabIn === 'suppliers' ? ' is-on' : '' ?>"
+<a class="pc-stat<?= $tabIn === 'suppliers' ? ' is-on' : '' ?>"
            href="<?= e(purchase_check_url(['period' => $periodIn, 'tab' => 'suppliers', 'st' => $stIn])) ?>">
             <div class="pc-num"><?= formatNumber($counts['suppliers']) ?></div>
             <div class="pc-lbl">ผู้จำหน่าย</div>
