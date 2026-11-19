@@ -61,19 +61,26 @@ function year_end_compute_summary(array $rows): array
  */
 function year_end_export_csv(array $rows, array $summary): void
 {
+    // อ่านรูปครั้งเดียวก่อน stream CSV
+    $icons = parts_product_icon_map($rows);
+
     header('Content-Type: text/csv; charset=UTF-8');
     header('Content-Disposition: attachment; filename="year-end-stock-' . date('Y-m-d') . '.csv"');
     echo "\xEF\xBB\xBF";
     $out = fopen('php://output', 'w');
-    fputcsv($out, ['รหัส', 'ชื่ออะไหล่', 'จำนวนคงเหลือ', 'หน่วย', 'ราคาต่อหน่วย', 'มูลค่ารวม', 'หมายเหตุ']);
+    fputcsv($out, ['รหัส', 'ชื่ออะไหล่', 'ผู้จำหน่าย', 'รูป (URL)', 'จำนวนคงเหลือ', 'หน่วย', 'ราคาต่อหน่วย', 'มูลค่ารวม', 'หมายเหตุ']);
     foreach ($rows as $row) {
         $qty = qty_norm($row['quantity']);
         $hasPrice = year_end_has_price($row['price'] ?? null);
         $price = $hasPrice ? (float) $row['price'] : null;
         $lineValue = $hasPrice ? $qty * $price : null;
+        $iconPath = $icons[$row['code']] ?? '';
+        $imgUrl = $iconPath !== '' ? (parts_upload_img_url($iconPath) ?? '') : '';
         fputcsv($out, [
             $row['code'],
             parts_display_name($row),
+            $row['supplier'] ?? '',
+            $imgUrl,
             qty_input_value($qty),
             $row['unit'],
             $hasPrice ? number_format($price, 2, '.', '') : '',
@@ -82,9 +89,9 @@ function year_end_export_csv(array $rows, array $summary): void
         ]);
     }
     fputcsv($out, []);
-    fputcsv($out, ['สรุป', '', qty_input_value($summary['total_qty']), '', '', number_format($summary['total_value'], 2, '.', ''), '']);
-    fputcsv($out, ['รายการในคลัง', $summary['total_items'], '', '', '', '', '']);
-    fputcsv($out, ['ยังไม่มีราคา', $summary['missing_price'], '', '', '', '', '']);
+    fputcsv($out, ['สรุป', '', '', '', qty_input_value($summary['total_qty']), '', '', number_format($summary['total_value'], 2, '.', ''), '']);
+    fputcsv($out, ['รายการในคลัง', $summary['total_items'], '', '', '', '', '', '', '']);
+    fputcsv($out, ['ยังไม่มีราคา', $summary['missing_price'], '', '', '', '', '', '', '']);
     fclose($out);
     exit;
 }
