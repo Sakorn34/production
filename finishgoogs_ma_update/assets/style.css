@@ -79,6 +79,14 @@ a:hover { text-decoration: underline; }
 .flash-toast-hide { opacity: 0; transform: translateY(-8px); }
 .flash-toast-ok { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
 .flash-toast-err { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+.flash-toast-info { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+/* Toast บนมือถือ: ย้ายมาด้านล่างตรงกลาง เหนือ bottom nav */
+@media (max-width: 640px) {
+  .flash-toast-host { top: auto; right: auto; bottom: calc(68px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); align-items: center; width: calc(100vw - 32px); max-width: 360px; }
+  .flash-toast { text-align: center; }
+  .flash-toast-show { opacity: 1; transform: translateY(0); }
+  .flash-toast-hide { opacity: 0; transform: translateY(8px); }
+}
 .parts-group-row.clickable { cursor: pointer; }
 .parts-group-row.clickable:hover { background: var(--surface-muted); }
 

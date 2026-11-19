@@ -462,72 +462,77 @@ $assetsCta = '<a class="btn" href="' . BASE_URL . '/asset_new.php">'
 page_header('ทะเบียนเครื่องผลิตใหม่', true, number_format($totalRows) . ' เครื่อง', '', $assetsCta);
 ?>
 <div class="filter assets-filter">
-<form method="get" class="assets-filter-form">
+<form method="get" class="assets-filter-form" id="assets-form">
   <?php if ($wsync) { ?><input type="hidden" name="wsync" value="1"><?php } ?>
-  <?php // ลำดับช่อง = ลำดับหัวตาราง (ข้ามคอลัมน์รูป) ?>
-  <label class="assets-ff">
-    <span>ผลิตเมื่อ</span>
-    <select name="sort" onchange="this.form.submit()">
-      <option value="time_code" <?= $sort === 'time_code' ? 'selected' : '' ?>>บันทึกล่าสุด</option>
-      <option value="date_desc" <?= $sort === 'date_desc' ? 'selected' : '' ?>>ใหม่ → เก่า</option>
-      <option value="date_asc" <?= $sort === 'date_asc' ? 'selected' : '' ?>>เก่า → ใหม่</option>
-      <?php if ($sort === 'code') { ?><option value="code" selected>รหัสเครื่อง</option><?php } ?>
-      <?php if ($sort === 'recent') { ?><option value="recent" selected>เพิ่มเข้าระบบล่าสุด</option><?php } ?>
-    </select>
-  </label>
-  <label class="assets-ff assets-ff-code">
-    <span>รหัสเครื่อง</span>
-    <span class="livesearch-wrap">
-      <input type="text" name="q" id="live-q" data-scan="submit" value="<?= h($search) ?>" placeholder="ค้นหารหัสเครื่อง" autocomplete="off">
-      <div id="live-results" class="combo-list" hidden></div>
-    </span>
-  </label>
-  <label class="assets-ff">
-    <span>รุ่น</span>
-    <select name="product" onchange="this.form.submit()">
-      <option value="">ทั้งหมด</option>
-      <?php while ($p = $productList->fetch_assoc()) { ?>
-        <option value="<?= h($p['name']) ?>" <?= $product === $p['name'] ? 'selected' : '' ?>><?= h($p['name']) ?></option>
-      <?php } ?>
-    </select>
-  </label>
-  <label class="assets-ff">
-    <span>สถานะ</span>
-    <select name="status" onchange="this.form.submit()">
-      <option value="">ทั้งหมด</option>
-      <?php foreach (status_list() as $s) { ?>
-        <option value="<?= $s ?>" <?= $status === $s ? 'selected' : '' ?>><?= h(status_th($s)) ?></option>
-      <?php } ?>
-    </select>
-  </label>
-  <label class="assets-ff">
-    <span>ผู้บันทึกรายการ</span>
-    <input type="text" name="recorder" value="<?= h($recorder) ?>" placeholder="ชื่อคนบันทึก" maxlength="100" autocomplete="off">
-  </label>
-  <label class="assets-ff assets-ff-fw">
-    <span>FW</span>
-    <input type="text" name="fw" value="<?= h($fw) ?>" placeholder="เวอร์ชัน" maxlength="40" autocomplete="off">
-  </label>
-  <label class="assets-ff assets-ff-wd">
-    <span>การเบิกใช้งาน</span>
-    <select name="wd" onchange="this.form.submit()">
-      <option value="">ทั้งหมด</option>
-      <?php foreach ($wdGroups as $wgLabel => $wdOpts) { ?>
-      <optgroup label="<?= h($wgLabel) ?>">
-        <?php foreach ($wdOpts as $wk => $wl) { ?>
-        <option value="<?= h($wk) ?>" <?= $wd === $wk ? 'selected' : '' ?>><?= h($wl) ?></option>
-        <?php } ?>
-      </optgroup>
-      <?php } ?>
-    </select>
-  </label>
-  <?php // ตัวกรอง pw (เบิกอะไหล่ตกหล่น) ถอดออกจากหน้าจอแล้ว — ลิงก์เก่า ?pw= ยังทำงาน ?>
   <?php if ($pw !== '') { ?><input type="hidden" name="pw" value="<?= h($pw) ?>"><?php } ?>
-  <div class="assets-ff-actions">
-    <button type="submit">ค้นหา</button>
-    <?php if ($hasActiveFilter) { ?>
-    <a href="<?= BASE_URL ?>/assets.php" class="btn btn-line btn-sm">ล้างการค้นหา</a>
-    <?php } ?>
+  <?php // ── แถวหลัก: ค้นหา + กรองสถานะ (เสมอ) + ปุ่มตัวกรองเพิ่มเติม ?>
+  <div class="af-top">
+    <div class="assets-ff assets-ff-code af-search">
+      <span class="livesearch-wrap">
+        <input type="text" name="q" id="live-q" data-scan="submit" value="<?= h($search) ?>" placeholder="ค้นหารหัสเครื่อง" autocomplete="off">
+        <div id="live-results" class="combo-list" hidden></div>
+      </span>
+    </div>
+    <?php // กรองสถานะแบบ pill — กดครั้งเดียวโดยไม่ต้องกดปุ่มค้นหา ?>
+    <div class="af-status-row">
+      <button type="button" class="af-spill<?= $status === '' ? ' af-on' : '' ?>" data-val="">ทั้งหมด</button>
+      <?php foreach (status_palette() as $sk => $se) { ?>
+      <button type="button" class="af-spill<?= $status === $sk ? ' af-on' : '' ?>" data-val="<?= h($sk) ?>" style="--sp-bg:<?= h($se['bg']) ?>;--sp-fg:<?= h($se['fg']) ?>"><?= h($se['chip']) ?></button>
+      <?php } ?>
+      <input type="hidden" name="status" id="af-status-val" value="<?= h($status) ?>">
+    </div>
+    <div class="af-top-actions">
+      <button type="button" id="af-toggle" class="btn btn-line btn-sm af-toggle-btn" aria-expanded="false">
+        ตัวกรอง<span class="af-cnt" id="af-cnt" hidden></span>
+      </button>
+      <button type="submit" class="btn">ค้นหา</button>
+      <?php if ($hasActiveFilter) { ?>
+      <a href="<?= BASE_URL ?>/assets.php" class="btn btn-line btn-sm">ล้าง</a>
+      <?php } ?>
+    </div>
+  </div>
+  <?php // ── แถวเพิ่มเติม: พับได้ — เรียงตาม / รุ่น / ผู้บันทึก / FW / การเบิก ?>
+  <div class="af-extra" id="af-extra">
+    <label class="assets-ff">
+      <span>เรียงตาม</span>
+      <select name="sort" onchange="this.form.submit()">
+        <option value="time_code" <?= $sort==='time_code'?'selected':'' ?>>บันทึกล่าสุด</option>
+        <option value="date_desc" <?= $sort==='date_desc'?'selected':'' ?>>ใหม่ → เก่า</option>
+        <option value="date_asc"  <?= $sort==='date_asc' ?'selected':'' ?>>เก่า → ใหม่</option>
+        <?php if ($sort==='code')   { ?><option value="code"   selected>รหัสเครื่อง</option><?php } ?>
+        <?php if ($sort==='recent') { ?><option value="recent" selected>เพิ่มเข้าระบบล่าสุด</option><?php } ?>
+      </select>
+    </label>
+    <label class="assets-ff">
+      <span>รุ่น</span>
+      <select name="product" onchange="this.form.submit()">
+        <option value="">ทั้งหมด</option>
+        <?php while ($p = $productList->fetch_assoc()) { ?>
+          <option value="<?= h($p['name']) ?>" <?= $product===$p['name']?'selected':'' ?>><?= h($p['name']) ?></option>
+        <?php } ?>
+      </select>
+    </label>
+    <label class="assets-ff">
+      <span>ผู้บันทึกรายการ</span>
+      <input type="text" name="recorder" value="<?= h($recorder) ?>" placeholder="ชื่อคนบันทึก" maxlength="100" autocomplete="off">
+    </label>
+    <label class="assets-ff assets-ff-fw">
+      <span>FW</span>
+      <input type="text" name="fw" value="<?= h($fw) ?>" placeholder="เวอร์ชัน" maxlength="40" autocomplete="off">
+    </label>
+    <label class="assets-ff assets-ff-wd">
+      <span>การเบิกใช้งาน</span>
+      <select name="wd" onchange="this.form.submit()">
+        <option value="">ทั้งหมด</option>
+        <?php foreach ($wdGroups as $wgLabel => $wdOpts) { ?>
+        <optgroup label="<?= h($wgLabel) ?>">
+          <?php foreach ($wdOpts as $wk => $wl) { ?>
+          <option value="<?= h($wk) ?>" <?= $wd===$wk?'selected':'' ?>><?= h($wl) ?></option>
+          <?php } ?>
+        </optgroup>
+        <?php } ?>
+      </select>
+    </label>
   </div>
 </form>
   <?php if ($withdrawSyncPendingCount > 0) { ?>
@@ -556,108 +561,160 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
 </div>
 
 <style>
-/* แถบค้นหา — ป้ายช่องตรงหัวตาราง และเรียงลำดับเดียวกับคอลัมน์ */
-.assets-filter {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: flex-end;
-  margin-bottom: 10px;
+/* ── Filter: layout ──────────────────────────────────────── */
+.assets-filter { margin-bottom: 10px; }
+.assets-filter-form { display: flex; flex-direction: column; gap: 10px; }
+.af-top { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+.af-search { flex: 1 1 160px; min-width: 140px; max-width: 260px; }
+.af-search .livesearch-wrap { display: block; width: 100%; position: relative; }
+.af-search input { width: 100%; }
+
+/* ── Status pills ─────────────────────────────────────────── */
+.af-status-row { flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.af-spill {
+  padding: 5px 11px; border-radius: 999px; cursor: pointer;
+  font-size: calc(12px * var(--font-scale,1)); font-weight: 600; white-space: nowrap;
+  border: 1.5px solid var(--border,#dfe4ec);
+  background: var(--surface-muted,#f4f1fb); color: var(--text-muted,#6b6480);
+  transition: background .1s, color .1s, border-color .1s, transform .1s;
+  line-height: 1.4;
 }
-.assets-filter-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 10px;
-  align-items: flex-end;
-  flex: 1 1 auto;
+.af-spill:hover { background: #fff; transform: translateY(-1px); border-color: var(--border-strong,#c3c0d0); }
+.af-spill.af-on {
+  background: var(--sp-bg,var(--primary)); color: var(--sp-fg,#fff);
+  border-color: var(--sp-fg,var(--primary));
 }
-.assets-ff {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-.assets-ff > span:first-child {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted, #6b6480);
-  line-height: 1.2;
-  white-space: nowrap;
-}
-.assets-ff input[type=text],
-.assets-ff select,
-.assets-ff-actions button,
-.assets-ff-actions .btn { min-height: var(--input-h, 40px); }
-.assets-ff select { min-width: 132px; max-width: 220px; }
-.assets-ff-code { flex: 1 1 170px; min-width: 150px; max-width: 240px; }
-.assets-ff-code .livesearch-wrap { display: block; width: 100%; position: relative; }
-.assets-ff-code input { width: 100%; }
-.assets-ff-fw { width: 108px; flex: 0 0 108px; }
-.assets-ff-fw input { width: 100%; }
-.assets-ff-wd select { min-width: 170px; max-width: 260px; }
-.assets-ff-actions { display: flex; gap: 8px; align-items: center; padding-bottom: 0; }
-.assets-filter-sync { display: inline-flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
-.assets-wsync-note { font-size: calc(12.5px * var(--font-scale, 1)); align-self: center; }
-.assets-wsync-flag {
-  display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px;
-  font-size: calc(11px * var(--font-scale, 1)); font-weight: 600; white-space: nowrap;
-  background: var(--warning-soft, #fef9c3); color: var(--warning, #a16207);
+.af-spill[data-val=""].af-on { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+/* ── Filter toggle + badge ────────────────────────────────── */
+.af-top-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.af-toggle-btn { display: inline-flex; align-items: center; gap: 5px; }
+.af-toggle-btn::after { content: '\25B8'; font-size: 11px; transition: transform .2s; }
+.af-toggle-btn[aria-expanded="true"]::after { transform: rotate(90deg); }
+.af-cnt {
+  display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 999px;
+  background: var(--primary); color: #fff; font-size: calc(11px * var(--font-scale,1));
+  font-weight: 700; text-align: center; line-height: 18px; margin-left: 2px;
 }
 
+/* ── Extra filters: พับ/กาง ───────────────────────────────── */
+.af-extra {
+  display: none; flex-wrap: wrap; gap: 8px 10px; align-items: flex-end;
+  padding-top: 10px; border-top: 1px solid var(--border,#dfe4ec);
+}
+.af-extra.af-open { display: flex; }
+.assets-ff { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.assets-ff > span:first-child {
+  font-size: 12px; font-weight: 600; color: var(--text-muted,#6b6480);
+  line-height: 1.2; white-space: nowrap;
+}
+.assets-ff input[type=text], .assets-ff select { min-height: var(--input-h,40px); }
+.af-extra .assets-ff select { min-width: 132px; max-width: 220px; }
+.af-extra .assets-ff-fw { width: 108px; flex: 0 0 108px; }
+.af-extra .assets-ff-fw input { width: 100%; }
+.af-extra .assets-ff-wd select { min-width: 170px; max-width: 260px; }
+.assets-filter-sync { display: inline-flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+.assets-wsync-note { font-size: calc(12.5px * var(--font-scale,1)); align-self: center; }
+.assets-wsync-flag {
+  display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px;
+  font-size: calc(11px * var(--font-scale,1)); font-weight: 600; white-space: nowrap;
+  background: var(--warning-soft,#fef9c3); color: var(--warning,#a16207);
+}
+
+/* ── Mobile ───────────────────────────────────────────────── */
 @media (max-width: 780px) {
-  .assets-ff, .assets-ff-code, .assets-ff-fw, .assets-ff-wd { flex: 1 1 calc(50% - 8px); max-width: none; width: auto; }
-  .assets-ff select { min-width: 0; max-width: none; width: 100%; }
-  .assets-ff-actions { flex: 1 1 100%; }
+  .af-search { max-width: none; }
+  .af-status-row { flex: 1 1 100%; }
+  .af-extra .assets-ff { flex: 1 1 calc(50% - 8px); max-width: none; }
+  .af-extra .assets-ff select { min-width: 0; max-width: none; width: 100%; }
 }
-/* ป้ายสถานะการเบิกขาย */
+
+/* ── การ์ดบนมือถือ: code+sub ซ้าย / status ขวา ─────────── */
+@media (max-width: 760px) {
+  table.assets-list tr { display: flex; flex-wrap: wrap; gap: 2px 10px; }
+  table.assets-list td[data-pri="1"]:first-of-type { flex: 1 1 0; min-width: 0; }
+  table.assets-list td[data-pri="1"]:last-of-type  { flex: 0 0 auto; align-self: center; }
+  table.assets-list .cell-sub { font-size: calc(12px * var(--font-scale,1)); margin-top: 2px; }
+}
+
+/* ── ป้ายการเบิกขาย ───────────────────────────────────────── */
 .sale-tag {
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-size: calc(12px * var(--font-scale, 1));
-  font-weight: 600;
-  white-space: nowrap;
+  display: inline-block; padding: 2px 10px; border-radius: 999px;
+  font-size: calc(12px * var(--font-scale,1)); font-weight: 600; white-space: nowrap;
 }
-.sale-in { background: var(--success-soft, #dcfce7); color: #15803d; }
-.sale-out { background: var(--warning-soft, #fef9c3); color: #a16207; }
-/* ไม่พบ S/N ในทะเบียน stock — ต่างจาก "อยู่ในคลัง" เพราะเราไม่รู้ ไม่ใช่รู้ว่ายังไม่ขาย */
-.sale-unknown { background: transparent; color: var(--text-muted, #6b6480); font-weight: 500; }
-/* ขายแล้วแต่ไม่มีเอกสารการเบิกที่ไหนเลย — ช่องว่างของข้อมูล ไม่ใช่สถานะปกติ */
-.sale-none { background: var(--surface-2, #f1efe8); color: var(--text-muted, #5f5e5a); }
-.sale-tag.asset-rent-status { border: 1px solid transparent; font-size: calc(11px * var(--font-scale, 1)); }
+.sale-in     { background: var(--success-soft,#dcfce7); color: #15803d; }
+.sale-out    { background: var(--warning-soft,#fef9c3); color: #a16207; }
+.sale-unknown{ background: transparent; color: var(--text-muted,#6b6480); font-weight: 500; }
+.sale-none   { background: var(--surface-2,#f1efe8); color: var(--text-muted,#5f5e5a); }
+.sale-tag.asset-rent-status { border: 1px solid transparent; font-size: calc(11px * var(--font-scale,1)); }
 </style>
 <script>
 (function(){
+  // ── livesearch ──────────────────────────────────────────────
   var input = document.getElementById('live-q');
-  var box = document.getElementById('live-results');
+  var box   = document.getElementById('live-results');
   var timer = null;
-  function esc(s){ var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+  function esc(s){ var d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML; }
   input.addEventListener('input', function(){
     clearTimeout(timer);
     var q = input.value.trim();
     if (q.length < 2) { box.hidden = true; return; }
     timer = setTimeout(function(){
-      var prod = document.querySelector('.assets-filter-form select[name="product"]');
-      var url = '<?= BASE_URL ?>/assets.php?ajax=suggest&q=' + encodeURIComponent(q);
-      if (prod && prod.value) { url += '&product=' + encodeURIComponent(prod.value); }
-      fetch(url)
-        .then(function(r){ return r.json(); })
-        .then(function(items){
-          if (!items.length) { box.innerHTML = '<div class="muted" style="padding:6px 10px">ไม่พบเครื่องที่ตรง</div>'; box.hidden = false; return; }
-          box.innerHTML = items.map(function(it){
-            return '<div onclick="openAssetUrl(\'<?= BASE_URL ?>/asset.php?id=' + it.id + '\')">'
-                 + '<b>' + esc(it.code) + '</b> <span class="muted">' + esc(it.pname) + ' · ' + esc(it.status) + '</span></div>';
-          }).join('');
-          box.hidden = false;
-        }).catch(function(){ box.hidden = true; });
+      var prod = document.querySelector('.af-extra select[name="product"]');
+      var url  = '<?= BASE_URL ?>/assets.php?ajax=suggest&q=' + encodeURIComponent(q);
+      if (prod && prod.value) url += '&product=' + encodeURIComponent(prod.value);
+      fetch(url).then(function(r){return r.json();}).then(function(items){
+        if (!items.length) { box.innerHTML = '<div class="muted" style="padding:6px 10px">ไม่พบเครื่องที่ตรง</div>'; box.hidden=false; return; }
+        box.innerHTML = items.map(function(it){
+          return '<div onclick="openAssetUrl(\'<?= BASE_URL ?>/asset.php?id=' + it.id + '\')">'
+               + '<b>' + esc(it.code) + '</b> <span class="muted">' + esc(it.pname) + ' \xb7 ' + esc(it.status) + '</span></div>';
+        }).join('');
+        box.hidden = false;
+      }).catch(function(){ box.hidden = true; });
     }, 350);
   });
-  document.addEventListener('click', function(e){ if (!box.contains(e.target) && e.target !== input) box.hidden = true; });
+  document.addEventListener('click', function(e){ if(!box.contains(e.target)&&e.target!==input) box.hidden=true; });
+
+  // ── Status pills ────────────────────────────────────────────
+  var spills = document.querySelectorAll('.af-spill');
+  var statusInput = document.getElementById('af-status-val');
+  var form = document.getElementById('assets-form');
+  spills.forEach(function(pill){
+    pill.addEventListener('click', function(){
+      spills.forEach(function(p){ p.classList.remove('af-on'); });
+      pill.classList.add('af-on');
+      statusInput.value = pill.dataset.val;
+      form.submit();
+    });
+  });
+
+  // ── Filter toggle ───────────────────────────────────────────
+  var toggle = document.getElementById('af-toggle');
+  var extra  = document.getElementById('af-extra');
+  var cntEl  = document.getElementById('af-cnt');
+  var extraCnt = <?= (int)($product!=='') + (int)($recorder!=='') + (int)($fw!=='') + (int)($wd!=='') + (int)($sort!=='time_code') ?>;
+
+  if (extraCnt > 0) { cntEl.textContent = extraCnt; cntEl.hidden = false; }
+
+  var open = extraCnt > 0;
+  try {
+    var saved = localStorage.getItem('af_open');
+    if (saved !== null && extraCnt === 0) open = saved === '1';
+    if (window.innerWidth > 780 && saved === null) open = true;
+  } catch(e) {}
+
+  function setOpen(v){
+    open = v;
+    extra.classList.toggle('af-open', v);
+    toggle.setAttribute('aria-expanded', v ? 'true' : 'false');
+    try { localStorage.setItem('af_open', v ? '1' : '0'); } catch(e) {}
+  }
+  setOpen(open);
+  toggle.addEventListener('click', function(){ setOpen(!open); });
 })();
 </script>
-
 <div class="table-wrap table-wrap-fold">
-<table class="list">
+<table class="list assets-list">
   <?php // data-pri = ลำดับความสำคัญของคอลัมน์ (shared/ui_table.css)
         // 1 เห็นทุกความกว้าง · 2 ยุบลงบรรทัดรองที่ < 900px · 3 ซ่อนที่ < 1100px ?>
   <?php // ต้องมี <thead> จริง ไม่ใช่ <tr><th> ลอย ๆ — โหมดการ์ดบนมือถือซ่อนหัวตาราง
