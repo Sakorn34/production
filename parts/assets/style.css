@@ -604,17 +604,18 @@ tr.history-sub-row td {
 
 /* ─ Stats & Cards ───────────────────────────────────────────────────────── */
 
+/* การ์ดตัวเลขสรุป — เตี้ยและชิดกว่าเดิม เพื่อให้ตารางรายการข้างล่างได้พื้นที่มากขึ้น */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 1rem;
-    margin-bottom: 2rem;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.6rem;
+    margin-bottom: 0.9rem;
 }
 
 .stat-card {
     background: var(--card);
     border-radius: var(--radius);
-    padding: 1.25rem 1.35rem;
+    padding: 0.7rem 0.9rem;
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--border);
     border-left: 4px solid var(--primary);
@@ -631,16 +632,17 @@ tr.history-sub-row td {
 .stat-card.danger  { border-left-color: var(--danger); }
 
 .stat-card .label {
-    font-size: calc(13px * var(--font-scale, 1));
+    font-size: calc(12px * var(--font-scale, 1));
     color: var(--text-muted);
-    margin-bottom: 0.45rem;
+    margin-bottom: 0.15rem;
     font-weight: 500;
 }
 
 .stat-card .value {
-    font-size: calc(26.5px * var(--font-scale, 1));
+    font-size: calc(20px * var(--font-scale, 1));
     font-weight: 700;
     letter-spacing: -0.02em;
+    line-height: 1.25;
 }
 
 /* การ์ดที่ห่อกรอบรายการไว้ ขอบบน 24px กลายเป็นช่องว่างเปล่าเหนือหัวตาราง
