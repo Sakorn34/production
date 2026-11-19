@@ -78,15 +78,6 @@ parts_page_header(
                 <?php endforeach; ?>
             </nav>
         </div>
-        <div class="pc-tool pc-tool-search">
-            <label class="pc-tool-label" for="pc-search">ค้นหาในหน้านี้</label>
-            <div class="products-search-bar pc-search-bar">
-                <span class="pc-search-ico" aria-hidden="true"><?= ui_icon_html('search', 16) ?></span>
-                <input type="search" id="pc-search" class="products-search-input"
-                       placeholder="<?= e($searchPh) ?>"
-                       autocomplete="off">
-            </div>
-        </div>
     </div>
 
     <div class="pc-stats" role="group" aria-label="สรุปช่วงที่เลือก">
