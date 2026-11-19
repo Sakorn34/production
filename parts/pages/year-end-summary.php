@@ -186,7 +186,14 @@ require_once __DIR__ . '/../includes/header.php';
     <?php if (empty($rows)): ?>
         <p class="empty-state">ไม่มีอะไหล่คงเหลือในคลัง</p>
     <?php else: ?>
-    <p class="ye-chip-note muted" id="ye-filter-note" hidden></p>
+    <div class="ye-filter-bar">
+        <label class="ye-vendor-label" for="ye-vendor-select">ผู้จำหน่าย</label>
+        <select id="ye-vendor-select" class="ye-vendor-select">
+            <option value="">ทั้งหมด</option>
+            <!-- JS เติม option ผู้จำหน่ายจริงให้เอง -->
+        </select>
+        <p class="ye-chip-note muted" id="ye-filter-note" hidden></p>
+    </div>
     <div class="table-wrap table-wrap-fold">
         <table class="ye-table">
             <colgroup>
@@ -277,6 +284,21 @@ require_once __DIR__ . '/../includes/header.php';
 }
 .price-input:focus { outline: none; border-color: var(--border-focus); }
 /* ชิปกรองรายการ — หน้าตาเดียวกับชิปในหน้าสั่งซื้ออะไหล่หลัก */
+.ye-filter-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.ye-vendor-label { font-size: calc(12px * var(--font-scale, 1)); color: var(--muted-text, #6b7280); white-space: nowrap; }
+.ye-vendor-select {
+    font: inherit; font-size: calc(12px * var(--font-scale, 1));
+    border: 1px solid var(--border, #e8e4f2); border-radius: 8px;
+    padding: 4px 28px 4px 10px; background: var(--card, #fff);
+    color: inherit; cursor: pointer;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center;
+    min-width: 150px; max-width: 220px;
+}
+.ye-vendor-select:focus { outline: none; border-color: var(--primary, #e11d74); }
+.ye-vendor-select.is-active { border-color: var(--primary, #e11d74); box-shadow: inset 0 0 0 1px var(--primary, #e11d74); }
+#ye-filter-note { margin: 0; }
 .ye-table { table-layout: fixed; width: 100%; }
 .ye-sort-th { cursor: pointer; user-select: none; white-space: nowrap; }
 .ye-sort-th:hover { color: var(--primary, #e11d74); }
@@ -316,40 +338,75 @@ tr[data-ye-price].is-hidden { display: none; }
 
 <script>
 (function () {
-    var chips = [].slice.call(document.querySelectorAll('[data-ye-filter]'));
-    if (!chips.length) { return; }
-    var rows = [].slice.call(document.querySelectorAll('tr[data-ye-price]'));
-    var note = document.getElementById('ye-filter-note');
-    var foot = document.querySelector('.ye-foot-row');
-    var KEY = 'parts_year_end_filter';
+    var chips   = [].slice.call(document.querySelectorAll('[data-ye-filter]'));
+    var rows    = [].slice.call(document.querySelectorAll('tr[data-ye-price]'));
+    var note    = document.getElementById('ye-filter-note');
+    var foot    = document.querySelector('.ye-foot-row');
+    var selEl   = document.getElementById('ye-vendor-select');
+    var PKEY    = 'parts_year_end_filter';
+    var VKEY    = 'parts_ye_vendor';
 
-    function apply(mode) {
+    // ── สร้าง option จากผู้จำหน่ายที่มีจริงในข้อมูล ──
+    if (selEl) {
+        var uniqVendors = [];
+        rows.forEach(function (tr) {
+            var v = (tr.querySelector('[data-supplier]') || {}).getAttribute ? tr.querySelector('[data-supplier]').getAttribute('data-supplier') : '';
+            if (v && v !== '—' && uniqVendors.indexOf(v) < 0) { uniqVendors.push(v); }
+        });
+        uniqVendors.sort(function (a, b) { return a.localeCompare(b, 'th'); });
+        uniqVendors.forEach(function (v) {
+            var opt = document.createElement('option'); opt.value = v; opt.textContent = v;
+            selEl.appendChild(opt);
+        });
+        // คืนค่าที่บันทึกไว้
+        try { var sv = localStorage.getItem(VKEY); if (sv) { selEl.value = sv; } } catch (e) {}
+    }
+
+    var currentPrice  = 'all';
+    var currentVendor = selEl ? selEl.value : '';
+
+    function applyFilters() {
         var shown = 0;
         rows.forEach(function (tr) {
-            var hit = mode === 'all' || tr.getAttribute('data-ye-price') === mode;
+            var priceOk  = currentPrice === 'all' || tr.getAttribute('data-ye-price') === currentPrice;
+            var vendorOk = !currentVendor;
+            if (!vendorOk) {
+                var cell = tr.querySelector('[data-supplier]');
+                vendorOk = cell && cell.getAttribute('data-supplier') === currentVendor;
+            }
+            var hit = priceOk && vendorOk;
             tr.classList.toggle('is-hidden', !hit);
             if (hit) { shown++; }
         });
         chips.forEach(function (c) {
-            c.classList.toggle('is-active', c.getAttribute('data-ye-filter') === mode);
+            c.classList.toggle('is-active', c.getAttribute('data-ye-filter') === currentPrice);
         });
-        // ยอดรวมท้ายตารางเป็นของทั้งคลังเสมอ ไม่ได้คิดตามที่กรอง จึงต้องบอกไว้ไม่ให้อ่านผิด
+        if (selEl) { selEl.classList.toggle('is-active', !!currentVendor); }
+        var isFiltered = currentPrice !== 'all' || !!currentVendor;
         if (note) {
-            note.hidden = mode === 'all';
-            note.textContent = mode === 'all' ? '' : 'แสดง ' + shown + ' รายการ · ยอดรวมท้ายตารางยังเป็นของทั้งคลัง';
+            note.hidden = !isFiltered;
+            if (isFiltered) {
+                var parts = [];
+                if (currentPrice !== 'all') { parts.push(currentPrice === 'none' ? 'ยังไม่มีราคา' : 'ใส่ราคาแล้ว'); }
+                if (currentVendor) { parts.push(currentVendor); }
+                note.textContent = 'แสดง ' + shown + ' รายการ' + (parts.length ? ' (' + parts.join(', ') + ')' : '') + ' · ยอดรวมท้ายตารางยังเป็นของทั้งคลัง';
+            }
         }
-        if (foot) { foot.classList.toggle('is-dim', mode !== 'all'); }
-        try { localStorage.setItem(KEY, mode); } catch (e) {}
+        if (foot) { foot.classList.toggle('is-dim', isFiltered); }
+        try { localStorage.setItem(PKEY, currentPrice); } catch (e) {}
+        try { if (currentVendor) { localStorage.setItem(VKEY, currentVendor); } else { localStorage.removeItem(VKEY); } } catch (e) {}
     }
 
     chips.forEach(function (c) {
-        c.addEventListener('click', function () { apply(c.getAttribute('data-ye-filter')); });
+        c.addEventListener('click', function () { currentPrice = c.getAttribute('data-ye-filter'); applyFilters(); });
     });
+    if (selEl) {
+        selEl.addEventListener('change', function () { currentVendor = selEl.value; applyFilters(); });
+    }
 
-    var saved = 'all';
-    try { saved = localStorage.getItem(KEY) || 'all'; } catch (e) {}
-    if (['all', 'none', 'has'].indexOf(saved) < 0) { saved = 'all'; }
-    apply(saved);
+    // คืนสถานะจาก localStorage
+    try { var sp = localStorage.getItem(PKEY) || 'all'; currentPrice = ['all','none','has'].indexOf(sp) >= 0 ? sp : 'all'; } catch (e) {}
+    applyFilters();
 })();
 
 // ── sort ตามผู้จำหน่าย ──
