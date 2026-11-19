@@ -18,13 +18,13 @@ if ($periodIn === '90') {
 } elseif ($periodIn === '30') {
     $periodIn = '30d';
 }
-$tabIn = (string) ($_GET['tab'] ?? 'parts');
+$tabIn = (string) ($_GET['tab'] ?? 'models');
 $stIn = (string) ($_GET['st'] ?? 'all');
 if (!isset(PURCHASE_CHECK_PERIODS[$periodIn])) {
     $periodIn = '90d';
 }
 if (!isset(PURCHASE_CHECK_TABS[$tabIn])) {
-    $tabIn = 'parts';
+    $tabIn = 'models';
 }
 if (!isset(PURCHASE_CHECK_STATUS[$stIn])) {
     $stIn = 'all';

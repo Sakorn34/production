@@ -17,10 +17,9 @@ const PURCHASE_CHECK_PERIODS = [
     '90d'   => '90 วัน',
 ];
 
-/** @var array<string,string> คีย์มุมมอง — ลำดับเดียวกับแถบสรุป: รุ่น · อะไหล่ · ผู้จำหน่าย */
+/** @var array<string,string> คีย์มุมมอง */
 const PURCHASE_CHECK_TABS = [
     'models'    => 'แยกตามรุ่นเครื่อง',
-    'parts'     => 'อะไหล่ที่ถูกเบิก',
     'suppliers' => 'แยกตามผู้จำหน่าย',
 ];
 
@@ -112,7 +111,7 @@ function purchase_check_url(array $over = []): string
     } elseif ($period === '30') {
         $period = '30d';
     }
-    $tab = (string) ($over['tab'] ?? ($_GET['tab'] ?? 'parts'));
+    $tab = (string) ($over['tab'] ?? ($_GET['tab'] ?? 'models'));
     $st = (string) ($over['st'] ?? ($_GET['st'] ?? 'all'));
     if (array_key_exists('period', $over) && $over['period'] === null) {
         $period = '90d';
@@ -121,13 +120,13 @@ function purchase_check_url(array $over = []): string
         $period = '90d';
     }
     if (!isset(PURCHASE_CHECK_TABS[$tab])) {
-        $tab = 'parts';
+        $tab = 'models';
     }
     if (!isset(PURCHASE_CHECK_STATUS[$st])) {
         $st = 'all';
     }
     $qs = ['period' => $period];
-    if ($tab !== 'parts') {
+    if ($tab !== 'models') {
         $qs['tab'] = $tab;
     }
     if ($st !== 'all') {
