@@ -2653,3 +2653,15 @@ a.asset-sales-ref-link:hover {
 .asset-sales-step-title { margin-top: 2px; line-height: 1.7; }
 .asset-sales-step-meta { margin-top: 2px; font-size: calc(12px * var(--font-scale, 1)); line-height: 1.7; }
 .asset-sales-line-sn { white-space: nowrap; }
+
+/* ── Dashboard: เงาการ์ดสองชั้น (ขอบคม + ฟุ้งด้านล่าง) อมสีเมนู ให้การ์ดลอยจากพื้นม่วงอ่อน ── */
+.content:has(> .dash-top-row) {
+  --dash-shadow: 0 1px 2px color-mix(in srgb, var(--sidebar-bg) 7%, transparent),
+                 0 8px 24px -6px color-mix(in srgb, var(--sidebar-bg) 16%, transparent);
+  --dash-shadow-hover: 0 2px 4px color-mix(in srgb, var(--sidebar-bg) 8%, transparent),
+                       0 14px 32px -8px color-mix(in srgb, var(--sidebar-bg) 22%, transparent);
+}
+.content:has(> .dash-top-row) .panel,
+.dash-top-row > .kpi-status-overview,
+.dash-side-kpis .side-kpi { box-shadow: var(--dash-shadow); }
+.dash-side-kpis .side-kpi.clickable:hover { box-shadow: var(--dash-shadow-hover); transform: translateY(-2px); }
