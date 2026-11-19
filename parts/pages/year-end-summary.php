@@ -61,26 +61,20 @@ function year_end_compute_summary(array $rows): array
  */
 function year_end_export_csv(array $rows, array $summary): void
 {
-    // อ่านรูปครั้งเดียวก่อน stream CSV
-    $icons = parts_product_icon_map($rows);
-
     header('Content-Type: text/csv; charset=UTF-8');
     header('Content-Disposition: attachment; filename="year-end-stock-' . date('Y-m-d') . '.csv"');
     echo "\xEF\xBB\xBF";
     $out = fopen('php://output', 'w');
-    fputcsv($out, ['รหัส', 'ชื่ออะไหล่', 'ผู้จำหน่าย', 'รูป (URL)', 'จำนวนคงเหลือ', 'หน่วย', 'ราคาต่อหน่วย', 'มูลค่ารวม', 'หมายเหตุ']);
+    fputcsv($out, ['รหัส', 'ชื่ออะไหล่', 'ผู้จำหน่าย', 'จำนวนคงเหลือ', 'หน่วย', 'ราคาต่อหน่วย', 'มูลค่ารวม', 'หมายเหตุ']);
     foreach ($rows as $row) {
         $qty = qty_norm($row['quantity']);
         $hasPrice = year_end_has_price($row['price'] ?? null);
         $price = $hasPrice ? (float) $row['price'] : null;
         $lineValue = $hasPrice ? $qty * $price : null;
-        $iconPath = $icons[$row['code']] ?? '';
-        $imgUrl = $iconPath !== '' ? (parts_upload_img_url($iconPath) ?? '') : '';
         fputcsv($out, [
             $row['code'],
             parts_display_name($row),
             $row['supplier'] ?? '',
-            $imgUrl,
             qty_input_value($qty),
             $row['unit'],
             $hasPrice ? number_format($price, 2, '.', '') : '',
@@ -89,9 +83,9 @@ function year_end_export_csv(array $rows, array $summary): void
         ]);
     }
     fputcsv($out, []);
-    fputcsv($out, ['สรุป', '', '', '', qty_input_value($summary['total_qty']), '', '', number_format($summary['total_value'], 2, '.', ''), '']);
-    fputcsv($out, ['รายการในคลัง', $summary['total_items'], '', '', '', '', '', '', '']);
-    fputcsv($out, ['ยังไม่มีราคา', $summary['missing_price'], '', '', '', '', '', '', '']);
+    fputcsv($out, ['สรุป', '', '', qty_input_value($summary['total_qty']), '', '', number_format($summary['total_value'], 2, '.', ''), '']);
+    fputcsv($out, ['รายการในคลัง', $summary['total_items'], '', '', '', '', '', '']);
+    fputcsv($out, ['ยังไม่มีราคา', $summary['missing_price'], '', '', '', '', '', '']);
     fclose($out);
     exit;
 }
@@ -280,67 +274,130 @@ require_once __DIR__ . '/../includes/header.php';
 </form>
 
 <style>
-.row-missing-price { background: var(--warning-soft); }
-.row-missing-price .price-input { border-color: var(--warning); }
-.price-input {
-    padding: 8px 10px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-size: 14px;
-    font-family: inherit;
-}
-.price-input:focus { outline: none; border-color: var(--border-focus); }
-/* ชิปกรองรายการ — หน้าตาเดียวกับชิปในหน้าสั่งซื้ออะไหล่หลัก */
-.ye-filter-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
-.ye-vendor-label { font-size: calc(12px * var(--font-scale, 1)); color: var(--muted-text, #6b7280); white-space: nowrap; }
-.ye-vendor-select {
-    font: inherit; font-size: calc(12px * var(--font-scale, 1));
-    border: 1px solid var(--border, #e8e4f2); border-radius: 8px;
-    padding: 4px 28px 4px 10px; background: var(--card, #fff);
-    color: inherit; cursor: pointer;
-    appearance: none; -webkit-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: right 10px center;
-    min-width: 150px; max-width: 220px;
-}
-.ye-vendor-select:focus { outline: none; border-color: var(--primary, #e11d74); }
-.ye-vendor-select.is-active { border-color: var(--primary, #e11d74); box-shadow: inset 0 0 0 1px var(--primary, #e11d74); }
-#ye-filter-note { margin: 0; }
-.ye-table { table-layout: fixed; width: 100%; }
-.ye-sort-th { cursor: pointer; user-select: none; white-space: nowrap; }
-.ye-sort-th:hover { color: var(--primary, #e11d74); }
-.ye-sort-th[data-sort-asc] .ye-sort-icon::after { content: " ▲"; font-size: 10px; }
-.ye-sort-th[data-sort-desc] .ye-sort-icon::after { content: " ▼"; font-size: 10px; }
-.ye-sort-icon { font-size: 11px; color: var(--muted, #9ca3af); margin-left: 2px; }
-.ye-sort-th[data-sort-asc] .ye-sort-icon,
-.ye-sort-th[data-sort-desc] .ye-sort-icon { color: var(--primary, #e11d74); }
-.ye-supplier { max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ye-table td, .ye-table th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ye-table td.col-img { text-overflow: clip; overflow: visible; white-space: normal; }
-.ye-table td:nth-child(2), .ye-table th:nth-child(2) { white-space: normal; } /* ชื่อตัดบรรทัดได้ */
-.ye-noimg {
-    display: inline-block; width: 40px; height: 40px; border-radius: 8px;
-    border: 1px dashed var(--border, #e5e7eb); background: var(--bg, #f8fafc);
-}
-#ye-filter-note { margin: -2px 0 10px; }
-.ye-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
-.ye-head > h2 { margin: 0; }
-/* ชิปยุบลงบรรทัดใหม่ในตัวเองเมื่อที่ไม่พอ ปุ่มบันทึกจึงอยู่ท้ายบรรทัดเดิมเสมอ */
-.ye-head > .ye-chip-row { flex: 0 1 auto; min-width: 0; }
-.ye-head > .btn { margin-left: auto; flex: 0 0 auto; }
-.ye-chip-row { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+/* ══ หัวการ์ด ══ */
+.ye-head { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:14px; }
+.ye-head > h2 { margin:0; }
+.ye-head > .ye-chip-row { flex:0 1 auto; min-width:0; }
+.ye-head > .btn { margin-left:auto; flex:0 0 auto; }
+
+/* ── ชิปกรองราคา ── */
+.ye-chip-row { display:flex; flex-wrap:wrap; gap:5px; align-items:center; }
 .ye-chip {
-    cursor: pointer; font: inherit; background: var(--card, #fff);
-    border: 1px solid var(--border, #e8e4f2); border-radius: 999px;
-    padding: 5px 8px; font-size: calc(12px * var(--font-scale, 1)); flex: 0 0 auto;
-    font-variant-numeric: tabular-nums; color: inherit;
+    cursor:pointer; font:inherit;
+    background:var(--card,#fff);
+    border:1px solid var(--border,#e8e4f2);
+    border-radius:999px;
+    padding:5px 10px;
+    font-size:calc(11.5px * var(--font-scale,1));
+    flex:0 0 auto;
+    font-variant-numeric:tabular-nums;
+    color:inherit;
+    transition:background .12s, border-color .12s;
 }
-.ye-chip:hover { border-color: var(--primary, #e11d74); background: var(--primary-soft, #fce7f3); }
-.ye-chip.is-active { border-color: var(--primary, #e11d74); box-shadow: inset 0 0 0 1px var(--primary, #e11d74); background: var(--primary-soft, #fce7f3); }
-.ye-chip b { color: var(--primary, #e11d74); margin-left: 2px; }
-.ye-chip-note { font-size: calc(12px * var(--font-scale, 1)); }
-tr[data-ye-price].is-hidden { display: none; }
-.ye-foot-row.is-dim td { opacity: .6; }
+.ye-chip:hover { border-color:var(--primary,#e11d74); background:var(--primary-soft,#fce7f3); }
+.ye-chip.is-active { border-color:var(--primary,#e11d74); box-shadow:inset 0 0 0 1px var(--primary,#e11d74); background:var(--primary-soft,#fce7f3); }
+.ye-chip b { color:var(--primary,#e11d74); margin-left:3px; }
+.ye-chip-note { font-size:calc(12px * var(--font-scale,1)); }
+
+/* ── แถบกรองผู้จำหน่าย ── */
+.ye-filter-bar { display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+.ye-vendor-label { font-size:calc(12px * var(--font-scale,1)); font-weight:600; color:var(--muted-text,#6b7280); white-space:nowrap; }
+.ye-vendor-select {
+    font:inherit; font-size:calc(12.5px * var(--font-scale,1));
+    border:1px solid var(--border,#e8e4f2); border-radius:8px;
+    padding:5px 30px 5px 11px; background:var(--card,#fff);
+    color:inherit; cursor:pointer;
+    appearance:none; -webkit-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 10px center;
+    min-width:160px; max-width:240px;
+    transition:border-color .12s;
+}
+.ye-vendor-select:focus { outline:none; border-color:var(--primary,#e11d74); }
+.ye-vendor-select.is-active { border-color:var(--primary,#e11d74); box-shadow:inset 0 0 0 1px var(--primary,#e11d74); color:var(--primary,#e11d74); font-weight:600; }
+#ye-filter-note { margin:0; font-size:calc(11.5px * var(--font-scale,1)); color:var(--muted-text,#6b7280); }
+
+/* ══ ตาราง ══ */
+.ye-table { table-layout:fixed; width:100%; border-collapse:separate; border-spacing:0; }
+
+/* header */
+.ye-table thead th {
+    background:var(--bg,#f8fafc);
+    font-size:calc(10.5px * var(--font-scale,1));
+    font-weight:700;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    color:var(--muted-text,#6b7280);
+    padding:10px 14px;
+    border-top:1px solid var(--border,#e8e4f2);
+    border-bottom:2px solid var(--border,#e8e4f2);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    position:sticky; top:0; z-index:1;
+}
+.ye-table thead th:first-child { border-radius:8px 0 0 0; }
+.ye-table thead th:last-child  { border-radius:0 8px 0 0; }
+
+/* data rows */
+.ye-table tbody tr { transition:background .1s; }
+.ye-table tbody tr:hover td { background:var(--primary-soft,#fdf4ff) !important; }
+.ye-table tbody td {
+    padding:10px 14px;
+    border-bottom:1px solid var(--border,#f0edf8);
+    font-size:calc(13.5px * var(--font-scale,1));
+    vertical-align:middle;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.ye-table td.col-img { text-overflow:clip; overflow:visible; white-space:normal; padding:6px 10px; }
+.ye-table td:nth-child(2), .ye-table th:nth-child(2) { white-space:normal; }
+
+/* แถวยังไม่มีราคา */
+.row-missing-price td { background:color-mix(in srgb, var(--warning,#d97706) 6%, transparent); }
+.row-missing-price:hover td { background:color-mix(in srgb, var(--warning,#d97706) 12%, transparent) !important; }
+.row-missing-price .price-input { border-color:var(--warning,#d97706); background:#fffbf2; }
+
+/* กล่องกรอกราคา */
+.price-input {
+    padding:7px 10px;
+    border:1.5px solid var(--border,#d1d5db);
+    border-radius:8px;
+    font-size:calc(13px * var(--font-scale,1));
+    font-family:inherit;
+    font-variant-numeric:tabular-nums;
+    text-align:right;
+    width:110px;
+    transition:border-color .15s, box-shadow .15s;
+    background:var(--card,#fff);
+}
+.price-input:hover { border-color:var(--primary,#e11d74); }
+.price-input:focus { outline:none; border-color:var(--primary,#e11d74); box-shadow:0 0 0 3px color-mix(in srgb, var(--primary,#e11d74) 15%, transparent); }
+
+/* คอลัมน์ผู้จำหน่าย */
+.ye-supplier { max-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted-text,#6b7280); font-size:calc(12px * var(--font-scale,1)); }
+
+/* ปุ่ม sort */
+.ye-sort-th { cursor:pointer; user-select:none; }
+.ye-sort-th:hover { color:var(--primary,#e11d74); }
+.ye-sort-icon { font-size:10px; color:var(--muted,#9ca3af); margin-left:2px; opacity:.6; }
+.ye-sort-th[data-sort-asc]  .ye-sort-icon,
+.ye-sort-th[data-sort-desc] .ye-sort-icon { color:var(--primary,#e11d74); opacity:1; }
+.ye-sort-th[data-sort-asc]  .ye-sort-icon::after { content:" ▲"; }
+.ye-sort-th[data-sort-desc] .ye-sort-icon::after { content:" ▼"; }
+
+/* รูป placeholder */
+.ye-noimg { display:inline-block; width:40px; height:40px; border-radius:8px; border:1px dashed var(--border,#d1d5db); background:var(--bg,#f8fafc); }
+
+/* tfoot */
+.ye-foot-row td {
+    padding:11px 14px;
+    background:var(--bg,#f8fafc) !important;
+    border-top:2px solid var(--border,#e8e4f2);
+    border-bottom:none;
+    font-size:calc(13px * var(--font-scale,1));
+    font-weight:700; color:var(--text,#1f1535);
+    font-variant-numeric:tabular-nums;
+}
+.ye-foot-row.is-dim td { opacity:.55; }
+tr[data-ye-price].is-hidden { display:none; }
 </style>
 
 <script>
