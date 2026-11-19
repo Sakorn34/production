@@ -214,57 +214,59 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   .dash-top-row { grid-template-columns: 1fr; }
 }
 
-/* การ์ดเครื่องทั้งหมด — ตัวเลขรวมซ้าย รายการสถานะสองคอลัมน์ขวา */
-.kpi-status-overview { display: flex; flex-direction: column; justify-content: center; padding: 16px 18px; border-radius: 14px; }
-.so-wrap { display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 22px; align-items: center; }
+/* การ์ดเครื่องทั้งหมด — หัวการ์ด (โลโก้ + ตัวเลขรวม) แล้วช่องสถานะพื้นอ่อนเรียงเป็นตาราง */
+.kpi-status-overview {
+  display: flex; flex-direction: column; justify-content: center; gap: 14px;
+  padding: 16px 18px; border-radius: 14px;
+}
 .dash-top-row > .kpi-status-overview { container-type: inline-size; }
-.so-total {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 12px;
-  padding: 4px 18px 4px 0; border-right: 1px solid var(--border);
-}
+.so-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
 .so-logo {
-  display: block; width: 52px; height: 52px; border-radius: 14px;
-  box-shadow: 0 4px 12px rgba(42, 36, 64, .10), 0 1px 2px rgba(42, 36, 64, .06);
+  display: block; width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+  box-shadow: 0 3px 10px rgba(42, 36, 64, .12), 0 1px 2px rgba(42, 36, 64, .06);
 }
-.so-lbl { font-size: calc(12px * var(--font-scale, 1)); font-weight: 600; color: var(--text-muted, #6b6480); }
+.so-total { display: flex; align-items: baseline; gap: 8px; }
 .so-num {
-  display: block; font-size: calc(30px * var(--font-scale, 1)); font-weight: 700; line-height: 1.15;
+  font-size: calc(28px * var(--font-scale, 1)); font-weight: 700; line-height: 1.1;
   letter-spacing: -.02em; color: var(--primary); font-variant-numeric: tabular-nums;
 }
-.so-hint { margin-top: -6px; font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-faint, #a49cc0); }
-
-.status-legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 14px; }
-.status-legend-item {
-  display: block; padding: 5px 8px; border-radius: var(--radius-sm, 8px);
-  color: inherit; text-decoration: none; transition: background .12s, opacity .15s;
+.so-lbl { font-size: calc(13px * var(--font-scale, 1)); font-weight: 600; color: var(--text-muted, #6b6480); }
+.so-hint {
+  margin-left: auto; padding: 4px 10px; border-radius: 999px;
+  background: var(--surface-muted, #f4f1fb);
+  font-size: calc(11px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); white-space: nowrap;
 }
-.status-legend-item:hover, .status-legend-item:focus-visible { background: var(--surface-muted); outline: none; }
-.status-legend-row { display: flex; align-items: center; gap: 7px; }
+
+.status-legend { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.status-legend-item {
+  display: flex; flex-direction: column; gap: 3px; min-width: 0;
+  padding: 9px 11px; border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-muted, #f4f1fb) 65%, #fff);
+  color: inherit; text-decoration: none; transition: background .12s, box-shadow .12s, opacity .15s;
+}
+.status-legend-item:hover, .status-legend-item:focus-visible {
+  background: var(--surface-muted, #f4f1fb); outline: none;
+}
 .status-legend-item.is-active-filter {
-  background: var(--surface-muted);
+  background: #fff;
   box-shadow: inset 0 0 0 1.5px var(--border-strong);
 }
 .status-legend-item.is-dimmed-filter,
 .dash-bar-seg.is-dimmed-filter { opacity: .28; }
+.status-legend-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
 /* สี่เหลี่ยมมุมมน ชุดเดียวกับ .dash-status-swatch ของกราฟด้านล่าง */
-.status-dot { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+.status-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
 .status-legend-label {
-  flex: 1 0 auto; white-space: nowrap;
-  font-size: calc(12px * var(--font-scale, 1)); color: var(--text-muted, #6b6480);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480);
 }
+.status-legend-val { display: flex; align-items: baseline; gap: 6px; }
 .status-legend-num {
-  font-size: calc(13.5px * var(--font-scale, 1)); font-weight: 700; font-variant-numeric: tabular-nums; color: #211a2e;
+  font-size: calc(16px * var(--font-scale, 1)); font-weight: 700; font-variant-numeric: tabular-nums; color: #211a2e;
 }
 .status-legend-pct {
-  width: 36px; text-align: right; flex-shrink: 0;
   font-size: calc(11px * var(--font-scale, 1)); color: var(--text-faint, #a49cc0); font-variant-numeric: tabular-nums;
 }
-.status-legend-track {
-  display: block; height: 3px; margin-top: 5px; border-radius: 2px;
-  background: var(--surface-muted, #f4f1fb); overflow: hidden;
-}
-.status-legend-track > span { display: block; height: 100%; border-radius: 2px; }
-
 /* การ์ดอะไหล่ด้านขวา — พื้นสีอ่อนตามความหมาย ไอคอนในกล่องขาวหน้าหัวข้อ */
 .dash-side-kpis .side-kpi {
   flex: 1; display: flex; flex-direction: column; justify-content: center;
@@ -298,22 +300,13 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .side-kpi-io .is-in { color: var(--success); }
 .side-kpi-io .is-out { color: var(--sk); }
 
-/* การ์ดแคบ (จอโน้ตบุ๊กที่ย่อเมนูไม่ได้ / แท็บเล็ต) — ตัวเลขรวมขึ้นไปเป็นแถวบน รายการสถานะได้ความกว้างเต็มการ์ด */
-@container (max-width: 640px) {
-  .so-wrap { grid-template-columns: 1fr; gap: 10px; }
-  .so-total {
-    flex-direction: row; align-items: center; flex-wrap: wrap; gap: 6px 12px;
-    padding: 0 0 12px; border-right: 0; border-bottom: 1px solid var(--border);
-  }
-  .so-logo { width: 44px; height: 44px; border-radius: 12px; }
-  .so-num { font-size: calc(26px * var(--font-scale, 1)); }
-  .so-hint { margin: 0 0 0 auto; align-self: flex-end; }
-  .status-legend { gap: 0 10px; }
-  .status-legend-pct { width: 32px; }
-  .status-legend-item { padding: 5px 6px; }
+/* ช่องสถานะลดคอลัมน์ตามความกว้างการ์ด ไม่ใช่ความกว้างจอ — การ์ดนี้แคบลงได้ทั้งจากจอเล็กและจากเมนูข้างที่กางอยู่ */
+@container (max-width: 520px) {
+  .status-legend { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
-@container (max-width: 330px) {
-  .status-legend { grid-template-columns: 1fr; }
+@container (max-width: 380px) {
+  .status-legend { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .so-hint { display: none; }
 }
 /* ── Dashboard รวม: อะไหล่ใกล้หมด (modal / popup) ── */
 .dash-low-stock-empty { margin: 0; padding: 4px 0; }

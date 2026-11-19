@@ -359,24 +359,21 @@ $partsBase = ui_parts_base_url();
       return $d !== 0 ? $d : ($statusCycleIdx[$a] - $statusCycleIdx[$b]);
   });
   ?>
-  <?php // ตัวเลขรวมฝั่งซ้าย รายการสถานะสองคอลัมน์ฝั่งขวา แต่ละสถานะมีแถบสัดส่วนของตัวเอง
-       // แทนแท่งรวมยาวแท่งเดียว — สถานะเล็ก ๆ (สำรอง/สูญหาย) อ่านค่าได้โดยไม่ต้องเพ่งหาบล็อก 4px
-       // กดป้าย = ไฮไลต์สถานะนั้นในกราฟด้านล่าง (dashStatusFilter) · Ctrl/กลางคลิก = ไปทะเบียนเครื่อง ?>
+  <?php // หัวการ์ด: โลโก้ + ตัวเลขรวม · ด้านล่างเป็นช่องสถานะเรียงตามจำนวน (4 คอลัมน์ ลดตามความกว้างการ์ด)
+       // กดช่อง = ไฮไลต์สถานะนั้นในกราฟด้านล่าง (dashStatusFilter) · Ctrl/กลางคลิก = ไปทะเบียนเครื่อง ?>
   <div class="kpi kpi-status-overview">
-    <div class="so-wrap">
-    <div class="so-total">
-      <img class="so-logo" src="<?= h($B) ?>/assets/bit-combine-icon.png" alt="bit combine" width="52" height="52">
-      <div class="so-text">
-        <div class="so-lbl">เครื่องทั้งหมด</div>
+    <div class="so-head">
+      <img class="so-logo" src="<?= h($B) ?>/assets/bit-combine-icon.png" alt="bit combine" width="40" height="40">
+      <div class="so-total">
         <b class="so-num"><?= number_format($total) ?></b>
+        <span class="so-lbl">เครื่องทั้งหมด</span>
       </div>
-      <div class="so-hint">กดสถานะเพื่อไฮไลต์กราฟ</div>
+      <span class="so-hint">กดสถานะเพื่อไฮไลต์กราฟ</span>
     </div>
     <div class="status-legend">
       <?php foreach ($statusByCount as $st):
           $n = (int) ($byStatus[$st] ?? 0);
           $href = "$B/assets.php?status=$st";
-          $w = $total > 0 ? max($n / $total * 100, $n > 0 ? 1.5 : 0) : 0;
       ?>
       <a class="status-legend-item" href="<?= h($href) ?>" data-status="<?= h($st) ?>"
          onclick="if(event.ctrlKey||event.metaKey||event.shiftKey||event.button===1)return true;dashStatusFilter.toggle('<?= h($st) ?>');return false;"
@@ -384,13 +381,13 @@ $partsBase = ui_parts_base_url();
         <span class="status-legend-row">
           <i class="status-dot" style="background:<?= h(dash_chart_color($st)) ?>"></i>
           <span class="status-legend-label"><?= h(status_th_chip($st)) ?></span>
+        </span>
+        <span class="status-legend-val">
           <b class="status-legend-num"><?= number_format($n) ?></b>
           <span class="status-legend-pct"><?= h(pct_label($n, $total)) ?></span>
         </span>
-        <span class="status-legend-track"><span style="width:<?= round($w, 2) ?>%;background:<?= h(dash_chart_color($st)) ?>"></span></span>
       </a>
       <?php endforeach; ?>
-    </div>
     </div>
   </div>
   <div class="dash-side-kpis">
