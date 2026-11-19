@@ -206,7 +206,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
    auto-fit ต้องเผื่อคอลัมน์ให้พอกับการ์ดรวมที่กว้างเต็มแถว แต่การ์ดอะไหล่ใช้แค่คอลัมน์เดียว
    เหลือช่องว่างลอยข้าง ๆ เกือบครึ่งแถว */
 .dash-top-row {
-  display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(200px, 1fr);
+  display: grid; grid-template-columns: minmax(0, 2.8fr) minmax(200px, 1fr);
   gap: 12px; align-items: stretch; margin-bottom: 16px;
 }
 .dash-side-kpis { display: flex; flex-direction: column; gap: 12px; }
