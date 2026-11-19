@@ -188,11 +188,22 @@ require_once __DIR__ . '/../includes/header.php';
     <?php else: ?>
     <p class="ye-chip-note muted" id="ye-filter-note" hidden></p>
     <div class="table-wrap table-wrap-fold">
-        <table>
+        <table class="ye-table">
+            <colgroup>
+                <col style="width:60px"><!-- รูป -->
+                <col><!-- ชื่ออะไหล่ — ยืด/หดตามที่เหลือ -->
+                <col style="width:14%"><!-- ผู้จำหน่าย -->
+                <col style="width:11%"><!-- คงเหลือ -->
+                <col style="width:16%"><!-- ราคา/หน่วย -->
+                <col style="width:11%"><!-- มูลค่ารวม -->
+            </colgroup>
             <thead>
                 <tr>
                     <th class="col-img">รูป</th>
                     <th>ชื่ออะไหล่</th>
+                    <th class="ye-sort-th" data-ye-sort="supplier">
+                        ผู้จำหน่าย <span class="ye-sort-icon" aria-hidden="true">⇅</span>
+                    </th>
                     <th class="text-right">คงเหลือ</th>
                     <th class="text-right">ราคา/หน่วย</th>
                     <th class="text-right">มูลค่ารวม</th>
@@ -219,6 +230,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <td>
                         <a href="<?= url('/pages/product-detail.php?id=' . (int) $row['id']) ?>" target="_blank" rel="noopener noreferrer" title="เปิดโปรไฟล์อะไหล่ในแท็บใหม่"><?= e(parts_display_name($row)) ?></a>
                     </td>
+                    <td class="ye-supplier" data-supplier="<?= e($row['supplier'] ?? '') ?>"><?= e($row['supplier'] ?? '—') ?></td>
                     <td class="text-right"><?= formatNumber($qty) ?> <?= e($row['unit']) ?></td>
                     <td class="text-right" style="min-width:120px">
                         <input type="number"
@@ -242,7 +254,7 @@ require_once __DIR__ . '/../includes/header.php';
             </tbody>
             <tfoot>
                 <tr class="ye-foot-row" style="background:var(--bg); font-weight:600">
-                    <td colspan="2">รวม (เฉพาะรายการที่มีราคา)</td>
+                    <td colspan="3">รวม (เฉพาะรายการที่มีราคา)</td>
                     <td class="text-right"><?= formatNumber($summary['total_qty']) ?></td>
                     <td></td>
                     <td class="text-right"><?= formatCurrency($summary['total_value']) ?></td>
@@ -265,6 +277,18 @@ require_once __DIR__ . '/../includes/header.php';
 }
 .price-input:focus { outline: none; border-color: var(--border-focus); }
 /* ชิปกรองรายการ — หน้าตาเดียวกับชิปในหน้าสั่งซื้ออะไหล่หลัก */
+.ye-table { table-layout: fixed; width: 100%; }
+.ye-sort-th { cursor: pointer; user-select: none; white-space: nowrap; }
+.ye-sort-th:hover { color: var(--primary, #e11d74); }
+.ye-sort-th[data-sort-asc] .ye-sort-icon::after { content: " ▲"; font-size: 10px; }
+.ye-sort-th[data-sort-desc] .ye-sort-icon::after { content: " ▼"; font-size: 10px; }
+.ye-sort-icon { font-size: 11px; color: var(--muted, #9ca3af); margin-left: 2px; }
+.ye-sort-th[data-sort-asc] .ye-sort-icon,
+.ye-sort-th[data-sort-desc] .ye-sort-icon { color: var(--primary, #e11d74); }
+.ye-supplier { max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ye-table td, .ye-table th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ye-table td.col-img { text-overflow: clip; overflow: visible; white-space: normal; }
+.ye-table td:nth-child(2), .ye-table th:nth-child(2) { white-space: normal; } /* ชื่อตัดบรรทัดได้ */
 .ye-noimg {
     display: inline-block; width: 40px; height: 40px; border-radius: 8px;
     border: 1px dashed var(--border, #e5e7eb); background: var(--bg, #f8fafc);
@@ -326,6 +350,72 @@ tr[data-ye-price].is-hidden { display: none; }
     try { saved = localStorage.getItem(KEY) || 'all'; } catch (e) {}
     if (['all', 'none', 'has'].indexOf(saved) < 0) { saved = 'all'; }
     apply(saved);
+})();
+
+// ── sort ตามผู้จำหน่าย ──
+(function () {
+    var SORT_KEY = 'parts_ye_sort';
+    var sortThs = [].slice.call(document.querySelectorAll('[data-ye-sort]'));
+    if (!sortThs.length) { return; }
+    var tbody = document.querySelector('.ye-table tbody');
+    if (!tbody) { return; }
+
+    var sortDir = { supplier: 0 }; // 0=ไม่ sort, 1=asc, -1=desc
+    try {
+        var saved = JSON.parse(localStorage.getItem(SORT_KEY) || 'null');
+        if (saved && saved.col && saved.dir) { sortDir[saved.col] = saved.dir; }
+    } catch (e) {}
+
+    function getVal(tr, col) {
+        var cell = tr.querySelector('[data-' + col + ']');
+        return cell ? cell.getAttribute('data-' + col).toLowerCase() : '';
+    }
+
+    function doSort(col) {
+        var rows = [].slice.call(tbody.querySelectorAll('tr[data-ye-price]'));
+        // สลับ asc → desc → ไม่ sort
+        sortDir[col] = sortDir[col] === 1 ? -1 : sortDir[col] === -1 ? 0 : 1;
+        sortThs.forEach(function (th) {
+            var c = th.getAttribute('data-ye-sort');
+            th.removeAttribute('data-sort-asc');
+            th.removeAttribute('data-sort-desc');
+            if (c === col && sortDir[col] !== 0) {
+                th.setAttribute(sortDir[col] === 1 ? 'data-sort-asc' : 'data-sort-desc', '');
+            }
+        });
+        if (sortDir[col] === 0) {
+            // กลับลำดับ a-z ตามชื่อ (ลำดับต้นฉบับ PHP)
+            rows.sort(function (a, b) {
+                var na = (a.querySelector('td:nth-child(2) a') || {}).textContent || '';
+                var nb = (b.querySelector('td:nth-child(2) a') || {}).textContent || '';
+                return na.localeCompare(nb, 'th');
+            });
+        } else {
+            rows.sort(function (a, b) {
+                var va = getVal(a, col), vb = getVal(b, col);
+                // "—" (ไม่มีผู้จำหน่าย) ไปท้ายเสมอ
+                if (!va || va === '—') { return 1; }
+                if (!vb || vb === '—') { return -1; }
+                return va.localeCompare(vb, 'th') * sortDir[col];
+            });
+        }
+        rows.forEach(function (tr) { tbody.appendChild(tr); });
+        try { localStorage.setItem(SORT_KEY, JSON.stringify({ col: col, dir: sortDir[col] })); } catch (e) {}
+    }
+
+    sortThs.forEach(function (th) {
+        th.addEventListener('click', function () { doSort(th.getAttribute('data-ye-sort')); });
+    });
+
+    // คืนสถานะ sort ที่บันทึกไว้
+    Object.keys(sortDir).forEach(function (col) {
+        if (sortDir[col] !== 0) {
+            // reset ก่อน sort จริง ให้ doSort เลือก dir เอง
+            var want = sortDir[col];
+            sortDir[col] = want === 1 ? 0 : 1; // ก่อนสลับ ให้ผล want
+            doSort(col);
+        }
+    });
 })();
 </script>
 

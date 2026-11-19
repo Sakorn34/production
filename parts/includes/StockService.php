@@ -214,7 +214,7 @@ class StockService
     public function getStockValuationRows(): array
     {
         return $this->db->query(
-            'SELECT id, code, name, unit, quantity, price FROM products WHERE quantity > 0 ORDER BY name'
+            'SELECT id, code, name, unit, quantity, price, supplier FROM products WHERE quantity > 0 ORDER BY name'
         )->fetchAll();
     }
 
