@@ -122,6 +122,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
 
 $rows = parts_enrich_products($stock->getStockValuationRows());
 $summary = year_end_compute_summary($rows);
+// รูปอะไหล่ — อ่านทีเดียวทั้งชุด ไม่ถามทีละแถว
+$rowIcons = parts_product_icon_map($rows);
 $reportYear = (int) date('Y') + 543;
 
 if (isset($_GET['export']) && $_GET['export'] === 'csv') {
@@ -138,7 +140,6 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
     <div style="display:flex; flex-wrap:wrap; gap:8px">
         <a href="<?= url('/pages/year-end-summary.php?export=csv') ?>" class="btn btn-outline"><?= ui_icon_html('download', 16, 'btn-svg') ?> Export CSV</a>
-        <a href="<?= e(ui_finishgoogs_app_url()) ?>" class="btn btn-outline">← Dashboard รวม</a>
     </div>
 </div>
 
@@ -161,39 +162,36 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<?php if ($summary['missing_price'] > 0): ?>
-<div class="card" style="margin-bottom:16px; border-left:4px solid var(--warning)">
-    <p style="margin:0; font-size:13px; color:var(--warning)">
-        มี <?= formatNumber($summary['missing_price']) ?> รายการที่ยังไม่มีราคา — กรอกในตารางด้านล่างแล้วกด <b>บันทึกราคา</b> มูลค่ารวมจะอัปเดตทันที
-    </p>
-</div>
-<?php endif; ?>
 
 <form method="post" class="card">
     <input type="hidden" name="action" value="save_prices">
-    <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px">
-        <?= ui_heading('clipboard', 'รายการอะไหล่คงเหลือ', 'h2') ?>
-        <button type="submit" class="btn btn-primary"><?= ui_icon_html('save', 16, 'btn-svg') ?> บันทึกราคา</button>
-    </div>
-    <?php if (empty($rows)): ?>
-        <p class="empty-state">ไม่มีอะไหล่คงเหลือในคลัง</p>
-    <?php else:
+    <?php
         $nMissing = 0;
         foreach ($rows as $r) { if (!year_end_has_price($r['price'] ?? null)) { $nMissing++; } }
         $nHas = count($rows) - $nMissing;
     ?>
-    <?php // กรองด้วย JS ไม่โหลดหน้าใหม่ — แถวที่ซ่อนยังอยู่ในฟอร์ม ราคาที่พิมพ์ค้างไว้จึงไม่หาย ?>
-    <div class="ye-chip-row" role="group" aria-label="กรองรายการ">
-        <button type="button" class="ye-chip is-active" data-ye-filter="all">ทั้งหมด <b><?= formatNumber(count($rows)) ?></b></button>
-        <button type="button" class="ye-chip" data-ye-filter="none">ยังไม่มีราคา <b><?= formatNumber($nMissing) ?></b></button>
-        <button type="button" class="ye-chip" data-ye-filter="has">ใส่ราคาแล้ว <b><?= formatNumber($nHas) ?></b></button>
-        <span class="ye-chip-note muted" id="ye-filter-note" hidden></span>
+    <?php // หัวการ์ด: ชื่อเรื่อง + ชิปกรอง + ปุ่มบันทึก อยู่บรรทัดเดียวกัน (ตกบรรทัดเองเมื่อจอแคบ)
+          // กรองด้วย JS ไม่โหลดหน้าใหม่ — แถวที่ซ่อนยังอยู่ในฟอร์ม ราคาที่พิมพ์ค้างไว้จึงไม่หาย ?>
+    <div class="ye-head">
+        <?= ui_heading('clipboard', 'รายการอะไหล่คงเหลือ', 'h2') ?>
+        <?php if (!empty($rows)): ?>
+        <div class="ye-chip-row" role="group" aria-label="กรองรายการ">
+            <button type="button" class="ye-chip is-active" data-ye-filter="all">ทั้งหมด <b><?= formatNumber(count($rows)) ?></b></button>
+            <button type="button" class="ye-chip" data-ye-filter="none">ยังไม่มีราคา <b><?= formatNumber($nMissing) ?></b></button>
+            <button type="button" class="ye-chip" data-ye-filter="has">ใส่ราคาแล้ว <b><?= formatNumber($nHas) ?></b></button>
+        </div>
+        <?php endif; ?>
+        <button type="submit" class="btn btn-primary"><?= ui_icon_html('save', 16, 'btn-svg') ?> บันทึกราคา</button>
     </div>
+    <?php if (empty($rows)): ?>
+        <p class="empty-state">ไม่มีอะไหล่คงเหลือในคลัง</p>
+    <?php else: ?>
+    <p class="ye-chip-note muted" id="ye-filter-note" hidden></p>
     <div class="table-wrap table-wrap-fold">
         <table>
             <thead>
                 <tr>
-                    <th>รหัส</th>
+                    <th class="col-img">รูป</th>
                     <th>ชื่ออะไหล่</th>
                     <th class="text-right">คงเหลือ</th>
                     <th class="text-right">ราคา/หน่วย</th>
@@ -208,7 +206,16 @@ require_once __DIR__ . '/../includes/header.php';
                     $lineTotal = $hasPrice ? $qty * $priceVal : null;
                 ?>
                 <tr class="<?= $hasPrice ? '' : 'row-missing-price' ?>" data-ye-price="<?= $hasPrice ? 'has' : 'none' ?>">
-                    <td><?= e($row['code']) ?></td>
+                    <?php // รูปแทนคอลัมน์รหัส — กวาดตาหาอะไหล่จากรูปเร็วกว่าอ่านรหัสทีละบรรทัด
+                          // รหัสยังอยู่ใน title ของรูป ชี้เมาส์ดูได้ และยังอยู่ในไฟล์ CSV ที่ export
+                          $rowIcon = $rowIcons[$row['code']] ?? ''; ?>
+                    <td class="col-img" title="<?= e($row['code']) ?>">
+                        <?php if ($rowIcon !== ''): ?>
+                            <?= parts_photo_button_html(parts_img_tag($rowIcon, parts_display_name($row)), $rowIcon, $row, 'parts-photo-btn-cell', false) ?>
+                        <?php else: ?>
+                            <span class="ye-noimg" aria-hidden="true"></span>
+                        <?php endif; ?>
+                    </td>
                     <td>
                         <a href="<?= url('/pages/product-detail.php?id=' . (int) $row['id']) ?>" target="_blank" rel="noopener noreferrer" title="เปิดโปรไฟล์อะไหล่ในแท็บใหม่"><?= e(parts_display_name($row)) ?></a>
                     </td>
@@ -258,11 +265,21 @@ require_once __DIR__ . '/../includes/header.php';
 }
 .price-input:focus { outline: none; border-color: var(--border-focus); }
 /* ชิปกรองรายการ — หน้าตาเดียวกับชิปในหน้าสั่งซื้ออะไหล่หลัก */
-.ye-chip-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.ye-noimg {
+    display: inline-block; width: 40px; height: 40px; border-radius: 8px;
+    border: 1px dashed var(--border, #e5e7eb); background: var(--bg, #f8fafc);
+}
+#ye-filter-note { margin: -2px 0 10px; }
+.ye-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.ye-head > h2 { margin: 0; }
+/* ชิปยุบลงบรรทัดใหม่ในตัวเองเมื่อที่ไม่พอ ปุ่มบันทึกจึงอยู่ท้ายบรรทัดเดิมเสมอ */
+.ye-head > .ye-chip-row { flex: 0 1 auto; min-width: 0; }
+.ye-head > .btn { margin-left: auto; flex: 0 0 auto; }
+.ye-chip-row { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
 .ye-chip {
     cursor: pointer; font: inherit; background: var(--card, #fff);
     border: 1px solid var(--border, #e8e4f2); border-radius: 999px;
-    padding: 6px 12px; font-size: calc(12px * var(--font-scale, 1));
+    padding: 5px 8px; font-size: calc(12px * var(--font-scale, 1)); flex: 0 0 auto;
     font-variant-numeric: tabular-nums; color: inherit;
 }
 .ye-chip:hover { border-color: var(--primary, #e11d74); background: var(--primary-soft, #fce7f3); }
@@ -311,5 +328,7 @@ tr[data-ye-price].is-hidden { display: none; }
     apply(saved);
 })();
 </script>
+
+<?php parts_photo_modal_html(); ?>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
