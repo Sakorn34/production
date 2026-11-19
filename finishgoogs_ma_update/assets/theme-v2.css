@@ -216,7 +216,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 
 /* การ์ดเครื่องทั้งหมด — หัวการ์ด (โลโก้ + ตัวเลขรวม) แล้วช่องสถานะพื้นอ่อนเรียงเป็นตาราง */
 .kpi-status-overview {
-  display: flex; flex-direction: column; justify-content: center; gap: 14px;
+  display: flex; flex-direction: column; gap: 14px;
   padding: 16px 18px; border-radius: 14px;
 }
 .dash-top-row > .kpi-status-overview { container-type: inline-size; }
@@ -237,9 +237,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   font-size: calc(11px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); white-space: nowrap;
 }
 
-.status-legend { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+/* ช่องยืดเต็มความสูงที่เหลือ — แถวนี้สูงตามการ์ดอะไหล่สองใบที่ซ้อนกัน ไม่ปล่อยที่ว่างลอยบน/ล่าง */
+.status-legend { flex: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; }
 .status-legend-item {
-  display: flex; flex-direction: column; gap: 3px; min-width: 0;
+  display: flex; flex-direction: column; justify-content: center; gap: 3px; min-width: 0;
   padding: 9px 11px; border-radius: 10px;
   background: color-mix(in srgb, var(--surface-muted, #f4f1fb) 65%, #fff);
   color: inherit; text-decoration: none;
@@ -277,39 +278,45 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .status-legend-pct {
   font-size: calc(11px * var(--font-scale, 1)); color: var(--text-faint, #a49cc0); font-variant-numeric: tabular-nums;
 }
-/* การ์ดอะไหล่ด้านขวา — พื้นสีอ่อนตามความหมาย ไอคอนในกล่องขาวหน้าหัวข้อ */
+/* การ์ดอะไหล่ด้านขวา — ชุดเดียวกับการ์ดเครื่องทั้งหมด: การ์ดขาว แถวหัว (ไอคอน + ชื่อ) แล้วตัวเลขอยู่ในช่องพื้นอ่อน
+   สีความหมาย (--sk) ใช้แค่ไอคอน จุดสี และตัวเลข ไม่ทาทั้งใบ */
 .dash-side-kpis .side-kpi {
-  flex: 1; display: flex; flex-direction: column; justify-content: center;
-  padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--sk) 16%, #fff); border-radius: 14px; box-shadow: none;
-  --sk: var(--warning); --sk-bg: color-mix(in srgb, var(--warning) 9%, #fff);
-  background: var(--sk-bg);
+  flex: 1; display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; background: #fff;
+  --sk: var(--warning);
 }
-.dash-side-kpis .side-kpi-info { --sk: var(--info); --sk-bg: color-mix(in srgb, var(--info) 11%, #fff); }
-.dash-side-kpis .side-kpi-ok { --sk: var(--success); --sk-bg: color-mix(in srgb, var(--success) 9%, #fff); }
-.side-kpi.clickable:hover { box-shadow: var(--shadow-sm); }
-.side-kpi-top {
-  display: flex; align-items: center; gap: 8px;
-  font-size: calc(12px * var(--font-scale, 1)); font-weight: 600;
-  color: color-mix(in srgb, var(--sk) 75%, #000);
-}
+.dash-side-kpis .side-kpi-info { --sk: var(--info); }
+.dash-side-kpis .side-kpi-ok { --sk: var(--success); }
+.side-kpi-head { display: flex; align-items: center; gap: 10px; }
 .side-kpi-ic {
-  width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
+  width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;
-  background: #fff; color: var(--sk);
+  background: color-mix(in srgb, var(--sk) 12%, #fff); color: var(--sk);
 }
-.side-kpi-num {
-  margin-top: 6px; font-size: calc(26px * var(--font-scale, 1)); font-weight: 700; line-height: 1.15;
-  color: var(--sk); font-variant-numeric: tabular-nums;
+.side-kpi-title { flex: 1; min-width: 0; font-size: calc(13px * var(--font-scale, 1)); font-weight: 600; color: var(--text, #2a2440); }
+.side-kpi-go { display: inline-flex; color: var(--text-faint, #a49cc0); transition: transform .15s, color .15s; }
+.side-kpi.clickable:hover .side-kpi-go { color: var(--sk); transform: translateX(2px); }
+.side-kpi-tiles { flex: 1; display: grid; gap: 8px; }
+.side-kpi-tiles-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.side-kpi-tile {
+  display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0;
+  padding: 7px 11px; border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-muted, #f4f1fb) 65%, #fff);
 }
-.side-kpi-num small { font-size: calc(12px * var(--font-scale, 1)); font-weight: 500; color: color-mix(in srgb, var(--sk) 75%, #000); }
-.side-kpi-sub { margin-top: 2px; font-size: calc(11.5px * var(--font-scale, 1)); color: var(--sk); }
-.side-kpi-io { display: grid; grid-template-columns: 1fr 1fr; margin-top: 8px; }
-.side-kpi-io > div + div { padding-left: 12px; border-left: 1px solid color-mix(in srgb, var(--sk) 18%, #fff); }
-.side-kpi-io span { display: block; font-size: calc(11px * var(--font-scale, 1)); color: color-mix(in srgb, var(--sk) 75%, #000); }
-.side-kpi-io b { font-size: calc(22px * var(--font-scale, 1)); font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
-.side-kpi-io .is-in { color: var(--success); }
-.side-kpi-io .is-out { color: var(--sk); }
-
+.side-kpi-tl {
+  display: flex; align-items: center; gap: 6px; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480);
+}
+.side-kpi-dot { background: var(--sk); }
+.side-kpi-tl .is-in { background: var(--success); }
+.side-kpi-tl .is-out { background: var(--info); }
+.side-kpi-tv { font-size: calc(11px * var(--font-scale, 1)); color: var(--text-faint, #a49cc0); }
+.side-kpi-tv b {
+  margin-right: 2px; font-size: calc(16px * var(--font-scale, 1)); font-weight: 700;
+  color: #211a2e; font-variant-numeric: tabular-nums;
+}
+.side-kpi-tv b.side-kpi-hl { color: var(--sk); }
 /* ช่องสถานะลดคอลัมน์ตามความกว้างการ์ด ไม่ใช่ความกว้างจอ — การ์ดนี้แคบลงได้ทั้งจากจอเล็กและจากเมนูข้างที่กางอยู่ */
 @container (max-width: 520px) {
   .status-legend { grid-template-columns: repeat(3, minmax(0, 1fr)); }

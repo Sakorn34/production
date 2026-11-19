@@ -401,21 +401,40 @@ $partsBase = ui_parts_base_url();
         ?>
     <a class="kpi clickable side-kpi side-kpi-<?= $lowTone ?>" href="<?= h($partsBase . '/pages/products.php') ?>"<?=
         $low > 0 ? $sideClick(modal_js('อะไหล่ที่ควรสั่งเพิ่ม (' . number_format($low) . ' รายการ)', "$B/dashboard_data.php?type=low_stock", "$partsBase/pages/products.php")) : '' ?>>
-      <div class="side-kpi-top"><span class="side-kpi-ic"><?= ui_icon_html($low > 0 ? 'alert' : 'check-circle', 15) ?></span> อะไหล่ควรสั่งเพิ่ม</div>
-      <div class="side-kpi-num"><?= number_format($low) ?> <small>รายการ</small></div>
-      <div class="side-kpi-sub"><?= $low > 0 ? 'ตรวจสอบ / สั่งซื้อ →' : 'ทุกรายการเพียงพอ' ?></div>
+      <div class="side-kpi-head">
+        <span class="side-kpi-ic"><?= ui_icon_html($low > 0 ? 'alert' : 'check-circle', 16) ?></span>
+        <span class="side-kpi-title">อะไหล่ควรสั่งเพิ่ม</span>
+        <span class="side-kpi-go"><?= ui_icon_html('chevron-right', 14) ?></span>
+      </div>
+      <div class="side-kpi-tiles">
+        <div class="side-kpi-tile">
+          <span class="side-kpi-tl"><i class="status-dot side-kpi-dot"></i><?= $low > 0 ? 'ต่ำกว่าขั้นต่ำ · ตรวจสอบ / สั่งซื้อ' : 'ทุกรายการเพียงพอ' ?></span>
+          <span class="side-kpi-tv"><b class="side-kpi-hl"><?= number_format($low) ?></b> รายการ</span>
+        </div>
+      </div>
     </a>
     <a class="kpi clickable side-kpi side-kpi-info" href="<?= h($partsBase . '/pages/history.php') ?>"<?=
         $sideClick(modal_js('รับเข้า / เบิกออกวันนี้', "$B/dashboard_data.php?type=stock_today", "$partsBase/pages/history.php")) ?>>
-      <div class="side-kpi-top"><span class="side-kpi-ic"><?= ui_icon_html('arrows-exchange', 15) ?></span> ความเคลื่อนไหววันนี้</div>
-      <div class="side-kpi-io">
-        <div><span>รับเข้า</span><b class="is-in"><?= h(qty_fmt($stock['in_today'])) ?></b></div>
-        <div><span>เบิกออก</span><b class="is-out"><?= h(qty_fmt($stock['out_today'])) ?></b></div>
+      <div class="side-kpi-head">
+        <span class="side-kpi-ic"><?= ui_icon_html('arrows-exchange', 16) ?></span>
+        <span class="side-kpi-title">ความเคลื่อนไหววันนี้</span>
+        <span class="side-kpi-go"><?= ui_icon_html('chevron-right', 14) ?></span>
+      </div>
+      <div class="side-kpi-tiles side-kpi-tiles-2">
+        <div class="side-kpi-tile">
+          <span class="side-kpi-tl"><i class="status-dot is-in"></i>รับเข้า</span>
+          <span class="side-kpi-tv"><b><?= h(qty_fmt($stock['in_today'])) ?></b> ชิ้น</span>
+        </div>
+        <div class="side-kpi-tile">
+          <span class="side-kpi-tl"><i class="status-dot is-out"></i>เบิกออก</span>
+          <span class="side-kpi-tv"><b><?= h(qty_fmt($stock['out_today'])) ?></b> ชิ้น</span>
+        </div>
       </div>
     </a>
     <?php
     } else {
-        echo '<div class="kpi side-kpi side-kpi-warn"><div class="side-kpi-top"><span class="side-kpi-ic">' . ui_icon_html('alert', 15) . '</span> สต็อกอะไหล่</div><div class="side-kpi-num">—</div><div class="side-kpi-sub">เชื่อมต่อระบบสต็อกไม่ได้</div></div>';
+        echo '<div class="kpi side-kpi side-kpi-warn"><div class="side-kpi-head"><span class="side-kpi-ic">' . ui_icon_html('alert', 16) . '</span><span class="side-kpi-title">สต็อกอะไหล่</span></div>'
+           . '<div class="side-kpi-tiles"><div class="side-kpi-tile"><span class="side-kpi-tl">เชื่อมต่อระบบสต็อกไม่ได้</span><span class="side-kpi-tv"><b>—</b></span></div></div></div>';
     }
     ?>
   </div>
