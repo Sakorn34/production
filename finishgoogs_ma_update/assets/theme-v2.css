@@ -216,19 +216,22 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 
 /* การ์ดเครื่องทั้งหมด — ตัวเลขรวมซ้าย รายการสถานะสองคอลัมน์ขวา */
 .kpi-status-overview { display: flex; flex-direction: column; justify-content: center; padding: 16px 18px; border-radius: 14px; }
-.so-wrap { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 20px; align-items: center; }
+.so-wrap { display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 22px; align-items: center; }
 .dash-top-row > .kpi-status-overview { container-type: inline-size; }
-.so-total { padding-right: 16px; border-right: 1px solid var(--border); }
-.so-ic {
-  width: 28px; height: 28px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center;
-  background: color-mix(in srgb, var(--primary) 10%, #fff); color: var(--primary);
+.so-total {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 12px;
+  padding: 4px 18px 4px 0; border-right: 1px solid var(--border);
 }
-.so-lbl { margin-top: 10px; font-size: calc(12px * var(--font-scale, 1)); font-weight: 600; color: var(--text-muted, #6b6480); }
+.so-logo {
+  display: block; width: 52px; height: 52px; border-radius: 14px;
+  box-shadow: 0 4px 12px rgba(42, 36, 64, .10), 0 1px 2px rgba(42, 36, 64, .06);
+}
+.so-lbl { font-size: calc(12px * var(--font-scale, 1)); font-weight: 600; color: var(--text-muted, #6b6480); }
 .so-num {
   display: block; font-size: calc(30px * var(--font-scale, 1)); font-weight: 700; line-height: 1.15;
   letter-spacing: -.02em; color: var(--primary); font-variant-numeric: tabular-nums;
 }
-.so-hint { margin-top: 2px; font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-faint, #a49cc0); }
+.so-hint { margin-top: -6px; font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-faint, #a49cc0); }
 
 .status-legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 14px; }
 .status-legend-item {
@@ -299,12 +302,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 @container (max-width: 640px) {
   .so-wrap { grid-template-columns: 1fr; gap: 10px; }
   .so-total {
-    display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px;
-    padding: 0 0 10px; border-right: 0; border-bottom: 1px solid var(--border);
+    flex-direction: row; align-items: center; flex-wrap: wrap; gap: 6px 12px;
+    padding: 0 0 12px; border-right: 0; border-bottom: 1px solid var(--border);
   }
-  .so-lbl { margin-top: 0; }
+  .so-logo { width: 44px; height: 44px; border-radius: 12px; }
   .so-num { font-size: calc(26px * var(--font-scale, 1)); }
-  .so-hint { margin: 0 0 0 auto; }
+  .so-hint { margin: 0 0 0 auto; align-self: flex-end; }
   .status-legend { gap: 0 10px; }
   .status-legend-pct { width: 32px; }
   .status-legend-item { padding: 5px 6px; }

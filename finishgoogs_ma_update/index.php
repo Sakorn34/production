@@ -365,9 +365,11 @@ $partsBase = ui_parts_base_url();
   <div class="kpi kpi-status-overview">
     <div class="so-wrap">
     <div class="so-total">
-      <span class="so-ic"><?= ui_icon_html('assets', 16) ?></span>
-      <div class="so-lbl">เครื่องทั้งหมด</div>
-      <b class="so-num"><?= number_format($total) ?></b>
+      <img class="so-logo" src="<?= h($B) ?>/assets/bit-combine-icon.png" alt="bit combine" width="52" height="52">
+      <div class="so-text">
+        <div class="so-lbl">เครื่องทั้งหมด</div>
+        <b class="so-num"><?= number_format($total) ?></b>
+      </div>
       <div class="so-hint">กดสถานะเพื่อไฮไลต์กราฟ</div>
     </div>
     <div class="status-legend">
