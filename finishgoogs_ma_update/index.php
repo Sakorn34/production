@@ -1510,6 +1510,7 @@ $partsBase = ui_parts_base_url();
   });
 
   if (backBtn) backBtn.addEventListener('click', showYearView);
+  showMonthView(<?= date('Y') ?>);
 })();
 // ─── MA chart drill: ปี → เดือน ─── */
 (function(){
@@ -1561,6 +1562,7 @@ $partsBase = ui_parts_base_url();
   });
 
   if (backBtn) backBtn.addEventListener('click', showYearView);
+  showMonthView(<?= date('Y') ?>);
 })();
 (function(){
   // กดป้ายสถานะ (การ์ด "เครื่องทั้งหมด" หรือ legend บนกราฟรายปี) = highlight เฉพาะ
