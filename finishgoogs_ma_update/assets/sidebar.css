@@ -83,6 +83,39 @@
   font-size: calc(14px * var(--font-scale, 1));
   line-height: 1.35;
   color: #fff;
+  overflow: hidden;
+  max-width: 300px;
+  transition: opacity .18s ease .1s, max-width .26s cubic-bezier(.4, 0, .2, 1);
+}
+.sidebar .sidebar-brand .brand-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+.sb-brand-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sb-brand-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sb-brand-sub {
+  font-size: 10px;
+  color: rgba(255, 255, 255, .42);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
 }
 .sidebar .brand .nav-ico,
 .sidebar .sidebar-brand .nav-ico {
@@ -424,6 +457,11 @@
 .app.nav-collapsed:not(.sidebar-top) .nav-text,
 .app.nav-collapsed:not(.sidebar-top) .ub-info,
 .app.nav-collapsed:not(.sidebar-top) .userbox-chevron {
+  opacity: 0;
+  max-width: 0;
+  transition: opacity .1s ease, max-width .26s cubic-bezier(.4, 0, .2, 1);
+}
+.app.nav-collapsed:not(.sidebar-top) .sidebar .sidebar-brand {
   opacity: 0;
   max-width: 0;
   transition: opacity .1s ease, max-width .26s cubic-bezier(.4, 0, .2, 1);

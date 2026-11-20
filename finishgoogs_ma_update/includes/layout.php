@@ -253,10 +253,16 @@ $settingsActive = in_array($cur, ['settings.php', 'appearance.php', 'server_conf
 if(a&&a.classList.contains('nav-collapsed')&&localStorage.getItem('fg-sidebar-expanded')==='1'){
 a.classList.remove('nav-collapsed');a.classList.add('nav-expanded');}}catch(e){}})();</script>
   <aside class="sidebar" id="fg-app-sidebar">
-    <?php // หัวแถบเหลือแค่ปุ่มหุบ/ขยาย ชื่อแอปกับโลโก้ถูกเอาออกตามที่ตกลง ?>
     <div class="sidebar-head">
+      <div class="sidebar-brand">
+        <img src="<?= BASE_URL ?>/assets/bit-combine-icon.png" class="brand-logo" width="28" height="28" alt="BIT COMBINE" loading="lazy">
+        <span class="sb-brand-text">
+          <span class="sb-brand-name">BIT COMBINE CO.,LTD</span>
+          <span class="sb-brand-sub">Innovation for better security</span>
+        </span>
+      </div>
       <button type="button" class="sidebar-pin-btn" aria-label="ขยายเมนู" aria-expanded="false">
-        <?php // ไอคอนเดียวหมุน 180 องศาเมื่อขยาย — เดิมเป็นตัวอักษร › ‹ สองอันสลับ display กัน ?>
+        <?php // ไอคอนเดียวหมุน 180 องศาเมื่อขยาย ?>
         <?= ui_icon_html('chevron-right', 16, 'pin-chevron') ?>
       </button>
     </div>
