@@ -199,19 +199,90 @@ function asset_model_grid($res, $st) {
     }
 }
 
-/** ตารางรับเข้า/เบิกออกวันนี้ (parts DB) — card-list layout */
+/** แถวอะไหล่ 1 รายการ — ใช้ร่วมกันทั้ง IN/OUT column */
+function _st_render_row(array $mv, bool $isIn, string $partsBase, array $partIcons): void {
+    $unit   = $mv['unit'] ?: 'ชิ้น';
+    $detail = '';
+    if (!$isIn) {
+        $bits = [];
+        if (!empty($mv['doc_no'])) {
+            $histUrl = h($partsBase . '/pages/history.php?id=' . (int) $mv['stock_out_id']);
+            $bits[] = '<a href="' . $histUrl . '" onclick="event.stopPropagation()" class="st-doc-link">' . h($mv['doc_no']) . '</a>';
+        }
+        if (!empty($mv['set_id'])) {
+            $bits[] = 'ชุด ' . h($mv['set_code']);
+        } else {
+            $bits[] = 'เบิกรายชิ้น';
+        }
+        if (!empty($mv['asset_code'])) {
+            $bits[] = 'S/N ' . h($mv['asset_code']);
+        }
+        if ($mv['note']) {
+            $bits[] = h($mv['note']);
+        }
+        $detail = implode(' · ', $bits);
+    } elseif ($mv['note']) {
+        $detail = h($mv['note']);
+    }
+    $actor = function_exists('production_person_display_name')
+        ? (production_person_display_name((string) ($mv['actor'] ?? '')) ?: h((string) ($mv['actor'] ?? '')))
+        : h((string) ($mv['actor'] ?? '-'));
+    $timeStr = '';
+    if (!empty($mv['created_at'])) {
+        $ts = strtotime((string) $mv['created_at']);
+        if ($ts) {
+            $timeStr = date('H:i', $ts);
+        }
+    }
+    $iconPath = $partIcons[$mv['code']] ?? '';
+    $imgHtml  = '';
+    if ($iconPath !== '') {
+        $imgUrl = img_url($iconPath);
+        if ($imgUrl) {
+            $imgHtml = '<img src="' . h($imgUrl) . '" alt="' . h((string) ($mv['name'] ?? '')) . '" class="st-thumb" loading="lazy">';
+        }
+    }
+    echo '<div class="st-row">';
+    echo   '<div class="st-img">'
+         . ($imgHtml ?: ('<span class="st-img-ph">' . ui_icon_html('parts', 18) . '</span>'))
+         . '</div>';
+    echo   '<div class="st-body">';
+    echo     '<div class="st-name-row">'
+           . '<span class="st-code">' . h($mv['code']) . '</span>'
+           . part_list_name_link((string) ($mv['name'] ?? ''), (int) ($mv['product_id'] ?? 0), 'st-name-link')
+           . '</div>';
+    if ($detail !== '') {
+        echo '<div class="st-detail">' . $detail . '</div>';
+    }
+    echo   '</div>';
+    echo   '<div class="st-side">';
+    echo     '<span class="st-qty ' . ($isIn ? 'part-move-in' : 'part-move-out') . '">'
+           . ($isIn ? '+' : '−') . qty_fmt($mv['quantity']) . ' ' . h($unit)
+           . '</span>';
+    if ($timeStr !== '' || $actor !== '') {
+        echo '<span class="st-time">' . $timeStr . ($actor !== '' ? ' · ' . $actor : '') . '</span>';
+    }
+    echo   '</div>';
+    echo '</div>';
+}
+
+/** ตารางรับเข้า/เบิกออกวันนี้ — 2-column layout (IN ซ้าย / OUT ขวา) */
 function render_stock_today_table(array $rows, $partsBase, array $partIcons = []) {
     if (!$rows) {
         echo '<p class="muted">ไม่มีความเคลื่อนไหววันนี้</p>';
         return;
     }
-    $inQty = 0;
-    $outQty = 0;
+    $inRows  = [];
+    $outRows = [];
+    $inQty   = 0;
+    $outQty  = 0;
     foreach ($rows as $mv) {
         if ($mv['move_type'] === 'in') {
-            $inQty += qty_norm($mv['quantity']);
+            $inRows[]  = $mv;
+            $inQty    += qty_norm($mv['quantity']);
         } else {
-            $outQty += qty_norm($mv['quantity']);
+            $outRows[] = $mv;
+            $outQty   += qty_norm($mv['quantity']);
         }
     }
     echo '<div class="st-summary">'
@@ -222,75 +293,41 @@ function render_stock_today_table(array $rows, $partsBase, array $partIcons = []
        . '<span class="st-out-lbl">เบิกออก <b>' . qty_fmt($outQty) . '</b></span>'
        . '<span class="st-sep">·</span>' . count($rows) . ' รายการ'
        . '</div>';
-    echo '<div class="st-list">';
-    foreach ($rows as $mv) {
-        $isIn  = $mv['move_type'] === 'in';
-        $unit  = $mv['unit'] ?: 'ชิ้น';
-        $detail = '';
-        if (!$isIn) {
-            $bits = [];
-            if (!empty($mv['doc_no'])) {
-                $histUrl = h($partsBase . '/pages/history.php?id=' . (int) $mv['stock_out_id']);
-                $bits[] = '<a href="' . $histUrl . '" onclick="event.stopPropagation()" class="st-doc-link">' . h($mv['doc_no']) . '</a>';
-            }
-            if (!empty($mv['set_id'])) {
-                $bits[] = 'ชุด ' . h($mv['set_code']);
-            } else {
-                $bits[] = 'เบิกรายชิ้น';
-            }
-            if (!empty($mv['asset_code'])) {
-                $bits[] = 'S/N ' . h($mv['asset_code']);
-            }
-            if ($mv['note']) {
-                $bits[] = h($mv['note']);
-            }
-            $detail = implode(' · ', $bits);
-        } elseif ($mv['note']) {
-            $detail = h($mv['note']);
+    echo '<div class="st-cols">';
+    // คอลัมน์รับเข้า (ซ้าย)
+    echo '<div class="st-col">';
+    echo   '<div class="st-col-head st-col-in">'
+         .   '<span class="st-col-dot"></span>'
+         .   '<span class="st-col-title">รับเข้า วันนี้</span>'
+         .   '<span class="st-col-count">' . count($inRows) . ' รายการ&nbsp;·&nbsp;' . qty_fmt($inQty) . '</span>'
+         . '</div>';
+    if ($inRows) {
+        echo '<div class="st-list">';
+        foreach ($inRows as $mv) {
+            _st_render_row($mv, true, $partsBase, $partIcons);
         }
-        $actor = function_exists('production_person_display_name')
-            ? (production_person_display_name((string) ($mv['actor'] ?? '')) ?: h((string) ($mv['actor'] ?? '')))
-            : h((string) ($mv['actor'] ?? '-'));
-        $timeStr = '';
-        if (!empty($mv['created_at'])) {
-            $ts = strtotime((string) $mv['created_at']);
-            if ($ts) {
-                $timeStr = date('H:i', $ts);
-            }
-        }
-        $iconPath = $partIcons[$mv['code']] ?? '';
-        $imgHtml  = '';
-        if ($iconPath !== '') {
-            $imgUrl = img_url($iconPath);
-            if ($imgUrl) {
-                $imgHtml = '<img src="' . h($imgUrl) . '" alt="' . h((string) ($mv['name'] ?? '')) . '" class="st-thumb" loading="lazy">';
-            }
-        }
-        $bc = $isIn ? 'part-move-badge-in' : 'part-move-badge-out';
-        echo '<div class="st-row">';
-        echo   '<div class="st-img">';
-        echo     ($imgHtml ?: ('<span class="st-img-ph">' . ui_icon_html('parts', 18) . '</span>'));
-        echo   '</div>';
-        echo   '<div class="st-body">';
-        echo     '<div class="st-name-row">'
-               . '<span class="st-code">' . h($mv['code']) . '</span>'
-               . part_list_name_link((string) ($mv['name'] ?? ''), (int) ($mv['product_id'] ?? 0), 'st-name-link')
-               . '</div>';
-        if ($detail !== '') {
-            echo '<div class="st-detail">' . $detail . '</div>';
-        }
-        echo   '</div>';
-        echo   '<div class="st-side">';
-        echo     '<span class="part-move-badge ' . $bc . '">' . ($isIn ? 'รับเข้า' : 'เบิกออก') . '</span>';
-        echo     '<span class="st-qty ' . ($isIn ? 'part-move-in' : 'part-move-out') . '">'
-               . ($isIn ? '+' : '−') . qty_fmt($mv['quantity']) . ' ' . h($unit)
-               . '</span>';
-        if ($timeStr !== '' || $actor !== '') {
-            echo '<span class="st-time">' . $timeStr . ($actor !== '' ? ' · ' . $actor : '') . '</span>';
-        }
-        echo   '</div>';
         echo '</div>';
+    } else {
+        echo '<p class="st-col-empty">ไม่มีรายการรับเข้า</p>';
     }
+    echo '</div>';
+    // คอลัมน์เบิกออก (ขวา)
+    echo '<div class="st-col">';
+    echo   '<div class="st-col-head st-col-out">'
+         .   '<span class="st-col-dot"></span>'
+         .   '<span class="st-col-title">เบิกออก วันนี้</span>'
+         .   '<span class="st-col-count">' . count($outRows) . ' รายการ&nbsp;·&nbsp;' . qty_fmt($outQty) . '</span>'
+         . '</div>';
+    if ($outRows) {
+        echo '<div class="st-list">';
+        foreach ($outRows as $mv) {
+            _st_render_row($mv, false, $partsBase, $partIcons);
+        }
+        echo '</div>';
+    } else {
+        echo '<p class="st-col-empty">ไม่มีรายการเบิกออก</p>';
+    }
+    echo '</div>';
     echo '</div>';
     echo '<p class="muted" style="margin-top:8px;font-size:12px">แสดงเฉพาะวันนี้ · ใช้ลิงก์ด้านบน modal เปิดประวัติเต็มหน้า</p>';
 }

@@ -777,6 +777,22 @@ a.ls-name-link:hover { color: var(--primary); text-decoration: underline; }
 .st-side { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; padding-top: 1px; }
 .st-qty { font-size: 13px; font-weight: 700; }
 .st-time { font-size: 11px; color: var(--text-muted, #9892a8); white-space: nowrap; }
+/* ── Stock-today 2-col (แบบ A: IN left / OUT right) ── */
+.st-cols { display: grid; grid-template-columns: 1fr 1fr; }
+.st-col { min-width: 0; }
+.st-col:first-child { border-right: 1px solid rgba(42, 36, 64, .06); }
+.st-col-head { display: flex; align-items: center; gap: 6px; padding: 8px 12px 7px; }
+.st-col-in { background: #f0fdf4; border-bottom: 1.5px solid #bbf7d0; }
+.st-col-out { background: #fff1f2; border-bottom: 1.5px solid #fecdd3; }
+.st-col-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.st-col-in .st-col-dot { background: #16a34a; }
+.st-col-out .st-col-dot { background: #dc2626; }
+.st-col-title { font-size: 12px; font-weight: 700; }
+.st-col-in .st-col-title { color: #15803d; }
+.st-col-out .st-col-title { color: #b91c1c; }
+.st-col-count { font-size: 11px; color: var(--text-muted, #9892a8); margin-left: auto; white-space: nowrap; }
+.st-col-empty { font-size: 12px; color: var(--text-muted, #9892a8); text-align: center; padding: 24px 12px; }
+.st-col .st-row { padding: 8px 12px; }
 
 /* โปรไฟล์เครื่อง — ใช้ asset-toolbar แทน pagehead ป้องกันชื่อซ้ำ
    ต้องเป็น ~ (พี่น้องที่อยู่หลัง) ไม่ใช่ + (ตัวถัดไปทันที) เพราะมี <style>/<script>
