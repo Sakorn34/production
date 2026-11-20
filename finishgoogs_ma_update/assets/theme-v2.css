@@ -222,9 +222,13 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .dash-top-row > .kpi-status-overview { container-type: inline-size; }
 .so-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
 .so-logo {
-  display: block; width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
-  box-shadow: 0 3px 10px rgba(42, 36, 64, .12), 0 1px 2px rgba(42, 36, 64, .06);
+  display: flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  color: var(--primary);
+  box-shadow: 0 3px 10px rgba(42, 36, 64, .10), 0 1px 2px rgba(42, 36, 64, .06);
 }
+.so-logo .nav-svg, .so-logo .ui-svg { flex-shrink: 0; }
 .so-total { display: flex; align-items: baseline; gap: 8px; }
 .so-num {
   font-size: calc(28px * var(--font-scale, 1)); font-weight: 700; line-height: 1.1;

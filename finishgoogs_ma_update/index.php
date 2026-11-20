@@ -363,7 +363,7 @@ $partsBase = ui_parts_base_url();
        // กดช่อง = ไฮไลต์สถานะนั้นในกราฟด้านล่าง (dashStatusFilter) · Ctrl/กลางคลิก = ไปทะเบียนเครื่อง ?>
   <div class="kpi kpi-status-overview">
     <div class="so-head">
-      <img class="so-logo" src="<?= h($B) ?>/assets/bit-combine-icon.png" alt="bit combine" width="40" height="40">
+      <span class="so-logo" aria-hidden="true"><?= ui_icon_html('assets', 22) ?></span>
       <div class="so-total">
         <b class="so-num"><?= number_format($total) ?></b>
         <span class="so-lbl">เครื่องทั้งหมด</span>
