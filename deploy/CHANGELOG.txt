@@ -9063,3 +9063,184 @@ Files:
   finishgoogs_ma_update/includes/release_notes.php
   finishgoogs_ma_update/index.php
 
+
+================================================================
+v2026-11-19_093402 | Patch | 2026-11-19 09:34:05
+From: 2026-11-19_092638  ->  To: b04e60b  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/includes/purchase_check.php
+  parts/pages/purchase-check.php
+
+
+================================================================
+v2026-11-19_093604 | Patch | 2026-11-19 09:36:06
+From: 2026-11-19_092638  ->  To: be07b73  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/includes/purchase_check.php
+  parts/pages/purchase-check.php
+
+
+================================================================
+v2026-11-19_093720 | Patch | 2026-11-19 09:37:22
+From: 2026-11-19_092638  ->  To: ce3c1cb  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  parts/includes/purchase_check.php
+  parts/pages/purchase-check.php
+
+
+================================================================
+v2026-11-19_094319 | Patch | 2026-11-19 09:43:22
+From: 2026-11-19_092638  ->  To: ce3c1cb  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  parts/assets/style.css
+  parts/includes/purchase_check.php
+  parts/pages/purchase-check.php
+
+
+================================================================
+v2026-11-19_105853 | Patch | 2026-11-19 10:58:56
+From: 2026-11-19_094319  ->  To: 3e3a5ce  |  Files: 2
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+
+
+================================================================
+v2026-11-19_111845 | Patch | 2026-11-19 11:18:48
+From: 2026-11-19_094319  ->  To: b9767b4  |  Files: 5
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/index.php
+  shared/ui_icons.php
+
+
+================================================================
+v2026-11-19_112255 | Patch | 2026-11-19 11:22:57
+From: 2026-11-19_094319  ->  To: cb5a54e  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/bit-combine-icon.png
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/index.php
+  shared/ui_icons.php
+
+
+================================================================
+v2026-11-19_112440 | Patch | 2026-11-19 11:24:42
+From: 2026-11-19_094319  ->  To: d0a2ef8  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/bit-combine-icon.png
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/index.php
+  shared/ui_icons.php
+
+
+================================================================
+v2026-11-19_113522 | Patch | 2026-11-19 11:35:25
+From: 2026-11-19_094319  ->  To: 65ca14e  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/bit-combine-icon.png
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/index.php
+  shared/ui_icons.php
+
+
+================================================================
+v2026-11-19_114234 | Patch | 2026-11-19 11:42:37
+From: 2026-11-19_113522  ->  To: ea24cdb  |  Files: 3
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+
+
+================================================================
+v2026-11-19_122039 | Patch | 2026-11-19 12:20:42
+From: 2026-11-19_114234  ->  To: 859b0c1  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-11-19_135027 | Patch | 2026-11-19 13:50:29
+From: 2026-11-19_122039  ->  To: 8b5482b  |  Files: 1
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/config.php
+
+
+================================================================
+v2026-11-20_121549 | Patch | 2026-11-20 12:15:51
+From: 2026-11-19_135027  ->  To: 9028572  |  Files: 6
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/sidebar.css
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/includes/layout.php
+  finishgoogs_ma_update/includes/release_notes.php
+  finishgoogs_ma_update/index.php
+
+
+================================================================
+v2026-11-20_132106 | Patch | 2026-11-20 13:21:09
+From: 2026-11-20_121549  ->  To: 71a3463  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/release_notes.php
+
+
+================================================================
+v2026-11-20_134445 | Patch | 2026-11-20 13:44:47
+From: 2026-11-20_132106  ->  To: 71a3463  |  Files: 4
+----------------------------------------------------------------
+
+Files:
+  finishgoogs_ma_update/assets/theme-v2.css
+  finishgoogs_ma_update/config.php
+  finishgoogs_ma_update/dashboard_data.php
+  finishgoogs_ma_update/includes/release_notes.php
+
