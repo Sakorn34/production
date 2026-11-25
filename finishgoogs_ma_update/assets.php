@@ -308,12 +308,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sync_withdraw_list_bu
     } else {
         $sync = asset_reconcile_withdraw_list_bulk($syncIds, actor_name());
         asset_withdraw_list_sync_pending_cache_clear($w, $types, $params);
+        $phIds = implode(',', array_fill(0, count($syncIds), '?'));
+        $still = asset_ids_needing_withdraw_list_sync(
+            'WHERE a.id IN (' . $phIds . ')',
+            str_repeat('i', count($syncIds)),
+            array_map('intval', $syncIds)
+        );
         if ($sync['ok']) {
             $msg = $sync['message'] ?? 'Sync รายการเบิกสำเร็จ';
-            if (!empty($sync['errors'])) {
-                $msg .= ' — มีรายการข้าม/ผิดพลาดบางส่วน';
+            if ($still) {
+                // บอกเหตุให้เห็นเลย — ข้อความรวม ๆ ทำให้กดซ้ำแล้วไม่รู้ว่าทำไมยังไม่หาย
+                $why = [];
+                foreach (array_slice($still, 0, 3) as $sid) {
+                    $r = asset_withdraw_sync_reason((int) $sid);
+                    if ($r !== '') {
+                        $why[] = $r;
+                    }
+                }
+                $msg .= ' — ยังไม่ตรง ' . count($still) . ' เครื่อง' . ($why ? ': ' . implode(' · ', $why) : '');
+            } elseif (!empty($sync['errors'])) {
+                $msg .= ' — ข้าม/ผิดพลาด ' . count($sync['errors']) . ' รายการ เช่น ' . $sync['errors'][0];
             }
-            flash_set($msg);
+            flash_set($msg, $still ? 'err' : 'ok');
         } else {
             flash_set($sync['errors'][0] ?? ($sync['message'] ?? 'Sync รายการเบิกไม่สำเร็จ'), 'err');
         }
@@ -737,7 +753,8 @@ page_header('ทะเบียนเครื่องผลิตใหม่'
     <td data-pri="1">
       <a href="<?= BASE_URL ?>/asset.php?id=<?= $r['id'] ?>"><b><?= h($r['asset_code']) ?></b></a>
       <?php if (isset($syncPendingSet[(int) $r['id']])) { ?>
-      <span class="assets-wsync-flag" title="รายการเบิกบนเครื่องนี้ยังไม่ตรงกับสต็อกอะไหล่">ต้อง Sync</span>
+      <?php $syncWhy = asset_withdraw_sync_reason((int) $r['id']); ?>
+      <span class="assets-wsync-flag" title="<?= h($syncWhy !== '' ? $syncWhy : 'รายการเบิกบนเครื่องนี้ยังไม่ตรงกับสต็อกอะไหล่') ?>">ต้อง Sync</span>
       <?php } ?>
       <?php // บรรทัดรอง — โผล่เองเมื่อคอลัมน์ระดับ 2 ถูกยุบที่จอแคบ ?>
       <span class="cell-sub"><?= h($r['pname']) ?> · <?= dthai($r['produced_at']) ?></span>

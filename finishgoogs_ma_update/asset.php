@@ -248,10 +248,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sync_withdraw_list'])
     $sync = asset_reconcile_withdraw_list_to_stock($id, actor_name());
     if ($sync['ok']) {
         $msg = $sync['message'] ?? 'Sync ตามรายการเบิกสำเร็จ';
-        if (!empty($sync['errors'])) {
-            $msg .= ' (มี ' . count($sync['errors']) . ' รายการข้าม/ผิดพลาด)';
+        $why = asset_withdraw_sync_reason($id);
+        if ($why !== '') {
+            $msg .= ' — ยังไม่ตรง: ' . $why;
+        } elseif (!empty($sync['errors'])) {
+            $msg .= ' — ข้าม/ผิดพลาด ' . count($sync['errors']) . ' รายการ เช่น ' . $sync['errors'][0];
         }
-        flash_set($msg);
+        flash_set($msg, $why !== '' ? 'err' : 'ok');
     } else {
         $err = $sync['errors'][0] ?? ($sync['message'] ?? 'Sync รายการเบิกไม่สำเร็จ');
         flash_set($err, 'err');

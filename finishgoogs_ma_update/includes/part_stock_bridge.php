@@ -1810,7 +1810,7 @@ function asset_reconcile_withdraw_list_bulk(array $assetIds, string $actor): arr
         @set_time_limit(300);
     }
 
-    $result = ['ok' => true, 'assets' => 0, 'removed' => 0, 'linked' => 0, 'created' => 0, 'errors' => []];
+    $result = ['ok' => true, 'assets' => 0, 'removed' => 0, 'linked' => 0, 'created' => 0, 'repaired' => 0, 'errors' => []];
     foreach ($assetIds as $id) {
         $id = (int) $id;
         if ($id <= 0) {
@@ -1821,17 +1821,70 @@ function asset_reconcile_withdraw_list_bulk(array $assetIds, string $actor): arr
         $result['removed'] += (int) ($r['removed'] ?? 0);
         $result['linked'] += (int) ($r['linked'] ?? 0);
         $result['created'] += (int) ($r['created'] ?? 0);
+        $result['repaired'] += (int) ($r['repaired'] ?? 0);
         if (!empty($r['errors'])) {
             foreach ($r['errors'] as $e) {
                 $result['errors'][] = "asset #{$id}: {$e}";
             }
         }
-        if (!($r['ok'] ?? true) && empty($r['removed']) && empty($r['linked']) && empty($r['created'])) {
+        if (!($r['ok'] ?? true) && empty($r['removed']) && empty($r['linked']) && empty($r['created']) && empty($r['repaired'])) {
             $result['ok'] = false;
         }
     }
     if ($result['assets'] > 0) {
-        $result['message'] = "Sync รายการเบิก {$result['assets']} เครื่อง · ลบ {$result['removed']} · ผูก {$result['linked']} · สร้าง {$result['created']}";
+        $result['message'] = "Sync รายการเบิก {$result['assets']} เครื่อง · ลบ {$result['removed']} · ผูก {$result['linked']} · สร้าง {$result['created']}"
+            . ($result['repaired'] > 0 ? " · ซ่อม/รวมใบเบิก {$result['repaired']}" : '');
     }
     return $result;
+}
+
+/**
+ * ทำไมเครื่องนี้ยังติด "ต้อง Sync" — เงื่อนไขเดียวกับ asset_ids_needing_withdraw_list_sync()
+ *
+ * ข้อความรวม ๆ หลังกด Sync ไม่พอ: กดซ้ำแล้วยังไม่หายก็ไม่รู้ว่าติดตรงไหน
+ *
+ * @param int $assetId
+ * @return string '' ถ้าไม่ติดแล้ว
+ */
+function asset_withdraw_sync_reason(int $assetId): string
+{
+    $row = qr(
+        "SELECT TRIM(a.asset_code) AS sn,
+                (SELECT COUNT(*) FROM part_movements pm WHERE pm.ref_asset_id=a.id AND pm.direction='out') AS out_cnt,
+                (SELECT COUNT(*) FROM part_movements pm WHERE pm.ref_asset_id=a.id AND pm.direction='out'
+                   AND pm.tech_stock_out_id IS NOT NULL AND pm.tech_stock_out_id > 0) AS linked_cnt
+         FROM assets a WHERE a.id = ?",
+        'i',
+        [$assetId]
+    )->fetch_assoc();
+    if (!$row || (int) $row['out_cnt'] === 0) {
+        return '';
+    }
+    $sn = (string) $row['sn'];
+    $unlinked = (int) $row['out_cnt'] - (int) $row['linked_cnt'];
+    if ($unlinked > 0) {
+        $unmapped = [];
+        $res = qr(
+            "SELECT DISTINCT p.id, p.name FROM part_movements pm JOIN parts p ON p.id = pm.part_id
+             WHERE pm.ref_asset_id = ? AND pm.direction = 'out'
+               AND (pm.tech_stock_out_id IS NULL OR pm.tech_stock_out_id = 0)",
+            'i',
+            [$assetId]
+        );
+        while ($p = $res->fetch_assoc()) {
+            if (part_resolve_code((int) $p['id']) === null) {
+                $unmapped[] = (string) $p['name'];
+            }
+        }
+        return $unmapped
+            ? $sn . ': อะไหล่ไม่มีรหัสสต็อกที่ตรงกับแอปอะไหล่ — ' . implode(', ', $unmapped)
+            : $sn . ': รายการเบิก ' . $unlinked . ' รายการยังไม่ผูกใบเบิกในแอปอะไหล่';
+    }
+    $docs = (int) (parts_stock_out_counts_by_sn([$sn])[$sn] ?? 0);
+    if ($docs === 1) {
+        return '';
+    }
+    return $docs === 0
+        ? $sn . ': ไม่พบใบเบิกของ S/N นี้ในแอปอะไหล่ (ใบที่ผูกไว้อาจไม่ได้ใส่ S/N หรือใส่ S/N อื่น)'
+        : $sn . ': S/N นี้มีใบเบิก ' . $docs . ' ใบในแอปอะไหล่ (ควรมีใบเดียว) — รวมใบอัตโนมัติไม่สำเร็จ';
 }
