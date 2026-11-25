@@ -253,10 +253,18 @@ function asset_sales_timeline_data(array $asset, array $stock, array $lease): ar
                     ? '<a class="asset-sales-ref-link" href="' . h($url) . '" target="_blank" rel="noopener">#' . h($v['ref']) . '</a>'
                     : '#' . h($v['ref']);
             }
+            $poHtml = '';
+            $poNum = trim((string) preg_replace('/^po\s*/iu', '', $v['po']));
+            if ($poNum !== '' && $poNum !== '-' && mb_strtolower($poNum) !== mb_strtolower($v['ref'])) {
+                $url = setup_sale_history_search_url($poNum);
+                $poHtml = $url !== ''
+                    ? '<a class="asset-sales-ref-link" href="' . h($url) . '" target="_blank" rel="noopener">PO ' . h($poNum) . '</a>'
+                    : 'PO ' . h($poNum);
+            }
             $who = array_values(array_unique(array_filter([$v['person'], $v['contact']], 'strlen')));
             $meta = ast_meta([
                 ['', $refHtml, true],
-                ['PO', $v['po'] !== $v['ref'] ? $v['po'] : ''],
+                ['', $poHtml, true],
                 ['ไซต์', $v['dept']],
                 ['ผู้ติดต่อ', implode(' · ', $who)],
                 ['สัญญาเช่า', $r['lease_number'] ?? ''],
@@ -423,6 +431,33 @@ function ast_steps_html(array $dated): string
     return $out . '</ol>';
 }
 
+/**
+ * ปุ่มเปิดเครื่องนี้ในระบบเช่า — ระบบเราอ่านอย่างเดียว แก้ข้อมูลเช่าต้องไปที่ต้นทาง
+ * Site ID / ชื่อไซต์ ใช้เฉพาะตอนเช่าอยู่ (สัญญาเก่าไม่ใช่ที่อยู่ปัจจุบันของเครื่อง)
+ */
+function ast_rent_links_html(array $lease): string
+{
+    $sn = trim((string) ($lease['serial'] ?? ''));
+    $inUse = function_exists('rent_leasing_is_current_use')
+        && rent_leasing_is_current_use((string) ($lease['pro_status'] ?? ''), (string) ($lease['p_status'] ?? ''));
+    $siteId = $inUse ? trim((string) ($lease['site_id'] ?? '')) : '';
+    $siteName = $inUse ? trim((string) ($lease['site_name'] ?? '')) : '';
+    $links = [
+        ['ข้อมูลสินค้า', rent_leasing_detail_product_filter_url($siteId, $sn), $siteId !== '' ? 'Site ' . $siteId : ''],
+        ['รายการประวัติ', rent_leasing_sn_search_url($sn), 'ประวัติการใช้งาน ' . $sn],
+        ['รายการเช่า', $siteName !== '' ? rent_leasing_view_rent_site_url($siteName) : '', $siteName],
+    ];
+    $bits = [];
+    foreach ($links as $l) {
+        if ($l[1] === '') {
+            continue;
+        }
+        $bits[] = '<a class="asset-sales-ref-link" href="' . h($l[1]) . '" target="_blank" rel="noopener"'
+            . ($l[2] !== '' ? ' title="' . h($l[2]) . '"' : '') . '>' . h($l[0]) . '</a>';
+    }
+    return $bits ? '<p class="ast-rent-links"><span class="ast-src ast-c-rent">ระบบเช่า</span> ' . implode(' ', $bits) . '</p>' : '';
+}
+
 /** แถวเหตุการณ์ในรายการด้านล่าง */
 function ast_row_html(array $ev): string
 {
@@ -502,6 +537,9 @@ function asset_sales_timeline_card_html(array $asset, array $stock, array $lease
     }
 
     $serial = trim((string) ($asset['asset_code'] ?? ''));
+    if (!empty($lease['found']) && function_exists('rent_leasing_sn_search_url')) {
+        $out .= ast_rent_links_html($lease);
+    }
     if ($serial !== '') {
         $out .= '<p class="asset-sales-foot muted"><a href="' . h(BASE_URL . '/share.php?q=' . rawurlencode($serial))
             . '">ดูในทะเบียน stock →</a></p>';

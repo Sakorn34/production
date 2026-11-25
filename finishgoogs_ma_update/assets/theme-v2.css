@@ -2765,6 +2765,7 @@ a.asset-sales-ref-link:hover {
   display: flex; flex-wrap: wrap; gap: 4px 12px;
   font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480);
 }
+.ast-rent-links { margin: 10px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .ast-chk.is-ok { color: #0b6b4f; }
 .ast-chk.is-none { color: var(--text-faint, #a09ab6); }
 .ast-chk.is-err { color: #b45309; cursor: help; }

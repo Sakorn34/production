@@ -1624,18 +1624,6 @@ function rent_wait_ma_panel_html($productId)
 }
 
 /**
- * ตรวจว่าวันที่จากระบบเช่าใช้แสดงผลได้หรือไม่
- *
- * @param mixed $date
- * @return bool
- */
-function rent_leasing_valid_date($date)
-{
-    $d = trim((string) $date);
-    return $d !== '' && $d !== '0000-00-00' && strpos($d, '0000-00-00') !== 0;
-}
-
-/**
  * ข้อความนี้บอก "อาการเสียของเครื่อง" หรือเป็นแค่งานเอกสาร
  *
  * ระบบเช่าไม่มีช่องเก็บเหตุผลที่ปลดระวาง/สูญหายเลย (pro_remarks ว่างทั้งหมด) ที่พอใช้ได้
@@ -1926,57 +1914,6 @@ function rent_leasing_view_rent_site_url(string $siteName): string
 }
 
 /**
- * แถวอ้างอิงในการ์ดเช่า — ปุ่มลิงก์ไปค้นหาระบบเช่า
- *
- * @param array<string,mixed> $info จาก asset_leasing_info()
- * @param bool                $inUse ใช้งานอยู่กับลูกค้า
- * @return string HTML
- */
-function rent_leasing_ref_facts_html(array $info, bool $inUse): string
-{
-    if (!$inUse) {
-        return '';
-    }
-    $bits = [];
-    $sep = ' <span class="asset-sales-sep">·</span> ';
-    $seen = [];
-    $add = static function (string $label, string $url, string $title = '') use (&$bits, &$seen): void {
-        $label = trim($label);
-        $url = trim($url);
-        if ($label === '' || $url === '') {
-            return;
-        }
-        $k = mb_strtolower($label);
-        if (isset($seen[$k])) {
-            return;
-        }
-        $seen[$k] = true;
-        $titleAttr = $title !== '' ? ' title="' . h($title) . '"' : '';
-        $bits[] = '<a class="asset-sales-ref-link" href="' . h($url) . '" target="_blank" rel="noopener"'
-            . $titleAttr . '>' . h($label) . '</a>';
-    };
-
-    $sn = trim((string) ($info['serial'] ?? ''));
-    $siteId = trim((string) ($info['site_id'] ?? ''));
-    if ($siteId !== '' || $sn !== '') {
-        $listUrl = rent_leasing_detail_product_filter_url($siteId, $sn);
-        if ($listUrl !== '') {
-            $tip = $siteId !== '' ? 'Site ' . $siteId . ($sn !== '' ? ' · S/N ' . $sn : '') : '';
-            $add('ข้อมูลสินค้า', $listUrl, $tip);
-        }
-    }
-    if ($sn !== '') {
-        $add('รายการประวัติ', rent_leasing_sn_search_url($sn), 'ประวัติการใช้งาน ' . $sn);
-    }
-    $siteName = trim((string) ($info['site_name'] ?? ''));
-    if ($siteName !== '') {
-        $add('รายการเช่า', rent_leasing_view_rent_site_url($siteName), $siteName);
-    }
-
-    return $bits ? implode($sep, $bits) : '';
-}
-
-/**
  * URL เปิดเครื่องเครื่องนั้นในระบบเช่าโดยตรง
  *
  * ค่าที่ตั้งไว้ใส่ตัวแทนได้: {sn} = S/N · {ma_id} = เลขอ้างอิงแถวประวัติ MA
@@ -2013,7 +1950,7 @@ function rent_leasing_record_url(string $sn, int $maId = 0): string
  *   • เลขอ้างอิงคัดลอกไปก็ค้นที่ระบบเช่าไม่ได้ — ระบบนั้นไม่มีช่องค้นหาด้วยเลขนี้
  *   • S/N แสดงอยู่บนหัวหน้าจอตลอดอยู่แล้ว
  *   • "เปิดในระบบเช่า" เป็นคำสั่งระดับเครื่อง ไม่ใช่ระดับรายการ MA
- *     จึงย้ายไปอยู่บนการ์ด「การเบิกเช่า」ปุ่มเดียวจบ (asset_leasing_card_html)
+ *     จึงย้ายไปอยู่ท้ายการ์ด「การขาย / เช่า」ปุ่มเดียวจบ (asset_sales_timeline_card_html)
  * เก็บฟังก์ชันไว้เพื่อไม่ให้จุดที่เรียกอยู่พัง
  *
  * @param array<string,mixed> $e รายการ timeline
@@ -2821,146 +2758,4 @@ function rent_leasing_list_status_html(array $status): string
     }
     return '<span class="sale-tag asset-rent-status ' . h((string) ($status['badge_class'] ?? 'asset-rent-badge-default')) . '" title="' . h($title) . '">'
         . h((string) ($status['status_label'] ?? '')) . '</span>';
-}
-
-/**
- * แถว dl ใน card เช่า — ใช้ stockparts_withdraw_dl_row ถ้ามี
- *
- * @param string $label
- * @param string $value HTML
- * @return string
- */
-function rent_leasing_dl_row($label, $value)
-{
-    if ($value === '') {
-        return '';
-    }
-    if (function_exists('stockparts_withdraw_dl_row')) {
-        return stockparts_withdraw_dl_row($label, $value);
-    }
-    return '<dt>' . h($label) . '</dt><dd>' . $value . '</dd>';
-}
-
-/**
- * สร้าง HTML card「การเบิกเช่า」บนโปรไฟล์เครื่อง production
- *
- * @param array<string,mixed> $info จาก asset_leasing_info()
- * @return string
- */
-function asset_leasing_card_html(array $info, $extraHtml = '', $footHtml = '')
-{
-    $icon = function_exists('ui_icon_html') ? ui_icon_html('customers', 16) : '';
-    $out = '<div class="asset-sales-card asset-rent-card">';
-    $out .= '<div class="asset-sales-card-head">' . $icon . '<b>การเบิกเช่า</b></div>';
-    $out .= '<div class="asset-sales-card-body">';
-
-    if (empty($info['found'])) {
-        $msg = trim((string) ($info['message'] ?? 'ไม่พบข้อมูลเช่า'));
-        $out .= '<p class="muted asset-sales-empty">' . h($msg !== '' ? $msg : 'ไม่พบ S/N ในระบบเช่า') . '</p>';
-        $out .= (string) $footHtml;
-        $out .= '</div></div>';
-        return $out;
-    }
-
-    $pro = (string) ($info['pro_status'] ?? '');
-    $pSt = (string) ($info['p_status'] ?? '');
-    $inUse = rent_leasing_is_current_use($pro, $pSt);
-
-    $out .= '<div class="asset-rent-status-row">';
-    $out .= rent_leasing_status_badge_html($pro, $pSt);
-    $out .= '</div>';
-    // กล่องผลเทียบสถานะเสื่อมสภาพ (ถ้ามี) — วางใต้ป้ายสถานะให้เห็นทันที ไม่ต้องเลื่อนหาท้ายการ์ด
-    $out .= (string) $extraHtml;
-
-    $refFacts = rent_leasing_ref_facts_html($info, $inUse);
-    if ($refFacts !== '') {
-        $out .= '<dl class="asset-sales-facts">';
-        if (function_exists('stockparts_withdraw_fact_row')) {
-            $out .= stockparts_withdraw_fact_row('อ้างอิง', $refFacts);
-        } else {
-            $out .= rent_leasing_dl_row('อ้างอิง', $refFacts);
-        }
-        $out .= '</dl>';
-    }
-
-    $out .= '<dl class="asset-sales-dl asset-sales-dl-inline">';
-    $out .= rent_leasing_dl_row('S/N', '<b>' . h((string) ($info['serial'] ?? '')) . '</b>');
-    if (!empty($info['product_name'])) {
-        $out .= rent_leasing_dl_row('รุ่น (เช่า)', h((string) $info['product_name']));
-    }
-    if (rent_leasing_valid_date($info['pro_date'] ?? '')) {
-        $out .= rent_leasing_dl_row('ลงทะเบียนเช่า', h(dthai($info['pro_date'])));
-    }
-    // คลังพร้อมเช่า / รับคืนแล้ว = ยังไม่ได้ใช้งาน — ห้ามโชว์ลูกค้า/ไซต์จากสัญญาเก่า
-    if ($inUse) {
-        if (!empty($info['customer_name'])) {
-            $out .= rent_leasing_dl_row('ลูกค้า', '<b>' . h((string) $info['customer_name']) . '</b>');
-        }
-        if (!empty($info['site_id'])) {
-            $out .= rent_leasing_dl_row('Site ID', h((string) $info['site_id']));
-        }
-        if (!empty($info['site_name'])) {
-            $out .= rent_leasing_dl_row('Site Name', h((string) $info['site_name']));
-        }
-        if (rent_leasing_valid_date($info['r_startdate'] ?? '')) {
-            $out .= rent_leasing_dl_row('เริ่มสัญญา', h(dthai($info['r_startdate'])));
-        }
-        if ($pSt === 'active' && rent_leasing_valid_date($info['r_enddate'] ?? '')) {
-            $out .= rent_leasing_dl_row('หมดสัญญา', h(dthai($info['r_enddate'])));
-        }
-        if (!empty($info['r_po'])) {
-            $out .= rent_leasing_dl_row('PO', h((string) $info['r_po']));
-        }
-        if (!empty($info['r_code'])) {
-            $out .= rent_leasing_dl_row('รหัสสัญญา', h((string) $info['r_code']));
-        }
-    } else {
-        $out .= rent_leasing_dl_row('การใช้งานปัจจุบัน', '<span class="muted">ยังไม่ได้ใช้งานอยู่</span>');
-    }
-    $retire = trim((string) ($info['ma_retire_reason'] ?? ''));
-    // เครื่องที่เคยปลดแล้วถูกเอากลับมาปล่อยเช่าใหม่ ยังมีแถว Asset Retirement ค้างในประวัติ
-    // ถ้าโชว์เหตุผลปลดระวางคู่กับป้าย "เครื่องเช่า" จะอ่านแล้วขัดกันเอง — ประวัติยังเห็นได้ในตาราง
-    if (trim((string) ($info['pro_status'] ?? '')) !== 'Asset Retirement') {
-        $retire = '';
-    }
-    if ($retire !== '') {
-        $parts = rent_leasing_ma_note_parts($retire);
-        $val = count($parts) > 1
-            ? '<ul class="rent-ma-note-list"><li>' . implode('</li><li>', array_map('h', $parts)) . '</li></ul>'
-            : h($parts ? $parts[0] : '');
-        $meta = rent_leasing_ma_retire_meta(
-            is_array($info['ma_history'] ?? null) ? $info['ma_history'] : []
-        );
-        $tail = [];
-        if (rent_leasing_valid_date($meta['date'])) {
-            $tail[] = dthai($meta['date']);
-        }
-        if ($meta['by'] !== '') {
-            $tail[] = 'โดย ' . $meta['by'];
-        }
-        if ($tail) {
-            $val .= '<span class="rent-retire-meta muted">' . h(implode(' · ', $tail)) . '</span>';
-        }
-        $out .= rent_leasing_dl_row('เหตุผลที่ปลดระวาง', '<span class="rent-retire-reason">' . $val . '</span>');
-    }
-    $faults = $inUse && is_array($info['fault_notes'] ?? null) ? $info['fault_notes'] : [];
-    if ($faults) {
-        $bits = [];
-        foreach ($faults as $fx) {
-            $bits[] = '<span class="rent-fault-note">' . h($fx) . '</span>';
-        }
-        $out .= rent_leasing_dl_row('อาการที่แจ้งเคลม', implode(' ', $bits));
-    }
-    $remarks = $inUse ? trim((string) ($info['p_remarks'] ?? '')) : '';
-    if ($remarks === '' && !empty($info['pro_remarks'])) {
-        $remarks = trim((string) $info['pro_remarks']);
-    }
-    if ($remarks !== '') {
-        $out .= rent_leasing_dl_row('หมายเหตุ', h($remarks));
-    }
-    $out .= '</dl>';
-
-    $out .= (string) $footHtml;
-    $out .= '</div></div>';
-    return $out;
 }
