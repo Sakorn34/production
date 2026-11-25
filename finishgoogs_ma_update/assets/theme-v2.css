@@ -2709,6 +2709,69 @@ a.asset-sales-ref-link:hover {
   margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border, #e3ddf0);
   font-size: calc(12px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); line-height: 1.7;
 }
+/* ── การ์ดการขาย/เช่า แบบไทม์ไลน์ข้ามระบบ (includes/asset_sales_timeline.php) ──
+   สีประจำแหล่งข้อมูล ไม่ใช่สีสถานะเครื่อง — สถานะเครื่องยังใช้ status_badge ตาม palette */
+.ast-c-prod    { --ast-c: #8a8599; --ast-bg: #eceaf2; --ast-fg: #55506a; }
+.ast-c-stock   { --ast-c: #7a5ae0; --ast-bg: #ede7fb; --ast-fg: #5b3fc4; }
+.ast-c-old     { --ast-c: #c98a12; --ast-bg: #fdf0d5; --ast-fg: #8a5a06; }
+.ast-c-sale    { --ast-c: #159a72; --ast-bg: #d9f3ea; --ast-fg: #0b6b4f; }
+.ast-c-install { --ast-c: #c2457a; --ast-bg: #fde6ee; --ast-fg: #93264f; }
+.ast-c-rent    { --ast-c: #3b74d4; --ast-bg: #dde9fb; --ast-fg: #1f4f9a; }
+.ast-head-now { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.ast-steps {
+  list-style: none; margin: 0 0 12px; padding: 2px 0 4px;
+  display: flex; align-items: flex-start; overflow-x: auto;
+}
+.ast-step {
+  flex: 1 0 64px; position: relative; text-align: center;
+  font-size: calc(11px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); line-height: 1.35;
+}
+.ast-step::after {
+  content: ""; position: absolute; top: 8px; left: calc(50% + 11px); right: calc(-50% + 11px);
+  height: 2px; background: var(--border, #ddd4f3);
+}
+.ast-step:last-child::after { display: none; }
+.ast-step i {
+  display: block; width: 14px; height: 14px; margin: 2px auto 4px; border-radius: 50%;
+  background: var(--ast-c, #c9c2dc); box-shadow: 0 0 0 3px var(--surface-muted, #f3effe);
+}
+.ast-step.is-cur i { box-shadow: 0 0 0 3px var(--surface-muted, #f3effe), 0 0 0 5px var(--ast-c, #8b6fe0); }
+.ast-step.is-gap i { background: transparent; border: 2px dashed var(--border-strong, #c9c2dc); width: 10px; height: 10px; }
+.ast-step b { display: block; color: var(--text); font-weight: 600; font-size: calc(11.5px * var(--font-scale, 1)); white-space: nowrap; }
+.ast-step span { white-space: nowrap; }
+.ast-list { background: #fff; border: 1px solid var(--border); border-radius: var(--radius-sm, 8px); overflow: hidden; }
+.ast-row {
+  display: grid; grid-template-columns: 78px minmax(0, 1fr) auto; gap: 4px 10px; align-items: start;
+  padding: 8px 10px; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.ast-row:last-child { border-bottom: 0; }
+.ast-when { font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); padding-top: 1px; white-space: nowrap; }
+.ast-title { font-weight: 600; color: var(--text); line-height: 1.5; overflow-wrap: anywhere; }
+.ast-meta { font-size: calc(12px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); line-height: 1.6; overflow-wrap: anywhere; }
+.ast-what .asset-sales-claim-pair,
+.ast-what .asset-sales-conflict { margin: 4px 0 0; }
+.ast-src {
+  font-size: calc(10.5px * var(--font-scale, 1)); font-weight: 600; white-space: nowrap;
+  padding: 1px 8px; border-radius: 999px; background: var(--ast-bg); color: var(--ast-fg);
+}
+.ast-undated {
+  padding: 6px 10px 4px; font-size: calc(11px * var(--font-scale, 1)); font-weight: 600;
+  color: var(--text-muted, #6b6480); background: var(--surface-muted, #f7f5fc);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.ast-card .asset-sales-lines-wrap { margin-top: 10px; }
+.ast-checked {
+  margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--border, #e3ddf0);
+  display: flex; flex-wrap: wrap; gap: 4px 12px;
+  font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480);
+}
+.ast-chk.is-ok { color: #0b6b4f; }
+.ast-chk.is-none { color: var(--text-faint, #a09ab6); }
+.ast-chk.is-err { color: #b45309; cursor: help; }
+@media (max-width: 560px) {
+  .ast-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .ast-when { grid-column: 1 / -1; }
+}
 .asset-sales-timeline { border-left: 2px solid var(--border); padding-left: 14px; margin-left: 4px; }
 .asset-sales-step + .asset-sales-step { margin-top: 14px; }
 .asset-sales-step-when {

@@ -440,11 +440,11 @@ document.addEventListener('click', function (ev) {
   require_once __DIR__ . '/includes/site_assets.php';
   $siteHtml = site_assets_inline_html((string) $a['asset_code']);
   ?>
-  <?php if (!empty($leaseInfo['found'])) { ?>
-  <?= asset_leasing_card_html($leaseInfo, rent_retire_sync_asset_box_html($a, $leaseInfo), $siteHtml) ?>
-  <?php } else { ?>
-  <?= asset_stockparts_withdraw_card_html($stockWithdraw, $siteHtml) ?>
-  <?php } ?>
+  <?php
+  require_once __DIR__ . '/includes/asset_sales_timeline.php';
+  $retireBox = !empty($leaseInfo['found']) ? rent_retire_sync_asset_box_html($a, $leaseInfo) : '';
+  ?>
+  <?= asset_sales_timeline_card_html($a, $stockWithdraw, $leaseInfo, $retireBox, $siteHtml) ?>
 </div>
 <?php
 // ใบเบิกผลิตจาก inventory ที่เครื่องนี้ถูกตัดยอด (ตารางมีเมื่อเปิดใช้ฟีเจอร์ใบเบิกแล้ว)
