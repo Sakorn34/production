@@ -837,6 +837,11 @@ a.ls-name-link:hover { color: var(--primary); text-decoration: underline; }
   white-space: nowrap;
   vertical-align: bottom;
 }
+/* จอแคบ: ชื่อไฟล์ SD image ยาวไม่มีช่องว่าง (เช่น jessie_cross_compile_rev3.1(Plus-M)) ถ้าห้ามตัดบรรทัด
+   จะดันคอลัมน์ให้กว้างกว่าจอ ทั้งหน้าเลื่อนซ้ายขวาได้ — ยอมให้ตัดกลางชื่อ */
+@media (max-width: 760px) {
+  .asset-head-main .asset-head-dl .asset-sd-fn-part { white-space: normal; overflow-wrap: anywhere; }
+}
 .asset-status-form select {
   font-size: calc(13px * var(--font-scale, 1)); padding: 4px 8px; min-width: 140px; max-width: 100%;
   height: 29px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm, 8px); background: #fff;
@@ -2648,7 +2653,7 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
 .ma-row-actions form { display: inline; }
 /* ขนาดตายตัว 28×28 — ใน .row-actions (flex) ลิงก์ถูกบีบแคบ ส่วน <button> ได้ padding/min-height
    จากสไตล์ปุ่มกลางจนสูงกว่าลิงก์ ทำให้สองปุ่มไม่เท่ากัน */
-.ma-row-actions .ma-ib, .awk-acts .ma-ib,
+.ma-row-actions .ma-ib,
 .ma-ib {
   flex: 0 0 28px; box-sizing: border-box; min-width: 28px; min-height: 0; line-height: 1; font-size: 0;
   display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;
@@ -2891,7 +2896,6 @@ a.asset-sales-ref-link:hover {
 .ast-chk.is-none { color: var(--text-faint, #a09ab6); }
 .ast-chk.is-err { color: #b45309; cursor: help; }
 /* อยู่ในกล่องที่เลื่อนได้ (overflow) — margin ติดลบจะโดนตัดครึ่งบรรทัด */
-.ast-card-sub { margin: 0 0 10px; font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); line-height: 1.5; }
 
 /* ── ป้าย "MA n" บนเส้นของแถบขั้นตอน — ช่วงนั้นมีงาน MA (กดแล้วเลื่อนไปการ์ดงานกับตัวเครื่อง) ──
    ปกติอยู่กลางเส้นที่วิ่งเข้าขั้นนี้ (ขอบช่อง) · is-turn = ขั้นแรกของแถว เส้นโค้งเข้ามาด้านต้นแถว
@@ -2921,49 +2925,31 @@ a.asset-sales-ref-link:hover {
   .ast-mab.is-after, .ast-srow.is-rev .ast-mab.is-after { top: -5px; inset-inline-start: calc(50% + 12px); }
 }
 
-/* ── การ์ด "งานกับตัวเครื่อง" — หน้าตาเดียวกับรายการของการ์ดเส้นทางเครื่อง ── */
-.asset-sales-card.awk-card { grid-area: auto; min-height: 0; max-height: none; margin: 20px 0 0; }
-.awk-card .asset-sales-card-body { overflow: visible; }
-.awk-headlink { font-size: calc(12px * var(--font-scale, 1)); }
-.awk-list { background: #fff; border: 1px solid var(--border); border-radius: var(--radius-sm, 8px); overflow: hidden; }
-.awk-row {
-  display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 4px 12px; align-items: start;
-  padding: 9px 12px; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
-  transition: background-color .4s ease;
+/* ── ส่วน "งานกับตัวเครื่อง" — หัวข้อ/กรอบเหมือนส่วนประวัติการเช่า · แถว MA เหมือนตารางหน้า MA ──
+   มือถือเลื่อนตารางซ้ายขวาในกรอบ (เหมือนตารางอื่นในส่วนประวัติ) ไม่ดันหน้าให้กว้างเกินจอ */
+.awk-table { min-width: 720px; }
+.awk-table tbody tr { transition: background-color .4s ease; }
+.awk-table tbody tr.is-hl td { background: #fff3c4; }
+.awk-job {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px;
+  font-weight: 600; color: var(--text); line-height: 1.5;
 }
-.awk-row:last-child { border-bottom: 0; }
-.awk-row.is-hl { background: #fff3c4; }
-.awk-when {
-  font-size: calc(12px * var(--font-scale, 1)); color: var(--text-muted, #6b6480);
-  white-space: nowrap; padding-top: 2px; font-variant-numeric: tabular-nums;
-}
-.awk-when small { display: block; font-size: calc(11px * var(--font-scale, 1)); color: var(--text-faint, #a09ab6); }
-.awk-title {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px;
-  font-weight: 600; color: var(--text); font-size: calc(13.5px * var(--font-scale, 1)); line-height: 1.5;
-}
+.ma-list-table.awk-table td.awk-c-job { white-space: normal; width: auto; min-width: 190px; max-width: 280px; }
+@media (min-width: 761px) { .ma-list-table.awk-table .ma-c-sym { min-width: 120px; } }
 .awk-ctx {
+  display: inline-block; margin-top: 4px;
   font-weight: 500; font-size: calc(11px * var(--font-scale, 1)); line-height: 1.6;
   padding: 0 7px; border-radius: 6px; background: #e6effc; color: #173a7a;
 }
-.awk-body {
-  margin-top: 2px; font-size: calc(12.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480);
-  line-height: 1.6; overflow-wrap: anywhere;
-}
-.awk-body b { color: var(--text); }
-.awk-body .tl-sec { margin: 4px 0; }
-.awk-body .tl-checklist-box { margin-top: 2px; }
+.awk-remark { margin-top: 4px; font-size: calc(12px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); line-height: 1.5; }
+.awk-c-body { color: var(--text-muted, #6b6480); line-height: 1.6; overflow-wrap: anywhere; }
+.awk-c-body b { color: var(--text); }
+.awk-c-body .tl-sec { margin: 4px 0; }
+.awk-c-body .tl-checklist-box { margin-top: 2px; }
 /* เนื้อหาเดิมต่อบรรทัดด้วย <br> — หลังกล่องพับ (block) จะกลายเป็นบรรทัดว่าง */
-.awk-body details + br, .awk-body .tl-sec + br { display: none; }
-.awk-body .tl-okfold .chips { display: block; margin: 4px 0 2px; }
-.awk-acts { display: flex; align-items: flex-start; }
-.awk-acts form { display: inline; margin: 0; }
-.awk-acts > :first-child, .awk-acts > :first-child .ma-ib { margin-left: 0; }
-@media (max-width: 560px) {
-  .awk-row { grid-template-columns: minmax(0, 1fr) auto; }
-  .awk-when { grid-column: 1 / -1; display: flex; gap: 6px; }
-  .awk-when small { display: inline; }
-}
+.awk-c-body details + br, .awk-c-body .tl-sec + br { display: none; }
+.awk-c-body .tl-okfold .chips { display: block; margin: 4px 0 2px; }
+.awk-section .ma-hint a { white-space: nowrap; }
 @media (max-width: 560px) {
   .ast-row { grid-template-columns: minmax(0, 1fr) auto; }
   .ast-when { grid-column: 1 / -1; }

@@ -615,7 +615,7 @@ if ($invAlloc) { ?>
 <?php
 $moveCount = (int) qr('SELECT COUNT(*) FROM stock_movements WHERE asset_id = ?', 'i', [$id])->fetch_row()[0];
 $moveLink = $moveCount > 0
-    ? '<a class="awk-headlink" href="' . h(BASE_URL . '/stock_movements.php?q=' . urlencode((string) $a['asset_code'])) . '">ประวัติเข้า-ออกคลัง (' . number_format($moveCount) . ') ›</a>'
+    ? '<a href="' . h(BASE_URL . '/stock_movements.php?q=' . urlencode((string) $a['asset_code'])) . '">ประวัติเข้า-ออกคลัง (' . number_format($moveCount) . ') ›</a>'
     : '';
 ?>
 <?= asset_work_card_html($tlAsc, 'asset_tl_actions', $id, ast_dated_events($salesData), $moveLink) ?>

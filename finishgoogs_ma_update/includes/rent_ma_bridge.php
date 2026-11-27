@@ -1818,6 +1818,11 @@ function rent_leasing_ma_timeline_items(array $info, array $ownItems = [])
             'rid' => 0,
             'rent_ma_id' => (int) ($r['id'] ?? 0),
             'rent_ma_sn' => $sn,
+            'ma' => [
+                'notes' => $parts,
+                'by' => $by,
+                'status' => trim((string) ($r['status'] ?? '')),
+            ],
         ];
     }
     return $items;

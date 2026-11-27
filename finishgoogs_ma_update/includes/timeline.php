@@ -161,7 +161,7 @@ function asset_timeline_items($id) {
             ],
         ];
     }
-    $res = qr("SELECT id, visited_at d, ma_round, result, fw_version, ok_items, replace_items, repair_items, versions_json, remark, done_by
+    $res = qr("SELECT id, visited_at d, ma_round, result, fw_version, ok_items, replace_items, repair_items, versions_json, remark, done_by, machine_status
                FROM ma_records WHERE asset_id=?", 'i', [$id]);
     while ($r = $res->fetch_assoc()) {
         $vj = $r['versions_json'] ? (json_decode($r['versions_json'], true) ?: []) : [];
@@ -200,6 +200,17 @@ function asset_timeline_items($id) {
         $tl[] = [
             'd' => timeline_dt($r['d']), 'type_key' => 'ma', 'type' => ui_timeline_type_html('ma'),
             'html' => implode('<br>', $body), 'kind' => 'ma', 'rid' => (int)$r['id'],
+            // ข้อมูลแยกช่องสำหรับตารางงานกับตัวเครื่อง (หน้าตาเดียวกับตารางประวัติหน้า MA)
+            'ma' => [
+                'repair' => $grab('repair_items', 'Repair'),
+                'replace' => $grab('replace_items', 'Replace'),
+                'ok' => $okItems,
+                'round' => (int) ($r['ma_round'] ?? 0),
+                'by' => trim((string) ($r['done_by'] ?? '')),
+                'fw' => trim((string) ($r['fw_version'] ?? '')),
+                'remark' => trim((string) ($r['remark'] ?? '')),
+                'spare' => ($r['machine_status'] ?? '') === 'spare',
+            ],
             'snippet' => [
                 'code' => $assetCode,
                 'replace' => implode(' , ', $grab('replace_items', 'Replace')),

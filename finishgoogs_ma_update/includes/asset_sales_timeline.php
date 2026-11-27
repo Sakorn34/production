@@ -362,6 +362,7 @@ function asset_sales_timeline_data(array $asset, array $stock, array $lease): ar
             // (เช่น สัญญาที่จบปี 2025 มีวันรับคืน 2026) ซึ่งไม่ใช่วันที่เครื่องกลับมาจริง
             $ends = array_filter([ast_date($r['returned']), ast_date($r['end'])], 'strlen');
             $rentEv['until'] = $ends ? min($ends) : '';
+            $rentEv['claim'] = trim((string) ($r['claim'] ?? ''));
             $events[] = $rentEv;
             if (ast_date($r['claim_date']) !== '' || $r['claim'] !== '') {
                 $events[] = ast_event(ast_date($r['claim_date']), 'rent', 'แจ้งเคลม', 'แจ้งเคลมระหว่างเช่า',
@@ -803,8 +804,19 @@ function asset_work_marks(array $tlAsc): array
  */
 function ast_work_context(array $dated, string $day): string
 {
+    return ast_work_context_info($dated, $day)['text'];
+}
+
+/**
+ * บริบทของงาน + อาการที่ลูกค้าแจ้งของสัญญาเช่าช่วงนั้น
+ *
+ * @return array{text:string,claim:string}
+ */
+function ast_work_context_info(array $dated, string $day): array
+{
+    $none = ['text' => '', 'claim' => ''];
     if ($day === '') {
-        return '';
+        return $none;
     }
     $last = null;
     $rent = null;
@@ -822,70 +834,142 @@ function ast_work_context(array $dated, string $day): string
         }
     }
     if ($last === null) {
-        return '';
+        return $none;
     }
     $step = $last['step'];
     if ($step === 'ปลดระวาง') {
-        return 'หลังปลดระวาง';
+        return ['text' => 'หลังปลดระวาง', 'claim' => ''];
     }
     if ($rent !== null && in_array($step, ['เช่า', 'แจ้งเคลม', 'รับคืน'], true)) {
         $site = trim((string) $rent['sub']) !== '' ? trim((string) $rent['sub']) : 'ลูกค้า';
         $until = (string) ($rent['until'] ?? '');
+        $claim = (string) ($rent['claim'] ?? '');
         if ($step === 'รับคืน' || ($until !== '' && $day >= $until)) {
-            return 'หลังจาก ' . $site . ' ใช้งานแล้ว';
+            return ['text' => 'หลังจาก ' . $site . ' ใช้งานแล้ว', 'claim' => $claim];
         }
-        return 'ระหว่างเช่าที่ ' . $site;
+        return ['text' => 'ระหว่างเช่าที่ ' . $site, 'claim' => $claim];
     }
     if ($step === 'เข้าระบบเช่า') {
-        return 'อยู่คลังเช่า';
+        return ['text' => 'อยู่คลังเช่า', 'claim' => ''];
     }
     if (trim((string) $last['sub']) !== '') {
-        return 'หลังส่งมอบ ' . trim((string) $last['sub']);
+        return ['text' => 'หลังส่งมอบ ' . trim((string) $last['sub']), 'claim' => ''];
     }
-    return '';
+    return $none;
+}
+
+/** ช่อง "สิ่งที่ทำ" ของงาน MA ระบบนี้ — ซ่อมก่อน เปลี่ยนรองลงมา ปกติเป็นจำนวน (เหมือนหน้า MA) */
+function awk_ma_done_html(array $m): string
+{
+    $html = '';
+    if ($m['repair'] || $m['replace']) {
+        $html .= '<div class="ma-list-item-chips">';
+        foreach ($m['repair'] as $it) {
+            $html .= '<span class="ma-list-item-chip ma-list-item-chip-repair" title="ซ่อม">' . h($it) . '</span>';
+        }
+        foreach ($m['replace'] as $it) {
+            $html .= '<span class="ma-list-item-chip ma-list-item-chip-replace" title="เปลี่ยน">' . h($it) . '</span>';
+        }
+        $html .= '</div>';
+    }
+    if ($m['ok']) {
+        $html .= '<div class="ma-list-okn" title="' . h(implode(', ', $m['ok'])) . '">✓ ตรวจปกติ ' . count($m['ok']) . ' รายการ</div>';
+    }
+    if ($m['remark'] !== '') {
+        $html .= '<div class="awk-remark">' . nl2br(h($m['remark'])) . '</div>';
+    }
+    return $html !== '' ? $html : '<span class="muted">—</span>';
+}
+
+/** ช่อง "ระบบเช่า" — ผลของงาน MA ต่อระบบเช่า (ป้ายเดียวกับหน้า MA) */
+function awk_rent_close_html(string $kind, array $m): string
+{
+    $st = $kind === 'rent_ma' ? (string) ($m['status'] ?? '') : '';
+    if ($st === 'Asset Retirement') {
+        return '<span class="ma-pill ma-pill-urgent">เสื่อมสภาพ</span>';
+    }
+    if ($st === 'finished goods') {
+        return '<span class="ma-pill ma-pill-done">ซ่อมแล้ว</span>';
+    }
+    if ($kind === 'ma' && !empty($m['spare'])) {
+        return '<span class="muted">ไม่ปิดคิว</span>';
+    }
+    return '<span class="muted">—</span>';
 }
 
 /**
- * การ์ด "งานกับตัวเครื่อง" — ผลิต/QC · MA · อัปเดต · เบิกอะไหล่ เรียงเก่า → ใหม่ แถวกระชับ
+ * ส่วน "งานกับตัวเครื่อง" — ผลิต/QC · MA · อัปเดต · เบิกอะไหล่ เรียงเก่า → ใหม่
  *
- * แต่ละแถวบอกว่าตอนนั้นเครื่องอยู่ช่วงไหน (ดูจากการ์ดเส้นทางเครื่อง) และมี data-work-row
- * ให้ป้าย MA บนแถบขั้นตอนกดแล้วเลื่อนมาที่แถวนี้
+ * หน้าตาเดียวกับส่วนประวัติการเช่า (หัวข้อ + คำอธิบาย + กรอบเดียว) และแถว MA
+ * ใช้คอลัมน์เดียวกับตารางประวัติหน้า MA: วันเวลา · งาน · อาการที่แจ้ง · สิ่งที่ทำ · ระบบเช่า
+ * แต่ละแถวบอกว่าตอนนั้นเครื่องอยู่ช่วงไหน และมี data-work-row ให้ป้าย MA บนแถบกดเลื่อนมาได้
  *
- * @param array<int,array<string,mixed>> $tlAsc     ผลจาก timeline_sort_items_asc()
- * @param callable|null                  $actionsFn ปุ่มแก้ไข/ลบของแต่ละแถว
- * @param array<int,array<string,string>> $dated    ast_dated_events()
- * @param string                          $headLink ลิงก์มุมขวาของหัวการ์ด (HTML)
+ * @param array<int,array<string,mixed>>  $tlAsc     ผลจาก timeline_sort_items_asc()
+ * @param callable|null                   $actionsFn ปุ่มแก้ไข/ลบของแต่ละแถว
+ * @param array<int,array<string,string>> $dated     ast_dated_events()
+ * @param string                          $headLink  ลิงก์ท้ายบรรทัดคำอธิบาย (HTML)
  */
 function asset_work_card_html(array $tlAsc, $actionsFn, int $assetId, array $dated, string $headLink = ''): string
 {
-    $out = '<section class="asset-sales-card awk-card" id="asset-work">'
-        . '<div class="asset-sales-card-head">' . ui_icon_html('repairs', 16)
-        . '<b>งานกับตัวเครื่อง (' . count($tlAsc) . ')</b>'
-        . ($headLink !== '' ? '<span class="ast-head-now">' . $headLink . '</span>' : '')
-        . '</div><div class="asset-sales-card-body">'
-        . '<p class="ast-card-sub">ผลิต/QC · MA · อัปเดต · อะไหล่ — สิ่งที่ทำกับตัวเครื่อง เรียงเก่า → ใหม่</p>';
+    $out = '<section class="ma-repair-section awk-section" id="asset-work">'
+        . '<h2 class="h-with-icon">' . ui_icon_html('repairs', 18) . 'งานกับตัวเครื่อง (' . count($tlAsc) . ')</h2>'
+        . '<p class="ma-hint">ผลิต/QC · MA · อัปเดต · อะไหล่ — สิ่งที่ทำกับตัวเครื่อง เรียงเก่า → ใหม่'
+        . ($headLink !== '' ? ' · ' . $headLink : '') . '</p>';
     if (!$tlAsc) {
-        return $out . '<p class="muted asset-sales-empty">ยังไม่มีประวัติ</p></div></section>';
+        return $out . '<p class="muted">ยังไม่มีประวัติ</p></section>';
     }
-    $out .= '<div class="awk-list">';
+    $out .= '<div class="ma-card ma-card-flat"><div class="ma-tblscroll"><table class="ma-table ma-list-table awk-table"><thead><tr>'
+        . '<th class="ma-c-when">วันเวลา</th><th class="ma-c-asset">งาน</th>'
+        . '<th class="ma-c-sym" title="อาการที่ลูกค้าแจ้งในสัญญาเช่าช่วงนั้น (ระบบเช่า)">อาการที่แจ้ง</th>'
+        . '<th class="ma-c-done" title="ซ่อม · เปลี่ยน · จำนวนรายการที่ตรวจแล้วปกติ">สิ่งที่ทำ</th>'
+        . '<th class="ma-c-rent" title="ผลต่อระบบเช่า: ซ่อมแล้ว หรือ เสื่อมสภาพ">ระบบเช่า</th>'
+        . '<th class="ma-c-act"></th></tr></thead><tbody>';
     $maNo = 0;
     foreach (array_values($tlAsc) as $i => $e) {
-        $maTag = ast_work_is_ma((string) ($e['kind'] ?? '')) ? '<span class="ast-mab is-legend">MA ' . (++$maNo) . '</span>' : '';
+        $kind = (string) ($e['kind'] ?? '');
+        $m = is_array($e['ma'] ?? null) ? $e['ma'] : null;
+        $isMa = ast_work_is_ma($kind) && $m !== null;
         $d = trim((string) ($e['d'] ?? ''));
         $day = $d !== '' ? substr($d, 0, 10) : '';
         $time = strlen($d) >= 16 ? substr($d, 11, 5) : '';
-        $when = $day !== '' ? h(date('d/m/Y', strtotime($day))) . ($time !== '' && $time !== '00:00' ? '<small>' . h($time) . '</small>' : '')
-            : '<span class="muted">ไม่ระบุวันที่</span>';
-        // บันทึกผลิต/QC อยู่ช่วงก่อนออกจากโรงงานเสมอ ไม่ต้องบอกบริบท
-        $ctx = ($e['kind'] ?? '') === 'production' ? '' : ast_work_context($dated, $day);
+        $time = $time === '00:00' ? '' : $time;
+        $ctx = $kind === 'production' ? ['text' => '', 'claim' => ''] : ast_work_context_info($dated, $day);
         $actions = ($actionsFn && is_callable($actionsFn)) ? (string) $actionsFn($e, $assetId) : '';
-        $out .= '<div class="awk-row" data-work-row="' . $i . '" data-work-kind="' . h((string) ($e['kind'] ?? '')) . '">'
-            . '<div class="awk-when">' . $when . '</div>'
-            . '<div class="awk-what"><div class="awk-title">' . $e['type'] . $maTag
-            . ($ctx !== '' ? '<span class="awk-ctx">' . h($ctx) . '</span>' : '') . '</div>'
-            . '<div class="awk-body">' . $e['html'] . '</div></div>'
-            . '<div class="awk-acts">' . $actions . '</div>'
-            . '</div>';
+
+        $when = $day !== '' ? '<b>' . h(date('d/m/Y', strtotime($day))) . '</b>' : '<b class="muted">ไม่ระบุวันที่</b>';
+        $small = array_filter([$time, $isMa ? (string) $m['by'] : '']);
+        $when .= $small ? '<small>' . h(implode(' · ', $small)) . '</small>' : '';
+        if ($kind === 'rent_ma') {
+            $when .= '<span class="ma-src-tag">ระบบเช่า</span>';
+        }
+
+        $job = '<div class="awk-job">' . $e['type']
+            . (ast_work_is_ma($kind) ? '<span class="ast-mab is-legend">MA ' . (++$maNo) . '</span>' : '') . '</div>';
+        $sub = [];
+        if ($isMa && $kind === 'ma' && $m['round'] > 0) {
+            $sub[] = 'รอบที่ ' . $m['round'];
+        }
+        if ($isMa && $kind === 'ma' && $m['fw'] !== '') {
+            $sub[] = 'FW ' . $m['fw'];
+        }
+        $job .= $sub ? '<small>' . h(implode(' · ', $sub)) . '</small>' : '';
+        $job .= $ctx['text'] !== '' ? '<span class="awk-ctx">' . h($ctx['text']) . '</span>' : '';
+
+        $out .= '<tr data-work-row="' . $i . '" data-work-kind="' . h($kind) . '">'
+            . '<td class="ma-c-when">' . $when . '</td>'
+            . '<td class="ma-c-asset awk-c-job">' . $job . '</td>';
+        if ($isMa) {
+            $done = $kind === 'rent_ma'
+                ? ($m['notes'] ? '<div class="ma-rent-note">' . implode('<br>', array_map('h', $m['notes'])) . '</div>' : '<span class="muted">ไม่มีรายละเอียด</span>')
+                : awk_ma_done_html($m);
+            $out .= '<td class="ma-list-symptom ma-c-sym">' . ($ctx['claim'] !== '' ? h($ctx['claim']) : '<span class="muted">—</span>') . '</td>'
+                . '<td class="ma-c-done">' . $done . '</td>'
+                . '<td class="ma-rent-close ma-c-rent">' . awk_rent_close_html($kind, $m) . '</td>';
+        } else {
+            // ผลิต/QC · อัปเดต · อะไหล่ ไม่มีอาการ/ผลต่อระบบเช่า — ใช้รายละเอียดเดิมเต็มช่อง
+            $out .= '<td class="ma-c-done awk-c-body" colspan="3">' . $e['html'] . '</td>';
+        }
+        $out .= '<td class="ma-row-actions row-actions ma-c-act">' . $actions . '</td></tr>';
     }
-    return $out . '</div></div></section>';
+    return $out . '</tbody></table></div></div></section>';
 }
