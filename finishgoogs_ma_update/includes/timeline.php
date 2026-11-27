@@ -181,9 +181,16 @@ function asset_timeline_items($id) {
         if ($r['result']) $head[] = ['ok' => 'ปกติ', 'replace' => 'เปลี่ยนอุปกรณ์', 'repair' => 'ต้องซ่อม'][$r['result']];
         if ($r['fw_version']) $head[] = 'FW ' . h($r['fw_version']);
         if ($head) $body[] = '<b>' . implode(' · ', $head) . '</b>';
-        $secs = $chipRow('ปกติ', $grab('ok_items', 'OK'), 'chip-ok')
-              . $chipRow('เปลี่ยน', $grab('replace_items', 'Replace'), 'chip-replace')
-              . $chipRow('ซ่อม', $grab('repair_items', 'Repair'), 'chip-repair');
+        // ซ่อมก่อน เปลี่ยนรองลงมา รายการปกติพับเป็นจำนวน (เหมือนตารางประวัติ MA)
+        $okItems = $grab('ok_items', 'OK');
+        $secs = $chipRow('ซ่อม', $grab('repair_items', 'Repair'), 'chip-repair')
+              . $chipRow('เปลี่ยน', $grab('replace_items', 'Replace'), 'chip-replace');
+        if ($okItems) {
+            $okChips = '';
+            foreach ($okItems as $it) $okChips .= '<span class="chip chip-ok">' . h($it) . '</span>';
+            $secs .= '<details class="tl-checklist-box tl-okfold"><summary class="tl-checklist-toggle">✓ ตรวจปกติ ' . count($okItems) . ' รายการ</summary>'
+                   . '<span class="chips">' . $okChips . '</span></details>';
+        }
         if ($secs) $body[] = $secs;
         $others = [];
         foreach ($vj as $k => $v) if (!in_array($k, ['OK', 'Replace', 'Repair'], true)) $others[] = "$k: $v";

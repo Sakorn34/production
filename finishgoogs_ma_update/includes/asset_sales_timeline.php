@@ -371,8 +371,14 @@ function asset_sales_timeline_data(array $asset, array $stock, array $lease): ar
                 $bits[] = ['อาการที่แจ้งเคลม', implode(' · ', is_array($lease['fault_notes'] ?? null) ? $lease['fault_notes'] : [])];
                 $bits[] = ['หมายเหตุ', $lease['p_remarks'] ?? ''];
             }
-            $events[] = ast_event(ast_date($r['start']), 'rent', 'เช่า',
+            $rentEv = ast_event(ast_date($r['start']), 'rent', 'เช่า',
                 'เช่า' . ($r['customer'] !== '' ? ' · ' . h($r['customer']) : ''), ast_meta($bits), '', $r['site']);
+            // วันที่เครื่องกลับมาจากสัญญานี้ — ใช้บอกบริบทของงาน MA
+            // เอาวันที่เร็วกว่าระหว่างวันรับคืนกับวันสิ้นสุดสัญญา: ระบบเช่าเคยลงวันรับคืนทีหลังทีเดียวทุกสัญญา
+            // (เช่น สัญญาที่จบปี 2025 มีวันรับคืน 2026) ซึ่งไม่ใช่วันที่เครื่องกลับมาจริง
+            $ends = array_filter([ast_date($r['returned']), ast_date($r['end'])], 'strlen');
+            $rentEv['until'] = $ends ? min($ends) : '';
+            $events[] = $rentEv;
             if (ast_date($r['claim_date']) !== '' || $r['claim'] !== '') {
                 $events[] = ast_event(ast_date($r['claim_date']), 'rent', 'แจ้งเคลม', 'แจ้งเคลมระหว่างเช่า',
                     ast_meta([['', $r['claim']], ['สัญญา', $r['code']]]));
@@ -459,7 +465,7 @@ function ast_icon3d_html(string $icon, string $src): string
  * @param array<int,array<string,string>> $dated
  * @return string
  */
-function ast_steps_html(array $dated): string
+function ast_steps_html(array $dated, array $work = []): string
 {
     $n = count($dated);
     if ($n === 0) {
@@ -475,15 +481,72 @@ function ast_steps_html(array $dated): string
     // จอกว้าง 5 ขั้นต่อแถว (ไม่เกิน 6 ขั้นอยู่แถวเดียว) / จอมือถือ 3 ขั้นต่อแถว — สลับด้วย CSS
     // defs อยู่นอกชุดที่ถูกซ่อน เพราะ gradient ใน display:none จะไม่ถูกวาด
     $wide = $n <= 6 ? $n : 5;
+    $links = ast_work_links($dated, $work);
     $out = '<div class="ast-stepwrap">' . $defs;
     if ($n <= 3) {
-        return $out . ast_snake_html($dated, $wide, '') . '</div>';
+        return $out . ast_snake_html($dated, $wide, '', $links) . '</div>';
     }
-    return $out . ast_snake_html($dated, $wide, ' is-wide') . ast_snake_html($dated, 3, ' is-narrow') . '</div>';
+    return $out . ast_snake_html($dated, $wide, ' is-wide', $links) . ast_snake_html($dated, 3, ' is-narrow', $links) . '</div>';
+}
+
+/** ชนิดงานกับตัวเครื่องที่นับเป็นป้าย MA บนแถบ */
+function ast_work_is_ma(string $kind): bool
+{
+    return $kind === 'ma' || $kind === 'rent_ma';
+}
+
+/**
+ * ผูกงานกับตัวเครื่องเข้ากับแถบขั้นตอน
+ *
+ * งาน MA ที่วันอยู่หลังขั้น i-1 และไม่เกินขั้น i → ป้ายบนเส้นที่วิ่งเข้าขั้น i
+ * งานหลังขั้นสุดท้าย → ป้ายต่อท้ายขั้นสุดท้าย · ขั้น "ผลิต" ชี้ไปบันทึกผลิต/QC
+ *
+ * @param array<int,array<string,string>> $dated
+ * @param array<int,array{i:int,day:string,kind:string}> $work  จาก asset_work_marks()
+ * @return array{seg:array<int,array>,after:array,prod:?int}
+ */
+function ast_work_links(array $dated, array $work): array
+{
+    $n = count($dated);
+    $seg = [];
+    $after = [];
+    $prod = null;
+    foreach ($work as $w) {
+        if ($w['kind'] === 'production' && $prod === null) {
+            $prod = $w['i'];
+        }
+        if (!ast_work_is_ma($w['kind']) || $w['day'] === '' || $n === 0) {
+            continue;
+        }
+        if ($w['day'] > $dated[$n - 1]['date']) {
+            $after[] = $w;
+            continue;
+        }
+        for ($k = 1; $k < $n; $k++) {
+            if ($w['day'] > $dated[$k - 1]['date'] && $w['day'] <= $dated[$k]['date']) {
+                $seg[$k][] = $w;
+                break;
+            }
+        }
+    }
+    return ['seg' => $seg, 'after' => $after, 'prod' => $prod];
+}
+
+/** ป้าย "MA n" บนแถบ — กดแล้วเลื่อนไปงานนั้นในการ์ดงานกับตัวเครื่อง */
+function ast_ma_badge_html(array $ws, string $mod): string
+{
+    $days = [];
+    $idx = [];
+    foreach ($ws as $w) {
+        $days[] = date('d/m/y', strtotime($w['day']));
+        $idx[] = (int) $w['i'];
+    }
+    $tip = 'งาน MA ' . count($ws) . ' ครั้งในช่วงนี้' . "\n" . implode(', ', $days) . "\n" . 'กดเพื่อดูในงานกับตัวเครื่อง';
+    return '<span class="ast-mab' . $mod . '" data-ast-work="' . implode(',', $idx) . '" data-ast-tip="' . h($tip) . '">MA ' . count($ws) . '</span>';
 }
 
 /** แถบขั้นแบบตัวยู — $per ขั้นต่อแถว แถวคี่วิ่งย้อนจากขวาไปซ้าย */
-function ast_snake_html(array $dated, int $per, string $mod): string
+function ast_snake_html(array $dated, int $per, string $mod, array $links = ['seg' => [], 'after' => [], 'prod' => null]): string
 {
     $n = count($dated);
     $labels = ast_sources();
@@ -496,9 +559,15 @@ function ast_snake_html(array $dated, int $per, string $mod): string
             $date = date('d/m/y', strtotime($ev['date']));
             $tip = trim(strip_tags(html_entity_decode($ev['title'], ENT_QUOTES, 'UTF-8')));
             $tipLines = array_filter([$tip, dthai($ev['date']) . ($ev['sub'] !== '' ? ' · ' . $ev['sub'] : ''), 'ที่มา: ' . ($labels[$ev['src']] ?? $ev['src'])]);
+            $work = ($ev['src'] === 'prod' && $links['prod'] !== null) ? ' data-ast-work="' . (int) $links['prod'] . '"' : '';
+            $badge = isset($links['seg'][$i]) ? ast_ma_badge_html($links['seg'][$i], $c === 0 ? ' is-turn' : '') : '';
+            if ($i === $n - 1 && $links['after']) {
+                $badge .= ast_ma_badge_html($links['after'], ' is-after');
+            }
             $out .= '<button type="button" class="ast-sstep ast-c-' . h($ev['src']) . ($i === $n - 1 ? ' is-cur' : '') . '"'
-                . ' data-ast-i="' . $i . '" data-ast-tip="' . h(implode("\n", $tipLines)) . '" style="--i:' . $i . '"'
+                . ' data-ast-i="' . $i . '"' . $work . ' data-ast-tip="' . h(implode("\n", $tipLines)) . '" style="--i:' . $i . '"'
                 . ' aria-label="' . h($ev['step'] . ' ' . $date) . '">'
+                . $badge
                 . '<span class="ast-sico">' . ast_icon3d_html(ast_step_icon($ev['step']), $ev['src']) . '</span>'
                 . '<b>' . h($ev['step']) . '</b><span class="ast-sdate">' . h($date) . '</span>'
                 . ($ev['sub'] !== '' ? '<span class="ast-ssub">' . h($ev['sub']) . '</span>' : '')
@@ -529,7 +598,7 @@ function ast_steps_script(): string
       el.textContent = l;
       tip.appendChild(el);
     });
-    var r = btn.querySelector('.ast-sico').getBoundingClientRect();
+    var r = (btn.querySelector('.ast-sico') || btn).getBoundingClientRect();
     tip.classList.add('is-on');
     var w = tip.offsetWidth, h = tip.offsetHeight;
     var x = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2));
@@ -539,7 +608,8 @@ function ast_steps_script(): string
     tip.style.top = y + 'px';
   }
   function hide(){ tip.classList.remove('is-on'); }
-  snake.addEventListener('mouseover', function(e){ var b = e.target.closest('.ast-sstep'); if (b) { show(b); } });
+  function pick(t){ return t.closest('.ast-mab') || t.closest('.ast-sstep'); }
+  snake.addEventListener('mouseover', function(e){ var b = pick(e.target); if (b) { show(b); } });
   snake.addEventListener('mouseout', function(e){ if (!e.relatedTarget || !snake.contains(e.relatedTarget)) { hide(); } });
   snake.addEventListener('focusin', function(e){ var b = e.target.closest('.ast-sstep'); if (b && b.matches(':focus-visible')) { show(b); } });
   snake.addEventListener('focusout', hide);
@@ -548,14 +618,29 @@ function ast_steps_script(): string
     var b = e.target.closest('.ast-sstep');
     if (!b) { return; }
     hide();
-    var row = document.querySelector('.ast-list [data-ast-row="' + b.getAttribute('data-ast-i') + '"]');
-    if (!row) { return; }
+    // ป้าย MA → งานในการ์ดงานกับตัวเครื่อง · ขั้นปกติ → แถวในรายการการ์ดนี้
+    // ขั้นผลิตไม่มีแถวในรายการ (บันทึกผลิตอยู่ในงานกับตัวเครื่อง) → ไปที่บันทึกผลิต/QC
+    var mab = e.target.closest('.ast-mab');
+    var rows = [];
+    if (!mab) {
+      var row = document.querySelector('.ast-list [data-ast-row="' + b.getAttribute('data-ast-i') + '"]');
+      if (row) { rows = [row]; }
+    }
+    if (!rows.length) {
+      ((mab || b).getAttribute('data-ast-work') || '').split(',').forEach(function(k){
+        var w = k !== '' ? document.querySelector('[data-work-row="' + k + '"]') : null;
+        if (w) { rows.push(w); }
+      });
+    }
+    if (!rows.length) { return; }
     var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    row.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
-    row.classList.remove('is-hl');
-    void row.offsetWidth;
-    row.classList.add('is-hl');
-    setTimeout(function(){ row.classList.remove('is-hl'); }, 1600);
+    rows[0].scrollIntoView({ block: mab ? 'center' : 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+    rows.forEach(function(r){
+      r.classList.remove('is-hl');
+      void r.offsetWidth;
+      r.classList.add('is-hl');
+      setTimeout(function(){ r.classList.remove('is-hl'); }, 1600);
+    });
   });
 })();
 </script>
@@ -615,17 +700,20 @@ function ast_row_html(array $ev, ?int $i = null): string
  * @param array<string,mixed> $lease    ผลจาก asset_leasing_info()
  * @param string              $topHtml  กล่องใต้หัวการ์ด (ผลเทียบสถานะเสื่อมสภาพกับระบบเช่า)
  * @param string              $footHtml บล็อกท้ายการ์ด (เครื่องอื่นที่ไซต์งานเดียวกัน)
+ * @param array               $work     asset_work_marks() — ป้าย MA บนแถบ + ขั้นผลิตชี้ไปบันทึกผลิต
+ * @param array|null          $data     asset_sales_timeline_data() ที่คำนวณไว้แล้ว (ไม่ต้องอ่านซ้ำ)
  * @return string
  */
-function asset_sales_timeline_card_html(array $asset, array $stock, array $lease, string $topHtml = '', string $footHtml = ''): string
+function asset_sales_timeline_card_html(array $asset, array $stock, array $lease, string $topHtml = '', string $footHtml = '', array $work = [], ?array $data = null): string
 {
-    $data = asset_sales_timeline_data($asset, $stock, $lease);
-    $dated = array_values(array_filter($data['events'], function ($e) { return $e['date'] !== ''; }));
+    $data = $data ?? asset_sales_timeline_data($asset, $stock, $lease);
+    $dated = ast_dated_events($data);
     $undated = array_values(array_filter($data['events'], function ($e) { return $e['date'] === ''; }));
 
     $out = '<div class="asset-sales-card ast-card">';
     $prodBadge = status_badge((string) ($asset['status'] ?? ''));
-    $out .= '<div class="asset-sales-card-head">' . ui_icon_html('history', 16) . '<b>การขาย / เช่า</b>'
+    $out .= '<div class="asset-sales-card-head">' . ui_icon_html('history', 16)
+        . '<b>เส้นทางเครื่อง · การขาย / เช่า</b>'
         . '<span class="ast-head-now">' . $prodBadge;
     if (!empty($lease['found']) && function_exists('rent_leasing_status_badge_html')) {
         $rentBadge = rent_leasing_status_badge_html((string) ($lease['pro_status'] ?? ''), (string) ($lease['p_status'] ?? ''));
@@ -635,12 +723,18 @@ function asset_sales_timeline_card_html(array $asset, array $stock, array $lease
         }
     }
     $out .= '</span></div><div class="asset-sales-card-body">';
+    $out .= '<p class="ast-card-sub">เครื่องไปอยู่ที่ไหน ของใคร — อ่านจากระบบอื่น'
+        . ($work ? ' · ป้าย <span class="ast-mab is-legend">MA</span> บนเส้น = ช่วงนั้นมีงาน MA' : '') . '</p>';
     $out .= $topHtml;
-    $out .= ast_steps_html($dated);
+    $out .= ast_steps_html($dated, $work);
 
     if ($data['events']) {
         $out .= '<div class="ast-list">';
         foreach ($dated as $i => $ev) {
+            // ผลิตเสร็จอยู่บนแถบแล้ว รายละเอียดอยู่ที่บันทึกผลิต/QC ในการ์ดงานกับตัวเครื่อง
+            if ($ev['src'] === 'prod' && $work) {
+                continue;
+            }
             $out .= ast_row_html($ev, $i);
         }
         if ($undated) {
@@ -681,4 +775,119 @@ function asset_sales_timeline_card_html(array $asset, array $stock, array $lease
     }
     $out .= $footHtml;
     return $out . '</div></div>' . ($dated ? ast_steps_script() : '');
+}
+
+/** เหตุการณ์ที่มีวันที่ เรียงเก่า → ใหม่ (ลำดับเดียวกับขั้นบนแถบ) */
+function ast_dated_events(array $data): array
+{
+    return array_values(array_filter($data['events'], function ($e) { return $e['date'] !== ''; }));
+}
+
+/**
+ * จุดอ้างอิงของงานกับตัวเครื่อง (เรียงเก่า → ใหม่ เท่ากับลำดับแถวที่แสดง) สำหรับผูกกับแถบขั้นตอน
+ *
+ * @param array<int,array<string,mixed>> $tlAsc ผลจาก timeline_sort_items_asc()
+ * @return array<int,array{i:int,day:string,kind:string}>
+ */
+function asset_work_marks(array $tlAsc): array
+{
+    $out = [];
+    foreach (array_values($tlAsc) as $i => $e) {
+        $d = trim((string) ($e['d'] ?? ''));
+        $out[] = ['i' => $i, 'day' => $d !== '' ? substr($d, 0, 10) : '', 'kind' => (string) ($e['kind'] ?? '')];
+    }
+    return $out;
+}
+
+/**
+ * ตอนทำงานนี้ เครื่องอยู่ช่วงไหนของเส้นทาง — ดูจากเหตุการณ์ขาย/เช่าล่าสุดก่อนวันนั้น
+ *
+ * @param array<int,array<string,string>> $dated
+ * @return string ข้อความดิบ (ยังไม่ escape) · ว่าง = ยังอยู่ช่วงผลิต/เข้าคลัง ไม่ต้องบอก
+ */
+function ast_work_context(array $dated, string $day): string
+{
+    if ($day === '') {
+        return '';
+    }
+    $last = null;
+    $rent = null;
+    // เฉพาะเหตุการณ์ก่อนวันนั้น — งานวันเดียวกับเหตุการณ์มักเป็นต้นเหตุ (เช่น MA เจอเสียแล้วปลดระวางวันเดียวกัน)
+    foreach ($dated as $ev) {
+        if ($ev['date'] >= $day) {
+            break;
+        }
+        if ($ev['src'] === 'prod' || $ev['step'] === 'เข้า stock') {
+            continue;
+        }
+        $last = $ev;
+        if ($ev['step'] === 'เช่า') {
+            $rent = $ev;
+        }
+    }
+    if ($last === null) {
+        return '';
+    }
+    $step = $last['step'];
+    if ($step === 'ปลดระวาง') {
+        return 'หลังปลดระวาง';
+    }
+    if ($rent !== null && in_array($step, ['เช่า', 'แจ้งเคลม', 'รับคืน'], true)) {
+        $site = trim((string) $rent['sub']) !== '' ? trim((string) $rent['sub']) : 'ลูกค้า';
+        $until = (string) ($rent['until'] ?? '');
+        if ($step === 'รับคืน' || ($until !== '' && $day >= $until)) {
+            return 'หลังคืนจาก ' . $site;
+        }
+        return 'ระหว่างเช่าที่ ' . $site;
+    }
+    if ($step === 'เข้าระบบเช่า') {
+        return 'อยู่คลังเช่า';
+    }
+    if (trim((string) $last['sub']) !== '') {
+        return 'หลังส่งมอบ ' . trim((string) $last['sub']);
+    }
+    return '';
+}
+
+/**
+ * การ์ด "งานกับตัวเครื่อง" — ผลิต/QC · MA · อัปเดต · เบิกอะไหล่ เรียงเก่า → ใหม่ แถวกระชับ
+ *
+ * แต่ละแถวบอกว่าตอนนั้นเครื่องอยู่ช่วงไหน (ดูจากการ์ดเส้นทางเครื่อง) และมี data-work-row
+ * ให้ป้าย MA บนแถบขั้นตอนกดแล้วเลื่อนมาที่แถวนี้
+ *
+ * @param array<int,array<string,mixed>> $tlAsc     ผลจาก timeline_sort_items_asc()
+ * @param callable|null                  $actionsFn ปุ่มแก้ไข/ลบของแต่ละแถว
+ * @param array<int,array<string,string>> $dated    ast_dated_events()
+ * @param string                          $headLink ลิงก์มุมขวาของหัวการ์ด (HTML)
+ */
+function asset_work_card_html(array $tlAsc, $actionsFn, int $assetId, array $dated, string $headLink = ''): string
+{
+    $out = '<section class="asset-sales-card awk-card" id="asset-work">'
+        . '<div class="asset-sales-card-head">' . ui_icon_html('repairs', 16)
+        . '<b>งานกับตัวเครื่อง (' . count($tlAsc) . ')</b>'
+        . ($headLink !== '' ? '<span class="ast-head-now">' . $headLink . '</span>' : '')
+        . '</div><div class="asset-sales-card-body">'
+        . '<p class="ast-card-sub">ผลิต/QC · MA · อัปเดต · อะไหล่ — สิ่งที่ทำกับตัวเครื่อง เรียงเก่า → ใหม่</p>';
+    if (!$tlAsc) {
+        return $out . '<p class="muted asset-sales-empty">ยังไม่มีประวัติ</p></div></section>';
+    }
+    $out .= '<div class="awk-list">';
+    foreach (array_values($tlAsc) as $i => $e) {
+        $d = trim((string) ($e['d'] ?? ''));
+        $day = $d !== '' ? substr($d, 0, 10) : '';
+        $time = strlen($d) >= 16 ? substr($d, 11, 5) : '';
+        $when = $day !== '' ? h(date('d/m/Y', strtotime($day))) . ($time !== '' && $time !== '00:00' ? '<small>' . h($time) . '</small>' : '')
+            : '<span class="muted">ไม่ระบุวันที่</span>';
+        // บันทึกผลิต/QC อยู่ช่วงก่อนออกจากโรงงานเสมอ ไม่ต้องบอกบริบท
+        $ctx = ($e['kind'] ?? '') === 'production' ? '' : ast_work_context($dated, $day);
+        $actions = ($actionsFn && is_callable($actionsFn)) ? (string) $actionsFn($e, $assetId) : '';
+        $out .= '<div class="awk-row" data-work-row="' . $i . '" data-work-kind="' . h((string) ($e['kind'] ?? '')) . '">'
+            . '<div class="awk-when">' . $when . '</div>'
+            . '<div class="awk-what"><div class="awk-title">' . $e['type']
+            . ($ctx !== '' ? '<span class="awk-ctx">' . h($ctx) . '</span>' : '') . '</div>'
+            . '<div class="awk-body">' . $e['html'] . '</div></div>'
+            . '<div class="awk-acts">' . $actions . '</div>'
+            . '</div>';
+    }
+    return $out . '</div></div></section>';
 }

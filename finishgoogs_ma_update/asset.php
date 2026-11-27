@@ -353,29 +353,29 @@ function asset_tl_actions($e, $assetId) {
     }
     if (empty($e['kind']) || empty($e['rid'])) return '';
     $id = (int)$e['rid'];
-    $out = '<div class="tl-actions" style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap">';
+    $edit = function ($attrs) {
+        return '<a class="ma-ib" ' . $attrs . ' title="แก้ไข" aria-label="แก้ไข">' . ui_icon_html('edit', 14) . '</a>';
+    };
+    $del = function ($field, $confirm) use ($id) {
+        return '<form method="post" onsubmit="return confirm(\'' . $confirm . '\')">' . csrf_field()
+             . '<input type="hidden" name="' . $field . '" value="1"><input type="hidden" name="record_id" value="' . $id . '">'
+             . '<button class="ma-ib is-del" type="submit" title="ลบ" aria-label="ลบ">' . ui_icon_html('trash', 14) . '</button></form>';
+    };
+    $out = '';
     if ($e['kind'] === 'update') {
         $back = urlencode(BASE_URL . '/asset.php?id=' . $assetId);
-        $out .= '<a class="btn btn-sm btn-line btn-with-icon" href="' . BASE_URL . '/update_edit.php?id=' . $id . '&back=' . $back . '">' . ui_btn_label('edit', 'แก้ไข') . '</a>';
-        $out .= '<form method="post" style="display:inline" onsubmit="return confirm(\'ลบรายการนี้?\')">' . csrf_field()
-              . '<input type="hidden" name="del_update" value="1"><input type="hidden" name="record_id" value="' . $id . '">'
-              . '<button class="btn btn-sm btn-line btn-with-icon tl-del" type="submit">' . ui_icon_html('trash', 16, 'btn-svg') . '<span>ลบ</span></button></form>';
+        $out .= $edit('href="' . BASE_URL . '/update_edit.php?id=' . $id . '&back=' . $back . '"');
+        $out .= $del('del_update', 'ลบรายการนี้?');
     } elseif ($e['kind'] === 'ma') {
-        $out .= '<a class="btn btn-sm btn-line btn-with-icon" href="' . BASE_URL . '/ma.php?edit=' . $id . '">' . ui_btn_label('edit', 'แก้ไข') . '</a>';
-        $out .= '<form method="post" style="display:inline" onsubmit="return confirm(\'ลบรายการ MA นี้?\')">' . csrf_field()
-              . '<input type="hidden" name="del_ma_asset" value="1"><input type="hidden" name="record_id" value="' . $id . '">'
-              . '<button class="btn btn-sm btn-line btn-with-icon tl-del" type="submit">' . ui_icon_html('trash', 16, 'btn-svg') . '<span>ลบ</span></button></form>';
+        $out .= $edit('href="' . BASE_URL . '/ma.php?edit=' . $id . '"');
+        $out .= $del('del_ma_asset', 'ลบรายการ MA นี้?');
     } elseif ($e['kind'] === 'part_move') {
-        $out .= '<button class="btn btn-sm btn-line btn-with-icon" onclick="showListModal(' . h(json_encode('แก้ไขรายการเบิก', JSON_UNESCAPED_UNICODE)) . ',' . h(json_encode(BASE_URL . '/parts.php?ajax=edit_move_form&id=' . $id . '&back=' . urlencode(BASE_URL . '/asset.php?id=' . $assetId))) . ',\'\')">' . ui_btn_label('edit', 'แก้ไข') . '</button>';
-        $out .= '<form method="post" style="display:inline" onsubmit="return confirm(\'ลบรายการเบิกนี้?\')">' . csrf_field()
-              . '<input type="hidden" name="del_part_move" value="1"><input type="hidden" name="record_id" value="' . $id . '">'
-              . '<button class="btn btn-sm btn-line btn-with-icon tl-del" type="submit">' . ui_icon_html('trash', 16, 'btn-svg') . '<span>ลบ</span></button></form>';
+        $out .= '<button type="button" class="ma-ib" title="แก้ไข" aria-label="แก้ไข" onclick="showListModal(' . h(json_encode('แก้ไขรายการเบิก', JSON_UNESCAPED_UNICODE)) . ',' . h(json_encode(BASE_URL . '/parts.php?ajax=edit_move_form&id=' . $id . '&back=' . urlencode(BASE_URL . '/asset.php?id=' . $assetId))) . ',\'\')">' . ui_icon_html('edit', 14) . '</button>';
+        $out .= $del('del_part_move', 'ลบรายการเบิกนี้?');
     } elseif ($e['kind'] === 'production') {
-        $out .= '<form method="post" style="display:inline" onsubmit="return confirm(\'ลบบันทึกผลิตนี้?\')">' . csrf_field()
-              . '<input type="hidden" name="del_production" value="1"><input type="hidden" name="record_id" value="' . $id . '">'
-              . '<button class="btn btn-sm btn-line btn-with-icon tl-del" type="submit">' . ui_icon_html('trash', 16, 'btn-svg') . '<span>ลบ</span></button></form>';
+        $out .= $del('del_production', 'ลบบันทึกผลิตนี้?');
     }
-    return $out . '</div>';
+    return $out;
 }
 
 page_header('เครื่อง ' . $a['asset_code'], false);
@@ -446,8 +446,11 @@ document.addEventListener('click', function (ev) {
   <?php
   require_once __DIR__ . '/includes/asset_sales_timeline.php';
   $retireBox = !empty($leaseInfo['found']) ? rent_retire_sync_asset_box_html($a, $leaseInfo) : '';
+  // สองการ์ดใช้ข้อมูลชุดเดียวกัน: เส้นทางเครื่องบอกช่วงที่มีงาน MA · งานกับตัวเครื่องบอกว่าตอนนั้นเครื่องอยู่ไหน
+  $salesData = asset_sales_timeline_data($a, $stockWithdraw, $leaseInfo);
+  $tlAsc = timeline_sort_items_asc($tl);
   ?>
-  <?= asset_sales_timeline_card_html($a, $stockWithdraw, $leaseInfo, $retireBox, $siteHtml) ?>
+  <?= asset_sales_timeline_card_html($a, $stockWithdraw, $leaseInfo, $retireBox, $siteHtml, asset_work_marks($tlAsc), $salesData) ?>
 </div>
 <?php
 // ใบเบิกผลิตจาก inventory ที่เครื่องนี้ถูกตัดยอด (ตารางมีเมื่อเปิดใช้ฟีเจอร์ใบเบิกแล้ว)
@@ -609,10 +612,13 @@ if ($invAlloc) { ?>
 
 <?= asset_maintenance_section_html($maRepairInfo, (int) $a['id']) ?>
 
-<h2>ประวัติทั้งหมด (<?= count($tl) ?> รายการ) — เรียงตามเวลาบันทึก</h2>
-<?php $moveCount = (int) qr('SELECT COUNT(*) FROM stock_movements WHERE asset_id = ?', 'i', [$id])->fetch_row()[0]; ?>
-<p class="muted" style="margin:-6px 0 12px; font-size:13px">ทุกประเภทงานอยู่ในเส้นเดียวกัน เรียงจากอดีต → ปัจจุบัน<?php if ($moveCount > 0) { ?> · <a href="<?= h(BASE_URL . '/stock_movements.php?q=' . urlencode((string) $a['asset_code'])) ?>">ประวัติเข้า-ออกคลัง (<?= number_format($moveCount) ?>) ›</a><?php } ?></p>
-<?php asset_timeline_chrono_html($tl, 'asset_tl_actions', $id); ?>
+<?php
+$moveCount = (int) qr('SELECT COUNT(*) FROM stock_movements WHERE asset_id = ?', 'i', [$id])->fetch_row()[0];
+$moveLink = $moveCount > 0
+    ? '<a class="awk-headlink" href="' . h(BASE_URL . '/stock_movements.php?q=' . urlencode((string) $a['asset_code'])) . '">ประวัติเข้า-ออกคลัง (' . number_format($moveCount) . ') ›</a>'
+    : '';
+?>
+<?= asset_work_card_html($tlAsc, 'asset_tl_actions', $id, ast_dated_events($salesData), $moveLink) ?>
 
 <div id="asset-snippet-overlay" class="notif-overlay ma-sn-overlay" hidden>
   <div class="notif-box ma-sn-modal" role="dialog" aria-modal="true" aria-labelledby="asset-snippet-title">

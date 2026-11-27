@@ -1799,7 +1799,9 @@ function rent_leasing_ma_timeline_items(array $info, array $ownItems = [])
             : '<b>กลับเข้าคลัง</b>';
         $parts = rent_leasing_ma_note_parts((string) ($r['remarks'] ?? ''));
         if (count($parts) > 1) {
-            $body[] = '<ul class="tl-checklist"><li>' . implode('</li><li>', array_map('h', $parts)) . '</li></ul>';
+            // พับไว้ — รายการตรวจซ้ำ ๆ ทุกรอบ กางตลอดจะดันงานอื่นหายจากจอ
+            $body[] = '<details class="tl-checklist-box"><summary class="tl-checklist-toggle">ตรวจ ' . count($parts) . ' รายการ</summary>'
+                . '<ul class="tl-checklist"><li>' . implode('</li><li>', array_map('h', $parts)) . '</li></ul></details>';
         } elseif ($parts) {
             $body[] = h($parts[0]);
         }
@@ -1982,17 +1984,14 @@ function rent_ma_source_actions_html(array $e): string
     if ($maId <= 0 || !function_exists('can') || !can('ma')) {
         return '';
     }
-    $out = '<div class="tl-actions" style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap">';
-    $out .= '<form method="post" style="display:inline" '
+    return '<form method="post" '
           . 'onsubmit="return confirm(\'ลบรายการ MA นี้จากระบบเช่า?\\nลบแล้วสถานะเครื่องจะ sync ตาม MA ล่าสุด\')">'
           . csrf_field()
           . '<input type="hidden" name="del_rent_ma_asset" value="1">'
           . '<input type="hidden" name="rent_ma_id" value="' . $maId . '">'
-          . '<button class="btn btn-sm btn-line btn-with-icon tl-del" type="submit">'
-          . (function_exists('ui_icon_html') ? ui_icon_html('trash', 16, 'btn-svg') : '')
-          . '<span>ลบ</span></button></form>';
-    $out .= '</div>';
-    return $out;
+          . '<button class="ma-ib is-del" type="submit" title="ลบจากระบบเช่า" aria-label="ลบรายการ MA จากระบบเช่า">'
+          . (function_exists('ui_icon_html') ? ui_icon_html('trash', 14) : '×')
+          . '</button></form>';
 }
 
 // ────────────────────────────────────────────────────────────────────────────────

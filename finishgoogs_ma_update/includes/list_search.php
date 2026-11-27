@@ -129,30 +129,3 @@ function timeline_sort_items_asc(array $items) {
     });
     return $items;
 }
-
-/**
- * แสดง timeline รวมทุกประเภทเป็นเส้นเดียว เรียงตามเวลาบันทึก เก่า → ใหม่
- *
- * ต่างจาก board ตรงที่อ่านเป็นเรื่องราวของเครื่องตั้งแต่ผลิตจนถึงตอนนี้ได้ทีเดียว
- * ไม่ต้องกวาดสายตาข้ามคอลัมน์แล้วประกอบลำดับเวลาเอง
- *
- * @param array<int, array{d:string, type:string, html:string}> $tl
- * @param callable|null $actionsFn
- * @param int $assetId
- * @return void
- */
-function asset_timeline_chrono_html(array $tl, $actionsFn = null, $assetId = 0) {
-    if (!$tl) {
-        echo '<p class="muted">ยังไม่มีประวัติ</p>';
-        return;
-    }
-    echo '<ul class="timeline tl-chrono">';
-    foreach (timeline_sort_items_asc($tl) as $e) {
-        $actions = ($actionsFn && is_callable($actionsFn)) ? $actionsFn($e, $assetId) : '';
-        $d = trim((string) ($e['d'] ?? ''));
-        echo '<li><div class="tl-date">' . ($d !== '' ? dthai_full($d) : '<span class="muted">ไม่ระบุวันที่</span>') . '</div>'
-           . '<div class="tl-type">' . $e['type'] . '</div>'
-           . '<div class="tl-body">' . $e['html'] . $actions . '</div></li>';
-    }
-    echo '</ul>';
-}
