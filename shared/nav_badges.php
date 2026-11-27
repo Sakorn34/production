@@ -68,7 +68,7 @@ function nav_badges(bool $canCountMa): array
         $near = (int) ($cache['po_near'] ?? 0);
         $out['pages/purchase-check.php'] = [
             'n'     => (int) $cache['po'],
-            'title' => 'ควรสั่งแล้ว ' . number_format((int) $cache['po']) . ' รายการ'
+            'title' => 'อะไหล่ต่ำกว่าขั้นต่ำ ' . number_format((int) $cache['po']) . ' รายการ (หมด · วิกฤต · ควรสั่ง)'
                 . ($near > 0 ? ' · ใกล้ถึงขั้นต่ำ ' . number_format($near) : ''),
         ];
     }
@@ -94,22 +94,26 @@ function nav_badges_count_ma(): ?int
     }
 }
 
-/** @return array{order:int,near:int}|null */
+/**
+ * นับจากคลังทั้งหมด ณ วันนี้ (ส่วน "คลังวันนี้" ของหน้าเช็คสั่งซื้อ) ไม่ใช่เฉพาะอะไหล่ที่ถูกเบิกผลิต
+ *
+ * @return array{order:int,near:int}|null
+ */
 function nav_badges_count_po(): ?array
 {
     try {
-        if (!function_exists('purchase_check_load_cached')) {
+        if (!function_exists('purchase_check_watch')) {
             require_once dirname(__DIR__) . '/parts/includes/purchase_check.php';
         }
-        if (!function_exists('production_db')) {
+        if ((!function_exists('getDB') && !function_exists('tech_parts_sync_db')) || !function_exists('stock_status_key')) {
             return null;
         }
-        $b = purchase_check_period_bounds('90d');
-        $d = purchase_check_load_cached($b['from']);
+        $d = purchase_check_watch(purchase_check_period_bounds('90d')['from']);
         if (empty($d['ok'])) {
             return null;
         }
-        return ['order' => (int) $d['counts']['order'], 'near' => (int) $d['counts']['near']];
+        $c = $d['counts'];
+        return ['order' => (int) $c['out'] + (int) $c['critical'] + (int) $c['low'], 'near' => (int) $c['near']];
     } catch (\Throwable $e) {
         error_log('[nav_badges] PO: ' . $e->getMessage());
         return null;

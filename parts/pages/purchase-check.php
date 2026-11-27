@@ -30,7 +30,13 @@ if (!isset(PURCHASE_CHECK_STATUS[$stIn])) {
     $stIn = 'all';
 }
 
+$wIn = (string) ($_GET['w'] ?? '');
+if (!isset(PURCHASE_CHECK_WATCH[$wIn])) {
+    $wIn = '';
+}
+
 $bounds = purchase_check_period_bounds($periodIn);
+$watch = purchase_check_watch($bounds['from']);
 $data = purchase_check_load_cached($bounds['from']);
 $allParts = $data['parts'];
 $partById = [];
@@ -74,11 +80,15 @@ require_once __DIR__ . '/../includes/header.php';
 parts_page_header(
     'basket',
     'เช็คสั่งซื้อ',
-    'ยอดเบิกผลิตในช่วงที่เลือก · คงเหลือและขั้นต่ำเป็นของวันนี้'
+    'อะไหล่ที่หมด/ใกล้หมดวันนี้ · ยอดเบิกผลิตแยกตามรุ่นและผู้จำหน่าย'
 );
 ?>
 
 <div class="pc-page">
+    <h2 class="pc-section-title">คลังวันนี้ <span>คงเหลือเทียบขั้นต่ำ ณ วันนี้ — ทุกอะไหล่ ไม่ขึ้นกับช่วงเวลา</span></h2>
+    <?= purchase_check_watch_html($watch, $wIn, $periodIn) ?>
+
+    <h2 class="pc-section-title" id="production-use">ยอดเบิกผลิต <span>เฉพาะอะไหล่ที่ถูกเบิกไปผลิตในช่วงที่เลือก (ไม่รวม MA / ซ่อม)</span></h2>
     <div class="pc-tools">
         <div class="pc-tool">
             <span class="pc-tool-label">ช่วงที่ดูยอดเบิก</span>
@@ -87,7 +97,7 @@ parts_page_header(
                     $key = (string) $key;
                     ?>
                 <a class="pc-seg-btn<?= $periodIn === $key ? ' is-active' : '' ?>"
-                   href="<?= e(purchase_check_url(['period' => $key, 'tab' => $tabIn, 'st' => $stIn])) ?>"><?= e($label) ?></a>
+                   href="<?= e(purchase_check_url(['period' => $key, 'tab' => $tabIn, 'st' => $stIn])) ?>#production-use"><?= e($label) ?></a>
                 <?php endforeach; ?>
             </nav>
         </div>
@@ -96,7 +106,7 @@ parts_page_header(
             <nav class="pc-seg" aria-label="มุมมอง">
                 <?php foreach (PURCHASE_CHECK_TABS as $key => $label): ?>
                 <a class="pc-seg-btn<?= $tabIn === $key ? ' is-active' : '' ?>"
-                   href="<?= e(purchase_check_url(['period' => $periodIn, 'tab' => $key, 'st' => $stIn])) ?>"><?= e($label) ?></a>
+                   href="<?= e(purchase_check_url(['period' => $periodIn, 'tab' => $key, 'st' => $stIn])) ?>#production-use"><?= e($label) ?></a>
                 <?php endforeach; ?>
             </nav>
         </div>
@@ -108,22 +118,22 @@ parts_page_header(
 
     <div class="pc-stats" role="group" aria-label="สรุปช่วงที่เลือก">
         <a class="pc-stat<?= $tabIn === 'models' && $stIn === 'all' ? ' is-on' : '' ?>"
-           href="<?= e(purchase_check_url(['period' => $periodIn, 'tab' => 'models', 'st' => 'all'])) ?>">
+           href="<?= e(purchase_check_url(['period' => $periodIn, 'tab' => 'models', 'st' => 'all'])) ?>#production-use">
             <span class="pc-lbl">รุ่นที่เบิกผลิต</span>
             <span class="pc-num"><?= formatNumber($counts['models']) ?></span>
         </a>
         <a class="pc-stat<?= $tabIn === 'suppliers' && $stIn === 'all' ? ' is-on' : '' ?>"
-           href="<?= e(purchase_check_url(['period' => $periodIn, 'tab' => 'suppliers', 'st' => 'all'])) ?>">
+           href="<?= e(purchase_check_url(['period' => $periodIn, 'tab' => 'suppliers', 'st' => 'all'])) ?>#production-use">
             <span class="pc-lbl">ผู้จำหน่าย</span>
             <span class="pc-num"><?= formatNumber($counts['suppliers']) ?></span>
         </a>
         <a class="pc-stat pc-stat-order<?= $stIn === 'order' ? ' is-on' : '' ?>"
-           href="<?= e(purchase_check_url(['period' => $periodIn, 'tab' => $tabIn, 'st' => $stIn === 'order' ? 'all' : 'order'])) ?>">
+           href="<?= e(purchase_check_url(['period' => $periodIn, 'tab' => $tabIn, 'st' => $stIn === 'order' ? 'all' : 'order'])) ?>#production-use">
             <span class="pc-lbl">ควรสั่งแล้ว</span>
             <span class="pc-num"><?= formatNumber($counts['order']) ?></span>
         </a>
         <a class="pc-stat pc-stat-near<?= $stIn === 'near' ? ' is-on' : '' ?>"
-           href="<?= e(purchase_check_url(['period' => $periodIn, 'tab' => $tabIn, 'st' => $stIn === 'near' ? 'all' : 'near'])) ?>">
+           href="<?= e(purchase_check_url(['period' => $periodIn, 'tab' => $tabIn, 'st' => $stIn === 'near' ? 'all' : 'near'])) ?>#production-use">
             <span class="pc-lbl">ใกล้ถึงขั้นต่ำ</span>
             <span class="pc-num"><?= formatNumber($counts['near']) ?></span>
         </a>
@@ -132,7 +142,7 @@ parts_page_header(
     <?php if ($stIn !== 'all'): ?>
     <div class="pc-filter-note">
         <span>แสดงเฉพาะ <b><?= e(PURCHASE_CHECK_STATUS[$stIn]) ?></b> · <?= formatNumber($shownCount) ?> อะไหล่</span>
-        <a href="<?= e(purchase_check_url(['period' => $periodIn, 'tab' => $tabIn, 'st' => 'all'])) ?>">ล้างตัวกรอง</a>
+        <a href="<?= e(purchase_check_url(['period' => $periodIn, 'tab' => $tabIn, 'st' => 'all'])) ?>#production-use">ล้างตัวกรอง</a>
     </div>
     <?php endif; ?>
     <?php if (!$data['ok']): ?>

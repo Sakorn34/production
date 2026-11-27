@@ -125,12 +125,17 @@ function purchase_check_url(array $over = []): string
     if (!isset(PURCHASE_CHECK_STATUS[$st])) {
         $st = 'all';
     }
+    $w = (string) ($over['w'] ?? ($_GET['w'] ?? ''));
     $qs = ['period' => $period];
     if ($tab !== 'models') {
         $qs['tab'] = $tab;
     }
     if ($st !== 'all') {
         $qs['st'] = $st;
+    }
+    // ตัวกรองระดับของส่วน "คลังวันนี้" — คีย์ที่ไม่รู้จักถูกทิ้ง
+    if ($w !== '' && isset(PURCHASE_CHECK_WATCH[$w])) {
+        $qs['w'] = $w;
     }
     return url('/pages/purchase-check.php?' . http_build_query($qs));
 }
@@ -610,6 +615,196 @@ function purchase_check_bom_display(array $models): ?string
     $vals = array_values($uniq);
     sort($vals, SORT_NUMERIC);
     return implode(' · ', array_map('formatNumber', $vals));
+}
+
+/** @var array<string,string> สถานะที่ส่วน "คลังวันนี้" แสดง (เรียงจากหนักไปเบา) */
+const PURCHASE_CHECK_WATCH = [
+    'out'      => 'หมดแล้ว',
+    'critical' => 'วิกฤต',
+    'low'      => 'ควรสั่งเพิ่ม',
+    'near'     => 'ใกล้ขั้นต่ำ',
+];
+
+/**
+ * อะไหล่ทั้งคลังที่หมด / ต่ำกว่า / ใกล้ขั้นต่ำ ณ วันนี้ — ไม่ขึ้นกับว่าถูกเบิกผลิตในช่วงไหน
+ *
+ * ตารางเบิกผลิตด้านล่างแสดงเฉพาะอะไหล่ที่ถูกเบิกผลิตในช่วงที่เลือก อะไหล่ที่หมดแต่ไม่มีใครเบิก
+ * (หรือเบิกไปใช้ MA / ซ่อม) จึงไม่เคยโผล่ — ส่วนนี้ตอบคำถาม "ตอนนี้อะไรหมด/ใกล้หมด" ตรง ๆ
+ * ยอดใช้นับจากใบเบิกทุกประเภทในคลังช่าง (stock_out) เพื่อคิดว่าของที่เหลือพอใช้อีกกี่วัน
+ *
+ * @param string $from วันเริ่มช่วงที่คิดยอดใช้ (Y-m-d H:i:s)
+ * @return array{ok:bool,error:string,rows:array<int,array<string,mixed>>,counts:array<string,int>,days:float}
+ */
+function purchase_check_watch(string $from): array
+{
+    $counts = array_fill_keys(array_keys(PURCHASE_CHECK_WATCH), 0);
+    $days = max(1.0, (time() - (int) strtotime($from)) / 86400);
+    $out = ['ok' => true, 'error' => '', 'rows' => [], 'counts' => $counts, 'days' => $days];
+    try {
+        // แอปทะเบียนเครื่องเรียกฟังก์ชันนี้ด้วย (ป้ายตัวเลขบนเมนู) ซึ่งไม่มี getDB() ของแอปอะไหล่
+        $db = function_exists('getDB') ? getDB() : tech_parts_sync_db();
+        $rows = [];
+        $st = $db->query(
+            'SELECT id, code, name, unit, quantity, min_stock, supplier, purchase_link
+             FROM products WHERE is_active = 1'
+        );
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $key = stock_status_key($r['quantity'], $r['min_stock']);
+            if (!isset(PURCHASE_CHECK_WATCH[$key])) {
+                continue;
+            }
+            $rows[(int) $r['id']] = [
+                'app_id'        => (int) $r['id'],
+                'code'          => trim((string) $r['code']),
+                'name'          => (string) $r['name'],
+                'unit'          => (string) ($r['unit'] ?: 'ชิ้น'),
+                'stock'         => qty_norm($r['quantity']),
+                'min'           => qty_norm($r['min_stock']),
+                'supplier'      => trim((string) $r['supplier']),
+                'purchase_link' => (string) $r['purchase_link'],
+                'status'        => $key,
+                'used'          => 0.0,
+                'days_left'     => null,
+                'icon_path'     => '',
+            ];
+        }
+        if ($rows) {
+            $ph = implode(',', array_fill(0, count($rows), '?'));
+            $use = $db->prepare(
+                "SELECT soi.product_id, SUM(soi.quantity) AS q
+                 FROM stock_out_items soi JOIN stock_out so ON so.id = soi.stock_out_id
+                 WHERE so.created_at >= ? AND soi.product_id IN ($ph)
+                 GROUP BY soi.product_id"
+            );
+            $use->execute(array_merge([$from], array_keys($rows)));
+            foreach ($use->fetchAll(PDO::FETCH_ASSOC) as $u) {
+                $rows[(int) $u['product_id']]['used'] = qty_norm($u['q']);
+            }
+            // รูปอะไหล่อยู่ฝั่งทะเบียนผลิต (parts.icon_path) จับคู่ด้วยรหัสสต็อก
+            $codes = array_values(array_filter(array_unique(array_column($rows, 'code'))));
+            if ($codes && function_exists('production_db')) {
+                $cph = implode(',', array_fill(0, count($codes), '?'));
+                $ic = production_db()->prepare(
+                    "SELECT TRIM(stock_code) AS sc, MAX(icon_path) AS icon_path FROM parts
+                     WHERE TRIM(stock_code) IN ($cph) AND icon_path IS NOT NULL AND icon_path <> ''
+                     GROUP BY TRIM(stock_code)"
+                );
+                $ic->execute($codes);
+                $icons = [];
+                foreach ($ic->fetchAll(PDO::FETCH_ASSOC) as $x) {
+                    $icons[(string) $x['sc']] = (string) $x['icon_path'];
+                }
+                foreach ($rows as &$r) {
+                    $r['icon_path'] = $icons[$r['code']] ?? '';
+                }
+                unset($r);
+            }
+        }
+        foreach ($rows as &$r) {
+            $perDay = $r['used'] / $days;
+            if ($r['stock'] > 0 && $perDay > 0) {
+                $r['days_left'] = (int) round($r['stock'] / $perDay);
+            }
+            $out['counts'][$r['status']]++;
+        }
+        unset($r);
+        $rank = array_flip(array_keys(PURCHASE_CHECK_WATCH));
+        usort($rows, static function ($a, $b) use ($rank) {
+            // ระดับเดียวกัน: ของที่ใช้หมดเร็วกว่าขึ้นก่อน แล้วค่อยเรียงตามคงเหลือเทียบขั้นต่ำ
+            $da = $a['days_left'] ?? PHP_INT_MAX;
+            $db = $b['days_left'] ?? PHP_INT_MAX;
+            $ra = $a['min'] > 0 ? $a['stock'] / $a['min'] : 0;
+            $rb = $b['min'] > 0 ? $b['stock'] / $b['min'] : 0;
+            return [$rank[$a['status']], $da, $ra] <=> [$rank[$b['status']], $db, $rb];
+        });
+        $out['rows'] = $rows;
+    } catch (Throwable $e) {
+        error_log('[purchase_check_watch] ' . $e->getMessage());
+        $out['ok'] = false;
+        $out['error'] = 'อ่านคลังอะไหล่ไม่ได้';
+    }
+    return $out;
+}
+
+/**
+ * ส่วน "คลังวันนี้" — การ์ดสรุป 4 ระดับ (กดกรอง) + ตารางเรียงจากหนักไปเบา
+ *
+ * @param array<string,mixed> $watch    ผลจาก purchase_check_watch()
+ * @param string              $wIn      ระดับที่กรองอยู่ ('' = ทั้งหมด)
+ * @param string              $periodIn ช่วงที่คิดยอดใช้
+ * @return string HTML
+ */
+function purchase_check_watch_html(array $watch, string $wIn, string $periodIn): string
+{
+    $tones = [
+        'out'      => ['var(--danger,#dc2626)', 'pc-w-danger'],
+        'critical' => ['var(--danger,#dc2626)', 'pc-w-danger'],
+        'low'      => ['var(--warning,#f59e0b)', 'pc-w-warn'],
+        'near'     => ['var(--near,#ca8a04)', 'pc-w-near'],
+    ];
+    $total = array_sum($watch['counts']);
+    $h = '<section class="pc-watch" id="stock-today">';
+    $h .= '<div class="pc-watch-stats" role="group" aria-label="สถานะคลังวันนี้">';
+    foreach (PURCHASE_CHECK_WATCH as $k => $label) {
+        $on = $wIn === $k;
+        $h .= '<a class="pc-stat pc-wstat' . ($on ? ' is-on' : '') . '" style="--pc-w:' . $tones[$k][0] . '"'
+            . ' href="' . e(purchase_check_url(['w' => $on ? '' : $k])) . '#stock-today">'
+            . '<span class="pc-lbl">' . e($label) . '</span>'
+            . '<span class="pc-num">' . formatNumber($watch['counts'][$k]) . '</span></a>';
+    }
+    $h .= '</div>';
+
+    $rows = $wIn !== '' ? array_values(array_filter($watch['rows'], static function ($r) use ($wIn) {
+        return $r['status'] === $wIn;
+    })) : $watch['rows'];
+
+    $h .= '<div class="card pc-watch-card">';
+    $h .= '<div class="pc-watch-head"><b>' . ($wIn !== ''
+            ? e(PURCHASE_CHECK_WATCH[$wIn]) . ' ' . formatNumber(count($rows)) . ' รายการ'
+              . ' <a href="' . e(purchase_check_url(['w' => ''])) . '#stock-today">ดูทั้งหมด</a>'
+            : 'อะไหล่ที่ต้องดู ' . formatNumber($total) . ' รายการ')
+        . '</b><span class="pc-watch-period">ยอดใช้คิดจาก <nav class="pc-seg pc-seg-sm" aria-label="ช่วงที่คิดยอดใช้">';
+    foreach (PURCHASE_CHECK_PERIODS as $pk => $pl) {
+        $pk = (string) $pk;
+        $h .= '<a class="pc-seg-btn' . ($periodIn === $pk ? ' is-active' : '') . '" href="'
+            . e(purchase_check_url(['period' => $pk])) . '#stock-today">' . e($pl) . '</a>';
+    }
+    $h .= '</nav></span></div>';
+
+    if (!$watch['ok']) {
+        $h .= '<p class="text-muted" style="color:var(--danger,#dc2626);padding:10px 14px;margin:0">' . e($watch['error']) . '</p>';
+    } elseif (!$rows) {
+        $h .= '<p class="text-muted" style="padding:10px 14px;margin:0">ไม่มีอะไหล่ที่หมดหรือใกล้ขั้นต่ำ</p>';
+    } else {
+        $h .= '<div class="table-wrap"><table class="pc-table pc-watch-table"><thead><tr>'
+            . '<th>อะไหล่</th><th>คงเหลือ / ขั้นต่ำ</th><th class="text-right">ใช้ไป</th><th class="text-right">พอใช้อีก</th>'
+            . '</tr></thead><tbody>';
+        foreach ($rows as $r) {
+            $k = $r['status'];
+            $pct = $r['min'] > 0 ? min(100, round($r['stock'] / $r['min'] * 100)) : 0;
+            $chip = '<span class="pc-wchip ' . $tones[$k][1] . '">' . e(PURCHASE_CHECK_WATCH[$k]) . '</span>';
+            if ($r['stock'] <= 0) {
+                $left = '<span class="pc-left is-out">หมดแล้ว</span>';
+            } elseif ($r['days_left'] === null) {
+                $left = '<span class="pc-left is-idle">ไม่มีการใช้ในช่วงนี้</span>';
+            } else {
+                $d = (int) $r['days_left'];
+                $cls = $d <= 30 ? 'is-soon' : ($d <= 60 ? 'is-mid' : 'is-ok');
+                $left = '<span class="pc-left ' . $cls . '">' . ($d > 365 ? 'เกิน 1 ปี' : '~' . formatNumber($d) . ' วัน') . '</span>';
+            }
+            $h .= '<tr>'
+                . '<td>' . purchase_check_name_cell_html($r, true, $chip) . '</td>'
+                . '<td><div class="pc-qty"><b>' . formatNumber($r['stock']) . '</b> <span class="text-muted">/ ' . formatNumber($r['min']) . ' ' . e($r['unit']) . '</span></div>'
+                . '<div class="pc-wbar"><i style="width:' . $pct . '%;background:' . $tones[$k][0] . '"></i></div>'
+                . '<div class="pc-left-m">' . $chip . ' ' . $left . '</div></td>'
+                . '<td class="text-right pc-qty">' . ($r['used'] > 0 ? formatNumber($r['used']) : '<span class="text-muted">—</span>') . '</td>'
+                . '<td class="text-right">' . $left . '</td>'
+                . '</tr>';
+        }
+        $h .= '</tbody></table></div>';
+    }
+    $h .= '</div></section>';
+    return $h;
 }
 
 /**

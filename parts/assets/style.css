@@ -2093,6 +2093,69 @@ a:focus-visible {
     background: var(--danger, #dc2626);
 }
 .pc-stat-near::before { background: var(--warning, #d97706); }
+/* ── หัวข้อสองส่วนของหน้า: คลังวันนี้ / ยอดเบิกผลิต ── */
+.pc-section-title {
+    margin: 4px 0 10px;
+    font-size: calc(15px * var(--font-scale, 1));
+    font-weight: 700;
+    color: var(--text, #2a2440);
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+}
+.pc-section-title span { font-size: calc(12px * var(--font-scale, 1)); font-weight: 400; color: var(--text-muted, #6b6480); }
+.pc-section-title + .pc-tools { margin-top: 0; }
+.pc-page > .pc-section-title:not(:first-child) { margin-top: 26px; }
+
+/* ── คลังวันนี้ ── */
+.pc-watch { margin-bottom: 4px; }
+.pc-watch-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+.pc-wstat .pc-num { color: var(--pc-w); }
+.pc-wstat::before {
+    content: ""; position: absolute; top: 16px; right: 16px;
+    width: 8px; height: 8px; border-radius: 50%; background: var(--pc-w);
+}
+.pc-watch-card { padding: 0; overflow: hidden; }
+.pc-watch-head {
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+    padding: 10px 14px; border-bottom: 1px solid #f1eef7;
+    font-size: calc(12.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480);
+}
+.pc-watch-head b { color: var(--text, #2a2440); font-size: calc(14px * var(--font-scale, 1)); }
+.pc-watch-head b a { margin-left: 8px; font-size: calc(12px * var(--font-scale, 1)); font-weight: 600; color: var(--primary, #e11d74); text-decoration: none; }
+.pc-watch-period { display: inline-flex; align-items: center; gap: 6px; }
+.pc-seg-sm .pc-seg-btn { padding: 3px 10px; font-size: calc(12px * var(--font-scale, 1)); }
+.pc-watch-table td { vertical-align: middle; }
+.pc-watch-table th:nth-child(2) { width: 22%; }
+.pc-watch-table th:nth-child(3) { width: 10%; }
+.pc-watch-table th:nth-child(4) { width: 16%; }
+.pc-wchip {
+    flex-shrink: 0; align-self: center; margin-left: auto;
+    font-size: calc(11px * var(--font-scale, 1)); font-weight: 700;
+    padding: 2px 9px; border-radius: 999px; white-space: nowrap;
+}
+.pc-w-danger { background: #fee2e2; color: #b91c1c; }
+.pc-w-warn { background: #fef3c7; color: #92400e; }
+.pc-w-near { background: #fef9c3; color: #854d0e; }
+.pc-wbar { height: 6px; border-radius: 3px; background: #f1eefa; overflow: hidden; margin-top: 4px; max-width: 160px; }
+.pc-wbar i { display: block; height: 100%; }
+.pc-left { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pc-left.is-out, .pc-left.is-soon { color: var(--danger, #dc2626); }
+.pc-left.is-mid { color: #b45309; }
+.pc-left.is-ok { color: var(--success, #16a34a); }
+.pc-left.is-idle { font-weight: 400; color: var(--text-faint, #a39fb3); font-size: calc(12px * var(--font-scale, 1)); }
+.pc-left-m { display: none; margin-top: 3px; font-size: calc(12px * var(--font-scale, 1)); }
+/* จอแคบ: เหลือสองคอลัมน์ — "พอใช้อีก" ย้ายไปอยู่ใต้คงเหลือ */
+@media (max-width: 720px) {
+    .pc-watch-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pc-watch-table th:nth-child(3), .pc-watch-table td:nth-child(3),
+    .pc-watch-table th:nth-child(4), .pc-watch-table td:nth-child(4) { display: none; }
+    .pc-watch-table { table-layout: fixed; }
+    .pc-watch-table th:nth-child(2) { width: 38%; }
+    .pc-watch-table .pc-qty, .pc-left-m .pc-left { white-space: normal; }
+    .pc-watch-table .pc-partcell > .pc-wchip { display: none; }
+    .pc-left-m .pc-wchip { margin: 0 4px 0 0; }
+    .pc-left-m { display: block; }
+}
+
 .pc-filter-note {
     display: flex;
     align-items: center;
