@@ -118,33 +118,31 @@ function ma_spare_skips_rent_sync($postedStatus): bool
 }
 
 /**
- * แสดงรายการ OK/Replace/Repair ในตาราง MA เป็นชิปข้อความ
+ * ช่อง "สิ่งที่ทำ" ในตารางประวัติ — ซ่อมก่อน แล้วเปลี่ยน ส่วนรายการปกติยุบเหลือจำนวน
+ * (รายการปกติเต็มอยู่ใน popup รายละเอียดเมื่อคลิกแถว และใน title ของบรรทัดจำนวน)
  *
  * @param array<string,mixed> $rec
- * @param string            $col     คอลัมน์ ma_records
- * @param string            $jsonKey คีย์ใน versions_json
- * @param int               $max     จำนวนชิปสูงสุดต่อเซลล์
  * @return string HTML
  */
-function ma_items_cell(array $rec, $col, $jsonKey, $max = 6) {
-    $items = ma_record_items($rec, $col, $jsonKey);
-    if (!$items) {
-        return '<span class="muted">-</span>';
+function ma_list_done_cell(array $rec) {
+    $repair = ma_record_items($rec, 'repair_items', 'Repair');
+    $replace = ma_record_items($rec, 'replace_items', 'Replace');
+    $ok = ma_record_items($rec, 'ok_items', 'OK');
+    $html = '';
+    if ($repair || $replace) {
+        $html .= '<div class="ma-list-item-chips">';
+        foreach ($repair as $it) {
+            $html .= '<span class="ma-list-item-chip ma-list-item-chip-repair" title="ซ่อม">' . h($it) . '</span>';
+        }
+        foreach ($replace as $it) {
+            $html .= '<span class="ma-list-item-chip ma-list-item-chip-replace" title="เปลี่ยน">' . h($it) . '</span>';
+        }
+        $html .= '</div>';
     }
-    $toneMap = ['OK' => 'ok', 'Replace' => 'replace', 'Repair' => 'repair'];
-    $tone = isset($toneMap[$jsonKey]) ? $toneMap[$jsonKey] : 'ok';
-    $show = array_slice($items, 0, $max);
-    $extra = count($items) - count($show);
-    $html = '<div class="ma-list-item-chips">';
-    foreach ($show as $it) {
-        $html .= '<span class="ma-list-item-chip ma-list-item-chip-' . h($tone) . '">' . h($it) . '</span>';
+    if ($ok) {
+        $html .= '<div class="ma-list-okn" title="' . h(implode(', ', $ok)) . '">✓ ตรวจปกติ ' . count($ok) . ' รายการ</div>';
     }
-    if ($extra > 0) {
-        $html .= '<span class="ma-list-item-chip ma-list-item-chip-more" title="' . h(implode(', ', array_slice($items, $max))) . '">+'
-            . (int) $extra . '</span>';
-    }
-    $html .= '</div>';
-    return $html;
+    return $html !== '' ? $html : '<span class="muted">—</span>';
 }
 
 /** แสดงรายการเป็นบรรทัดพร้อมหัวข้อ */
@@ -2668,7 +2666,7 @@ if (document.readyState === 'loading') {
 <?php
 $maListHasFilter = ma_list_filter_active($mq, $mby, $mround, $mkind, $mfrom, $mto, $mok, $mrepl, $mrepair, $mr);
 $maListPanelOpen = $maListHasFilter;
-$maListColspan = 9 + ($maListShowFw ? 1 : 0) + (can('ma') ? 1 : 0);
+$maListColspan = 5 + ($maListShowFw ? 1 : 0) + (can('ma') ? 1 : 0);
 $maListSymptoms = [];
 if (!empty($recentMA)) {
     $maListSnBatch = [];
@@ -2795,17 +2793,13 @@ if ($mby !== '') {
 <table class="list ma-list-table">
   <thead>
   <tr class="ma-list-sort-row">
-    <th><?= ma_sort_th('วันเวลา', 'date_asc', 'date_desc', $msort, $productId) ?></th>
-    <th><?= ma_sort_th('รอบ', 'round_asc', 'round_desc', $msort, $productId) ?></th>
-    <th><?= ma_sort_th('เครื่อง', 'asset_asc', 'asset_desc', $msort, $productId) ?></th>
-    <th title="จากระบบเช่า — ข้อความที่แจ้งตอนเข้า MA">ปัญหา / อาการที่แจ้ง</th>
-    <th><?= ma_sort_th('✅ ปกติ', 'ok_asc', 'ok_desc', $msort, $productId) ?></th>
-    <th><?= ma_sort_th('🔄 เปลี่ยน', 'replace_asc', 'replace_desc', $msort, $productId) ?></th>
-    <th><?= ma_sort_th('🔧 ซ่อม', 'repair_asc', 'repair_desc', $msort, $productId) ?></th>
-    <th title="ผลต่อระบบเช่า: ซ่อมแล้ว หรือ เสื่อมสภาพ">ระบบเช่า</th>
-    <?php if ($maListShowFw) { ?><th><?= ma_sort_th('FW', 'fw_asc', 'fw_desc', $msort, $productId) ?></th><?php } ?>
-    <th><?= ma_sort_th('โดย', 'by_asc', 'by_desc', $msort, $productId) ?></th>
-    <?= can('ma') ? '<th></th>' : '' ?>
+    <th class="ma-c-when"><?= ma_sort_th('วันเวลา', 'date_asc', 'date_desc', $msort, $productId) ?></th>
+    <th class="ma-c-asset"><?= ma_sort_th('เครื่อง', 'asset_asc', 'asset_desc', $msort, $productId) ?></th>
+    <th class="ma-c-sym" title="จากระบบเช่า — ข้อความที่แจ้งตอนเข้า MA">อาการที่แจ้ง</th>
+    <th class="ma-c-done" title="ซ่อม · เปลี่ยน · จำนวนรายการที่ตรวจแล้วปกติ">สิ่งที่ทำ</th>
+    <th class="ma-c-rent" title="ผลต่อระบบเช่า: ซ่อมแล้ว หรือ เสื่อมสภาพ">ระบบเช่า</th>
+    <?php if ($maListShowFw) { ?><th class="ma-c-fw"><?= ma_sort_th('FW', 'fw_asc', 'fw_desc', $msort, $productId) ?></th><?php } ?>
+    <?= can('ma') ? '<th class="ma-c-act"></th>' : '' ?>
   </tr>
   </thead>
   <tbody>
@@ -2822,52 +2816,56 @@ if ($mby !== '') {
       $maSymSn = rent_normalize_sn((string) ($m['asset_code'] ?? ''));
       $maSymText = trim((string) ($maListSymptoms[$maSymSn] ?? ''));
   ?>
+  <?php
+      $maWhen = ma_when_label((string) $m['visited_at']);
+      [$maDay, $maTime] = array_pad(explode(' ', $maWhen, 2), 2, '');
+      $maBy = trim((string) ($m['done_by'] ?? ''));
+      $maRemark = trim((string) ($m['remark'] ?? ''));
+  ?>
   <tr class="ma-row-click" title="คลิกดูรายละเอียด MA และคำสั่งตั้งค่าหมายเลขสินค้า · <?= h(status_th($machineKind)) ?>" <?= ma_row_data_attrs($m) ?>>
-    <td style="white-space:nowrap"><?= dthai_full($m['visited_at']) ?>
-      <?php if ($isRent) { ?><span class="ma-src-tag">ระบบเช่า</span><?php } ?></td>
-    <td style="text-align:center"><?= $m['ma_round'] ? (int)$m['ma_round'] : '-' ?></td>
-    <td class="ma-list-asset-cell">
+    <td class="ma-c-when">
+      <b><?= h($maDay) ?></b>
+      <small><?= h(implode(' · ', array_filter([$maTime, $maBy]))) ?></small>
+      <?php if ($isRent) { ?><span class="ma-src-tag">ระบบเช่า</span><?php } ?>
+    </td>
+    <td class="ma-list-asset-cell ma-c-asset">
       <a href="<?= BASE_URL ?>/asset.php?id=<?= (int)$m['asset_id'] ?>"><?= h($m['asset_code']) ?></a>
       <?= ma_list_kind_chip_html($machineKind) ?>
+      <?php if ($m['ma_round']) { ?><small>รอบที่ <?= (int) $m['ma_round'] ?></small><?php } ?>
     </td>
-    <td class="ma-list-symptom"><?= $maSymText !== '' ? h($maSymText) : '<span class="muted">—</span>' ?></td>
+    <td class="ma-list-symptom ma-c-sym">
+      <?= $maSymText !== '' ? h($maSymText) : '<span class="muted">—</span>' ?>
+    </td>
     <?php if ($isRent) {
-        // ฝั่งระบบเช่าบันทึกงานเป็นข้อความก้อนเดียว ไม่ได้แยก ปกติ/เปลี่ยน/ซ่อม
-        // จึงกางข้อความคลุมสามช่องนั้นแทนการเดาว่าอะไรอยู่ช่องไหน
-        $rentNote = trim((string) ($m['remark'] ?? ''));
+        // ฝั่งระบบเช่าบันทึกงานเป็นข้อความก้อนเดียว ไม่ได้แยก ซ่อม/เปลี่ยน/ปกติ — แสดงตามที่บันทึกไว้
     ?>
-    <td colspan="3" class="ma-rent-note">
-      <?= $rentNote !== '' ? nl2br(h($rentNote)) : '<span class="muted">ไม่มีรายละเอียด</span>' ?>
-    </td>
+    <td class="ma-rent-note ma-c-done"><?= $maRemark !== '' ? nl2br(h($maRemark)) : '<span class="muted">ไม่มีรายละเอียด</span>' ?></td>
     <?php } else { ?>
-    <td class="ma-list-ma-items"><?= ma_items_cell($m, 'ok_items', 'OK') ?></td>
-    <td class="ma-list-ma-items"><?= ma_items_cell($m, 'replace_items', 'Replace') ?></td>
-    <td class="ma-list-ma-items"><?= ma_items_cell($m, 'repair_items', 'Repair') ?></td>
+    <td class="ma-c-done"><?= ma_list_done_cell($m) ?></td>
     <?php } ?>
-    <td class="ma-rent-close"><?= ma_rent_close_cell($m) ?></td>
-    <?php if ($maListShowFw) { ?><td><?= h($m['fw_version'] ?: '-') ?></td><?php } ?>
-    <td><?= h($m['done_by'] ?: '-') ?></td>
+    <td class="ma-rent-close ma-c-rent"><?= ma_rent_close_cell($m) ?></td>
+    <?php if ($maListShowFw) { ?><td class="ma-c-fw"><?= h($m['fw_version'] ?: '-') ?></td><?php } ?>
     <?php if (can('ma')) { ?>
-    <td class="ma-row-actions row-actions">
+    <td class="ma-row-actions row-actions ma-c-act">
       <?php if ($isRent) {
           $rentUrl = function_exists('rent_leasing_record_url') ? rent_leasing_record_url((string) $m['asset_code'], (int) $m['id']) : '';
       ?>
         <?php if ($rentUrl !== '') { ?>
-        <a class="btn btn-sm btn-line" href="<?= h($rentUrl) ?>" target="_blank" rel="noopener">เปิดในระบบเช่า ↗</a>
+        <a class="ma-ib" href="<?= h($rentUrl) ?>" target="_blank" rel="noopener" title="เปิดในระบบเช่า" aria-label="เปิดในระบบเช่า"><?= ui_icon_html('external-link', 14) ?></a>
         <?php } ?>
-        <form method="post" style="display:inline" onsubmit="return confirm('ลบรายการ MA นี้จากระบบเช่า?\nลบแล้วสถานะเครื่องจะ sync ตาม MA ล่าสุด')">
+        <form method="post" onsubmit="return confirm('ลบรายการ MA นี้จากระบบเช่า?\nลบแล้วสถานะเครื่องจะ sync ตาม MA ล่าสุด')">
           <?= csrf_field() ?>
           <input type="hidden" name="del_rent_ma" value="1">
           <input type="hidden" name="rent_ma_id" value="<?= (int)$m['id'] ?>">
           <input type="hidden" name="rent_sn" value="<?= h($m['asset_code'] ?? '') ?>">
           <input type="hidden" name="back" value="<?= h($maListUrl) ?>">
-          <button class="btn-sm btn-danger" type="submit">ลบ</button>
+          <button class="ma-ib is-del" type="submit" title="ลบ" aria-label="ลบรายการ MA"><?= ui_icon_html('trash', 14) ?></button>
         </form>
       <?php } else { ?>
-      <a class="btn btn-sm btn-line" href="<?= BASE_URL ?>/ma.php?product=<?= $productId ?>&edit=<?= (int)$m['id'] ?>">แก้ไข</a>
+      <a class="ma-ib" href="<?= BASE_URL ?>/ma.php?product=<?= $productId ?>&edit=<?= (int)$m['id'] ?>" title="แก้ไข" aria-label="แก้ไขรายการ MA"><?= ui_icon_html('edit', 14) ?></a>
       <form method="post" onsubmit="return confirm('ลบรายการ MA นี้?')">
         <?= csrf_field() ?><input type="hidden" name="del_ma" value="1"><input type="hidden" name="ma_id" value="<?= (int)$m['id'] ?>"><input type="hidden" name="back" value="<?= h($maListUrl) ?>">
-        <button class="btn-sm btn-danger" type="submit">ลบ</button>
+        <button class="ma-ib is-del" type="submit" title="ลบ" aria-label="ลบรายการ MA"><?= ui_icon_html('trash', 14) ?></button>
       </form>
       <?php } ?>
     </td>

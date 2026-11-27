@@ -2625,11 +2625,37 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
 @media (max-width: 560px) {
   .ma-list-filter-grid4 { grid-template-columns: 1fr; }
 }
-.ma-list-table td.ma-list-ma-items {
-  max-width: 220px;
-  font-size: calc(12.5px * var(--font-scale, 1));
-  vertical-align: top;
+/* ── ตารางประวัติ MA แบบแถวกระชับ — ซ่อม/เปลี่ยนเป็นชิป รายการปกติยุบเหลือจำนวน ── */
+.ma-list-table td { vertical-align: middle; }
+.ma-list-table td.ma-c-when b { display: block; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ma-list-table td.ma-c-when small,
+.ma-list-table td.ma-c-asset small { display: block; margin-top: 2px; font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); }
+.ma-list-table td.ma-c-when .ma-src-tag { margin: 4px 0 0; }
+.ma-list-table td.ma-c-asset a { font-weight: 700; }
+.ma-list-table td.ma-c-asset .ma-kind-chip { display: inline-block; margin: 0 0 0 5px; vertical-align: 1px; }
+.ma-list-table .ma-c-done { font-size: calc(12.5px * var(--font-scale, 1)); }
+.ma-list-table td.ma-c-fw { font-family: ui-monospace, Consolas, monospace; font-size: calc(12px * var(--font-scale, 1)); color: var(--text-muted, #55506a); }
+/* สัดส่วนคอลัมน์ใช้เฉพาะจอกว้าง — จอแคบ ui_table เปลี่ยนแถวเป็นการ์ด width:1% จะบีบช่องจนทับกัน */
+@media (min-width: 761px) {
+  .ma-list-table .ma-c-when, .ma-list-table .ma-c-asset,
+  .ma-list-table .ma-c-rent, .ma-list-table .ma-c-fw { white-space: nowrap; width: 1%; }
+  .ma-list-table .ma-c-sym { min-width: 180px; }
+  .ma-list-table .ma-c-done { min-width: 220px; }
+  .ma-list-table .ma-c-act { white-space: nowrap; width: 1%; text-align: right; }
 }
+.ma-list-okn { margin-top: 4px; font-size: calc(11.5px * var(--font-scale, 1)); color: #15803d; cursor: help; width: fit-content; }
+.ma-list-item-chips + .ma-list-okn { margin-top: 5px; }
+.ma-row-actions form { display: inline; }
+.ma-ib {
+  display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;
+  width: 28px; height: 28px; margin-left: 4px; padding: 0;
+  border: 1px solid var(--border, #e6e0f5); border-radius: 7px; background: #fff;
+  color: var(--text-muted, #6b6480); cursor: pointer; text-decoration: none;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.ma-ib:hover { border-color: var(--primary); color: var(--primary); text-decoration: none; }
+.ma-ib.is-del { color: var(--danger, #b91c1c); border-color: color-mix(in srgb, var(--danger, #b91c1c) 30%, #fff); }
+.ma-ib.is-del:hover { background: var(--danger, #b91c1c); color: #fff; border-color: var(--danger, #b91c1c); }
 .ma-list-item-chips {
   display: flex;
   flex-wrap: wrap;
@@ -2645,15 +2671,8 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
   border-radius: 999px;
   overflow-wrap: anywhere;
 }
-.ma-list-item-chip-ok { background: #d1fae5; color: #065f46; }
 .ma-list-item-chip-replace { background: #fef3c7; color: #854d0e; }
 .ma-list-item-chip-repair { background: #fee2e2; color: #991b1b; }
-.ma-list-item-chip-more {
-  background: var(--surface-soft, #f6f4fb);
-  color: var(--text-muted, #6b6480);
-  font-weight: 600;
-  cursor: default;
-}
 
 /* ปุ่มลบในไทม์ไลน์หน้าเครื่อง — ทรงเดียวกับปุ่มแก้ไข/อื่น ๆ ต่างกันแค่สีเตือน
    ของเดิมใส่แค่ btn-sm btn-danger (ไม่มีคลาส btn) จึงกลายเป็นปุ่มแดงทึบคนละทรงกับเพื่อนข้าง ๆ */
