@@ -2890,7 +2890,8 @@ a.asset-sales-ref-link:hover {
 .ast-chk.is-ok { color: #0b6b4f; }
 .ast-chk.is-none { color: var(--text-faint, #a09ab6); }
 .ast-chk.is-err { color: #b45309; cursor: help; }
-.ast-card-sub { margin: -6px 0 10px; font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); line-height: 1.5; }
+/* อยู่ในกล่องที่เลื่อนได้ (overflow) — margin ติดลบจะโดนตัดครึ่งบรรทัด */
+.ast-card-sub { margin: 0 0 10px; font-size: calc(11.5px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); line-height: 1.5; }
 
 /* ── ป้าย "MA n" บนเส้นของแถบขั้นตอน — ช่วงนั้นมีงาน MA (กดแล้วเลื่อนไปการ์ดงานกับตัวเครื่อง) ──
    ปกติอยู่กลางเส้นที่วิ่งเข้าขั้นนี้ (ขอบช่อง) · is-turn = ขั้นแรกของแถว เส้นโค้งเข้ามาด้านต้นแถว

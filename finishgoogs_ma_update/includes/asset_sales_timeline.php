@@ -348,31 +348,15 @@ function asset_sales_timeline_data(array $asset, array $stock, array $lease): ar
     // ─ ระบบเช่า ─
     if (!empty($lease['found'])) {
         $pro = (string) ($lease['pro_status'] ?? '');
-        $inUse = function_exists('rent_leasing_is_current_use')
-            && rent_leasing_is_current_use($pro, (string) ($lease['p_status'] ?? ''));
         $events[] = ast_event(ast_date($lease['pro_date'] ?? ''), 'rent', 'เข้าระบบเช่า', 'ลงทะเบียนในระบบเช่า',
             ast_meta([['รุ่น', $lease['product_name'] ?? '']]));
-        $labels = [
-            'active' => 'กำลังเช่า', 'received' => 'รับคืนแล้ว', 'claim' => 'เคลม', 'Awaiting Return' => 'รอรับคืน',
-            'MA' => 'ส่ง MA', 'Lost' => 'สูญหาย', 'Asset Retirement' => 'ปลดระวาง',
-        ];
         // ระบบเช่าลงวันรับคืนวันเดียวกันให้หลายสัญญาพร้อมกันได้ — รวมเป็นแถวเดียวต่อวัน
         $returns = [];
         foreach (is_array($lease['rent_history'] ?? null) ? $lease['rent_history'] : [] as $r) {
-            $isNow = $inUse && $r['status'] === 'active';
-            $bits = [
-                ['ไซต์', trim($r['site'] . ($r['site_id'] !== '' ? ' (' . $r['site_id'] . ')' : ''))],
-                ['สัญญา', $r['code']],
-                ['PO', $r['po'] !== $r['code'] ? $r['po'] : ''],
-                ['ถึง', $r['end'] !== '' ? dthai($r['end']) : ''],
-                ['สถานะ', $labels[$r['status']] ?? $r['status']],
-            ];
-            if ($isNow) {
-                $bits[] = ['อาการที่แจ้งเคลม', implode(' · ', is_array($lease['fault_notes'] ?? null) ? $lease['fault_notes'] : [])];
-                $bits[] = ['หมายเหตุ', $lease['p_remarks'] ?? ''];
-            }
+            // บอกแค่ชื่อไซต์ — สัญญา/PO/วันสิ้นสุด/หมายเหตุ ดูได้ครบในส่วน "ประวัติการเช่า (ระบบเช่า)"
+            $site = trim((string) $r['site']) !== '' ? trim((string) $r['site']) : trim((string) $r['customer']);
             $rentEv = ast_event(ast_date($r['start']), 'rent', 'เช่า',
-                'เช่า' . ($r['customer'] !== '' ? ' · ' . h($r['customer']) : ''), ast_meta($bits), '', $r['site']);
+                'เช่า' . ($site !== '' ? ' · ' . h($site) : ''), '', '', $r['site']);
             // วันที่เครื่องกลับมาจากสัญญานี้ — ใช้บอกบริบทของงาน MA
             // เอาวันที่เร็วกว่าระหว่างวันรับคืนกับวันสิ้นสุดสัญญา: ระบบเช่าเคยลงวันรับคืนทีหลังทีเดียวทุกสัญญา
             // (เช่น สัญญาที่จบปี 2025 มีวันรับคืน 2026) ซึ่งไม่ใช่วันที่เครื่องกลับมาจริง
@@ -381,17 +365,17 @@ function asset_sales_timeline_data(array $asset, array $stock, array $lease): ar
             $events[] = $rentEv;
             if (ast_date($r['claim_date']) !== '' || $r['claim'] !== '') {
                 $events[] = ast_event(ast_date($r['claim_date']), 'rent', 'แจ้งเคลม', 'แจ้งเคลมระหว่างเช่า',
-                    ast_meta([['', $r['claim']], ['สัญญา', $r['code']]]));
+                    ast_meta([['', $r['claim']], ['ไซต์', $site]]));
             }
             if (ast_date($r['returned']) !== '') {
-                $returns[ast_date($r['returned'])][] = $r['code'];
+                $returns[ast_date($r['returned'])][] = $site;
             }
         }
-        foreach ($returns as $day => $codes) {
-            $codes = array_values(array_unique(array_filter($codes, 'strlen')));
-            $events[] = ast_event($day, 'rent', 'รับคืน', 'รับคืนจากลูกค้า'
-                . (count($codes) > 1 ? ' · ' . count($codes) . ' สัญญา' : ''),
-                ast_meta([['สัญญา', implode(', ', $codes)]]));
+        foreach ($returns as $day => $sites) {
+            $n = count($sites);
+            $sites = array_values(array_unique(array_filter($sites, 'strlen')));
+            $events[] = ast_event($day, 'rent', 'รับคืน', 'รับคืนจากลูกค้า' . ($n > 1 ? ' · ' . $n . ' สัญญา' : ''),
+                ast_meta([['ไซต์', implode(', ', $sites)]]));
         }
         if ($pro === 'Asset Retirement') {
             $meta = function_exists('rent_leasing_ma_retire_meta')
@@ -558,7 +542,8 @@ function ast_snake_html(array $dated, int $per, string $mod, array $links = ['se
             $i = $r * $per + $c;
             $date = date('d/m/y', strtotime($ev['date']));
             $tip = trim(strip_tags(html_entity_decode($ev['title'], ENT_QUOTES, 'UTF-8')));
-            $tipLines = array_filter([$tip, dthai($ev['date']) . ($ev['sub'] !== '' ? ' · ' . $ev['sub'] : ''), 'ที่มา: ' . ($labels[$ev['src']] ?? $ev['src'])]);
+            $tipSub = ($ev['sub'] !== '' && strpos($tip, $ev['sub']) === false) ? ' · ' . $ev['sub'] : '';
+            $tipLines = array_filter([$tip, dthai($ev['date']) . $tipSub, 'ที่มา: ' . ($labels[$ev['src']] ?? $ev['src'])]);
             $work = ($ev['src'] === 'prod' && $links['prod'] !== null) ? ' data-ast-work="' . (int) $links['prod'] . '"' : '';
             $badge = isset($links['seg'][$i]) ? ast_ma_badge_html($links['seg'][$i], $c === 0 ? ' is-turn' : '') : '';
             if ($i === $n - 1 && $links['after']) {
