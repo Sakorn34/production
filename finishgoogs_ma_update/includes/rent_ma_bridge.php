@@ -45,23 +45,6 @@ function rent_lease_produced_date($proDate)
 }
 
 /**
- * ป้ายสถานะเครื่องในผลิต (สำหรับแสดงในคิวเช่า)
- *
- * @param string $status ค่า status จาก assets
- * @return string
- */
-function rent_asset_status_label($status)
-{
-    static $map = [
-        'new'    => 'ใหม่ (คลัง)',
-        'rental' => 'เครื่องเช่า',
-        'spare'  => 'เครื่องสำรอง',
-    ];
-    $status = (string)$status;
-    return $map[$status] ?? $status;
-}
-
-/**
  * แยกหมายเลขสินค้าจากข้อความ (บรรทัด / ลูกน้ำ / ช่องว่าง)
  *
  * @param string $raw
@@ -319,6 +302,39 @@ function rent_wait_ma_symptoms(array $sns): array
 }
 
 /**
+ * ไซต์ที่เครื่องไปเช่ามาล่าสุด — บรรทัดสัญญาล่าสุดที่มีชื่อไซต์ (tbl_rent_product)
+ *
+ * @param array<int,string> $sns S/N ที่ normalize แล้ว
+ * @return array<string,array{name:string,id:string}> sn => ไซต์
+ */
+function rent_wait_ma_sites(array $sns): array
+{
+    $sns = array_values(array_unique(array_filter(array_map('rent_normalize_sn', $sns))));
+    $out = [];
+    foreach (array_chunk($sns, 500) as $chunk) {
+        $ph = implode(',', array_fill(0, count($chunk), '?'));
+        $q = rent_q_try(
+            "SELECT p_sn, p_sitename, p_siteid FROM tbl_rent_product
+             WHERE p_sn IN ($ph) AND p_sitename IS NOT NULL AND TRIM(p_sitename) <> ''
+             ORDER BY p_id ASC",
+            str_repeat('s', count($chunk)),
+            $chunk
+        );
+        if (!$q['ok'] || empty($q['result'])) {
+            continue;
+        }
+        // p_id น้อยไปมาก แถวหลังทับแถวหน้า → ได้ไซต์ของสัญญาล่าสุด
+        while ($r = $q['result']->fetch_assoc()) {
+            $sn = rent_normalize_sn($r['p_sn'] ?? '');
+            if ($sn !== '') {
+                $out[$sn] = ['name' => trim((string) $r['p_sitename']), 'id' => trim((string) ($r['p_siteid'] ?? ''))];
+            }
+        }
+    }
+    return $out;
+}
+
+/**
  * ดึงคิวสินค้าสถานะ MA จากระบบเช่า พร้อมจับคู่ทะเบียนผลิต
  *
  * @param int $limit
@@ -381,16 +397,23 @@ function rent_wait_ma_queue($limit = 2000)
         }
     }
     $symptoms = [];
+    $sites = [];
     if ($snList) {
         try {
             $symptoms = rent_wait_ma_symptoms($snList);
         } catch (Throwable $e) {
             $symptoms = [];   // คิวยังแสดงได้แม้อ่านอาการไม่สำเร็จ
         }
+        try {
+            $sites = rent_wait_ma_sites($snList);
+        } catch (Throwable $e) {
+            $sites = [];
+        }
     }
     foreach ($rows as $i => $row) {
         $rows[$i]['asset'] = $assetMap[$row['pro_sn']] ?? null;
         $rows[$i]['symptom'] = $symptoms[$row['pro_sn']] ?? '';
+        $rows[$i]['site'] = $sites[$row['pro_sn']] ?? null;
     }
     return ['ok' => true, 'error' => '', 'rows' => $rows];
 }
@@ -1457,11 +1480,11 @@ function rent_wait_ma_panel_html($productId)
               <th class="rent-q-num" title="จำนวนครั้งที่เคยบันทึก MA แล้ว (ระบบผลิตและระบบเช่า นับวันเดียวกันครั้งเดียว)">MA แล้ว</th>
               <th>ปัญหา / อาการที่แจ้ง</th>
               <th>วันที่บันทึกเช่า</th>
-              <th>สถานะผลิต</th>
+              <th title="ไซต์ของสัญญาเช่าล่าสุดที่เครื่องนี้ไปอยู่">Site ที่ไปเช่า</th>
             </tr>
             <?php foreach ($matched as $row) {
                 $a = $row['asset'];
-                $st = rent_asset_status_label($a['status'] ?? '');
+                $site = is_array($row['site'] ?? null) ? $row['site'] : null;
                 $sym = trim((string) ($row['symptom'] ?? ''));
                 $produced = (string) ($a['produced_at'] ?? '');
                 $age = function_exists('dt_age_text') ? dt_age_text($produced) : '';
@@ -1475,7 +1498,7 @@ function rent_wait_ma_panel_html($productId)
               <?= rent_queue_stat_td($stn['ma_n'], 'เคยทำ MA') ?>
               <td class="rent-q-sym"><?= $sym !== '' ? h($sym) : '<span class="muted">—</span>' ?></td>
               <td style="white-space:nowrap"><?= function_exists('dthai') ? dthai($row['pro_date'] ?? '') : h($row['pro_date'] ?? '') ?></td>
-              <td class="muted">พบในทะเบียนผลิต<?= $st !== '' ? ' · ' . h($st) : '' ?></td>
+              <td<?= $site && $site['id'] !== '' ? ' title="Site ID ' . h($site['id']) . '"' : '' ?>><?= $site ? h($site['name']) : '<span class="muted">—</span>' ?></td>
             </tr>
             <?php } ?>
           </table>
