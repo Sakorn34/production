@@ -1971,7 +1971,7 @@ a:focus-visible {
   .grid-2 { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* ─ เช็คสั่งซื้อ (purchase-check) ─────────────────────────────────────────── */
+/* ─ เช็คสั่งซื้อ (purchase-check) · โครงหน้า/ตาราง pc-* ใช้ร่วมกับหน้าอะไหล่สั่งต่างประเทศ ─ */
 .pc-page { width: 100%; max-width: none; min-width: 0; }
 .pc-tools {
     display: grid;
@@ -1992,7 +1992,7 @@ a:focus-visible {
     margin-bottom: 6px;
 }
 .pc-tool .history-kind-legend { margin-bottom: 0; flex-wrap: nowrap; }
-/* แถบเครื่องมือหน้าเช็คสั่งซื้อ — สองกลุ่มปุ่มชิดซ้าย ช่วงวันที่ชิดขวา แถวเดียว */
+/* แถบเครื่องมือของหน้าที่ใช้ .pc-page (อะไหล่สั่งต่างประเทศ / รูปอะไหล่) */
 .pc-page .pc-tools {
     display: flex;
     flex-wrap: wrap;
@@ -2003,40 +2003,6 @@ a:focus-visible {
     box-shadow: var(--shadow-sm);
 }
 .pc-page .pc-tool-label { margin-bottom: 7px; font-size: calc(11.5px * var(--font-scale, 1)); }
-.pc-seg {
-    display: inline-flex;
-    gap: 2px;
-    padding: 3px;
-    background: var(--surface-muted, #f5f3fa);
-    border: 1px solid var(--border, #e8e4f2);
-    border-radius: 10px;
-}
-.pc-seg-btn {
-    padding: 6px 14px;
-    border-radius: 7px;
-    font-size: calc(12.5px * var(--font-scale, 1));
-    font-weight: 600;
-    color: var(--text-muted, #6b6480);
-    text-decoration: none;
-    white-space: nowrap;
-    transition: background .12s, color .12s, box-shadow .12s;
-}
-.pc-seg-btn:hover { color: var(--text, #2a2440); }
-.pc-seg-btn.is-active {
-    background: var(--card, #fff);
-    color: var(--primary, #e11d74);
-    box-shadow: 0 1px 2px rgba(42, 36, 64, .08), 0 0 0 1px var(--border, #e8e4f2);
-}
-.pc-range { margin-left: auto; text-align: right; }
-.pc-range-val {
-    display: block;
-    padding: 6px 0;
-    font-size: calc(13px * var(--font-scale, 1));
-    font-weight: 600;
-    color: var(--text, #2a2440);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
 
 /* การ์ดสรุป — ป้ายเล็กด้านบน ตัวเลขใหญ่ด้านล่าง ชิดซ้าย */
 .pc-stats {
@@ -2104,14 +2070,6 @@ a:focus-visible {
 .pc-filter-note b { color: var(--text, #2a2440); }
 .pc-filter-note a { color: var(--primary, #e11d74); font-weight: 600; text-decoration: none; }
 .pc-filter-note a:hover { text-decoration: underline; }
-.pc-card-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 10px;
-    font-size: calc(13px * var(--font-scale, 1));
-    color: var(--text-muted, #6b6480);
-}
 .pc-table { width: 100%; border-collapse: collapse; table-layout: auto; }
 .pc-page .table-wrap-fold .pc-table {
     border-collapse: separate;
@@ -2165,36 +2123,6 @@ a:focus-visible {
     object-fit: contain;
     border-radius: 8px;
 }
-.pc-partcell-more { padding-left: 44px; }
-.pc-more td { background: #fcfbfe; color: inherit; }
-.pc-fold {
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    margin-left: auto;
-    border: 1px solid var(--border, #e8e4f2);
-    background: #fff;
-    border-radius: 999px;
-    padding: 2px 8px 2px 6px;
-    font-size: calc(12px * var(--font-scale, 1));
-    color: var(--text-muted, #6b6480);
-    cursor: pointer;
-    line-height: 1.2;
-    white-space: nowrap;
-}
-.pc-fold:hover { border-color: var(--primary, #e11d74); color: var(--primary, #e11d74); }
-.pc-fold-ico { display: inline-flex; transition: transform .15s ease; }
-.pc-fold[aria-expanded="true"] .pc-fold-ico { transform: rotate(90deg); }
-.pc-fold-all-btn {
-    border: 0;
-    background: none;
-    padding: 0;
-    color: var(--primary, #e11d74);
-    font-size: calc(13px * var(--font-scale, 1));
-    cursor: pointer;
-}
-.pc-fold-all-btn:hover { text-decoration: underline; }
 .pc-table tr.pc-group td {
     background: #f7f4fd;
     font-weight: 600;
@@ -2292,7 +2220,6 @@ a:focus-visible {
 .pc-buy { display: block; margin-top: 4px; font-size: calc(12.5px * var(--font-scale, 1)); }
 @media (max-width: 900px) {
     .pc-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .pc-range { margin-left: 0; text-align: left; }
 }
 @media (min-width: 761px) {
     /* กรอบตารางสูงเกือบหนึ่งจอ — เลื่อนหน้าลงมาแล้วเห็นแต่ตาราง แล้วเลื่อนในกรอบต่อ */
