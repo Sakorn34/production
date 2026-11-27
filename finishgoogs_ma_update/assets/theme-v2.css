@@ -1863,6 +1863,12 @@ a.kpi:hover { text-decoration: none; }
   text-align: center; white-space: nowrap; width: 1%;
   font-variant-numeric: tabular-nums;
 }
+/* สัดส่วนคอลัมน์: รหัส/ตัวเลข/วันที่แคบพอดีเนื้อ · อาการได้ที่มากสุด · Site ตัดบรรทัดได้ */
+.rent-q-panel table.list .rent-q-sncol,
+.rent-q-panel table.list .rent-q-date { white-space: nowrap; width: 1%; }
+.rent-q-panel table.list .rent-q-sym { min-width: 240px; }
+.rent-q-panel table.list .rent-q-site { width: 24%; min-width: 150px; }
+.rent-q-panel table.list td.rent-q-date { color: var(--text-muted, #6b6480); font-variant-numeric: tabular-nums; }
 .rent-q-row { cursor: pointer; }
 .rent-q-row.is-picked td { background: var(--primary-soft, #fce7f3); }
 .rent-q-sn { color: var(--primary); text-decoration: none; font-weight: 700; }

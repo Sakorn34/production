@@ -1474,13 +1474,12 @@ function rent_wait_ma_panel_html($productId)
         <div class="rent-q-tablewrap">
           <table class="list" style="margin:0">
             <tr>
-              <th>S/N</th>
-              <th>สินค้า (เช่า)</th>
+              <th class="rent-q-sncol">S/N</th>
               <th class="rent-q-num" title="จำนวนสัญญาเช่าที่เครื่องนี้เคยไปใช้งาน">ใช้งาน</th>
               <th class="rent-q-num" title="จำนวนครั้งที่เคยบันทึก MA แล้ว (ระบบผลิตและระบบเช่า นับวันเดียวกันครั้งเดียว)">MA แล้ว</th>
-              <th>ปัญหา / อาการที่แจ้ง</th>
-              <th>วันที่บันทึกเช่า</th>
-              <th title="ไซต์ของสัญญาเช่าล่าสุดที่เครื่องนี้ไปอยู่">Site ที่ไปเช่า</th>
+              <th class="rent-q-sym">ปัญหา / อาการที่แจ้ง</th>
+              <th class="rent-q-site" title="ไซต์ของสัญญาเช่าล่าสุดที่เครื่องนี้ไปอยู่">Site ที่ไปเช่า</th>
+              <th class="rent-q-date">วันที่บันทึกเช่า</th>
             </tr>
             <?php foreach ($matched as $row) {
                 $a = $row['asset'];
@@ -1492,13 +1491,12 @@ function rent_wait_ma_panel_html($productId)
                 $stn = $snStats[$row['pro_sn']] ?? ['use_n' => 0, 'ma_n' => 0];
                 ?>
             <tr class="rent-q-row">
-              <td><a class="rent-q-sn" href="<?= h($href) ?>" data-code="<?= h($row['pro_sn']) ?>" data-id="<?= (int)$a['id'] ?>" data-age="<?= h($age) ?>" data-produced="<?= h($produced) ?>" data-symptom="<?= h($sym) ?>"><?= h($row['pro_sn']) ?></a></td>
-              <td><?= h($row['pro_name']) ?></td>
+              <td class="rent-q-sncol"><a class="rent-q-sn" href="<?= h($href) ?>" data-code="<?= h($row['pro_sn']) ?>" data-id="<?= (int)$a['id'] ?>" data-age="<?= h($age) ?>" data-produced="<?= h($produced) ?>" data-symptom="<?= h($sym) ?>"><?= h($row['pro_sn']) ?></a></td>
               <?= rent_queue_stat_td($stn['use_n'], 'เคยไปใช้งาน') ?>
               <?= rent_queue_stat_td($stn['ma_n'], 'เคยทำ MA') ?>
               <td class="rent-q-sym"><?= $sym !== '' ? h($sym) : '<span class="muted">—</span>' ?></td>
-              <td style="white-space:nowrap"><?= function_exists('dthai') ? dthai($row['pro_date'] ?? '') : h($row['pro_date'] ?? '') ?></td>
-              <td<?= $site && $site['id'] !== '' ? ' title="Site ID ' . h($site['id']) . '"' : '' ?>><?= $site ? h($site['name']) : '<span class="muted">—</span>' ?></td>
+              <td class="rent-q-site"<?= $site && $site['id'] !== '' ? ' title="Site ID ' . h($site['id']) . '"' : '' ?>><?= $site ? h($site['name']) : '<span class="muted">—</span>' ?></td>
+              <td class="rent-q-date"><?= function_exists('dthai') ? dthai($row['pro_date'] ?? '') : h($row['pro_date'] ?? '') ?></td>
             </tr>
             <?php } ?>
           </table>
@@ -1521,12 +1519,11 @@ function rent_wait_ma_panel_html($productId)
             <table class="list" style="margin:0">
               <tr>
                 <th style="width:36px"><input type="checkbox" id="rent-reg-all" checked title="เลือกทั้งหมด"></th>
-                <th>S/N</th>
-                <th>สินค้า (เช่า)</th>
+                <th class="rent-q-sncol">S/N</th>
                 <th class="rent-q-num" title="จำนวนสัญญาเช่าที่เครื่องนี้เคยไปใช้งาน">ใช้งาน</th>
                 <th class="rent-q-num" title="จำนวนครั้งที่เคยบันทึก MA แล้ว (ระบบผลิตและระบบเช่า นับวันเดียวกันครั้งเดียว)">MA แล้ว</th>
-                <th>ปัญหา / อาการที่แจ้ง</th>
-                <th>วันที่บันทึกเช่า</th>
+                <th class="rent-q-sym">ปัญหา / อาการที่แจ้ง</th>
+                <th class="rent-q-date">วันที่บันทึกเช่า</th>
               </tr>
               <?php foreach ($unmatched as $row) {
                   $sym = trim((string) ($row['symptom'] ?? ''));
@@ -1534,12 +1531,11 @@ function rent_wait_ma_panel_html($productId)
                   ?>
               <tr>
                 <td><input type="checkbox" class="rent-reg-sn" name="register_sns[]" value="<?= h($row['pro_sn']) ?>" checked></td>
-                <td><b><?= h($row['pro_sn']) ?></b></td>
-                <td><?= h($row['pro_name']) ?></td>
+                <td class="rent-q-sncol"><b><?= h($row['pro_sn']) ?></b></td>
                 <?= rent_queue_stat_td($stn['use_n'], 'เคยไปใช้งาน') ?>
                 <?= rent_queue_stat_td($stn['ma_n'], 'เคยทำ MA') ?>
                 <td class="rent-q-sym"><?= $sym !== '' ? h($sym) : '<span class="muted">—</span>' ?></td>
-                <td style="white-space:nowrap"><?= function_exists('dthai') ? dthai($row['pro_date'] ?? '') : h($row['pro_date'] ?? '') ?></td>
+                <td class="rent-q-date"><?= function_exists('dthai') ? dthai($row['pro_date'] ?? '') : h($row['pro_date'] ?? '') ?></td>
               </tr>
               <?php } ?>
             </table>
