@@ -3,7 +3,7 @@
  * shared/nav_badges.php — ตัวเลขบนเมนูด้านซ้าย (ใช้ทั้งแอปทะเบียนเครื่องและแอปอะไหล่)
  *
  *   ma.php                    เครื่องรอ MA จากระบบเช่า ทุกรุ่นรวมกัน (ยอดเดียวกับหัวหน้าบันทึก MA)
- *   pages/purchase-check.php  อะไหล่ที่ "ควรสั่งแล้ว" (ยอดเดียวกับการ์ดบนหน้าเช็คสั่งซื้อ ช่วง 90 วัน)
+ *   pages/purchase-check.php  อะไหล่ที่ "ควรสั่งแล้ว" (ยอดเดียวกับการ์ดบนหน้าเช็คสั่งซื้อ)
  *
  * เมนูวาดทุกหน้า จึงเก็บผลไว้ในไฟล์ 5 นาทีแล้วใช้ร่วมกันทั้งสองแอป
  * แอปอะไหล่นับ MA เองไม่ได้ (ไม่มีการเชื่อมระบบเช่า) — ใช้ค่าที่แอปทะเบียนเครื่องนับไว้ล่าสุด
@@ -68,7 +68,7 @@ function nav_badges(bool $canCountMa): array
         $near = (int) ($cache['po_near'] ?? 0);
         $out['pages/purchase-check.php'] = [
             'n'     => (int) $cache['po'],
-            'title' => 'อะไหล่ต่ำกว่าขั้นต่ำ ' . number_format((int) $cache['po']) . ' รายการ (หมด · วิกฤต · ควรสั่ง)'
+            'title' => 'ควรสั่งแล้ว ' . number_format((int) $cache['po']) . ' รายการ (อะไหล่ตามสูตรผลิต)'
                 . ($near > 0 ? ' · ใกล้ถึงขั้นต่ำ ' . number_format($near) : ''),
         ];
     }
@@ -95,25 +95,25 @@ function nav_badges_count_ma(): ?int
 }
 
 /**
- * นับจากคลังทั้งหมด ณ วันนี้ (ส่วน "คลังวันนี้" ของหน้าเช็คสั่งซื้อ) ไม่ใช่เฉพาะอะไหล่ที่ถูกเบิกผลิต
+ * ยอดเดียวกับการ์ด "ควรสั่งแล้ว / ใกล้ถึงขั้นต่ำ" บนหน้าเช็คสั่งซื้อ (อะไหล่ตามสูตรผลิตของทุกรุ่น)
  *
  * @return array{order:int,near:int}|null
  */
 function nav_badges_count_po(): ?array
 {
     try {
-        if (!function_exists('purchase_check_watch')) {
+        if (!function_exists('purchase_check_load')) {
             require_once dirname(__DIR__) . '/parts/includes/purchase_check.php';
         }
-        if ((!function_exists('getDB') && !function_exists('tech_parts_sync_db')) || !function_exists('stock_status_key')) {
+        if (!function_exists('production_db') || !function_exists('stock_status_key')
+            || (!function_exists('getDB') && !function_exists('tech_parts_sync_db'))) {
             return null;
         }
-        $d = purchase_check_watch(purchase_check_period_bounds('90d')['from']);
+        $d = purchase_check_load();
         if (empty($d['ok'])) {
             return null;
         }
-        $c = $d['counts'];
-        return ['order' => (int) $c['out'] + (int) $c['critical'] + (int) $c['low'], 'near' => (int) $c['near']];
+        return ['order' => (int) $d['counts']['order'], 'near' => (int) $d['counts']['near']];
     } catch (\Throwable $e) {
         error_log('[nav_badges] PO: ' . $e->getMessage());
         return null;
