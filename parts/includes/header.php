@@ -61,8 +61,10 @@ a.classList.remove('nav-collapsed');a.classList.add('nav-expanded');}}catch(e){}
             <button type="button" class="sidebar-search-mini" aria-label="ค้นหา" title="ค้นหา"><?= ui_icon_html('search', 16) ?></button>
         </div>
         <div class="sidebar-nav">
+            <?php require_once dirname(__DIR__, 2) . '/shared/nav_badges.php';
+                  $navBadges = nav_badges(false); ?>
             <div class="nav-links-cross nav-links-cross-top">
-                <?= ui_sidebar_cross_group('ทะเบียนเครื่อง', ui_nav_items_finishgoogs(), $fgBase) ?>
+                <?= ui_sidebar_cross_group('ทะเบียนเครื่อง', ui_nav_items_finishgoogs(), $fgBase, $navBadges) ?>
             </div>
             <ul class="nav-links">
                 <li><?= ui_nav_group_label('สต็อกอะไหล่') ?></li>
@@ -71,6 +73,7 @@ a.classList.remove('nav-collapsed');a.classList.add('nav-expanded');}}catch(e){}
                     <a href="<?= e($item['href']) ?>" class="<?= $currentPage === $item['file'] ? 'active' : '' ?>">
                         <?= ui_nav_icon_html($item['icon']) ?>
                         <span class="nav-text"><?= e($item['label']) ?></span>
+                        <?= nav_badge_html($navBadges, 'pages/' . $item['file'] . '.php') ?>
                     </a>
                 </li>
                 <?php endforeach; ?>

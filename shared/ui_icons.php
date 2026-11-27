@@ -418,9 +418,10 @@ function ui_nav_group_label(string $text): string
  * @param string $label   หัวข้อกลุ่ม
  * @param array  $items   รายการจาก ui_nav_items_*()
  * @param string $baseUrl base URL ของระบบปลายทาง
+ * @param array  $badges  ตัวเลขท้ายเมนูจาก nav_badges() — คีย์เป็น file ของเมนู
  * @return string
  */
-function ui_sidebar_cross_group(string $label, array $items, string $baseUrl): string
+function ui_sidebar_cross_group(string $label, array $items, string $baseUrl, array $badges = []): string
 {
     $html = ui_nav_group_label($label);
     foreach ($items as $it) {
@@ -428,6 +429,7 @@ function ui_sidebar_cross_group(string $label, array $items, string $baseUrl): s
         $html .= '<a class="nav-cross" href="' . htmlspecialchars($href, ENT_QUOTES, 'UTF-8') . '">'
             . '<span class="nav-ico">' . ui_nav_icon_html($it['icon']) . '</span>'
             . '<span class="nav-text">' . htmlspecialchars($it['label'], ENT_QUOTES, 'UTF-8') . '</span>'
+            . (function_exists('nav_badge_html') ? nav_badge_html($badges, $it['file']) : '')
             . '</a>';
     }
     return $html;

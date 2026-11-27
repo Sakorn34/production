@@ -277,13 +277,16 @@ a.classList.remove('nav-collapsed');a.classList.add('nav-expanded');}}catch(e){}
     <div class="sidebar-nav">
       <nav>
         <?= ui_nav_group_label('ทะเบียนเครื่อง') ?>
+        <?php require_once dirname(__DIR__, 2) . '/shared/nav_badges.php';
+              $navBadges = nav_badges(true); ?>
         <?php foreach ($nav as $n) { ?>
         <a href="<?= BASE_URL . '/' . $n['file'] ?>" class="<?= $cur === $n['file'] ? 'active' : '' ?>">
           <span class="nav-ico"><?= ui_nav_icon_html($n['icon']) ?></span>
           <span class="nav-text"><?= h($n['label']) ?></span>
+          <?= nav_badge_html($navBadges, $n['file']) ?>
         </a>
         <?php } ?>
-        <?= ui_sidebar_cross_group('สต็อกอะไหล่', ui_nav_items_parts(), ui_parts_base_url()) ?>
+        <?= ui_sidebar_cross_group('สต็อกอะไหล่', ui_nav_items_parts(), ui_parts_base_url(), $navBadges) ?>
       </nav>
     </div>
     <?php require_once dirname(__DIR__, 2) . '/shared/ui_footer.php'; ?>

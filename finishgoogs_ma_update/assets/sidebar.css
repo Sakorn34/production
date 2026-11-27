@@ -425,6 +425,36 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* ── ตัวเลขท้ายเมนู (รอ MA · ควรสั่งแล้ว) — shared/nav_badges.php ── */
+.sidebar .nav-badge {
+  flex-shrink: 0;
+  font-size: calc(10.5px * var(--font-scale, 1));
+  font-weight: 700;
+  line-height: 1.5;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .18);
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.sidebar nav a.active .nav-badge,
+.sidebar .nav-links a.active .nav-badge {
+  background: #fff;
+  color: var(--sidebar-active, var(--primary));
+}
+/* ตอนหุบ ชื่อเมนูหายไป — ป้ายย้ายไปมุมขวาบนของไอคอน */
+.app.nav-collapsed:not(.sidebar-top) .sidebar .nav-badge {
+  position: absolute;
+  top: 1px;
+  left: calc(50% + 2px);
+  font-size: 9px;
+  line-height: 1;
+  padding: 2px 4px;
+  background: #fff;
+  color: var(--sidebar-active, var(--primary));
+  box-shadow: 0 0 0 1.5px var(--sidebar-bg, #4e2985);
+  pointer-events: none;
+}
 .sidebar nav a.is-filter-hidden,
 .sidebar .nav-links a.is-filter-hidden,
 .sidebar .nav-cross.is-filter-hidden {
