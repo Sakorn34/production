@@ -2651,6 +2651,8 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
 .ma-list-okn { margin-top: 4px; font-size: calc(11.5px * var(--font-scale, 1)); color: #15803d; cursor: help; width: fit-content; }
 .ma-list-item-chips + .ma-list-okn { margin-top: 5px; }
 .ma-row-actions form { display: inline; }
+/* .row-actions (flex) ทำให้ <td> ไม่เป็นช่องตาราง — เส้นคั่นแถวเลยสั้นแค่ความกว้างปุ่ม ไม่สุดตาราง */
+.ma-list-table td.ma-row-actions { display: table-cell; white-space: nowrap; }
 /* ขนาดตายตัว 28×28 — ใน .row-actions (flex) ลิงก์ถูกบีบแคบ ส่วน <button> ได้ padding/min-height
    จากสไตล์ปุ่มกลางจนสูงกว่าลิงก์ ทำให้สองปุ่มไม่เท่ากัน */
 .ma-row-actions .ma-ib,
@@ -2917,8 +2919,6 @@ a.asset-sales-ref-link:hover {
 .ast-mab.is-after,
 .ast-srow.is-rev .ast-mab.is-after { top: 9px; inset-inline-start: calc(50% + 26px); transform: none; }
 .ast-mab:hover { background: var(--primary, #db2777); color: #fff; }
-.ast-mab.is-legend { position: static; display: inline-block; transform: none; cursor: default; vertical-align: 1px; }
-.ast-mab.is-legend:hover { background: var(--primary-soft, #fce7f3); color: #9d174d; }
 @media (max-width: 560px) {
   /* ช่องแคบ ป้ายที่อยู่นอกไอคอนจะล้นขอบการ์ด — ย้ายขึ้นไปมุมบนภายในช่องแทน */
   .ast-mab.is-turn, .ast-srow.is-rev .ast-mab.is-turn { top: -5px; inset-inline-start: 0; transform: none; }

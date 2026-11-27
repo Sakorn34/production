@@ -924,7 +924,6 @@ function asset_work_card_html(array $tlAsc, $actionsFn, int $assetId, array $dat
         . '<th class="ma-c-done" title="ซ่อม · เปลี่ยน · จำนวนรายการที่ตรวจแล้วปกติ">สิ่งที่ทำ</th>'
         . '<th class="ma-c-rent" title="ผลต่อระบบเช่า: ซ่อมแล้ว หรือ เสื่อมสภาพ">ระบบเช่า</th>'
         . '<th class="ma-c-act"></th></tr></thead><tbody>';
-    $maNo = 0;
     foreach (array_values($tlAsc) as $i => $e) {
         $kind = (string) ($e['kind'] ?? '');
         $m = is_array($e['ma'] ?? null) ? $e['ma'] : null;
@@ -944,7 +943,7 @@ function asset_work_card_html(array $tlAsc, $actionsFn, int $assetId, array $dat
         }
 
         $job = '<div class="awk-job">' . $e['type']
-            . (ast_work_is_ma($kind) ? '<span class="ast-mab is-legend">MA ' . (++$maNo) . '</span>' : '') . '</div>';
+            . '</div>';
         $sub = [];
         if ($isMa && $kind === 'ma' && $m['round'] > 0) {
             $sub[] = 'รอบที่ ' . $m['round'];
