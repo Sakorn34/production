@@ -1345,7 +1345,10 @@ a.asset-sales-serial-tag.is-page-serial:hover {
 .fg-bar i.is-new, .fg-legend i.is-new { background: var(--st-new-bar, #6ee7b7); }
 .fg-bar i.is-pool, .fg-legend i.is-pool { background: var(--st-rental-bar, #93c5fd); }
 .fg-bar i.is-extra { opacity: .38; }
-.fg-bar i.is-ma-reuse, .fg-legend i.is-ma-reuse { background: #c4b5fd; }
+/* ลายทางสีเดียวกับเครื่องใหม่(เช่า) — เป็นเครื่องคลังเช่าเหมือนกัน แต่วนกลับจาก MA */
+.fg-bar i.is-ma-reuse, .fg-legend i.is-ma-reuse {
+  background: repeating-linear-gradient(135deg, var(--st-rental-bar, #93c5fd) 0 3px, #e0edff 3px 6px);
+}
 .fg-pool-ma-num.is-not-counted { color: var(--text-faint, #a39fb3); text-decoration: line-through; cursor: help; }
 .dash-models-table td[data-fg-cell="ours"] .fg-ours-stack,
 .dash-models-table td[data-fg-cell="pool"] .fg-pool-stack { display: flex; flex-direction: column; align-items: center; gap: 1px; text-align: center; }
