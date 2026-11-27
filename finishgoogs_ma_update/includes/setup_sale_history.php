@@ -23,6 +23,17 @@
 const SETUP_SALE_HISTORY_URL = 'https://bit-online.net/setupsystem/claim_history.php';
 
 /**
+ * URL หน้ารายละเอียดใบสั่งงานในระบบ setupsystem (setup_orders.id)
+ *
+ * @param int $orderId
+ * @return string
+ */
+function setup_order_detail_url(int $orderId): string
+{
+    return $orderId > 0 ? dirname(SETUP_SALE_HISTORY_URL) . '/order_detail.php?id=' . $orderId : '';
+}
+
+/**
  * URL ค้นหาในหน้า claim_history — ช่อง «เลขที่/PO/Order» ใช้พารามิเตอร์ claim_no
  *
  * @param string $term เลข PO · OPS-xxx · เลข order

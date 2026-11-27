@@ -1329,14 +1329,14 @@ switch ($type) {
            . ') · ' . $fgVerdict
            . ($fgFromRegistry && $sr['leasing']
                ? ' · <span class="muted">เครื่องใหม่ ' . number_format(count($sr['stock']))
-               . ' · เช่าใหม่ ' . number_format(count($sr['leasing_new']))
-               . ' · MA ' . number_format(count($sr['leasing_ma']))
+               . ' · เครื่องใหม่(เช่า) ' . number_format(count($sr['leasing_new']))
+               . ' · เครื่องเช่า(MA) ' . number_format(count($sr['leasing_ma']))
                . '</span>'
                : '')
            . '</p>';
         echo '<p class="muted" style="font-size:12px;margin:0 0 12px">'
            . ($fgFromRegistry
-               ? 'รุ่นนี้นับจากทะเบียนเครื่องของเรา — มี = เครื่องใหม่ (ไม่ได้ลงทะเบียนในระบบเช่า) + คลังพร้อมเช่า (ระบบเช่าเป็น finished goods)'
+               ? 'รุ่นนี้นับจากทะเบียนเครื่องของเรา — มี = เครื่องใหม่ (ไม่ได้ลงทะเบียนในระบบเช่า) + คลังเช่า (ระบบเช่าเป็น finished goods)'
                : 'ตัวเลข "มี" มาจากระบบ Setup = หมายเลขในสต็อก + เครื่องเช่าพร้อมเช่า')
            . '</p>';
         if ($fgFallback && $fgNeed < 0) {
@@ -1385,17 +1385,19 @@ switch ($type) {
         }
         if ($sr['leasing'] || (int) $fgItem['leasing_qty'] > 0) {
             $poolNote = $fgFromRegistry
-                ? 'ระบบเช่าเป็น finished goods รอปล่อยเช่า — เช่าใหม่นับรวมในยอดขาด · MA แสดงแยก (รุ่น ACC027 ไม่นับ MA ในยอดขาด)'
+                ? 'ระบบเช่าเป็น finished goods รอปล่อยเช่า — นับรวมในยอดที่มีทั้งเครื่องใหม่(เช่า) และเครื่องเช่า(MA) ยกเว้น Portable Printer ที่ไม่นับ MA'
                 : 'รับคืนจากลูกค้าและตรวจ MA แล้ว พร้อมปล่อยเช่ารอบใหม่ — ไม่ใช่ของที่ผลิตใหม่';
             if ($fgFromRegistry) {
-                echo '<h4 style="margin:14px 0 4px;font-size:14px">คลังพร้อมเช่า <span class="muted" style="font-weight:400">('
+                echo '<h4 style="margin:14px 0 4px;font-size:14px">คลังเช่า <span class="muted" style="font-weight:400">('
                    . number_format(count($sr['leasing'])) . ')</span></h4>';
                 echo '<p class="muted" style="font-size:12px;margin:0 0 8px">' . h($poolNote) . '</p>';
-                $fgTable('เช่าใหม่ — ยังไม่เคยอยู่ในสัญญา', $sr['leasing_new'],
-                    'ย้ายไประบบเช่าแล้ว แต่ยังไม่มีประวัติใน tbl_rent_product — นับรวมในคอลัมน์เช่าใหม่บนตาราง',
+                $fgTable('เครื่องใหม่(เช่า) — ยังไม่เคยอยู่ในสัญญา', $sr['leasing_new'],
+                    'ย้ายไประบบเช่าแล้ว แต่ยังไม่มีประวัติใน tbl_rent_product',
                     'is-pool-new');
-                $fgTable('MA — วนกลับคลัง', $sr['leasing_ma'],
-                    'เคยอยู่ในสัญญาเช่าแล้ว กลับ finished goods — แสดงเป็น MA n เครื่อง ไม่นับในขาด',
+                $fgTable('เครื่องเช่า(MA) — วนกลับคลัง', $sr['leasing_ma'],
+                    'เคยอยู่ในสัญญาเช่าแล้ว กลับ finished goods'
+                    . (function_exists('fg_model_show_ma_reuse_ui') && fg_model_show_ma_reuse_ui($fgCode)
+                        ? ' — รุ่นนี้ไม่นับในผล' : ' — นับรวมในผล'),
                     'is-pool-ma');
             } else {
                 $fgTable(
@@ -1408,6 +1410,7 @@ switch ($type) {
 
         // ฝั่ง "ต้องการ" — PO ค้างมาจากใบสั่งงานใบไหนบ้าง
         $fgPo = fg_shortage_open_pos($fgCode);
+        require_once __DIR__ . '/includes/setup_sale_history.php';
         echo '<h4 style="margin:18px 0 6px;font-size:14px">PO ค้าง <span class="muted" style="font-weight:400">('
            . number_format((int) $fgItem['po_qty']) . ' ชิ้น)</span></h4>';
         if (!$fgPo['ok']) {
@@ -1467,11 +1470,17 @@ switch ($type) {
                         if (!$manyTypes && $po['sale_type'] !== '') { $sub[] = $po['sale_type']; }
                         if ($po['status'] !== '')    { $sub[] = 'สถานะ ' . $po['status']; }
                         $when = $fgPoDate($po);
-                        echo '<li class="fg-sn fg-po">'
-                           . '<span class="fg-po-main"><b>' . h($po['po_number'] !== '' ? $po['po_number'] : 'ไม่มีเลข PO') . '</b>'
+                        $poBody = '<span class="fg-po-main"><b>' . h($po['po_number'] !== '' ? $po['po_number'] : 'ไม่มีเลข PO') . '</b>'
                            . '<span class="muted fg-po-sub">' . h(implode(' · ', $sub)) . '</span></span>'
                            . '<span class="muted fg-po-qty">' . number_format($po['qty']) . ' ชิ้น'
-                           . ($when !== '' ? ' · ' . h($when) : '') . '</span></li>';
+                           . ($when !== '' ? ' · ' . h($when) : '') . '</span>';
+                        // กดทั้งการ์ดเปิดใบงานในระบบ Setup (แท็บใหม่ — popup นี้ยังเปิดค้างไว้)
+                        $poUrl = function_exists('setup_order_detail_url') ? setup_order_detail_url((int) $po['order_id']) : '';
+                        echo $poUrl !== ''
+                            ? '<li class="fg-sn fg-po"><a class="fg-po-link" href="' . h($poUrl) . '" target="_blank" rel="noopener"'
+                              . ' title="เปิดใบสั่งงาน #' . (int) $po['order_id'] . ' ในระบบ Setup">' . $poBody
+                              . '<span class="fg-po-go" aria-hidden="true">↗</span></a></li>'
+                            : '<li class="fg-sn fg-po">' . $poBody . '</li>';
                     }
                     echo '</ul>';
                 }
