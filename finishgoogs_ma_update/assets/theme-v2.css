@@ -2646,9 +2646,13 @@ a.mw-item.is-link::after { content: ' ↗'; color: var(--text-faint); font-size:
 .ma-list-okn { margin-top: 4px; font-size: calc(11.5px * var(--font-scale, 1)); color: #15803d; cursor: help; width: fit-content; }
 .ma-list-item-chips + .ma-list-okn { margin-top: 5px; }
 .ma-row-actions form { display: inline; }
+/* ขนาดตายตัว 28×28 — ใน .row-actions (flex) ลิงก์ถูกบีบแคบ ส่วน <button> ได้ padding/min-height
+   จากสไตล์ปุ่มกลางจนสูงกว่าลิงก์ ทำให้สองปุ่มไม่เท่ากัน */
+.ma-row-actions .ma-ib,
 .ma-ib {
+  flex: 0 0 28px; box-sizing: border-box; min-width: 28px; min-height: 0; line-height: 1; font-size: 0;
   display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;
-  width: 28px; height: 28px; margin-left: 4px; padding: 0;
+  width: 28px; height: 28px; margin: 0 0 0 4px; padding: 0;
   border: 1px solid var(--border, #e6e0f5); border-radius: 7px; background: #fff;
   color: var(--text-muted, #6b6480); cursor: pointer; text-decoration: none;
   transition: background .12s, color .12s, border-color .12s;

@@ -1560,15 +1560,18 @@ require __DIR__ . '/includes/list_search.php';
         return '<div class="ma-detail-row"><dt>' + escHtml(r[0]) + '</dt><dd>' + dd + '</dd></div>';
       }).join('');
     }
-    window.resetMaCopyButtonsInScope('ma-modal-sn');
-    window.maFillSnippets('ma-modal-sn', {
-      code: d.code || '',
-      replace: d.replace || '',
-      repair: d.repair || '',
-      fw: d.fw || '',
-      remark: d.remark || '',
-      rentClose: d.rentClose || ''
-    });
+    // ส่วนคำสั่งมีใน popup เฉพาะรุ่นที่เปิดแผงคำสั่งไว้
+    if (document.getElementById('ma-modal-sn-serial')) {
+      window.resetMaCopyButtonsInScope('ma-modal-sn');
+      window.maFillSnippets('ma-modal-sn', {
+        code: d.code || '',
+        replace: d.replace || '',
+        repair: d.repair || '',
+        fw: d.fw || '',
+        remark: d.remark || '',
+        rentClose: d.rentClose || ''
+      });
+    }
     var titleEl = document.getElementById('ma-detail-modal-title');
     if (titleEl) {
       titleEl.textContent = 'รายละเอียด MA — ' + (d.asset || d.code || '');
@@ -2822,7 +2825,7 @@ if ($mby !== '') {
       $maBy = trim((string) ($m['done_by'] ?? ''));
       $maRemark = trim((string) ($m['remark'] ?? ''));
   ?>
-  <tr class="ma-row-click" title="คลิกดูรายละเอียด MA และคำสั่งตั้งค่าหมายเลขสินค้า · <?= h(status_th($machineKind)) ?>" <?= ma_row_data_attrs($m) ?>>
+  <tr class="ma-row-click" title="<?= $maShowSnippets ? 'คลิกดูรายละเอียด MA และคำสั่งตั้งค่าหมายเลขสินค้า' : 'คลิกดูรายละเอียด MA' ?> · <?= h(status_th($machineKind)) ?>" <?= ma_row_data_attrs($m) ?>>
     <td class="ma-c-when">
       <b><?= h($maDay) ?></b>
       <small><?= h(implode(' · ', array_filter([$maTime, $maBy]))) ?></small>
@@ -2887,7 +2890,7 @@ if ($total > 0) {
     <div class="ma-sn-modal-hd">
       <div>
         <h2 id="ma-detail-modal-title" class="ma-snippets-title">รายละเอียด MA</h2>
-        <p class="muted ma-snippets-lead">ข้อมูลการ MA และคำสั่งตั้งค่าหมายเลขสินค้า · กดคัดลอกทีละข้อ</p>
+        <p class="muted ma-snippets-lead"><?= $maShowSnippets ? 'ข้อมูลการ MA และคำสั่งตั้งค่าหมายเลขสินค้า · กดคัดลอกทีละข้อ' : 'ข้อมูลการ MA' ?></p>
       </div>
       <button type="button" class="btn-sm btn-line" onclick="closeOverlay('ma-detail-overlay')">✕ ปิด</button>
     </div>
@@ -2895,11 +2898,14 @@ if ($total > 0) {
       <h3 class="ma-detail-sub h-with-icon"><?= ui_icon_html('clipboard', 14, 'h-svg') ?>ข้อมูลการ MA</h3>
       <dl class="ma-detail-dl" id="ma-detail-dl"></dl>
     </section>
+    <?php // รุ่นที่ปิดแผงคำสั่ง (ตั้งค่า → คำสั่งตั้งค่าหมายเลขสินค้า) ต้องไม่โผล่ใน popup ด้วย ?>
+    <?php if ($maShowSnippets) { ?>
     <section class="ma-detail-section">
       <h3 class="ma-detail-sub h-with-icon"><?= ui_icon_html("clipboard", 14, "h-svg") ?><?= h(ma_snippets_title(true)) ?></h3>
       <p class="muted ma-snippets-lead">อัปเดตตามรหัสเครื่องและฟอร์ม · กดคัดลอกทีละข้อ</p>
       <?= ma_snippets_inner_html('ma-modal-sn', ['title' => false, 'lead' => false]) ?>
     </section>
+    <?php } ?>
   </div>
 </div>
 <script>
