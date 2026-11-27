@@ -2763,27 +2763,102 @@ a.asset-sales-ref-link:hover {
 .ast-c-install { --ast-c: #c2457a; --ast-bg: #fde6ee; --ast-fg: #93264f; }
 .ast-c-rent    { --ast-c: #3b74d4; --ast-bg: #dde9fb; --ast-fg: #1f4f9a; }
 .ast-head-now { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
-.ast-steps {
-  list-style: none; margin: 0 0 12px; padding: 2px 0 4px;
-  display: flex; align-items: flex-start; overflow-x: auto;
+
+/* ── แถบขั้นตอนเส้นตัวยู (ast_steps_html) ─────────────────────────────────
+   แถวละ --ast-per ขั้น · แถวกลับทิศใช้ direction:rtl ให้ grid เรียงขวา→ซ้าย
+   เส้นเชื่อม/ลูกศร/โค้งตัวยู ใช้ inset-inline-* จึงกลับทิศตามแถวเอง
+   จุดกึ่งกลางไอคอนอยู่ที่ 17px จากขอบบนของขั้น — เส้นทุกเส้นอิงค่านี้ */
+.ast-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+.ast-snake { display: flex; flex-direction: column; gap: 16px; margin: 0 0 12px; padding: 6px 18px 2px; }
+.ast-srow {
+  position: relative; display: grid;
+  grid-template-columns: repeat(var(--ast-per), minmax(0, 1fr));
 }
-.ast-step {
-  flex: 1 0 64px; position: relative; text-align: center;
-  font-size: calc(11px * var(--font-scale, 1)); color: var(--text-muted, #6b6480); line-height: 1.35;
+.ast-srow.is-rev { direction: rtl; }
+.ast-srow.has-next::after {
+  content: ""; position: absolute; top: 16px;
+  inset-inline-start: calc(100% - 100% / var(--ast-per) / 2); inset-inline-end: -16px;
+  height: calc(100% + 16px);
+  border: 2px solid #ddd4f3; border-inline-start: 0;
+  border-start-end-radius: 40px; border-end-end-radius: 40px;
+  pointer-events: none;
 }
-.ast-step::after {
-  content: ""; position: absolute; top: 8px; left: calc(50% + 11px); right: calc(-50% + 11px);
-  height: 2px; background: var(--border, #ddd4f3);
+.ast-sstep {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  min-width: 0; padding: 0 2px; margin: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; color: var(--text-muted, #6b6480); text-align: center; line-height: 1.35;
 }
-.ast-step:last-child::after { display: none; }
-.ast-step i {
-  display: block; width: 14px; height: 14px; margin: 2px auto 4px; border-radius: 50%;
-  background: var(--ast-c, #c9c2dc); box-shadow: 0 0 0 3px var(--surface-muted, #f3effe);
+.ast-sstep > * { direction: ltr; }
+/* กันกฎกลาง button:hover ใน style.css ทาพื้นหลังสีหลัก */
+.ast-sstep:hover, .ast-sstep:focus, .ast-sstep:active { background: none; color: var(--text-muted, #6b6480); box-shadow: none; }
+.ast-sstep:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 8px; }
+.ast-sstep:not(:first-child)::before {
+  content: ""; position: absolute; top: 16px; height: 2px; background: #ddd4f3;
+  inset-inline-start: -50%; inset-inline-end: 50%;
 }
-.ast-step.is-cur i { box-shadow: 0 0 0 3px var(--surface-muted, #f3effe), 0 0 0 5px var(--ast-c, #8b6fe0); }
-.ast-step.is-gap i { background: transparent; border: 2px dashed var(--border-strong, #c9c2dc); width: 10px; height: 10px; }
-.ast-step b { display: block; color: var(--text); font-weight: 600; font-size: calc(11.5px * var(--font-scale, 1)); white-space: nowrap; }
-.ast-step span { white-space: nowrap; }
+.ast-sstep:not(:first-child)::after {
+  content: ""; position: absolute; top: 13px; inset-inline-start: -4px;
+  width: 6px; height: 6px; border-top: 2px solid #b9aee0; border-right: 2px solid #b9aee0;
+  transform: rotate(45deg);
+}
+.ast-srow.is-rev .ast-sstep:not(:first-child)::after { transform: rotate(-135deg); }
+.ast-sico {
+  position: relative; z-index: 1; display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 34px; border-radius: 50%; background: var(--surface-muted, #f3effe);
+  transition: transform .18s ease;
+}
+.ast-ico3d { display: block; overflow: visible; }
+.ast-ico3d .ast-glow { transition: opacity .18s ease; }
+.ast-sstep b { color: var(--text); font-weight: 700; font-size: calc(11.5px * var(--font-scale, 1)); white-space: nowrap; }
+.ast-sdate { font-size: calc(11px * var(--font-scale, 1)); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ast-ssub {
+  max-width: 100%; font-size: calc(10.5px * var(--font-scale, 1)); color: var(--text-faint, #8b84a0);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ast-sstep:hover .ast-sico, .ast-sstep:focus-visible .ast-sico { transform: translateY(-3px) scale(1.1); }
+.ast-sstep:hover .ast-glow, .ast-sstep:focus-visible .ast-glow { opacity: .8; }
+/* ขั้นล่าสุด: วงแหวนกระจายออก (เคลื่อนไหวเฉพาะเมื่อไม่ได้ปิดการเคลื่อนไหวในเครื่อง) */
+.ast-sstep.is-cur .ast-sico::after {
+  content: ""; position: absolute; inset: -1px; border-radius: 50%;
+  border: 2px solid var(--ast-c); opacity: .55;
+}
+.ast-tipbox {
+  position: fixed; z-index: 10000; pointer-events: none; max-width: 280px;
+  background: #2a2440; color: #fff; border-radius: 8px; padding: 7px 10px;
+  font-size: calc(12px * var(--font-scale, 1)); line-height: 1.5;
+  box-shadow: 0 6px 18px rgba(42, 36, 64, .25);
+  opacity: 0; transform: translateY(2px); transition: opacity .12s ease, transform .12s ease;
+}
+.ast-tipbox.is-on { opacity: 1; transform: none; }
+.ast-tipbox div:last-child { opacity: .75; }
+.ast-row { transition: background-color .4s ease; }
+.ast-row.is-hl { background: #fff3c4; }
+@media (prefers-reduced-motion: no-preference) {
+  .ast-sstep.is-cur .ast-glow { animation: ast-breathe 2.2s ease-in-out infinite; }
+  .ast-sstep.is-cur .ast-sico::after { animation: ast-ring 2.2s ease-out infinite; }
+  /* เปิดหน้า: เส้นวิ่งตามลำดับเวลา ขั้นโผล่ทีละขั้น */
+  .ast-sstep { animation: ast-pop .38s ease both; animation-delay: calc(var(--i) * .14s); }
+  .ast-sstep:not(:first-child)::before {
+    animation: ast-draw .22s ease both; animation-delay: calc(var(--i) * .14s - .12s);
+    transform-origin: left center;
+  }
+  .ast-srow.is-rev .ast-sstep:not(:first-child)::before { transform-origin: right center; }
+  .ast-srow.has-next::after { animation: ast-fade .3s ease both; animation-delay: calc(var(--ast-end) * .14s + .05s); }
+}
+@keyframes ast-breathe { 0%, 100% { opacity: .3; } 50% { opacity: .9; } }
+@keyframes ast-ring { 0% { transform: scale(.9); opacity: .6; } 100% { transform: scale(1.55); opacity: 0; } }
+@keyframes ast-pop { 0% { opacity: 0; transform: scale(.5); } 70% { transform: scale(1.08); } 100% { opacity: 1; transform: none; } }
+@keyframes ast-draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes ast-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 560px) {
+  .ast-snake { padding-inline: 12px; }
+  .ast-snake.is-wide { display: none; }
+  .ast-sstep b { white-space: normal; overflow-wrap: anywhere; line-height: 1.25; }
+}
+/* มือถือใช้ชุด 3 ขั้นต่อแถว (ast_snake_html is-narrow) */
+@media (min-width: 561px) {
+  .ast-snake.is-narrow { display: none; }
+}
 .ast-list { background: #fff; border: 1px solid var(--border); border-radius: var(--radius-sm, 8px); overflow: hidden; }
 .ast-row {
   display: grid; grid-template-columns: 78px minmax(0, 1fr) auto; gap: 4px 10px; align-items: start;

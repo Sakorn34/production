@@ -86,11 +86,35 @@ function ast_clean_note($note, string $serial, string $kind, array $known = []):
 /**
  * เหตุการณ์หนึ่งรายการ
  *
+ * @param string $sub บรรทัดเล็กใต้ขั้นบนแถบ เช่น ไซต์ที่ไปเช่า (ข้อความดิบ ยังไม่ escape)
  * @return array<string,string>
  */
-function ast_event(string $date, string $src, string $step, string $title, string $meta = '', string $extra = ''): array
+function ast_event(string $date, string $src, string $step, string $title, string $meta = '', string $extra = '', string $sub = ''): array
 {
-    return ['date' => $date, 'src' => $src, 'step' => $step, 'title' => $title, 'meta' => $meta, 'extra' => $extra];
+    return ['date' => $date, 'src' => $src, 'step' => $step, 'title' => $title, 'meta' => $meta, 'extra' => $extra, 'sub' => $sub];
+}
+
+/** ไอคอนของแต่ละขั้นบนแถบ (ชื่อใน shared/ui_icons.php) */
+function ast_step_icon(string $step): string
+{
+    static $map = [
+        'ผลิต'         => 'assets',
+        'เข้า stock'    => 'stock-in',
+        'ลงทะเบียน'    => 'clipboard',
+        'เบิกขาย'      => 'stock-out-set',
+        'ขาย'          => 'tag',
+        'ส่งมอบ'       => 'check',
+        'เคลม'         => 'arrows-exchange',
+        'เคลมเข้า'     => 'arrows-exchange',
+        'เคลมออก'      => 'arrows-exchange',
+        'ติดตั้ง'       => 'technicians',
+        'เข้าระบบเช่า' => 'box',
+        'เช่า'          => 'customers',
+        'แจ้งเคลม'     => 'alert',
+        'รับคืน'        => 'refresh',
+        'ปลดระวาง'     => 'close',
+    ];
+    return $map[$step] ?? 'history';
 }
 
 /**
@@ -209,7 +233,7 @@ function asset_sales_timeline_data(array $asset, array $stock, array $lease): ar
         $events[] = ast_event(ast_date($old['timestamp'] ?? ''), 'old', 'ส่งมอบ', $title, ast_meta([
             ['รปภ.', $old['security_company'] ?? ''],
             ['โดย', $old['create_name'] ?? ''],
-        ]));
+        ]), '', $isLabel ? $place : '');
     }
     $checked['old'] = $stockErr ? ['state' => 'err', 'note' => $stockMsg] : ['state' => $old ? 'ok' : 'none', 'note' => ''];
 
@@ -288,7 +312,7 @@ function asset_sales_timeline_data(array $asset, array $stock, array $lease): ar
             foreach (array_keys($conf) as $c) {
                 $extra .= '<p class="asset-sales-conflict">' . ui_icon_html('alert', 13, 'h-svg') . ' ' . h($c) . '</p>';
             }
-            $events[] = ast_event(ast_date($v['date']), 'sale', $step, $title, $meta, $extra);
+            $events[] = ast_event(ast_date($v['date']), 'sale', $step, $title, $meta, $extra, $v['dept'] !== '' ? $v['dept'] : $v['org']);
         }
         $err = trim((string) ($hist['error'] ?? ''));
         $checked['sale'] = (!$rows && $err !== '') ? ['state' => 'err', 'note' => $err]
@@ -348,7 +372,7 @@ function asset_sales_timeline_data(array $asset, array $stock, array $lease): ar
                 $bits[] = ['หมายเหตุ', $lease['p_remarks'] ?? ''];
             }
             $events[] = ast_event(ast_date($r['start']), 'rent', 'เช่า',
-                'เช่า' . ($r['customer'] !== '' ? ' · ' . h($r['customer']) : ''), ast_meta($bits));
+                'เช่า' . ($r['customer'] !== '' ? ' · ' . h($r['customer']) : ''), ast_meta($bits), '', $r['site']);
             if (ast_date($r['claim_date']) !== '' || $r['claim'] !== '') {
                 $events[] = ast_event(ast_date($r['claim_date']), 'rent', 'แจ้งเคลม', 'แจ้งเคลมระหว่างเช่า',
                     ast_meta([['', $r['claim']], ['สัญญา', $r['code']]]));
@@ -392,43 +416,150 @@ function asset_sales_timeline_data(array $asset, array $stock, array $lease): ar
     return ['events' => $events, 'checked' => $checked, 'set_table' => $setTable];
 }
 
+/** สีไล่สามระดับของแต่ละแหล่ง (อ่อน · กลาง · เข้ม) สำหรับไอคอน 3D บนแถบ */
+function ast_source_tones(): array
+{
+    return [
+        'prod'    => ['#b3afc2', '#6e6982', '#3f3b4f'],
+        'stock'   => ['#b9a6f7', '#6a48d6', '#3a2290'],
+        'old'     => ['#f3cf7a', '#c98a12', '#7a4f05'],
+        'sale'    => ['#7fd8b6', '#159a72', '#0a5a42'],
+        'install' => ['#f2a3c2', '#c2457a', '#7a1d45'],
+        'rent'    => ['#8fbcf7', '#2f66c8', '#173a7a'],
+    ];
+}
+
 /**
- * แถบขั้นตอนด้านบน — เกิน 6 ขั้นแสดงขั้นแรก … แล้ว 4 ขั้นล่าสุด
+ * ไอคอน 3D ไม่มีกรอบ — เส้นไอคอนซ้อนสามชั้น: แสงเรืองจาง · เงาเข้มเลื่อนลง · เส้นไล่สี
+ *
+ * @param string $icon ชื่อใน shared/ui_icons.php
+ * @param string $src  คีย์แหล่งข้อมูล (ใช้ gradient ที่ประกาศไว้ใน ast_steps_html)
+ */
+function ast_icon3d_html(string $icon, string $src): string
+{
+    $paths = function_exists('ui_icon_paths') ? (ui_icon_paths($icon) ?? ui_icon_paths('history')) : null;
+    $tone = ast_source_tones()[$src] ?? ast_source_tones()['prod'];
+    $g = static function (string $attrs) use ($paths): string {
+        return '<g fill="none" stroke-linecap="round" stroke-linejoin="round" ' . $attrs . '>' . $paths . '</g>';
+    };
+    return '<svg class="ast-ico3d" viewBox="-3 -3 30 30" width="30" height="30" aria-hidden="true">'
+        . $g('class="ast-glow" stroke="' . $tone[0] . '" stroke-width="5.5" opacity=".35" filter="url(#ast-blur)"')
+        . $g('stroke="' . $tone[2] . '" stroke-width="2.8" opacity=".5" transform="translate(0 1.4)"')
+        . $g('stroke="url(#ast-g-' . h($src) . ')" stroke-width="2.6"')
+        . '</svg>';
+}
+
+/**
+ * แถบขั้นตอน — ทุกการเคลื่อนไหว ไม่ยุบ ไม่ตัด
+ *
+ * ไม่เกิน 6 ขั้นเป็นแถวเดียว · มากกว่านั้นแถวละ 5 วนเป็นตัวยู (แถวคู่ซ้าย→ขวา แถวคี่ขวา→ซ้าย)
+ * แถวกลับทิศใช้ direction:rtl ให้ grid เรียงจากขวา เส้นเชื่อม/ลูกศรใช้ logical property จึงกลับตาม
+ * ลำดับขั้นตรงกับแถวในรายการด้านล่าง (data-ast-i) — กดขั้นแล้วเลื่อนไปแถวนั้น
  *
  * @param array<int,array<string,string>> $dated
  * @return string
  */
 function ast_steps_html(array $dated): string
 {
-    if (!$dated) {
+    $n = count($dated);
+    if ($n === 0) {
         return '';
     }
-    // ขั้นเดียวกันติดกัน (เช่าต่อสัญญา 4 รอบ) ยุบเป็นขั้นเดียว "เช่า ×4" ใช้วันล่าสุด
-    $steps = [];
-    foreach ($dated as $ev) {
-        $last = count($steps) - 1;
-        if ($last >= 0 && $steps[$last]['step'] === $ev['step'] && $steps[$last]['src'] === $ev['src']) {
-            $steps[$last]['date'] = $ev['date'];
-            $steps[$last]['n']++;
-            continue;
-        }
-        $steps[] = $ev + ['n' => 1];
+    $defs = '<svg class="ast-defs" width="0" height="0" aria-hidden="true" focusable="false"><defs>';
+    foreach (ast_source_tones() as $k => $t) {
+        $defs .= '<linearGradient id="ast-g-' . $k . '" x1="0" y1="0" x2="1" y2="1">'
+            . '<stop offset="0" stop-color="' . $t[0] . '"/><stop offset="1" stop-color="' . $t[1] . '"/></linearGradient>';
     }
-    $dated = $steps;
+    $defs .= '<filter id="ast-blur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="1.6"/></filter></defs></svg>';
+
+    // จอกว้าง 5 ขั้นต่อแถว (ไม่เกิน 6 ขั้นอยู่แถวเดียว) / จอมือถือ 3 ขั้นต่อแถว — สลับด้วย CSS
+    // defs อยู่นอกชุดที่ถูกซ่อน เพราะ gradient ใน display:none จะไม่ถูกวาด
+    $wide = $n <= 6 ? $n : 5;
+    $out = '<div class="ast-stepwrap">' . $defs;
+    if ($n <= 3) {
+        return $out . ast_snake_html($dated, $wide, '') . '</div>';
+    }
+    return $out . ast_snake_html($dated, $wide, ' is-wide') . ast_snake_html($dated, 3, ' is-narrow') . '</div>';
+}
+
+/** แถบขั้นแบบตัวยู — $per ขั้นต่อแถว แถวคี่วิ่งย้อนจากขวาไปซ้าย */
+function ast_snake_html(array $dated, int $per, string $mod): string
+{
     $n = count($dated);
-    $show = $n > 6 ? array_merge([$dated[0], null], array_slice($dated, -4)) : $dated;
-    $out = '<ol class="ast-steps">';
-    foreach ($show as $i => $ev) {
-        if ($ev === null) {
-            $out .= '<li class="ast-step is-gap"><i></i><b>…</b><span>อีก ' . ($n - 5) . ' ขั้น</span></li>';
-            continue;
+    $labels = ast_sources();
+    $out = '<div class="ast-snake' . $mod . '" style="--ast-per:' . $per . '">';
+    foreach (array_chunk($dated, $per) as $r => $row) {
+        $cls = 'ast-srow' . ($r % 2 === 1 ? ' is-rev' : '') . (($r + 1) * $per < $n ? ' has-next' : '');
+        $out .= '<div class="' . $cls . '" style="--ast-end:' . (($r + 1) * $per - 1) . '">';
+        foreach ($row as $c => $ev) {
+            $i = $r * $per + $c;
+            $date = date('d/m/y', strtotime($ev['date']));
+            $tip = trim(strip_tags(html_entity_decode($ev['title'], ENT_QUOTES, 'UTF-8')));
+            $tipLines = array_filter([$tip, dthai($ev['date']) . ($ev['sub'] !== '' ? ' · ' . $ev['sub'] : ''), 'ที่มา: ' . ($labels[$ev['src']] ?? $ev['src'])]);
+            $out .= '<button type="button" class="ast-sstep ast-c-' . h($ev['src']) . ($i === $n - 1 ? ' is-cur' : '') . '"'
+                . ' data-ast-i="' . $i . '" data-ast-tip="' . h(implode("\n", $tipLines)) . '" style="--i:' . $i . '"'
+                . ' aria-label="' . h($ev['step'] . ' ' . $date) . '">'
+                . '<span class="ast-sico">' . ast_icon3d_html(ast_step_icon($ev['step']), $ev['src']) . '</span>'
+                . '<b>' . h($ev['step']) . '</b><span class="ast-sdate">' . h($date) . '</span>'
+                . ($ev['sub'] !== '' ? '<span class="ast-ssub">' . h($ev['sub']) . '</span>' : '')
+                . '</button>';
         }
-        $cur = $i === count($show) - 1 ? ' is-cur' : '';
-        $out .= '<li class="ast-step ast-c-' . h($ev['src']) . $cur . '"><i></i><b>' . h($ev['step'])
-            . ($ev['n'] > 1 ? ' ×' . (int) $ev['n'] : '') . '</b>'
-            . '<span>' . h(date('d/m/y', strtotime($ev['date']))) . '</span></li>';
+        $out .= '</div>';
     }
-    return $out . '</ol>';
+    return $out . '</div>';
+}
+function ast_steps_script(): string
+{
+    return <<<'JS'
+<script>
+(function(){
+  var snake = document.querySelector('.ast-stepwrap');
+  if (!snake) { return; }
+  var tip = document.createElement('div');
+  tip.className = 'ast-tipbox';
+  tip.setAttribute('role', 'tooltip');
+  document.body.appendChild(tip);
+  function show(btn){
+    var t = btn.getAttribute('data-ast-tip') || '';
+    if (!t) { return; }
+    var lines = t.split('\n');
+    tip.innerHTML = '';
+    lines.forEach(function(l, k){
+      var el = document.createElement(k === 0 ? 'b' : 'div');
+      el.textContent = l;
+      tip.appendChild(el);
+    });
+    var r = btn.querySelector('.ast-sico').getBoundingClientRect();
+    tip.classList.add('is-on');
+    var w = tip.offsetWidth, h = tip.offsetHeight;
+    var x = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2));
+    var y = r.top - h - 8;
+    if (y < 8) { y = r.bottom + 8; }
+    tip.style.left = x + 'px';
+    tip.style.top = y + 'px';
+  }
+  function hide(){ tip.classList.remove('is-on'); }
+  snake.addEventListener('mouseover', function(e){ var b = e.target.closest('.ast-sstep'); if (b) { show(b); } });
+  snake.addEventListener('mouseout', function(e){ if (!e.relatedTarget || !snake.contains(e.relatedTarget)) { hide(); } });
+  snake.addEventListener('focusin', function(e){ var b = e.target.closest('.ast-sstep'); if (b && b.matches(':focus-visible')) { show(b); } });
+  snake.addEventListener('focusout', hide);
+  window.addEventListener('scroll', hide, true);
+  snake.addEventListener('click', function(e){
+    var b = e.target.closest('.ast-sstep');
+    if (!b) { return; }
+    hide();
+    var row = document.querySelector('.ast-list [data-ast-row="' + b.getAttribute('data-ast-i') + '"]');
+    if (!row) { return; }
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    row.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+    row.classList.remove('is-hl');
+    void row.offsetWidth;
+    row.classList.add('is-hl');
+    setTimeout(function(){ row.classList.remove('is-hl'); }, 1600);
+  });
+})();
+</script>
+JS;
 }
 
 /**
@@ -458,12 +589,16 @@ function ast_rent_links_html(array $lease): string
     return $bits ? '<p class="ast-rent-links"><span class="ast-src ast-c-rent">ระบบเช่า</span> ' . implode(' ', $bits) . '</p>' : '';
 }
 
-/** แถวเหตุการณ์ในรายการด้านล่าง */
-function ast_row_html(array $ev): string
+/**
+ * แถวเหตุการณ์ในรายการด้านล่าง
+ *
+ * @param int|null $i ลำดับขั้นบนแถบ (เฉพาะแถวที่มีวันที่) — ให้กดขั้นแล้วเลื่อนมาที่แถวนี้
+ */
+function ast_row_html(array $ev, ?int $i = null): string
 {
     $labels = ast_sources();
     $when = $ev['date'] !== '' ? h(dthai($ev['date'])) : '<span class="muted">—</span>';
-    return '<div class="ast-row">'
+    return '<div class="ast-row"' . ($i !== null ? ' data-ast-row="' . $i . '"' : '') . '>'
         . '<div class="ast-when">' . $when . '</div>'
         . '<div class="ast-what"><div class="ast-title">' . $ev['title'] . '</div>'
         . ($ev['meta'] !== '' ? '<div class="ast-meta">' . $ev['meta'] . '</div>' : '')
@@ -505,8 +640,8 @@ function asset_sales_timeline_card_html(array $asset, array $stock, array $lease
 
     if ($data['events']) {
         $out .= '<div class="ast-list">';
-        foreach ($dated as $ev) {
-            $out .= ast_row_html($ev);
+        foreach ($dated as $i => $ev) {
+            $out .= ast_row_html($ev, $i);
         }
         if ($undated) {
             $out .= '<div class="ast-undated">ไม่ระบุวัน</div>';
@@ -545,5 +680,5 @@ function asset_sales_timeline_card_html(array $asset, array $stock, array $lease
             . '">ดูในทะเบียน stock →</a></p>';
     }
     $out .= $footHtml;
-    return $out . '</div></div>';
+    return $out . '</div></div>' . ($dated ? ast_steps_script() : '');
 }
