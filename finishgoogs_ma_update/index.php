@@ -668,9 +668,9 @@ $partsBase = ui_parts_base_url();
       <tr>
         <th data-pri="2" style="width:44px"></th>
         <th data-pri="1">รุ่น</th>
-        <th data-pri="2" class="fg-bar-col" title="ทุกรุ่นใช้สเกลเดียวกัน — แถบยาวเท่ากันคือจำนวนเครื่องเท่ากัน · รางบนแถบคือยอดที่ต้องมี ท่อนเทา = ขั้นต่ำ ท่อนส้ม = PO ค้าง จบที่หมุด ▼ · ส่วนสีจาง = เกินจากที่ต้องมี"><span class="fg-legend"><i class="is-new"></i>เครื่องใหม่</span> <span class="fg-legend"><i class="is-pool"></i>คลังพร้อมเช่า</span> <span class="fg-legend"><b class="fg-legend-mark is-band-min"></b>ขั้นต่ำ</span> <span class="fg-legend"><b class="fg-legend-mark is-band"></b>PO ค้าง</span> <span class="fg-legend"><b class="fg-legend-mark is-po"></b>ต้องมี</span></th>
+        <th data-pri="2" class="fg-bar-col" title="ทุกรุ่นใช้สเกลเดียวกัน — แถบยาวเท่ากันคือจำนวนเครื่องเท่ากัน · รางบนแถบคือยอดที่ต้องมี ท่อนเทา = ขั้นต่ำ ท่อนส้ม = PO ค้าง จบที่หมุด ▼ · ส่วนสีจาง = เกินจากที่ต้องมี"><span class="fg-legend"><i class="is-new"></i>เครื่องใหม่</span> <span class="fg-legend"><i class="is-pool"></i>คลังพร้อมเช่า</span> <span class="fg-legend" title="คลังพร้อมเช่าที่วนกลับจาก MA — นับในผลทุกรุ่น ยกเว้น Portable Printer"><i class="is-ma-reuse"></i>วนกลับ MA</span> <span class="fg-legend"><b class="fg-legend-mark is-band-min"></b>ขั้นต่ำ</span> <span class="fg-legend"><b class="fg-legend-mark is-band"></b>PO ค้าง</span> <span class="fg-legend"><b class="fg-legend-mark is-po"></b>ต้องมี</span></th>
         <th data-pri="1" class="num-col">เครื่องใหม่</th>
-        <th data-pri="2" class="num-col dash-col-pool" title="ระบบเช่าเป็น finished goods รอปล่อยเช่า — นับรวมในยอดที่มี · ตัวเลขซ้าย = เช่าใหม่ (New) · ขวา = วนกลับจาก MA">
+        <th data-pri="2" class="num-col dash-col-pool" title="ระบบเช่าเป็น finished goods รอปล่อยเช่า — นับรวมในยอดที่มี · ตัวเลขซ้าย = เช่าใหม่ (New) · ขวา = วนกลับจาก MA (Portable Printer ไม่นับ MA ในผล)">
           <span class="dash-col-head-main">คลังพร้อมเช่า</span>
           <span class="dash-col-head-sub">New : MA</span>
         </th>
@@ -979,7 +979,8 @@ $partsBase = ui_parts_base_url();
     modelCards.forEach(function (row0) {
       var row = d.codes[row0.getAttribute('data-code') || ''];
       if (!row) { return; }
-      fgVals.push(Math.max(Number(row.req) || 0, (Number(row.new) || 0) + Math.max(0, Number(row.rent) || 0)));
+      var maInBar = row.show_ma_reuse ? 0 : Math.max(0, Number(row.ma_reuse) || 0);
+      fgVals.push(Math.max(Number(row.req) || 0, (Number(row.new) || 0) + Math.max(0, Number(row.rent) || 0) + maInBar));
     });
     fgVals.sort(function (a, b) { return a - b; });
     var fgMax = fgVals.length ? fgVals[fgVals.length - 1] : 1;
@@ -990,12 +991,15 @@ $partsBase = ui_parts_base_url();
       if (!row) { return; }
       // บอกให้ชัดว่า PO ค้างต้องใช้เครื่องกี่เครื่อง ไม่ใช่แค่ "+ PO 2" ที่อ่านแล้วไม่รู้ว่า 2 อะไร
       var base = 'ขั้นต่ำ ' + fgNum(row.min) + ' + PO ต้องใช้ ' + fgNum(row.po) + ' เครื่อง';
-      // have = เครื่องใหม่ · pool = คลังพร้อมเช่า · รุ่น MA ไม่นับ pool ในขาด/เร่งด่วน (สอดคล้อง fg_model_shortage_from_stock)
+      // have = เครื่องใหม่ · poolNew = คลังเช่าที่ยังไม่เคยเช่า · maReuse = คลังเช่าวนกลับจาก MA
+      // นับ MA ในยอดที่มีทุกรุ่น ยกเว้นรุ่นใน fg_ma_reuse_display_codes (Portable Printer) — show_ma_reuse = ไม่นับ
+      // กลุ่มกับแถบต้องใช้ยอดเดียวกับที่ server คิด "ผล" ไม่งั้นรุ่นที่ขึ้น "เกิน" ไปอยู่กลุ่มผลิตด่วน
       var have = Number(row.new) || 0;
       var poolNew = Math.max(0, Number(row.rent) || 0);
-      var poolAllQty = Math.max(0, Number(row.rent_total) || (poolNew + maReuse));
       var maReuse = Math.max(0, Number(row.ma_reuse) || 0);
-      var stockForNeed = have + poolNew;
+      var poolAllQty = Math.max(0, Number(row.rent_total) || (poolNew + maReuse));
+      var maCounted = row.show_ma_reuse ? 0 : maReuse;
+      var stockForNeed = row.have !== undefined ? (Number(row.have) || 0) : have + poolNew + maCounted;
       var req = Number(row.req) || 0;
       newTotal += have;
       var tag = '';
@@ -1025,7 +1029,7 @@ $partsBase = ui_parts_base_url();
       var minNum = Number(row.min) || 0;
       row0.setAttribute('data-have', String(stockForNeed));
       row0.setAttribute('data-new', String(have));
-      row0.setAttribute('data-pool', String(poolNew));
+      row0.setAttribute('data-pool', String(poolNew + maCounted));
       row0.setAttribute('data-req', String(req));
       row0.setAttribute('data-stage', row.state === 'over' ? '2' : (stockForNeed < minNum ? '0' : '1'));
 
@@ -1054,7 +1058,9 @@ $partsBase = ui_parts_base_url();
         var html = '<div class="fg-pool-stack fg-pool-inline">'
           + '<b class="fg-pool-new">' + fgNum(poolNew) + '</b>'
           + '<span class="fg-pool-sep" aria-hidden="true">:</span>'
-          + '<b class="fg-pool-ma-num">' + fgNum(maReuse) + '</b>'
+          + (maReuse > 0 && !maCounted
+            ? '<b class="fg-pool-ma-num is-not-counted" title="รุ่นนี้ไม่นับเครื่องวนกลับ MA ในผล">' + fgNum(maReuse) + '</b>'
+            : '<b class="fg-pool-ma-num">' + fgNum(maReuse) + '</b>')
           + '</div>';
         c.innerHTML = html;
       })();
@@ -1065,22 +1071,24 @@ $partsBase = ui_parts_base_url();
       var bar = cell('bar');
       if (bar) {
         var pc = function (n) { return Math.min(100, Math.round(n / fgScale * 1000) / 10); };
-        // แถบสีนับเฉพาะเครื่องใหม่ + คลังเช่าใหม่ — ไม่รวมสต็อกวนกลับ MA (แสดงแยกใต้ตัวเลข)
+        // แถบสี = ยอดที่นับใน "ผล": เครื่องใหม่ · คลังเช่าใหม่ · วนกลับ MA (รุ่นที่ไม่นับ MA ไม่มีท่อนนี้)
         var barPool = poolNew;
         var barHave = have;
+        var barMa = maCounted;
         var newIn = Math.min(barHave, req);
         var poolIn = Math.min(barPool, Math.max(0, req - newIn));
+        var maIn = Math.min(barMa, Math.max(0, req - newIn - poolIn));
         var seg = function (cls, n) { return n > 0 ? '<i class="' + cls + '" style="width:' + pc(n) + '%"></i>' : ''; };
-        bar.innerHTML = seg('is-new', newIn) + seg('is-pool', poolIn)
-          + seg('is-new is-extra', barHave - newIn) + seg('is-pool is-extra', barPool - poolIn);
+        bar.innerHTML = seg('is-new', newIn) + seg('is-pool', poolIn) + seg('is-ma-reuse', maIn)
+          + seg('is-new is-extra', barHave - newIn) + seg('is-pool is-extra', barPool - poolIn)
+          + seg('is-ma-reuse is-extra', barMa - maIn);
         bar.title = 'เครื่องใหม่ ' + fgNum(have)
-          + (maReuse > 0 ? ' · วนกลับ MA ' + fgNum(maReuse) : '')
           + (poolNew > 0 ? ' · เช่าใหม่ ' + fgNum(poolNew) : '')
-          + (maReuse > 0 ? ' · MA ' + fgNum(maReuse) : '')
+          + (maReuse > 0 ? ' · วนกลับ MA ' + fgNum(maReuse) : '')
           + (poolAllQty > poolNew + maReuse ? ' · คลังรวม ' + fgNum(poolAllQty) : '')
-          + ' · ต้องมี ' + fgNum(req) + (maReuse > 0 ? ' (ไม่นับ MA ในขาด)' : '')
+          + ' · ต้องมี ' + fgNum(req) + (maReuse > 0 && !maCounted ? ' (รุ่นนี้ไม่นับ MA ในผล)' : '')
           + ' · ทุกรุ่นใช้สเกลเดียวกัน (สุดแถบ = ' + fgNum(fgScale) + ' เครื่อง'
-          + (Math.max(req, barHave + barPool) > fgScale ? ' — รุ่นนี้เกินสเกล' : '') + ')';
+          + (Math.max(req, barHave + barPool + barMa) > fgScale ? ' — รุ่นนี้เกินสเกล' : '') + ')';
 
         // หมุด ▼ เหนือแถบ: ดำ = ขั้นต่ำ · ส้ม = ขั้นต่ำ + PO (= ต้องมี) — PO เป็น 0 จะทับกัน เหลือหมุดเดียว
         var minQ = Number(row.min) || 0;
