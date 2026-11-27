@@ -633,7 +633,7 @@ $partsBase = ui_parts_base_url();
   <?php // สรุปยอดทั้งคลังก่อน แล้วค่อยไล่รายรุ่น — โผล่เมื่อคำนวณตัวเลขเสร็จ ?>
   <div class="dash-fg-summary" id="dash-fg-summary" hidden>
     <div class="dash-fg-tile"><span class="dash-fg-tile-label">เครื่องใหม่ในคลัง</span><span class="dash-fg-tile-num" id="dash-fg-sum-new">—</span></div>
-    <div class="dash-fg-tile"><span class="dash-fg-tile-label">คลังพร้อมเช่า</span><span class="dash-fg-tile-num is-pool" id="dash-fg-sum-pool">—</span></div>
+    <div class="dash-fg-tile"><span class="dash-fg-tile-label" title="เครื่องใหม่(เช่า) + เครื่องเช่า(MA)">คลังเช่า</span><span class="dash-fg-tile-num is-pool" id="dash-fg-sum-pool">—</span></div>
     <div class="dash-fg-tile"><span class="dash-fg-tile-label">ต้องผลิตเพิ่ม</span><span class="dash-fg-tile-num is-short" id="dash-fg-sum-models">—</span></div>
     <div class="dash-fg-tile"><span class="dash-fg-tile-label">ขาดรวม</span><span class="dash-fg-tile-num is-short" id="dash-fg-sum-gap">—</span></div>
   </div>
@@ -668,10 +668,10 @@ $partsBase = ui_parts_base_url();
       <tr>
         <th data-pri="2" style="width:44px"></th>
         <th data-pri="1">รุ่น</th>
-        <th data-pri="2" class="fg-bar-col" title="ทุกรุ่นใช้สเกลเดียวกัน — แถบยาวเท่ากันคือจำนวนเครื่องเท่ากัน · รางบนแถบคือยอดที่ต้องมี ท่อนเทา = ขั้นต่ำ ท่อนส้ม = PO ค้าง จบที่หมุด ▼ · ส่วนสีจาง = เกินจากที่ต้องมี"><span class="fg-legend"><i class="is-new"></i>เครื่องใหม่</span> <span class="fg-legend"><i class="is-pool"></i>คลังพร้อมเช่า</span> <span class="fg-legend" title="คลังพร้อมเช่าที่วนกลับจาก MA — นับในผลทุกรุ่น ยกเว้น Portable Printer"><i class="is-ma-reuse"></i>วนกลับ MA</span> <span class="fg-legend"><b class="fg-legend-mark is-band-min"></b>ขั้นต่ำ</span> <span class="fg-legend"><b class="fg-legend-mark is-band"></b>PO ค้าง</span> <span class="fg-legend"><b class="fg-legend-mark is-po"></b>ต้องมี</span></th>
+        <th data-pri="2" class="fg-bar-col" title="ทุกรุ่นใช้สเกลเดียวกัน — แถบยาวเท่ากันคือจำนวนเครื่องเท่ากัน · รางบนแถบคือยอดที่ต้องมี ท่อนเทา = ขั้นต่ำ ท่อนส้ม = PO ค้าง จบที่หมุด ▼ · ส่วนสีจาง = เกินจากที่ต้องมี"><span class="fg-legend"><i class="is-new"></i>เครื่องใหม่</span> <span class="fg-legend" title="เครื่องในคลังเช่าที่ยังไม่เคยปล่อยเช่า"><i class="is-pool"></i>เครื่องใหม่(เช่า)</span> <span class="fg-legend" title="เครื่องในคลังเช่าที่เคยเช่าแล้ววนกลับจาก MA — นับในผลทุกรุ่น ยกเว้น Portable Printer"><i class="is-ma-reuse"></i>เครื่องเช่า(MA)</span> <span class="fg-legend"><b class="fg-legend-mark is-band-min"></b>ขั้นต่ำ</span> <span class="fg-legend"><b class="fg-legend-mark is-band"></b>PO ค้าง</span> <span class="fg-legend"><b class="fg-legend-mark is-po"></b>ต้องมี</span></th>
         <th data-pri="1" class="num-col">เครื่องใหม่</th>
         <th data-pri="2" class="num-col dash-col-pool" title="ระบบเช่าเป็น finished goods รอปล่อยเช่า — นับรวมในยอดที่มี · ตัวเลขซ้าย = เช่าใหม่ (New) · ขวา = วนกลับจาก MA (Portable Printer ไม่นับ MA ในผล)">
-          <span class="dash-col-head-main">คลังพร้อมเช่า</span>
+          <span class="dash-col-head-main">คลังเช่า</span>
           <span class="dash-col-head-sub">New : MA</span>
         </th>
         <th data-pri="1" class="num-col">ผล</th>
@@ -1049,7 +1049,7 @@ $partsBase = ui_parts_base_url();
         if (!c) { return; }
         c.innerHTML = '<div class="fg-ours-stack"><b class="fg-ours-new">' + fgNum(have) + '</b>'
           + '<div class="cell-sub muted fg-m-only">เครื่องใหม่'
-          + (poolNew > 0 || maReuse > 0 ? ' · คลังพร้อมเช่า ' + fgNum(poolNew) : '')
+          + (poolNew > 0 || maReuse > 0 ? ' · เครื่องใหม่(เช่า) ' + fgNum(poolNew) : '')
           + (maReuse > 0 ? ' · MA ' + fgNum(maReuse) : '') + '</div></div>';
       })();
       (function () {
@@ -1065,7 +1065,7 @@ $partsBase = ui_parts_base_url();
         c.innerHTML = html;
       })();
       // ขั้นต่ำ / PO / ต้องมี อยู่ในบรรทัดสูตรใต้แถบแล้ว ไม่แยกคอลัมน์ซ้ำ
-      poolTotal += poolNew;
+      poolTotal += poolNew + maReuse;
       // แถบแบ่งสีตามชนิด (สีสถานะ "ใหม่" / "เช่า") · เต็มแถบ = ยอดที่ต้องมี
       // มีเกินกว่าที่ต้องมี → ขยายสเกล แล้วส่วนที่เกินเป็นสีจาง
       var bar = cell('bar');
@@ -1083,8 +1083,8 @@ $partsBase = ui_parts_base_url();
           + seg('is-new is-extra', barHave - newIn) + seg('is-pool is-extra', barPool - poolIn)
           + seg('is-ma-reuse is-extra', barMa - maIn);
         bar.title = 'เครื่องใหม่ ' + fgNum(have)
-          + (poolNew > 0 ? ' · เช่าใหม่ ' + fgNum(poolNew) : '')
-          + (maReuse > 0 ? ' · วนกลับ MA ' + fgNum(maReuse) : '')
+          + (poolNew > 0 ? ' · เครื่องใหม่(เช่า) ' + fgNum(poolNew) : '')
+          + (maReuse > 0 ? ' · เครื่องเช่า(MA) ' + fgNum(maReuse) : '')
           + (poolAllQty > poolNew + maReuse ? ' · คลังรวม ' + fgNum(poolAllQty) : '')
           + ' · ต้องมี ' + fgNum(req) + (maReuse > 0 && !maCounted ? ' (รุ่นนี้ไม่นับ MA ในผล)' : '')
           + ' · ทุกรุ่นใช้สเกลเดียวกัน (สุดแถบ = ' + fgNum(fgScale) + ' เครื่อง'
@@ -1158,9 +1158,9 @@ $partsBase = ui_parts_base_url();
         v.innerHTML = tag + '<span class="fg-go" aria-hidden="true">›</span>';
       }
       var stockTip = 'เครื่องใหม่ ' + fgNum(have)
-        + (poolNew > 0 ? ' · เช่าใหม่ ' + fgNum(poolNew) : '')
-        + (maReuse > 0 ? ' · MA ' + fgNum(maReuse) + ' เครื่อง' : '')
-        + (poolAllQty > 0 ? ' · รวมใช้คิดขาด ' + fgNum(stockForNeed) + ' (ไม่รวม MA)' : '')
+        + (poolNew > 0 ? ' · เครื่องใหม่(เช่า) ' + fgNum(poolNew) : '')
+        + (maReuse > 0 ? ' · เครื่องเช่า(MA) ' + fgNum(maReuse) : '')
+        + (poolAllQty > 0 ? ' · รวมใช้คิดขาด ' + fgNum(stockForNeed) + (maReuse > 0 && !maCounted ? ' (ไม่รวม MA)' : '') : '')
         + ' · ต้องมี ' + fgNum(req) + ' (' + base + ')'
         + (row.src === 'registry' ? '' : ' · ตัวเลขจากระบบ Setup (รุ่นนี้ไม่มีในทะเบียนเรา)')
         + ' — กดดูหมายเลขสินค้าในสต็อก';
@@ -1185,7 +1185,7 @@ $partsBase = ui_parts_base_url();
     setFgLabel(fgBtns[0], 'ทั้งหมด', modelCards.length);
     setFgLabel(fgBtns[3], 'ถึงรอบนับ', dueCount);
     if (fgHint) {
-      fgHint.textContent = 'ขาด = (เครื่องใหม่ + คลังพร้อมเช่า) − (ขั้นต่ำ + PO ค้าง)'
+      fgHint.textContent = 'ขาด = (เครื่องใหม่ + คลังเช่า) − (ขั้นต่ำ + PO ค้าง)'
         + (d.updated ? ' · ข้อมูล ณ ' + d.updated : '')
         + (d.stale ? ' (ดึงรอบล่าสุดไม่สำเร็จ — แสดงข้อมูลเก่า)' : '');
     }
