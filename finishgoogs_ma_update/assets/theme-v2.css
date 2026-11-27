@@ -2777,14 +2777,14 @@ a.asset-sales-ref-link:hover {
 .ast-srow.is-rev { direction: rtl; }
 .ast-srow.has-next::after {
   content: ""; position: absolute; top: 16px;
-  inset-inline-start: calc(100% - 100% / var(--ast-per) / 2); inset-inline-end: -16px;
-  height: calc(100% + 16px);
+  inset-inline-start: calc(100% - 100% / var(--ast-per) / 2 + 24px); inset-inline-end: -16px;
+  height: calc(100% + 18px); /* ขอบล่างตรงกึ่งกลางไอคอนแถวถัดไป (ช่องว่างแถว 16px + ครึ่งเส้น) */
   border: 2px solid #ddd4f3; border-inline-start: 0;
   border-start-end-radius: 40px; border-end-end-radius: 40px;
   pointer-events: none;
 }
 .ast-sstep {
-  position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 1px;
   min-width: 0; padding: 0 2px; margin: 0; border: 0; background: none; cursor: pointer;
   font: inherit; color: var(--text-muted, #6b6480); text-align: center; line-height: 1.35;
 }
@@ -2794,7 +2794,8 @@ a.asset-sales-ref-link:hover {
 .ast-sstep:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 8px; }
 .ast-sstep:not(:first-child)::before {
   content: ""; position: absolute; top: 16px; height: 2px; background: #ddd4f3;
-  inset-inline-start: -50%; inset-inline-end: 50%;
+  /* เว้นช่องห่างจากวงไอคอน (กว้าง 36px) ข้างละ 6px ไม่ให้เส้นชนไอคอน */
+  inset-inline-start: calc(-50% + 24px); inset-inline-end: calc(50% + 24px);
 }
 .ast-sstep:not(:first-child)::after {
   content: ""; position: absolute; top: 13px; inset-inline-start: -4px;
