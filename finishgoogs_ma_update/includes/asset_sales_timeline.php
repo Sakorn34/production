@@ -495,11 +495,17 @@ function ast_work_links(array $dated, array $work): array
     $seg = [];
     $after = [];
     $prod = null;
+    $ord = 0;
     foreach ($work as $w) {
         if ($w['kind'] === 'production' && $prod === null) {
             $prod = $w['i'];
         }
-        if (!ast_work_is_ma($w['kind']) || $w['day'] === '' || $n === 0) {
+        if (!ast_work_is_ma($w['kind'])) {
+            continue;
+        }
+        // ครั้งที่ของ MA เรียงตามเวลา — เลขเดียวกับป้ายในการ์ดงานกับตัวเครื่อง
+        $w['n'] = ++$ord;
+        if ($w['day'] === '' || $n === 0) {
             continue;
         }
         if ($w['day'] > $dated[$n - 1]['date']) {
@@ -516,7 +522,7 @@ function ast_work_links(array $dated, array $work): array
     return ['seg' => $seg, 'after' => $after, 'prod' => $prod];
 }
 
-/** ป้าย "MA n" บนแถบ — กดแล้วเลื่อนไปงานนั้นในการ์ดงานกับตัวเครื่อง */
+/** ป้าย "MA n" บนแถบ (n = ครั้งที่) — กดแล้วเลื่อนไปงานนั้นในการ์ดงานกับตัวเครื่อง */
 function ast_ma_badge_html(array $ws, string $mod): string
 {
     $days = [];
@@ -525,8 +531,11 @@ function ast_ma_badge_html(array $ws, string $mod): string
         $days[] = date('d/m/y', strtotime($w['day']));
         $idx[] = (int) $w['i'];
     }
-    $tip = 'งาน MA ' . count($ws) . ' ครั้งในช่วงนี้' . "\n" . implode(', ', $days) . "\n" . 'กดเพื่อดูในงานกับตัวเครื่อง';
-    return '<span class="ast-mab' . $mod . '" data-ast-work="' . implode(',', $idx) . '" data-ast-tip="' . h($tip) . '">MA ' . count($ws) . '</span>';
+    $first = (int) $ws[0]['n'];
+    $last = (int) $ws[count($ws) - 1]['n'];
+    $num = $first === $last ? (string) $first : $first . '–' . $last;
+    $tip = 'งาน MA ครั้งที่ ' . $num . "\n" . implode(', ', $days) . "\n" . 'กดเพื่อดูในงานกับตัวเครื่อง';
+    return '<span class="ast-mab' . $mod . '" data-ast-work="' . implode(',', $idx) . '" data-ast-tip="' . h($tip) . '">MA ' . $num . '</span>';
 }
 
 /** แถบขั้นแบบตัวยู — $per ขั้นต่อแถว แถวคี่วิ่งย้อนจากขวาไปซ้าย */
@@ -573,7 +582,10 @@ function ast_steps_script(): string
   tip.className = 'ast-tipbox';
   tip.setAttribute('role', 'tooltip');
   document.body.appendChild(tip);
+  // ระหว่างเลื่อนหน้า (รวมเลื่อนอัตโนมัติหลังกด) ปุ่มวิ่งผ่านใต้เมาส์ — ถ้าโชว์ตอนนั้นกล่องจะค้างผิดที่
+  var quietUntil = 0;
   function show(btn){
+    if (Date.now() < quietUntil) { return; }
     var t = btn.getAttribute('data-ast-tip') || '';
     if (!t) { return; }
     var lines = t.split('\n');
@@ -598,11 +610,12 @@ function ast_steps_script(): string
   snake.addEventListener('mouseout', function(e){ if (!e.relatedTarget || !snake.contains(e.relatedTarget)) { hide(); } });
   snake.addEventListener('focusin', function(e){ var b = e.target.closest('.ast-sstep'); if (b && b.matches(':focus-visible')) { show(b); } });
   snake.addEventListener('focusout', hide);
-  window.addEventListener('scroll', hide, true);
+  window.addEventListener('scroll', function(){ hide(); quietUntil = Date.now() + 250; }, true);
   snake.addEventListener('click', function(e){
     var b = e.target.closest('.ast-sstep');
     if (!b) { return; }
     hide();
+    quietUntil = Date.now() + 900;
     // ป้าย MA → งานในการ์ดงานกับตัวเครื่อง · ขั้นปกติ → แถวในรายการการ์ดนี้
     // ขั้นผลิตไม่มีแถวในรายการ (บันทึกผลิตอยู่ในงานกับตัวเครื่อง) → ไปที่บันทึกผลิต/QC
     var mab = e.target.closest('.ast-mab');
@@ -708,8 +721,6 @@ function asset_sales_timeline_card_html(array $asset, array $stock, array $lease
         }
     }
     $out .= '</span></div><div class="asset-sales-card-body">';
-    $out .= '<p class="ast-card-sub">เครื่องไปอยู่ที่ไหน ของใคร — อ่านจากระบบอื่น'
-        . ($work ? ' · ป้าย <span class="ast-mab is-legend">MA</span> บนเส้น = ช่วงนั้นมีงาน MA' : '') . '</p>';
     $out .= $topHtml;
     $out .= ast_steps_html($dated, $work);
 
@@ -821,7 +832,7 @@ function ast_work_context(array $dated, string $day): string
         $site = trim((string) $rent['sub']) !== '' ? trim((string) $rent['sub']) : 'ลูกค้า';
         $until = (string) ($rent['until'] ?? '');
         if ($step === 'รับคืน' || ($until !== '' && $day >= $until)) {
-            return 'หลังคืนจาก ' . $site;
+            return 'หลังจาก ' . $site . ' ใช้งานแล้ว';
         }
         return 'ระหว่างเช่าที่ ' . $site;
     }
@@ -857,7 +868,9 @@ function asset_work_card_html(array $tlAsc, $actionsFn, int $assetId, array $dat
         return $out . '<p class="muted asset-sales-empty">ยังไม่มีประวัติ</p></div></section>';
     }
     $out .= '<div class="awk-list">';
+    $maNo = 0;
     foreach (array_values($tlAsc) as $i => $e) {
+        $maTag = ast_work_is_ma((string) ($e['kind'] ?? '')) ? '<span class="ast-mab is-legend">MA ' . (++$maNo) . '</span>' : '';
         $d = trim((string) ($e['d'] ?? ''));
         $day = $d !== '' ? substr($d, 0, 10) : '';
         $time = strlen($d) >= 16 ? substr($d, 11, 5) : '';
@@ -868,7 +881,7 @@ function asset_work_card_html(array $tlAsc, $actionsFn, int $assetId, array $dat
         $actions = ($actionsFn && is_callable($actionsFn)) ? (string) $actionsFn($e, $assetId) : '';
         $out .= '<div class="awk-row" data-work-row="' . $i . '" data-work-kind="' . h((string) ($e['kind'] ?? '')) . '">'
             . '<div class="awk-when">' . $when . '</div>'
-            . '<div class="awk-what"><div class="awk-title">' . $e['type']
+            . '<div class="awk-what"><div class="awk-title">' . $e['type'] . $maTag
             . ($ctx !== '' ? '<span class="awk-ctx">' . h($ctx) . '</span>' : '') . '</div>'
             . '<div class="awk-body">' . $e['html'] . '</div></div>'
             . '<div class="awk-acts">' . $actions . '</div>'
