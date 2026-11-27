@@ -1427,6 +1427,7 @@ a.asset-sales-serial-tag.is-page-serial:hover {
 .fg-n-min { color: var(--text-faint, #a39fb3); }
 .fg-n-op { color: var(--text-faint, #a39fb3); margin: 0 4px; }
 .fg-n-po { color: #b45309; font-weight: 700; font-size: calc(12.5px * var(--font-scale, 1)); }
+.fg-n-po-split { color: var(--text-muted, #8b84a0); margin-left: 4px; white-space: nowrap; }
 .fg-n-req { color: var(--text, #2a2440); font-weight: 600; }
 /* ชิปคำอธิบายแต่ละอันสูงไม่เท่ากัน (สี่เหลี่ยม 10px · ขีด 3px · สามเหลี่ยม 5px)
    inline-flex เอา baseline จากลูกตัวแรก ชิปจึงลอยคนละระดับ — บังคับให้เทียบกึ่งกลางแทน */

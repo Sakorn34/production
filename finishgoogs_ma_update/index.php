@@ -1137,17 +1137,30 @@ $partsBase = ui_parts_base_url();
             var ov = document.createElement('span');
             ov.className = 'fg-mark is-clip';
             ov.textContent = '›';
-            ov.title = 'เกินสเกลแถบ (สุดแถบ = ' + fgNum(fgScale) + ' เครื่อง) · มี ' + fgNum(barHave + barPool)
-              + (maReuse > 0 ? ' (ไม่รวม MA ' + fgNum(maReuse) + ')' : '') + ' · ต้องมี ' + fgNum(req);
+            ov.title = 'เกินสเกลแถบ (สุดแถบ = ' + fgNum(fgScale) + ' เครื่อง) · มี ' + fgNum(barHave + barPool + barMa)
+              + (maReuse > 0 && !maCounted ? ' (ไม่รวม MA ' + fgNum(maReuse) + ')' : '') + ' · ต้องมี ' + fgNum(req);
             marks.appendChild(ov);
           }
         }
         var note = cell('note');
         if (note) {
           // PO คือตัวเลขที่ต้องลงมือทำ จึงเน้นสุด ขั้นต่ำเป็นค่าตั้งไว้เฉย ๆ ให้จางที่สุด
+          // แยก PO ตามประเภทการขายของใบสั่งงาน — ประเภทเดียวบอกว่า "ทั้งหมด" ไม่ต้องซ้ำตัวเลข
+          var poParts = [];
+          var poSale = Number(row.po_sale) || 0, poRent = Number(row.po_rent) || 0, poOther = Number(row.po_other) || 0;
+          if (poSale > 0) { poParts.push(['ขาย', poSale, 'ขายขาด']); }
+          if (poRent > 0) { poParts.push(['เช่า', poRent, 'เช่า']); }
+          if (poOther > 0) { poParts.push(['ไม่ระบุ', poOther, 'ไม่ระบุประเภท']); }
+          var poSplit = '';
+          if (poQ > 0 && poParts.length === 1) {
+            poSplit = poParts[0][2] + 'ทั้งหมด';
+          } else if (poParts.length > 1) {
+            poSplit = poParts.map(function (p) { return p[0] + ' ' + fgNum(p[1]); }).join(' · ');
+          }
           note.innerHTML = '<span class="fg-n-min">ขั้นต่ำ ' + fgNum(minQ) + '</span>'
             + '<span class="fg-n-op">+</span>'
             + '<span class="fg-n-po">PO ' + fgNum(poQ) + '</span>'
+            + (poSplit !== '' ? '<span class="fg-n-po-split">(' + poSplit + ')</span>' : '')
             + '<span class="fg-n-op">=</span>'
             + '<span class="fg-n-req">ต้องมี ' + fgNum(req) + '</span>';
         }

@@ -250,17 +250,21 @@ function fg_shortage_registry_rows(?array $codes = null): array
         //    ตลอดไปและถูกนับเป็นความต้องการของใบที่ไม่มีอยู่จริง ทำให้ยอด "ต้องผลิตเพิ่ม" บวมเกิน
         $cancelled = [];
         $live = [];
-        $res = $setup->query('SELECT id, status FROM setup_orders');
+        $saleType = [];
+        $res = $setup->query('SELECT id, status, sale_type FROM setup_orders');
         if (!$res) {
             return $fail('อ่านรายการใบสั่งงานไม่ได้');
         }
         while ($r = $res->fetch_assoc()) {
             $live[] = (int) $r['id'];
+            $saleType[(int) $r['id']] = trim((string) $r['sale_type']);
             if (trim((string) $r['status']) === FG_SHORTAGE_PO_CANCELLED_STATUS) {
                 $cancelled[] = (int) $r['id'];
             }
         }
 
+        // แยก PO ค้างตามประเภทการขายของใบสั่งงาน — ชุดเดียวกับ popup ที่แยกกอง "ขายขาด" / "แบบเช่า"
+        $poSplit = [];
         $po = [];
         $ids = [];
         foreach ($sp as $row) {
@@ -269,7 +273,7 @@ function fg_shortage_registry_rows(?array $codes = null): array
             }
         }
         if ($ids !== []) {
-            $sql = "SELECT part_id, COALESCE(SUM(quantity), 0) AS q
+            $sql = "SELECT part_id, order_id, COALESCE(SUM(quantity), 0) AS q
                     FROM po_order_parts
                     WHERE part_id IN (" . implode(',', $ids) . ")
                       AND order_product_type IS NOT NULL
@@ -280,13 +284,27 @@ function fg_shortage_registry_rows(?array $codes = null): array
             if ($live !== []) {
                 $sql .= " AND order_id IN (" . implode(',', $live) . ")";
             }
-            $sql .= " GROUP BY part_id";
+            $sql .= " GROUP BY part_id, order_id";
             $res = $stock->query($sql);
             if (!$res) {
                 return $fail('อ่าน PO ค้างไม่ได้');
             }
+            $poRaw = [];
             while ($r = $res->fetch_assoc()) {
-                $po[(int) $r['part_id']] = (int) round((float) $r['q']);
+                $pid = (int) $r['part_id'];
+                $t = $saleType[(int) $r['order_id']] ?? '';
+                $k = $t === 'ขายขาด' ? 'sale' : ($t === 'แบบเช่า' ? 'rent' : 'other');
+                $poRaw[$pid]['all'] = ($poRaw[$pid]['all'] ?? 0) + (float) $r['q'];
+                $poRaw[$pid][$k] = ($poRaw[$pid][$k] ?? 0) + (float) $r['q'];
+            }
+            // ปัดที่ยอดรวมของอะไหล่ทีเดียวเหมือนเดิม — ปัดรายใบแล้วบวกจะได้ยอดเพี้ยนจากที่เคยแสดง
+            foreach ($poRaw as $pid => $v) {
+                $po[$pid] = (int) round($v['all']);
+                $poSplit[$pid] = [
+                    'sale'  => (int) round($v['sale'] ?? 0),
+                    'rent'  => (int) round($v['rent'] ?? 0),
+                    'other' => (int) round($v['other'] ?? 0),
+                ];
             }
         }
         // 4) เครื่องที่ลงทะเบียนในระบบเช่าแล้วเป็นเครื่องเช่า ไม่ใช่สต็อกเครื่องใหม่
@@ -360,8 +378,12 @@ function fg_shortage_registry_rows(?array $codes = null): array
             continue;
         }
         $poQty = 0;
+        $poBy = ['sale' => 0, 'rent' => 0, 'other' => 0];
         foreach ((isset($sp[$code]) ? $sp[$code]['ids'] : []) as $id) {
             $poQty += $po[$id] ?? 0;
+            foreach ($poBy as $k => $_) {
+                $poBy[$k] += (int) ($poSplit[$id][$k] ?? 0);
+            }
         }
         $min = (int) $o['min'];
         $required = $min + $poQty;
@@ -402,6 +424,9 @@ function fg_shortage_registry_rows(?array $codes = null): array
             'pool_qty'            => (int) ($poolQty[$code] ?? 0),
             'minimum_stock'  => $min,
             'po_qty'         => $poQty,
+            'po_sale'        => $poBy['sale'],
+            'po_rent'        => $poBy['rent'],
+            'po_other'       => $poBy['other'],
             'available'      => (int) $short['available'],
             'required'       => $required,
             'need'           => (int) $short['available'] - $required,
